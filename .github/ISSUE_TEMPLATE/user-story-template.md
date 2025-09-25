@@ -9,7 +9,7 @@ assignees: Yardomn
 
 ### User Story
 
-
+As a __, I want to __ so that __
 
 ### Acceptance Criteria
 
