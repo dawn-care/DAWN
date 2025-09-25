@@ -1,9 +1,9 @@
 ---
 name: User Story Template
-about: For making user stories/epics
+about: For making user stories
 title: ''
 labels: ''
-assignees: Yardomn
+assignees: ''
 
 ---
 
