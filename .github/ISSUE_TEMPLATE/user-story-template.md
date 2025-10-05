@@ -15,8 +15,4 @@ As a __, I want to __ so that __
 
 - [ ] 
 
-### Definition of Done
-
-- [ ] 
-
 ### Notes
