@@ -1,0 +1,26 @@
+{
+  "name": "startup",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:backend": "cd server && go run cmd/main.go",
+    "dev:web": "cd caregiver && npm run dev",
+    "dev:mobile": "cd carepartner && npm start",
+    "dev:caregiver": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
+    "dev:carepartner": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp/issues"
+  },
+  "homepage": "https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp#readme",
+  "dependencies": {
+  }
+}
