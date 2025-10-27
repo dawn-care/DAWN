@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: server
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+
+  caregiver:
+    build:
+      context: ./caregiver
+      dockerfile: Dockerfile
+    container_name: caregiver
+    ports:
+      - "3001:80"
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+  carepartner:
+    build:
+      context: ./carepartner
+      dockerfile: Dockerfile
+    container_name: carepartner
+    ports:
+      - "3002:80"
+    depends_on:
+      - server
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
