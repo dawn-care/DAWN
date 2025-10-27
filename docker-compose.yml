@@ -5,6 +5,14 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    environment:
+        DB_HOST: db
+        DB_PORT: 5432
+        DB_USER: username
+        DB_PASSWORD: password
+        DB_NAME: db
+    depends_on:
+      - db
     container_name: server
     ports:
       - "8080:8080"
@@ -34,6 +42,21 @@ services:
       - server
     networks:
       - app-network
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+
+volumes:
+  db-data:
 
 networks:
   app-network:
