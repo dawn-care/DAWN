@@ -9,7 +9,7 @@ type VideoMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
 	Filename  string `json:"filename"`
-	Extension int    `json:"extension"`
+	Extension string `json:"extension"`
 }
 
 // Create a single video
@@ -66,34 +66,8 @@ func GetVideoByID(db *sql.DB, id int) (*VideoMedia, error) {
 	return video, nil
 }
 
-// Retrieve multiple videos for a given carepartner and caregiver on a specific day
-func GetVideosByDayAndUsers(db *sql.DB, date string, carepartnerID, caregiverID int) ([]int, error) {
-	query := `
-		SELECT v.id
-		FROM "VideoMedia" v
-		JOIN "Module" m ON m.metadata_id = v.id
-		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2
-		AND v.filename LIKE $3;  -- assuming filename or uri encodes the date
-	`
-	rows, err := db.Query(query, carepartnerID, caregiverID, fmt.Sprintf("%%%s%%", date))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ids []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, nil
-}
-
 // Retrieve all videos for a given carepartner and caregiver
-func GetVideosByUsers(db *sql.DB, carepartnerID, caregiverID int) ([]VideoMedia, error) {
+func GetVideosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID int) ([]VideoMedia, error) {
 	query := `
 		SELECT v.id, v.uri, v.filename, v.extension
 		FROM "VideoMedia" v

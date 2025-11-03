@@ -43,7 +43,7 @@ func GetModuleByID(db *sql.DB, id int) (*Module, error) {
 }
 
 // Get all metadata IDs by caregiver ID, carepartner ID, and module type
-func GetMetadataByUsersAndType(db *sql.DB, caregiverID int, carepartnerID int, moduleType string) ([]int, error) {
+func GetMetadataByCaregiverCarepartnerAndType(db *sql.DB, caregiverID int, carepartnerID int, moduleType string) ([]int, error) {
 	query := `
 		SELECT metadata_id
 		FROM "Module"

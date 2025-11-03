@@ -45,7 +45,7 @@ CREATE TABLE "VideoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "AudioMedia" (
