@@ -7,12 +7,15 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
-	"server/internal/models/modules"
 	"github.com/joho/godotenv"
+	"server/internal/models/modules"
 )
 
 func main() {
-	godotenv.Load("../../../../.env")
+	err := godotenv.Load("../../../../.env")
+	if err != nil {
+		log.Fatal("Error loading .env file:", err)
+	}
 
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
@@ -22,18 +25,32 @@ func main() {
 	}
 	defer db.Close()
 
+	fmt.Println("✅ Connected to database")
+
 	// Create a module referencing a video metadata ID
-	mod := &module.Module{ModuleType: "video", CaregiverID: 301, CarepartnerID: 201, MetadataID: 1}
-	if err := module.CreateModule(db, mod); err != nil {
-		log.Fatal(err)
+	mod := &module.Module{
+		ModuleType:    "video",
+		CaregiverID:   301,
+		CarepartnerID: 201,
+		MetadataID:    1,
 	}
-	fmt.Println("Inserted module:", mod.ID)
+	if err := module.CreateModule(db, mod); err != nil {
+		log.Fatal("Error creating module:", err)
+	}
+	fmt.Println("Inserted module with ID:", mod.ID)
 
 	// Retrieve module by ID
-	got, _ := module.GetModuleByID(db, mod.ID)
-	fmt.Println("Got module:", got)
+	got, err := module.GetModuleByID(db, mod.ID)
+	if err != nil {
+		log.Fatal("Error retrieving module:", err)
+	}
+	fmt.Printf("Retrieved module: %+v\n", got)
 
-	// Get the owners of a video through metadata ID
-	cpID, cgID, _ := module.GetVideoOwners(db, mod.MetadataID)
-	fmt.Printf("Owners of video %d -> Carepartner: %d, Caregiver: %d\n", mod.MetadataID, cpID, cgID)
+	// Get metadata IDs for caregiver, carepartner, and type
+	metadataIDs, err := module.GetMetadataByUsersAndType(db, mod.CaregiverID, mod.CarepartnerID, mod.ModuleType)
+	if err != nil {
+		log.Fatal("Error getting metadata by user and type:", err)
+	}
+	fmt.Printf("Metadata IDs for caregiver %d, carepartner %d, type '%s': %v\n",
+		mod.CaregiverID, mod.CarepartnerID, mod.ModuleType, metadataIDs)
 }

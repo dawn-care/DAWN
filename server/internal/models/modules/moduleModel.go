@@ -42,19 +42,32 @@ func GetModuleByID(db *sql.DB, id int) (*Module, error) {
 	return mod, nil
 }
 
-// Find the caregiver and carepartner IDs for a given video by metadata_id
-func GetVideoOwners(db *sql.DB, videoID int) (carepartnerID int, caregiverID int, err error) {
+// Get all metadata IDs by caregiver ID, carepartner ID, and module type
+func GetMetadataByUsersAndType(db *sql.DB, caregiverID int, carepartnerID int, moduleType string) ([]int, error) {
 	query := `
-		SELECT carepartner_id, caregiver_id
+		SELECT metadata_id
 		FROM "Module"
-		WHERE metadata_id = $1;
+		WHERE caregiver_id = $1 AND carepartner_id = $2 AND module_type = $3;
 	`
-	err = db.QueryRow(query, videoID).Scan(&carepartnerID, &caregiverID)
+
+	rows, err := db.Query(query, caregiverID, carepartnerID, moduleType)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return 0, 0, fmt.Errorf("no module found for video id %d", videoID)
-		}
-		return 0, 0, err
+		return nil, err
 	}
-	return carepartnerID, caregiverID, nil
+	defer rows.Close()
+
+	var metadataIDs []int
+	for rows.Next() {
+		var metadataID int
+		if err := rows.Scan(&metadataID); err != nil {
+			return nil, err
+		}
+		metadataIDs = append(metadataIDs, metadataID)
+	}
+
+	if len(metadataIDs) == 0 {
+		return nil, fmt.Errorf("no metadata found for caregiver %d, carepartner %d, and module type %s", caregiverID, carepartnerID, moduleType)
+	}
+
+	return metadataIDs, nil
 }
