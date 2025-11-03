@@ -66,6 +66,57 @@ func GetVideoByID(db *sql.DB, id int) (*VideoMedia, error) {
 	return video, nil
 }
 
+// Retrieve multiple videos for a given carepartner and caregiver on a specific day
+func GetVideosByDayAndUsers(db *sql.DB, date string, carepartnerID, caregiverID int) ([]int, error) {
+	query := `
+		SELECT v.id
+		FROM "VideoMedia" v
+		JOIN "Module" m ON m.metadata_id = v.id
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2
+		AND v.filename LIKE $3;  -- assuming filename or uri encodes the date
+	`
+	rows, err := db.Query(query, carepartnerID, caregiverID, fmt.Sprintf("%%%s%%", date))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// Retrieve all videos for a given carepartner and caregiver
+func GetVideosByUsers(db *sql.DB, carepartnerID, caregiverID int) ([]VideoMedia, error) {
+	query := `
+		SELECT v.id, v.uri, v.filename, v.extension
+		FROM "VideoMedia" v
+		JOIN "Module" m ON m.metadata_id = v.id
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
+	`
+	rows, err := db.Query(query, carepartnerID, caregiverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var videos []VideoMedia
+	for rows.Next() {
+		var v VideoMedia
+		if err := rows.Scan(&v.ID, &v.URI, &v.Filename, &v.Extension); err != nil {
+			return nil, err
+		}
+		videos = append(videos, v)
+	}
+	return videos, nil
+}
+
 // Update the URI, filename, and extension of a video
 func UpdateVideo(db *sql.DB, video *VideoMedia) error {
 	query := `
@@ -101,7 +152,7 @@ func DeleteVideo(db *sql.DB, id int) error {
 	return nil
 }
 
-// Get the total number of videos
+// Get total video count
 func GetVideoStats(db *sql.DB) (int, error) {
 	query := `SELECT COUNT(*) FROM "VideoMedia";`
 	var count int
