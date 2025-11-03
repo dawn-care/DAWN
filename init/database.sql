@@ -90,6 +90,6 @@ CREATE TABLE "MessagePrompt" (
 CREATE TABLE "EventPrompt" (
   "list_id" integer,
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "time" timestamp,
+  "time" time,
   "text" text
 );
