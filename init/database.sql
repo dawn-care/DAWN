@@ -38,21 +38,21 @@ CREATE TABLE "PhotoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "VideoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "AudioMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "WeatherWidget" (
@@ -91,6 +91,6 @@ CREATE TABLE "MessagePrompt" (
 CREATE TABLE "EventPrompt" (
   "list_id" integer,
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "time" timestamp,
+  "time" time,
   "text" text
 );
