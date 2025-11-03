@@ -1,4 +1,4 @@
-CCREATE TABLE "Caregiver" (
+CREATE TABLE "Caregiver" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "carepartner_id" integer,
   "name" text,
