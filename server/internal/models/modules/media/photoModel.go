@@ -9,7 +9,7 @@ type PhotoMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
 	Filename  string `json:"filename"`
-	Extension int    `json:"extension"`
+	Extension string    `json:"extension"`
 }
 
 // Create a single photo
@@ -66,34 +66,8 @@ func GetPhotoByID(db *sql.DB, id int) (*PhotoMedia, error) {
 	return photo, nil
 }
 
-// Retrieve multiple photos for a given carepartner and caregiver on a specific day
-func GetPhotosByDayAndUsers(db *sql.DB, date string, carepartnerID, caregiverID int) ([]int, error) {
-	query := `
-		SELECT p.id
-		FROM "PhotoMedia" p
-		JOIN "Module" m ON m.metadata_id = p.id
-		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2
-		AND p.filename LIKE $3;  -- assuming filename or uri encodes the date
-	`
-	rows, err := db.Query(query, carepartnerID, caregiverID, fmt.Sprintf("%%%s%%", date))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ids []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, nil
-}
-
 // Retrieve all photos for a given carepartner and caregiver
-func GetPhotosByUsers(db *sql.DB, carepartnerID, caregiverID int) ([]PhotoMedia, error) {
+func GetPhotosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID int) ([]PhotoMedia, error) {
 	query := `
 		SELECT p.id, p.uri, p.filename, p.extension
 		FROM "PhotoMedia" p
