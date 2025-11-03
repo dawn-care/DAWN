@@ -21,7 +21,7 @@ CREATE TABLE "Module" (
 CREATE TABLE "Configuration" (
   "id" integer GENERATED ALWAYS AS IDENTITY UNIQUE,
   "carepartner_id" integer,
-  "module_id" text,
+  "module_id" integer,
   "occurence_type" text,
   "occurence_definition" text[],
   "position" integer,
