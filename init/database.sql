@@ -57,8 +57,7 @@ CREATE TABLE "AudioMedia" (
 
 CREATE TABLE "WeatherWidget" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "latitude" decimal,
-  "longitude" decimal
+  "zipcode" integer
 );
 
 CREATE TABLE "NewsWidget" (

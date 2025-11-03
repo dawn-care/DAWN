@@ -106,8 +106,8 @@ func GetNewsByDayAndUser(db *sql.DB, carepartner_id int, day, month, day_of_week
 		}
 		news_widgets = append(news_widgets, news_widget)
 	}
-
-	if err := rows.Err(); err != nil {
+	err = rows.Err()
+	if err != nil {
 		return nil, fmt.Errorf("Error in rows: %v", err)
 	}
 
@@ -138,8 +138,8 @@ func GetUserNews(db *sql.DB, carepartner_id int) ([]NewsWidget, error) {
 		}
 		news_widgets = append(news_widgets, news_widget)
 	}
-
-	if err := rows.Err(); err != nil {
+	err = rows.Err()
+	if err != nil {
 		return nil, fmt.Errorf("Rows Error: %v", err)
 	}
 

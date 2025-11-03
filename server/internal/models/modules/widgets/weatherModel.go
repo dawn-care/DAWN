@@ -6,9 +6,8 @@ import (
 )
 
 type WeatherWidget struct {
-	ID        int     `json:"id"`
-	LATITUDE  float32 `json:"latitude"`
-	LONGITUDE float32 `json:"longitude"`
+	ID      int `json:"id"`
+	ZIPCODE int `json:"zipcode"`
 }
 
 var DAYS_OF_WEEK_STR = [7]string{"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat"}
@@ -17,11 +16,11 @@ var MONTH_STR = [12]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
 // Add Weather Widget
 func CreateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
 	query := `
-			INSTERT INTO "WeatherWidget" (latitude, longitude)
-			VALUES ($1, $2)
+			INSERT INTO "WeatherWidget" (zipcode)
+			VALUES ($1)
 			RETURNING id;
 	`
-	return db.QueryRow(query, weather_widget.LATITUDE, weather_widget.LONGITUDE).Scan(&weather_widget.ID)
+	return db.QueryRow(query, weather_widget.ZIPCODE).Scan(&weather_widget.ID)
 }
 
 // Add Multiple Weather Widgets
@@ -31,8 +30,8 @@ func CreateWeathersBulk(db *sql.DB, weather_widgets []WeatherWidget) error {
 		return err
 	}
 	statement, err := transaction.Prepare(`
-			INSERT INTO "WeatherWidget" (latitude, longitude)
-			VALUES ($1, $2)
+			INSERT INTO "WeatherWidget" (zipcode)
+			VALUES ($1)
 			RETURNING id;
 	`)
 	if err != nil {
@@ -41,7 +40,7 @@ func CreateWeathersBulk(db *sql.DB, weather_widgets []WeatherWidget) error {
 	defer statement.Close()
 
 	for i := range weather_widgets {
-		err := statement.QueryRow(weather_widgets[i].LATITUDE, weather_widgets[i].LONGITUDE).Scan(&weather_widgets[i].ID)
+		err := statement.QueryRow(weather_widgets[i].ZIPCODE).Scan(&weather_widgets[i].ID)
 		if err != nil {
 			transaction.Rollback()
 			return err
@@ -55,11 +54,11 @@ func GetWeatherByID(db *sql.DB, id int) (*WeatherWidget, error) {
 	weather_widget := &WeatherWidget{}
 
 	query := `
-			SELECT id, latitude, longitude
+			SELECT id, zipcode
 			FROM "WeatherWidget"
 			WHERE id = $1;
 	`
-	err := db.QueryRow(query, id).Scan(&weather_widget.ID, &weather_widget.LATITUDE, &weather_widget.LONGITUDE)
+	err := db.QueryRow(query, id).Scan(&weather_widget.ID, &weather_widget.ZIPCODE)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -77,7 +76,7 @@ func GetWeatherByDayAndUser(db *sql.DB, carepartner_id int, day, month, day_of_w
 	var weather_widgets []WeatherWidget
 
 	query := `
-			SELECT widget.id, widget.latitude, widget.longitude
+			SELECT widget.id, widget.zipcode
 			FROM "Configuration" config
 			JOIN "Module" mod ON config.module_id = mod.id
 			JOIN "WeatherWidget" widget ON mod.metadata_id = widget.id
@@ -99,14 +98,14 @@ func GetWeatherByDayAndUser(db *sql.DB, carepartner_id int, day, month, day_of_w
 
 	var weather_widget WeatherWidget
 	for rows.Next() {
-		err := rows.Scan(&weather_widget.ID, &weather_widget.LATITUDE, &weather_widget.LONGITUDE)
+		err := rows.Scan(&weather_widget.ID, &weather_widget.ZIPCODE)
 		if err != nil {
 			return nil, fmt.Errorf("Error Scanning: %v", err)
 		}
 		weather_widgets = append(weather_widgets, weather_widget)
 	}
-
-	if err := rows.Err(); err != nil {
+	err = rows.Err()
+	if err != nil {
 		return nil, fmt.Errorf("Error in rows: %v", err)
 	}
 
@@ -117,7 +116,7 @@ func GetWeatherByDayAndUser(db *sql.DB, carepartner_id int, day, month, day_of_w
 func GetUserWeather(db *sql.DB, carepartner_id int) ([]WeatherWidget, error) {
 	var weather_widgets []WeatherWidget
 	query := `
-			SELECT widget.id, widget.latitude, widget.longitude
+			SELECT widget.id, widget.zipcode
 			FROM "Module" AS mod
 			JOIN "WeatherWidget" AS widget ON mod.metadat_id = widget.id
 			WHERE mod.carepartner_id = $1
@@ -131,14 +130,14 @@ func GetUserWeather(db *sql.DB, carepartner_id int) ([]WeatherWidget, error) {
 
 	var weather_widget WeatherWidget
 	for rows.Next() {
-		err := rows.Scan(&weather_widget.ID, &weather_widget.LATITUDE, &weather_widget.LONGITUDE)
+		err := rows.Scan(&weather_widget.ID, &weather_widget.ZIPCODE)
 		if err != nil {
 			return nil, fmt.Errorf("Error Scanning: %v", err)
 		}
 		weather_widgets = append(weather_widgets, weather_widget)
 	}
-
-	if err := rows.Err(); err != nil {
+	err = rows.Err()
+	if err != nil {
 		return nil, fmt.Errorf("Rows Error: %v", err)
 	}
 
@@ -149,10 +148,10 @@ func GetUserWeather(db *sql.DB, carepartner_id int) ([]WeatherWidget, error) {
 func UpdateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
 	query := `
 			UPDATE "WeatherWidget"
-			SET latitude = $1, longitude = $2
-			WHERE id = $4;
+			SET zipcode = $1
+			WHERE id = $2;
 	`
-	result, err := db.Exec(query, weather_widget.LATITUDE, weather_widget.LONGITUDE, weather_widget.ID)
+	result, err := db.Exec(query, weather_widget.ZIPCODE, weather_widget.ID)
 	if err != nil {
 		return err
 	}
