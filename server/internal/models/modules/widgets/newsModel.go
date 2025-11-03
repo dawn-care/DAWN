@@ -71,7 +71,7 @@ func GetNewsByID(db *sql.DB, id int) (*NewsWidget, error) {
 }
 
 // Get Multiple News Widgets by Day and User
-func GetNewsByDayAndUser(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]NewsWidget, error) {
+func GetNewsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]NewsWidget, error) {
 	dayStr := fmt.Sprintf("%d", day)                        // For Monthly
 	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]           // For Weekly
 	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month], day) // For Yearly

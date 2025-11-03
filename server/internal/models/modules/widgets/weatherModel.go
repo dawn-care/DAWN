@@ -69,7 +69,7 @@ func GetWeatherByID(db *sql.DB, id int) (*WeatherWidget, error) {
 }
 
 // Get Multiple Weather Widgets by Day and User
-func GetWeatherByDayAndUser(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]WeatherWidget, error) {
+func GetWeatherByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]WeatherWidget, error) {
 	dayStr := fmt.Sprintf("%d", day)                        //For Monthly Type - int 1 - 31
 	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]           //For Weekly Type - string "Sun" - "Sat"
 	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month], day) //For Yearly Type - string "Month day" - i.e. "Jan 1"

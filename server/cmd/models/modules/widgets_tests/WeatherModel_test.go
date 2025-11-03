@@ -36,8 +36,8 @@ func clearWeatherTable(t *testing.T) {
 	}
 }
 
-// Tests Weather Widgets' Model Functions
-func TestWeatherWidgets(t *testing.T) {
+// Tests CreateWeather and GetWeatherByID
+func TestCreateWeatherWidget(t *testing.T) {
 	clearWeatherTable(t)
 
 	weather_widget := &widgets.WeatherWidget{
@@ -62,34 +62,70 @@ func TestWeatherWidgets(t *testing.T) {
 	if found_widget.ZIPCODE != 14623 {
 		t.Errorf("Unexpected Widget Returned (CreateWeather): %+v", found_widget)
 	}
+}
+
+// Tests UpdateWeather
+func TestUpdateWeatherWidget(t *testing.T) {
+	clearWeatherTable(t)
+
+	weather_widget := &widgets.WeatherWidget{
+		ZIPCODE: 14623,
+	}
+
+	err := widgets.CreateWeather(testDB, weather_widget)
+	if err != nil {
+		t.Fatalf("CreateWeather Failed: %v", err)
+	}
 
 	weather_widget.ZIPCODE = 14618
 	err = widgets.UpdateWeather(testDB, weather_widget)
 	if err != nil {
 		t.Fatalf("UpdateWeather Failed: %v", err)
 	}
-	found_widget, err = widgets.GetWeatherByID(testDB, weather_widget.ID)
+	found_widget, err := widgets.GetWeatherByID(testDB, weather_widget.ID)
 	if found_widget.ZIPCODE != 14618 {
 		t.Errorf("Unexpected Widget Returned (UpdateWeather): %+v", found_widget)
+	}
+}
+
+// Tests DeleteWeather
+
+func TestDeleteWeatherWidget(t *testing.T) {
+	clearWeatherTable(t)
+
+	weather_widget := &widgets.WeatherWidget{
+		ZIPCODE: 14623,
+	}
+
+	err := widgets.CreateWeather(testDB, weather_widget)
+	if err != nil {
+		t.Fatalf("CreateWeather Failed: %v", err)
 	}
 
 	err = widgets.DeleteWeather(testDB, weather_widget.ID)
 	if err != nil {
 		t.Fatalf("DeleteWeather Failed: %v", err)
 	}
-	found_widget, err = widgets.GetWeatherByID(testDB, weather_widget.ID)
+	found_widget, err := widgets.GetWeatherByID(testDB, weather_widget.ID)
 	if found_widget != nil {
 		t.Errorf("Unexpected Widget Returned (DeleteWeather): %+v", found_widget)
 	}
+}
+
+// Tests CreateWeatherBulk
+func TestCreateWeatherBulkWidgets(t *testing.T) {
+	clearWeatherTable(t)
 
 	weather_widgets := []widgets.WeatherWidget{
-		{ZIPCODE: 14623}, {ZIPCODE: 14618}, {ZIPCODE: 14626},
+		{ZIPCODE: 14623},
+		{ZIPCODE: 14618},
+		{ZIPCODE: 14626},
 	}
-	err = widgets.CreateWeathersBulk(testDB, weather_widgets)
+	err := widgets.CreateWeathersBulk(testDB, weather_widgets)
 	if err != nil {
 		t.Fatalf("CreateWeatherBulk Failed: %v", err)
 	}
-	found_widget, err = widgets.GetWeatherByID(testDB, weather_widgets[0].ID)
+	found_widget, err := widgets.GetWeatherByID(testDB, weather_widgets[0].ID)
 	if found_widget == nil {
 		t.Error("CreateWeatherBulk widget[0] Not Found")
 	}
@@ -101,6 +137,22 @@ func TestWeatherWidgets(t *testing.T) {
 	if found_widget == nil {
 		t.Error("CreateWeatherBulk widget[2] Not Found")
 	}
+}
+
+// Test GetWeatherStats
+func TestGetWeatherStatsWidget(t *testing.T) {
+	clearWeatherTable(t)
+
+	weather_widgets := []widgets.WeatherWidget{
+		{ZIPCODE: 14623},
+		{ZIPCODE: 14618},
+		{ZIPCODE: 14626},
+	}
+	err := widgets.CreateWeathersBulk(testDB, weather_widgets)
+	if err != nil {
+		t.Fatalf("CreateWeatherBulk Failed: %v", err)
+	}
+
 	count, err := widgets.GetWeatherStats(testDB)
 	if count != 3 {
 		t.Errorf("Unexpected Count Returned: %d", count)

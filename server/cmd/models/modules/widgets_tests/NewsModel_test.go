@@ -17,8 +17,8 @@ func clearNewsTable(t *testing.T) {
 	}
 }
 
-// Tests News Widgets' Model Functions
-func TestNewsWidgets(t *testing.T) {
+// Tests CreateNews and GetNewsByID
+func TestCreateNewsWidget(t *testing.T) {
 	clearNewsTable(t)
 
 	news_widget := &widgets.NewsWidget{
@@ -51,36 +51,74 @@ func TestNewsWidgets(t *testing.T) {
 	if found_widget.COUNTRY != "us" {
 		t.Errorf("Unexpected Widget Returned (CreateNews): %+v", found_widget)
 	}
+}
+
+// Tests UpdateNews
+func TestUpdateNewsWidget(t *testing.T) {
+	clearNewsTable(t)
+
+	news_widget := &widgets.NewsWidget{
+		CATEGORY: "Animals",
+		LANGUAGE: "en",
+		COUNTRY:  "us",
+	}
+
+	err := widgets.CreateNews(testDB, news_widget)
+	if err != nil {
+		t.Fatalf("CreateNews Failed: %v", err)
+	}
 
 	news_widget.LANGUAGE = "es"
 	err = widgets.UpdateNews(testDB, news_widget)
 	if err != nil {
 		t.Fatalf("UpdateNews Failed: %v", err)
 	}
-	found_widget, err = widgets.GetNewsByID(testDB, news_widget.ID)
+	found_widget, err := widgets.GetNewsByID(testDB, news_widget.ID)
 	if found_widget.LANGUAGE != "es" {
 		t.Errorf("Unexpected Widget Returned (UpdateNews): %+v", found_widget)
+	}
+}
+
+// Tests DeleteNews
+
+func TestDeleteNewsWidget(t *testing.T) {
+	clearNewsTable(t)
+
+	news_widget := &widgets.NewsWidget{
+		CATEGORY: "Animals",
+		LANGUAGE: "en",
+		COUNTRY:  "us",
+	}
+
+	err := widgets.CreateNews(testDB, news_widget)
+	if err != nil {
+		t.Fatalf("CreateNews Failed: %v", err)
 	}
 
 	err = widgets.DeleteNews(testDB, news_widget.ID)
 	if err != nil {
 		t.Fatalf("DeleteNews Failed: %v", err)
 	}
-	found_widget, err = widgets.GetNewsByID(testDB, news_widget.ID)
+	found_widget, err := widgets.GetNewsByID(testDB, news_widget.ID)
 	if found_widget != nil {
 		t.Errorf("Unexpected Widget Returned (DeleteNews): %+v", found_widget)
 	}
+}
+
+// Tests CreateNewsBulk
+func TestCreateNewsBulkWidgets(t *testing.T) {
+	clearNewsTable(t)
 
 	news_widgets := []widgets.NewsWidget{
 		{CATEGORY: "Animals", LANGUAGE: "en", COUNTRY: "us"},
 		{CATEGORY: "Charity", LANGUAGE: "fr", COUNTRY: "ca"},
 		{CATEGORY: "Good News", LANGUAGE: "es", COUNTRY: "mx"},
 	}
-	err = widgets.CreateNewsBulk(testDB, news_widgets)
+	err := widgets.CreateNewsBulk(testDB, news_widgets)
 	if err != nil {
 		t.Fatalf("CreateNewsBulk Failed: %v", err)
 	}
-	found_widget, err = widgets.GetNewsByID(testDB, news_widgets[0].ID)
+	found_widget, err := widgets.GetNewsByID(testDB, news_widgets[0].ID)
 	if found_widget == nil {
 		t.Error("CreateNewsBulk widget[0] Not Found")
 	}
@@ -92,6 +130,22 @@ func TestNewsWidgets(t *testing.T) {
 	if found_widget == nil {
 		t.Error("CreateNewsBulk widget[2] Not Found")
 	}
+}
+
+// Test GetNewsStats
+func TestGetNewsStatsWidget(t *testing.T) {
+	clearNewsTable(t)
+
+	news_widgets := []widgets.NewsWidget{
+		{CATEGORY: "Animals", LANGUAGE: "en", COUNTRY: "us"},
+		{CATEGORY: "Charity", LANGUAGE: "fr", COUNTRY: "ca"},
+		{CATEGORY: "Good News", LANGUAGE: "es", COUNTRY: "mx"},
+	}
+	err := widgets.CreateNewsBulk(testDB, news_widgets)
+	if err != nil {
+		t.Fatalf("CreateNewsBulk Failed: %v", err)
+	}
+
 	count, err := widgets.GetNewsStats(testDB)
 	if count != 3 {
 		t.Errorf("Unexpected Count Returned: %d", count)
