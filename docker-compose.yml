@@ -51,7 +51,7 @@ services:
       POSTGRES_DB: mydb
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./init:/docker-entrypoint-initdb.d/:ro
     ports:
       - "5432:5432"
 
