@@ -14,6 +14,9 @@ type Configuration struct {
 	POSITION              int      `json:"position"`
 }
 
+var DAYS_OF_WEEK_STR = [7]string{"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat"}
+var MONTH_STR = [12]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+
 // Adds Configuration
 func CreateConfiguration(db *sql.DB, configuration *Configuration) error {
 	query := `
@@ -60,6 +63,46 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 		return nil, err
 	}
 	return configuration, nil
+}
+
+func GetConfigurationByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]Configuration, error) {
+	dayStr := fmt.Sprintf("%d", day)                        //For Monthly Type - int 1 - 31
+	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]           //For Weekly Type - string "Sun" - "Sat"
+	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month], day) //For Yearly Type - string "Month day" - i.e. "Jan 1"
+	var configurations []Configuration
+
+	query := `
+			SELECT id, carepartner_id, module_id, occurrence_type, occurrence_definition, position
+			FROM "Configuration"
+			WHERE carepartner_id = $1
+			AND (
+				occurence_type = 'Daily'
+				OR (occurence_type = 'Weekly' AND $2 = ANY(occurence_definition))
+				OR (occurence_type = 'Monthly' AND $3 = ANY(occurence_definition))
+				OR (occurence_type = 'Yearly' AND $4 = ANY(occurence_definition))
+			)
+			ORDER BY position;
+	`
+	rows, err := db.Query(query, carepartner_id, dayOfWeekStr, dayStr, monthDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var configuration Configuration
+	for rows.Next() {
+		err := rows.Scan(&configuration.ID, &configuration.MODULE_ID, &configuration.OCCURRENCE_TYPE, &configuration.OCCURRENCE_DEFINITION, &configuration.POSITION)
+		if err != nil {
+			return nil, fmt.Errorf("Error Scanning: %v", err)
+		}
+		configurations = append(configurations, configuration)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("Error in rows: %v", err)
+	}
+
+	return configurations, nil
 }
 
 // Get All Configurations by User
