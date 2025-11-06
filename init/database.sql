@@ -21,7 +21,7 @@ CREATE TABLE "Module" (
 CREATE TABLE "Configuration" (
   "id" integer GENERATED ALWAYS AS IDENTITY UNIQUE,
   "carepartner_id" integer,
-  "module_id" text,
+  "module_id" integer,
   "occurence_type" text,
   "occurence_definition" text[],
   "position" integer,
@@ -38,27 +38,26 @@ CREATE TABLE "PhotoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "VideoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "AudioMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
   "filename" text,
-  "extension" integer
+  "extension" text
 );
 
 CREATE TABLE "WeatherWidget" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "latitude" decimal,
-  "longitude" decimal
+  "zipcode" integer
 );
 
 CREATE TABLE "NewsWidget" (
@@ -91,6 +90,6 @@ CREATE TABLE "MessagePrompt" (
 CREATE TABLE "EventPrompt" (
   "list_id" integer,
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "time" timestamp,
+  "time" time,
   "text" text
 );
