@@ -5,12 +5,11 @@ import (
 	"fmt"
 )
 
-// AudioMedia represents one audio media record
 type AudioMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
 	Filename  string `json:"filename"`
-	Extension string `json:"extension"` // replace with string later if needed
+	Extension string `json:"extension"`
 }
 
 // ─────────────────────────────────────────────
@@ -76,15 +75,15 @@ func GetAudioByID(db *sql.DB, id int) (*AudioMedia, error) {
 }
 
 // Get multiple audio IDs by date and users (assuming filename/URI encodes date)
-func GetAudiosByDayAndUsers(db *sql.DB, date string, carereceiverID, caregiverID int) ([]int, error) {
+func GetAudiosByDayCarepartnerandCaregiver(db *sql.DB, date string, carepartnerID, caregiverID int) ([]int, error) {
 	query := `
 		SELECT a.id
 		FROM "AudioMedia" a
 		JOIN "Module" m ON m.metadata = a.id
-		WHERE m.carereceiver_id = $1 AND m.caregiver_id = $2
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2
 		AND a.filename LIKE $3;
 	`
-	rows, err := db.Query(query, carereceiverID, caregiverID, fmt.Sprintf("%%%s%%", date))
+	rows, err := db.Query(query, carepartnerID, caregiverID, fmt.Sprintf("%%%s%%", date))
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +100,8 @@ func GetAudiosByDayAndUsers(db *sql.DB, date string, carereceiverID, caregiverID
 	return ids, nil
 }
 
-// Get all media (video, audio, photo) by type and user (returns IDs)
-func GetMediaByTypeAndUser(db *sql.DB, mediaType string, carereceiverID, caregiverID int) ([]int, error) {
+// Get all media (video, audio, photo) by type, carepartner, and caregiver (returns IDs)
+func GetMediaByTypeCarepartnerAndCaregiver(db *sql.DB, mediaType string, carepartnerID, caregiverID int) ([]int, error) {
 	validTables := map[string]string{
 		"audio": "AudioMedia",
 		"video": "VideoMedia",
@@ -117,10 +116,10 @@ func GetMediaByTypeAndUser(db *sql.DB, mediaType string, carereceiverID, caregiv
 		SELECT m.metadata
 		FROM "%s" t
 		JOIN "Module" m ON m.metadata = t.id
-		WHERE m.carereceiver_id = $1 AND m.caregiver_id = $2;
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
 	`, table)
 
-	rows, err := db.Query(query, carereceiverID, caregiverID)
+	rows, err := db.Query(query, carepartnerID, caregiverID)
 	if err != nil {
 		return nil, err
 	}
@@ -137,15 +136,15 @@ func GetMediaByTypeAndUser(db *sql.DB, mediaType string, carereceiverID, caregiv
 	return ids, nil
 }
 
-// Get all audio files by user (full records)
-func GetAudiosByUsers(db *sql.DB, carereceiverID, caregiverID int) ([]AudioMedia, error) {
+// Get all audio files by carepartner and caregiver (full records)
+func GetAudiosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID int) ([]AudioMedia, error) {
 	query := `
 		SELECT a.id, a.uri, a.filename, a.extension
 		FROM "AudioMedia" a
 		JOIN "Module" m ON m.metadata = a.id
-		WHERE m.carereceiver_id = $1 AND m.caregiver_id = $2;
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
 	`
-	rows, err := db.Query(query, carereceiverID, caregiverID)
+	rows, err := db.Query(query, carepartnerID, caregiverID)
 	if err != nil {
 		return nil, err
 	}
