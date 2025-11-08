@@ -14,17 +14,24 @@ type Module struct {
 	MetadataID    int    `json:"metadata_id"`
 }
 
-// Insert a new module
+// Insert a new module (DB)
 func CreateModule(db *sql.DB, m *Module) error {
+	return CreateModuleTx(db, m)
+}
+
+// Insert a new module (Tx)
+func CreateModuleTx(exec interface {
+	QueryRow(query string, args ...any) *sql.Row
+}, m *Module) error {
 	query := `
 		INSERT INTO "Module" (module_type, caregiver_id, carepartner_id, metadata_id)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`
-	return db.QueryRow(query, m.ModuleType, m.CaregiverID, m.CarepartnerID, m.MetadataID).Scan(&m.ID)
+	return exec.QueryRow(query, m.ModuleType, m.CaregiverID, m.CarepartnerID, m.MetadataID).Scan(&m.ID)
 }
 
-// Retrieve a module by its ID
+// Retrieve a module by its ID (DB)
 func GetModuleByID(db *sql.DB, id int) (*Module, error) {
 	query := `
 		SELECT id, module_type, caregiver_id, carepartner_id, metadata_id

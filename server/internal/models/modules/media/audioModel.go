@@ -18,15 +18,22 @@ type AudioMedia struct {
 
 // Add one audio file
 func CreateAudio(db *sql.DB, audio *AudioMedia) error {
+	return CreateAudioTx(db, audio)
+}
+
+// Add one audio file (Tx)
+func CreateAudioTx(exec interface {
+	QueryRow(query string, args ...any) *sql.Row
+}, audio *AudioMedia) error {
 	query := `
 		INSERT INTO "AudioMedia" (uri, filename, extension)
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
-	return db.QueryRow(query, audio.URI, audio.Filename, audio.Extension).Scan(&audio.ID)
+	return exec.QueryRow(query, audio.URI, audio.Filename, audio.Extension).Scan(&audio.ID)
 }
 
-// Add multiple audio files at once
+// Add multiple audio files at once (DB)
 func CreateAudiosBulk(db *sql.DB, audios []AudioMedia) error {
 	tx, err := db.Begin()
 	if err != nil {

@@ -9,17 +9,24 @@ type PhotoMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
 	Filename  string `json:"filename"`
-	Extension string    `json:"extension"`
+	Extension string `json:"extension"`
 }
 
-// Create a single photo
+// Create photo (DB)
 func CreatePhoto(db *sql.DB, photo *PhotoMedia) error {
+	return CreatePhotoTx(db, photo)
+}
+
+// Create photo (Tx)
+func CreatePhotoTx(exec interface {
+	QueryRow(query string, args ...any) *sql.Row
+}, photo *PhotoMedia) error {
 	query := `
 		INSERT INTO "PhotoMedia" (uri, filename, extension)
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
-	return db.QueryRow(query, photo.URI, photo.Filename, photo.Extension).Scan(&photo.ID)
+	return exec.QueryRow(query, photo.URI, photo.Filename, photo.Extension).Scan(&photo.ID)
 }
 
 // Create multiple photos

@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+
 type VideoMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
@@ -12,14 +13,21 @@ type VideoMedia struct {
 	Extension string `json:"extension"`
 }
 
-// Create a single video
+// Create video (DB)
 func CreateVideo(db *sql.DB, video *VideoMedia) error {
+	return CreateVideoTx(db, video)
+}
+
+// Create video (Tx)
+func CreateVideoTx(exec interface {
+	QueryRow(query string, args ...any) *sql.Row
+}, video *VideoMedia) error {
 	query := `
 		INSERT INTO "VideoMedia" (uri, filename, extension)
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
-	return db.QueryRow(query, video.URI, video.Filename, video.Extension).Scan(&video.ID)
+	return exec.QueryRow(query, video.URI, video.Filename, video.Extension).Scan(&video.ID)
 }
 
 // Create multiple videos
