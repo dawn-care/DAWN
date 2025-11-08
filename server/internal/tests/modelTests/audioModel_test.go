@@ -1,26 +1,18 @@
 package modelTests
 
 import (
-	"database/sql"
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 
+	"server/internal/tests"
 	"server/internal/models/modules/media"
 )
 
-func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to open sqlmock database: %v", err)
-	}
-	return db, mock
-}
-
 func TestCreateAudio(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
 	audio := &media.AudioMedia{
@@ -45,7 +37,7 @@ func TestCreateAudio(t *testing.T) {
 }
 
 func TestGetAudioByID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
@@ -69,7 +61,7 @@ func TestGetAudioByID(t *testing.T) {
 }
 
 func TestUpdateAudio(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
 	audio := &media.AudioMedia{
@@ -93,7 +85,7 @@ func TestUpdateAudio(t *testing.T) {
 }
 
 func TestDeleteAudio(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -109,7 +101,7 @@ func TestDeleteAudio(t *testing.T) {
 }
 
 func TestGetMediaStats(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"audio_count", "video_count", "photo_count"}).
