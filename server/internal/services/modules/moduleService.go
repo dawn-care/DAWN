@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	modules "server/internal/models/modules"
-	"server/internal/models/modules/media"
+	models "server/internal/models/modules/media"
 )
 
 type ModuleService struct {
@@ -32,34 +32,34 @@ func (s *ModuleService) CreateModuleWithMedia(moduleType string, caregiverID, ca
 
 	switch moduleType {
 	case "audio":
-		audio := &media.AudioMedia{
+		audio := &models.AudioMedia{
 			URI:       uri,
 			Filename:  filename,
 			Extension: extension,
 		}
-		if err := media.CreateAudioTx(tx, audio); err != nil {
+		if err := models.CreateAudioTx(tx, audio); err != nil {
 			tx.Rollback()
 			return nil, err
 		}
 		metadataID = audio.ID
 	case "video":
-		video := &media.VideoMedia{
+		video := &models.VideoMedia{
 			URI:       uri,
 			Filename:  filename,
 			Extension: extension,
 		}
-		if err := media.CreateVideoTx(tx, video); err != nil {
+		if err := models.CreateVideoTx(tx, video); err != nil {
 			tx.Rollback()
 			return nil, err
 		}
 		metadataID = video.ID
 	case "photo":
-		photo := &media.PhotoMedia{
+		photo := &models.PhotoMedia{
 			URI:       uri,
 			Filename:  filename,
 			Extension: extension,
 		}
-		if err := media.CreatePhotoTx(tx, photo); err != nil {
+		if err := models.CreatePhotoTx(tx, photo); err != nil {
 			tx.Rollback()
 			return nil, err
 		}
