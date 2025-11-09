@@ -6,15 +6,25 @@ import (
 	"strconv"
 
 	models "server/internal/models/modules/media"
-	services "server/internal/services/modules/media"
 )
 
-type VideoController struct {
-	Service *services.VideoService
+// ---- Interface ----
+type VideoServiceInterface interface {
+	CreateVideo(video *models.VideoMedia) error
+	GetVideoByID(id int) (*models.VideoMedia, error)
+	GetVideosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.VideoMedia, error)
+	UpdateVideo(video *models.VideoMedia) error
+	DeleteVideo(id int) error
+	GetVideoStats() (int, error)
 }
 
-func NewVideoController(service *services.VideoService) *VideoController {
-	return &VideoController{Service: service}
+// ---- Controller ----
+type VideoController struct {
+	services VideoServiceInterface
+}
+
+func NewVideoController(services VideoServiceInterface) *VideoController {
+	return &VideoController{services: services}
 }
 
 // Create a new video
@@ -25,7 +35,7 @@ func (c *VideoController) CreateVideoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := c.Service.CreateVideo(&video); err != nil {
+	if err := c.services.CreateVideo(&video); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -42,7 +52,7 @@ func (c *VideoController) GetVideoByIDHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	video, err := c.Service.GetVideoByID(id)
+	video, err := c.services.GetVideoByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -56,7 +66,7 @@ func (c *VideoController) GetVideosByCarepartnerAndCaregiverHandler(w http.Respo
 	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
 
-	videos, err := c.Service.GetVideosByCarepartnerAndCaregiver(carepartnerID, caregiverID)
+	videos, err := c.services.GetVideosByCarepartnerAndCaregiver(carepartnerID, caregiverID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -73,7 +83,7 @@ func (c *VideoController) UpdateVideoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := c.Service.UpdateVideo(&video); err != nil {
+	if err := c.services.UpdateVideo(&video); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +99,7 @@ func (c *VideoController) DeleteVideoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := c.Service.DeleteVideo(id); err != nil {
+	if err := c.services.DeleteVideo(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -99,11 +109,11 @@ func (c *VideoController) DeleteVideoHandler(w http.ResponseWriter, r *http.Requ
 
 // Get video stats
 func (c *VideoController) GetVideoStatsHandler(w http.ResponseWriter, r *http.Request) {
-	count, err := c.Service.GetVideoStats()
+	stats, err := c.services.GetVideoStats()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]int{"total_videos": count})
+	json.NewEncoder(w).Encode(stats)
 }

@@ -6,14 +6,25 @@ import (
 	"strconv"
 
 	models "server/internal/models/modules/media"
-	services "server/internal/services/modules/media"
 )
 
-type AudioController struct {
-	services *services.AudioService
+// ---- Interface ----
+type AudioServiceInterface interface {
+	CreateAudio(audio *models.AudioMedia) error
+	GetAudioByID(id int) (*models.AudioMedia, error)
+	GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.AudioMedia, error)
+	UpdateAudio(audio *models.AudioMedia) error
+	DeleteAudio(id int) error
+	SearchAudios(keyword string) ([]models.AudioMedia, error)
+	GetMediaStats() (*models.MediaStats, error)
 }
 
-func NewAudioController(services *services.AudioService) *AudioController {
+// ---- Controller ----
+type AudioController struct {
+	services AudioServiceInterface
+}
+
+func NewAudioController(services AudioServiceInterface) *AudioController {
 	return &AudioController{services: services}
 }
 

@@ -5,14 +5,22 @@ import (
 	"net/http"
 	"strconv"
 
-	services "server/internal/services/modules"
+	modules "server/internal/models/modules"
 )
 
-type ModuleController struct {
-	Service *services.ModuleService
+// ---- Interface ----
+type ModuleServiceInterface interface {
+	CreateModuleWithMedia(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error)
+	GetModuleByID(id int) (*modules.Module, error)
+	GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID int, moduleType string) ([]int, error)
 }
 
-func NewModuleController(service *services.ModuleService) *ModuleController {
+// ---- Controller ----
+type ModuleController struct {
+	Service ModuleServiceInterface
+}
+
+func NewModuleController(service ModuleServiceInterface) *ModuleController {
 	return &ModuleController{Service: service}
 }
 

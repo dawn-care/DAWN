@@ -6,14 +6,24 @@ import (
 	"strconv"
 
 	models "server/internal/models/modules/media"
-	services "server/internal/services/modules/media"
 )
 
-type PhotoController struct {
-	Service *services.PhotoService
+// ---- Interface ----
+type PhotoServiceInterface interface {
+	CreatePhoto(photo *models.PhotoMedia) error
+	GetPhotoByID(id int) (*models.PhotoMedia, error)
+	GetPhotosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.PhotoMedia, error)
+	UpdatePhoto(photo *models.PhotoMedia) error
+	DeletePhoto(id int) error
+	GetPhotoStats() (int, error)
 }
 
-func NewPhotoController(service *services.PhotoService) *PhotoController {
+// ---- Controller ----
+type PhotoController struct {
+	Service PhotoServiceInterface
+}
+
+func NewPhotoController(service PhotoServiceInterface) *PhotoController {
 	return &PhotoController{Service: service}
 }
 
