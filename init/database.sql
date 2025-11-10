@@ -160,3 +160,14 @@ BEGIN
     DROP TABLE tmp_configs;
 END;
 $$;
+
+CREATE OR REPLACE PROCEDURE delete_configurations(
+    id_list TEXT[]
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    DELETE FROM "Configuration"
+    WHERE id = ANY(id_list);
+END;
+$$;
