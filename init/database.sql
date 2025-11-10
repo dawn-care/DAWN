@@ -162,12 +162,20 @@ END;
 $$;
 
 CREATE OR REPLACE PROCEDURE delete_configurations(
+    p_carepartner_id INT,
     id_list TEXT[]
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    current_id TEXT;
+    pos INT;
 BEGIN
-    DELETE FROM "Configuration"
-    WHERE id = ANY(id_list);
+    FOREACH current_id IN ARRAY id_list
+    LOOP
+        SELECT position INTO pos FROM "Configuration" WHERE id = current_id;
+        DELETE FROM "Configuration" WHERE id = current_id;
+        UPDATE "Configuration" SET position = position - 1 WHERE carepartner_id = p_carepartner_id AND position > pos;
+    END LOOP;
 END;
 $$;
