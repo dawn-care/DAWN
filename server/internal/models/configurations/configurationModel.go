@@ -3,15 +3,18 @@ package configurations
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+
+	"github.com/lib/pq"
 )
 
 type Configuration struct {
-	ID                    int      `json:"id"`
-	CAREPARTNER_ID        int      `json:"carepartner_id"`
-	MODULE_ID             int      `json:"module_id"`
-	OCCURRENCE_TYPE       string   `json:"occurrence_type"`
-	OCCURRENCE_DEFINITION []string `json:"occurrence_definition"`
-	POSITION              int      `json:"position"`
+	ID                   int      `json:"id"`
+	CAREPARTNER_ID       int      `json:"carepartner_id"`
+	MODULE_ID            int      `json:"module_id"`
+	OCCURENCE_TYPE       string   `json:"occurence_type"`
+	OCCURENCE_DEFINITION []string `json:"occurence_definition"`
+	POSITION             int      `json:"position"`
 }
 
 var DAYS_OF_WEEK_STR = [7]string{"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat"}
@@ -19,22 +22,70 @@ var MONTH_STR = [12]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
 
 // Adds Configuration
 func CreateConfiguration(db *sql.DB, configuration *Configuration) error {
-	query := `
-			INSERT INTO "Configuration" (
-					carepartner_id,
-					module_id,
-					occurence_type,
-					occurrence_definition,
-					position)
-			VALUES ($1, $2, $3, $4, $5)
-			RETURNING id;
-	`
-	return db.QueryRow(query,
-		configuration.CAREPARTNER_ID,
-		configuration.MODULE_ID,
-		configuration.OCCURRENCE_TYPE,
-		configuration.OCCURRENCE_DEFINITION,
-		configuration.POSITION).Scan(configuration.ID)
+
+	jsonConfig := fmt.Sprintf(`[
+			{
+				"id": null,
+				"module_id": %d,
+				"occurence_type": "%s",
+				"occurence_definition": ["%s"],
+				"position": %d
+			}
+		]`, configuration.MODULE_ID, configuration.OCCURENCE_TYPE, strings.Join(configuration.OCCURENCE_DEFINITION, `","`), configuration.POSITION)
+	query := `CALL insert_configurations($1, $2::jsonb);`
+	_, err := db.Exec(query, configuration.CAREPARTNER_ID, jsonConfig)
+	if err != nil {
+		return fmt.Errorf("failed to call insert_configurations: %w", err)
+	}
+	err = db.QueryRow(`
+			SELECT id FROM "Configuration"
+			WHERE carepartner_id = $1 AND position = $2
+			ORDER BY id DESC
+			LIMIT 1;
+		`, configuration.CAREPARTNER_ID, configuration.POSITION).Scan(&configuration.ID)
+	return err
+}
+
+func CreateConfigurationsBulk(db *sql.DB, configurations []Configuration) error {
+	jsonConfig := `[`
+	for i, configuration := range configurations {
+		if i < len(configurations)-1 {
+			jsonConfig = fmt.Sprintf(`%s 
+					{
+						"id": null,
+						"module_id": %d,
+						"occurence_type": "%s",
+						"occurence_definition": ["%s"],
+						"position": %d
+					},
+				`, jsonConfig, configuration.MODULE_ID, configuration.OCCURENCE_TYPE, strings.Join(configuration.OCCURENCE_DEFINITION, `","`), configuration.POSITION)
+		} else {
+			jsonConfig = fmt.Sprintf(`%s 
+					{
+						"id": null,
+						"module_id": %d,
+						"occurence_type": "%s",
+						"occurence_definition": ["%s"],
+						"position": %d
+					}
+				]
+				`, jsonConfig, configuration.MODULE_ID, configuration.OCCURENCE_TYPE, strings.Join(configuration.OCCURENCE_DEFINITION, `","`), configuration.POSITION)
+		}
+	}
+	query := `CALL insert_configurations($1, $2::jsonb);`
+	_, err := db.Exec(query, configurations[0].CAREPARTNER_ID, jsonConfig)
+	if err != nil {
+		return fmt.Errorf("failed to call insert_configurations: %w", err)
+	}
+	for _, configuration := range configurations {
+		err = db.QueryRow(`
+			SELECT id FROM "Configuration"
+			WHERE carepartner_id = $1 AND position = $2
+			ORDER BY id DESC
+			LIMIT 1;
+		`, configuration.CAREPARTNER_ID, configuration.POSITION).Scan(&configuration.ID)
+	}
+	return err
 }
 
 // Get Configuration by ID
@@ -45,7 +96,7 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 					carepartner_id,
 					module_id,
 					occurence_type,
-					occurrence_definition,
+					occurence_definition,
 					position
 			FROM "Configuration"
 			WHERE id = $1;
@@ -53,8 +104,8 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 	err := db.QueryRow(query, id).Scan(&configuration.ID,
 		&configuration.CAREPARTNER_ID,
 		&configuration.MODULE_ID,
-		&configuration.OCCURRENCE_TYPE,
-		&configuration.OCCURRENCE_DEFINITION,
+		&configuration.OCCURENCE_TYPE,
+		pq.Array(&configuration.OCCURENCE_DEFINITION),
 		&configuration.POSITION)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -65,14 +116,14 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 	return configuration, nil
 }
 
-func GetConfigurationByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]Configuration, error) {
-	dayStr := fmt.Sprintf("%d", day)                        //For Monthly Type - int 1 - 31
-	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]           //For Weekly Type - string "Sun" - "Sat"
-	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month], day) //For Yearly Type - string "Month day" - i.e. "Jan 1"
+func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]Configuration, error) {
+	dayStr := fmt.Sprintf("%d", day)                          //For Monthly Type - int 1 - 31
+	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]             //For Weekly Type - string "Sun" - "Sat"
+	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month-1], day) //For Yearly Type - string "Month day" - i.e. "Jan 1"
 	var configurations []Configuration
 
 	query := `
-			SELECT id, carepartner_id, module_id, occurrence_type, occurrence_definition, position
+			SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position
 			FROM "Configuration"
 			WHERE carepartner_id = $1
 			AND (
@@ -91,7 +142,7 @@ func GetConfigurationByDayAndCarepartner(db *sql.DB, carepartner_id int, day, mo
 
 	var configuration Configuration
 	for rows.Next() {
-		err := rows.Scan(&configuration.ID, &configuration.MODULE_ID, &configuration.OCCURRENCE_TYPE, &configuration.OCCURRENCE_DEFINITION, &configuration.POSITION)
+		err := rows.Scan(&configuration.ID, &configuration.CAREPARTNER_ID, &configuration.MODULE_ID, &configuration.OCCURENCE_TYPE, pq.Array(&configuration.OCCURENCE_DEFINITION), &configuration.POSITION)
 		if err != nil {
 			return nil, fmt.Errorf("Error Scanning: %v", err)
 		}
@@ -105,15 +156,15 @@ func GetConfigurationByDayAndCarepartner(db *sql.DB, carepartner_id int, day, mo
 	return configurations, nil
 }
 
-// Get All Configurations by User
-func GetUserConfigurations(db *sql.DB, carepartner_id int) ([]Configuration, error) {
+// Get All Configurations by Carepartner
+func GetCarePartnerConfigurations(db *sql.DB, carepartner_id int) ([]Configuration, error) {
 	var configurations []Configuration
 	query := `
 			SELECT id,
 					carepartner_id,
 					module_id,
 					occurence_type,
-					occurrence_definition,
+					occurence_definition,
 					position
 			FROM "Configuration"
 			WHERE carepartner_id = $1;
@@ -129,8 +180,8 @@ func GetUserConfigurations(db *sql.DB, carepartner_id int) ([]Configuration, err
 		err := rows.Scan(&configuration.ID,
 			&configuration.CAREPARTNER_ID,
 			&configuration.MODULE_ID,
-			&configuration.OCCURRENCE_TYPE,
-			&configuration.OCCURRENCE_DEFINITION,
+			&configuration.OCCURENCE_TYPE,
+			pq.Array(&configuration.OCCURENCE_DEFINITION),
 			&configuration.POSITION)
 		if err != nil {
 			return nil, fmt.Errorf("Error Scanning: %v", err)
@@ -147,44 +198,42 @@ func GetUserConfigurations(db *sql.DB, carepartner_id int) ([]Configuration, err
 
 // Update Configuration
 func UpdateConfiguration(db *sql.DB, configuration *Configuration) error {
-	query := `
-			UPDATE "Configuration"
-			SET carepartner_id = $1,
-					module_id = $2,
-					occurrence_type = $3,
-					occurrence_definition = $4,
-					position = $5
-			WHERE id = $6;
-	`
-	result, err := db.Exec(query,
-		configuration.CAREPARTNER_ID,
-		configuration.MODULE_ID,
-		configuration.OCCURRENCE_TYPE,
-		configuration.OCCURRENCE_DEFINITION,
-		configuration.POSITION)
+	query := `CALL delete_configurations($1, $2);`
+	id_array := []int{configuration.ID}
+	_, err := db.Exec(query, configuration.CAREPARTNER_ID, pq.Array(id_array))
 	if err != nil {
 		return err
 	}
-	count, err := result.RowsAffected()
-	if count == 0 {
-		return fmt.Errorf("No Configurations Found With ID: %d", configuration.ID)
+	jsonConfig := fmt.Sprintf(`[
+			{
+				"id": null,
+				"module_id": %d,
+				"occurence_type": "%s",
+				"occurence_definition": ["%s"],
+				"position": %d
+			}
+		]`, configuration.MODULE_ID, configuration.OCCURENCE_TYPE, strings.Join(configuration.OCCURENCE_DEFINITION, `","`), configuration.POSITION)
+	query = `CALL insert_configurations($1, $2::jsonb);`
+	_, err = db.Exec(query, configuration.CAREPARTNER_ID, jsonConfig)
+	if err != nil {
+		return fmt.Errorf("failed to call insert_configurations: %w", err)
 	}
-	return nil
+	err = db.QueryRow(`
+			SELECT id FROM "Configuration"
+			WHERE carepartner_id = $1 AND position = $2
+			ORDER BY id DESC
+			LIMIT 1;
+		`, configuration.CAREPARTNER_ID, configuration.POSITION).Scan(&configuration.ID)
+	return err
 }
 
-// Delete A Configuration
-func DeleteConfiguration(db *sql.DB, id int) error {
-	query := `
-			DELETE FROM "Configuration"
-			WHERE id = $1;
-	`
-	result, err := db.Exec(query, id)
+// Delete A Configuration By ID and carepartner_id
+func DeleteConfiguration(db *sql.DB, id, carepartner_id int) error {
+	query := `CALL delete_configurations($1, $2);`
+	id_array := []int{id}
+	_, err := db.Exec(query, carepartner_id, pq.Array(id_array))
 	if err != nil {
 		return err
-	}
-	count, err := result.RowsAffected()
-	if count == 0 {
-		return fmt.Errorf("No Configuration Found With ID: %d", id)
 	}
 	return nil
 }

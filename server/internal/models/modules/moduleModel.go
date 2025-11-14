@@ -71,3 +71,39 @@ func GetMetadataByCaregiverCarepartnerAndType(db *sql.DB, caregiverID int, carep
 
 	return metadataIDs, nil
 }
+
+func GetModulesByCarepartner(db *sql.DB, carepartner_id int) ([]Module, error) {
+	var modules []Module
+	query := `
+		SELECT id, 
+				module_type, 
+				caregiver_id, 
+				carepartner_id, 
+				metadata_id
+		FROM "Module"
+		WHERE carepartner_id = $1;
+	`
+	rows, err := db.Query(query, carepartner_id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mod Module
+	for rows.Next() {
+		err := rows.Scan(&mod.ID,
+			&mod.ModuleType,
+			&mod.CaregiverID,
+			&mod.CarepartnerID,
+			&mod.MetadataID)
+		if err != nil {
+			return nil, fmt.Errorf("Error Scanning: %v", err)
+		}
+		modules = append(modules, mod)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("Rows Error: %v", err)
+	}
+	return modules, nil
+}
