@@ -41,7 +41,7 @@ func TestCreateWeatherWidget(t *testing.T) {
 	clearWeatherTable(t)
 
 	weather_widget := &widgets.WeatherWidget{
-		ZIPCODE: 14623,
+		ZIPCODE: "14623",
 	}
 
 	err := widgets.CreateWeather(testDB, weather_widget)
@@ -59,7 +59,7 @@ func TestCreateWeatherWidget(t *testing.T) {
 	if found_widget == nil {
 		t.Fatalf("Widget Not Found")
 	}
-	if found_widget.ZIPCODE != 14623 {
+	if found_widget.ZIPCODE != "14623" {
 		t.Errorf("Unexpected Widget Returned (CreateWeather): %+v", found_widget)
 	}
 }
@@ -69,7 +69,7 @@ func TestUpdateWeatherWidget(t *testing.T) {
 	clearWeatherTable(t)
 
 	weather_widget := &widgets.WeatherWidget{
-		ZIPCODE: 14623,
+		ZIPCODE: "14623",
 	}
 
 	err := widgets.CreateWeather(testDB, weather_widget)
@@ -77,13 +77,13 @@ func TestUpdateWeatherWidget(t *testing.T) {
 		t.Fatalf("CreateWeather Failed: %v", err)
 	}
 
-	weather_widget.ZIPCODE = 14618
+	weather_widget.ZIPCODE = "14618"
 	err = widgets.UpdateWeather(testDB, weather_widget)
 	if err != nil {
 		t.Fatalf("UpdateWeather Failed: %v", err)
 	}
 	found_widget, err := widgets.GetWeatherByID(testDB, weather_widget.ID)
-	if found_widget.ZIPCODE != 14618 {
+	if found_widget.ZIPCODE != "14618" {
 		t.Errorf("Unexpected Widget Returned (UpdateWeather): %+v", found_widget)
 	}
 }
@@ -94,7 +94,7 @@ func TestDeleteWeatherWidget(t *testing.T) {
 	clearWeatherTable(t)
 
 	weather_widget := &widgets.WeatherWidget{
-		ZIPCODE: 14623,
+		ZIPCODE: "14623",
 	}
 
 	err := widgets.CreateWeather(testDB, weather_widget)
@@ -117,9 +117,9 @@ func TestCreateWeatherBulkWidgets(t *testing.T) {
 	clearWeatherTable(t)
 
 	weather_widgets := []widgets.WeatherWidget{
-		{ZIPCODE: 14623},
-		{ZIPCODE: 14618},
-		{ZIPCODE: 14626},
+		{ZIPCODE: "14623"},
+		{ZIPCODE: "14618"},
+		{ZIPCODE: "14626"},
 	}
 	err := widgets.CreateWeathersBulk(testDB, weather_widgets)
 	if err != nil {
@@ -144,9 +144,9 @@ func TestGetWeatherStatsWidget(t *testing.T) {
 	clearWeatherTable(t)
 
 	weather_widgets := []widgets.WeatherWidget{
-		{ZIPCODE: 14623},
-		{ZIPCODE: 14618},
-		{ZIPCODE: 14626},
+		{ZIPCODE: "14623"},
+		{ZIPCODE: "14618"},
+		{ZIPCODE: "14626"},
 	}
 	err := widgets.CreateWeathersBulk(testDB, weather_widgets)
 	if err != nil {

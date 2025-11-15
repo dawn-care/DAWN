@@ -6,8 +6,8 @@ import (
 )
 
 type WeatherWidget struct {
-	ID      int `json:"id"`
-	ZIPCODE int `json:"zipcode"`
+	ID      int    `json:"id"`
+	ZIPCODE string `json:"zipcode"`
 }
 
 var DAYS_OF_WEEK_STR = [7]string{"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat"}
@@ -66,6 +66,31 @@ func GetWeatherByID(db *sql.DB, id int) (*WeatherWidget, error) {
 		return nil, err
 	}
 	return weather_widget, nil
+}
+
+// Retrieve all Weather Widgets for a given carepartner and caregiver
+func GetWeatherByCarepartnerAndCaregiver(db *sql.DB, carepartner_id int, caregiver_id int) ([]WeatherWidget, error) {
+	query := `
+			SELECT weather.id, weather.zipcode
+			FROM "WeatherWidget" weather
+			JOIN "Module" mod ON mod.metadata_id = weather.id
+			WHERE mod.carepartner_id = $1 AND mod.caregiver_id = $2;
+	`
+	rows, err := db.Query(query, carepartner_id, caregiver_id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var weather_widgets []WeatherWidget
+	for rows.Next() {
+		var weather_widget WeatherWidget
+		if err := rows.Scan(&weather_widget.ID, &weather_widget.ZIPCODE); err != nil {
+			return nil, err
+		}
+		weather_widgets = append(weather_widgets, weather_widget)
+	}
+	return weather_widgets, nil
 }
 
 // Get Multiple Weather Widgets by Day and User

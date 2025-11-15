@@ -70,6 +70,31 @@ func GetNewsByID(db *sql.DB, id int) (*NewsWidget, error) {
 	return news_widget, nil
 }
 
+// Retrieve all Weather Widgets for a given carepartner and caregiver
+func GetNewsByCarepartnerAndCaregiver(db *sql.DB, carepartner_id int, caregiver_id int) ([]NewsWidget, error) {
+	query := `
+			SELECT news.id, news.category, news.language, news.country
+			FROM "NewsWidget" news
+			JOIN "Module" mod ON mod.metadata_id = news.id
+			WHERE mod.carepartner_id = $1 AND mod.caregiver_id = $2;
+	`
+	rows, err := db.Query(query, carepartner_id, caregiver_id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var news_widgets []NewsWidget
+	for rows.Next() {
+		var news_widget NewsWidget
+		if err := rows.Scan(&news_widget.ID, &news_widget.CATEGORY, &news_widget.LANGUAGE, &news_widget.LANGUAGE); err != nil {
+			return nil, err
+		}
+		news_widgets = append(news_widgets, news_widget)
+	}
+	return news_widgets, nil
+}
+
 // Get Multiple News Widgets by Day and User
 func GetNewsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]NewsWidget, error) {
 	dayStr := fmt.Sprintf("%d", day)                        // For Monthly
