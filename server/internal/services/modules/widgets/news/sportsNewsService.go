@@ -145,6 +145,7 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 	return widgets.GetNewsStats(s.db)
 }
 
+// Gets the the schedule for a team then calls the helper function to parse that data into a game summary
 func (s *SportsNewsWidgetService) GetTeamGame(league, team string) (string, error) {
 	if league == "" || team == "" {
 		return "", errors.New("league and team cannot be empty")
@@ -176,6 +177,7 @@ func (s *SportsNewsWidgetService) GetTeamGame(league, team string) (string, erro
 	return game_summary, nil
 }
 
+// Parses the API response into a game_summary string
 func CreateGameSummary(apiResponse *SportAPIResponse, team string) (string, error) {
 	if apiResponse == nil || len(apiResponse.Events) == 0 {
 		return "No upcoming games found.", nil

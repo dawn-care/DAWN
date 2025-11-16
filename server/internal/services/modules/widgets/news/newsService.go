@@ -115,6 +115,11 @@ func (s *NewsWidgetService) GetNewsWidgetStats() (int, error) {
 	return widgets.GetNewsStats(s.db)
 }
 
+/*
+Uses News API to search for reacent stories from goodnewsnetwork.org
+If you need an API key for testing you can use this one:
+3bc060a2d2c146bf92e6d9b94341d739 ***REMOVE LATER***
+*/
 func (s *NewsWidgetService) GetGoodNews() (*NewsAPIResponse, error) {
 	url := "https://newsapi.org/v2/everything?domains=goodnewsnetwork.org"
 	request, err := http.NewRequest("GET", url, nil)
@@ -139,6 +144,16 @@ func (s *NewsWidgetService) GetGoodNews() (*NewsAPIResponse, error) {
 	return &newsResponse, nil
 }
 
+/*
+tbh I thought the way I figured out how to get uplifting news was kinda lame and might not be the best feature.
+And I didn't really need any of the db attributes for it, so I thought we could use the categories for
+widget categories that would call different external APIs that might be uplifting based on their type.
+I only had time to do the joke one tonite, but I am looking into inspirational quotes, and fun facts APIs.
+ie Category could be "Sports", "News", "Joke", "Quote", etc.
+idk lmk wat u think
+*/
+
+// Gets a random dad joke
 func (s *NewsWidgetService) GetJoke() (string, error) {
 	url := "https://icanhazdadjoke.com/"
 	request, err := http.NewRequest("GET", url, nil)
