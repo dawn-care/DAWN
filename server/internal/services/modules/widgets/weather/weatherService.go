@@ -122,6 +122,11 @@ func (s *WeatherService) DeleteWeatherWidget(id int) error {
 	return widgets.DeleteWeather(s.db, id)
 }
 
+/*
+Uses OpenWeather API to get coordinates from zipcode, then fetches the weather overview for the day
+If you need an API key for testing you can use this one:
+30d992579f0ac7f70e065cf0afaa070d ***REMOVE LATER***
+*/
 func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (string, error) {
 	url := fmt.Sprintf(
 		"https://api.openweathermap.org/geo/1.0/zip?zip=%s,US&appid=%s",
