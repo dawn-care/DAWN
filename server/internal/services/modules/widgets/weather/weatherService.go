@@ -122,44 +122,36 @@ func (s *WeatherService) DeleteWeatherWidget(id int) error {
 	return widgets.DeleteWeather(s.db, id)
 }
 
-func (s *WeatherService) GetCoordinatesFromZip(zip string) (*CoordinateResponse, error) {
+func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (string, error) {
 	url := fmt.Sprintf(
 		"https://api.openweathermap.org/geo/1.0/zip?zip=%s,US&appid=%s",
-		zip,
+		weather_widget.ZIPCODE,
 		s.apiKey,
 	)
 
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed geocode request: %v", err)
+		return "", fmt.Errorf("failed geocode request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("geocode API returned status %d", resp.StatusCode)
+		return "", fmt.Errorf("geocode API returned status %d", resp.StatusCode)
 	}
 
-	var response CoordinateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed parsing geocode response: %v", err)
-	}
-
-	return &response, nil
-}
-
-func (s *WeatherService) GetWeatherOverview(coordinate_response *CoordinateResponse) (string, error) {
-	if coordinate_response == nil {
-		return "", fmt.Errorf("coordinate response cannot be nil")
+	var coordinate_response CoordinateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&coordinate_response); err != nil {
+		return "", fmt.Errorf("failed parsing geocode response: %v", err)
 	}
 
 	unitsParam := "imperial"
 
-	url := fmt.Sprintf(
+	url = fmt.Sprintf(
 		"https://api.openweathermap.org/data/3.0/onecall/overview?lon=%f&lat=%f&units=%s&appid=%s",
 		coordinate_response.Lon, coordinate_response.Lat, unitsParam, s.apiKey,
 	)
 
-	resp, err := s.client.Get(url)
+	resp, err = s.client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed overview request: %v", err)
 	}

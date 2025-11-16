@@ -11,7 +11,7 @@ import (
 	"server/internal/models/modules/widgets"
 )
 
-type NewsService struct {
+type NewsWidgetService struct {
 	db     *sql.DB
 	apiKey string
 	client *http.Client
@@ -25,8 +25,8 @@ type NewsAPIResponse struct {
 	} `json:"articles"`
 }
 
-func NewNewsService(db *sql.DB, apiKey string) *NewsService {
-	return &NewsService{
+func NewNewsWidgetService(db *sql.DB, apiKey string) *NewsWidgetService {
+	return &NewsWidgetService{
 		db:     db,
 		apiKey: apiKey,
 		client: &http.Client{},
@@ -34,7 +34,7 @@ func NewNewsService(db *sql.DB, apiKey string) *NewsService {
 }
 
 // Create a new news widget module
-func (s *NewsService) CreateNewsWidget(news_widget *widgets.NewsWidget) error {
+func (s *NewsWidgetService) CreateNewsWidget(news_widget *widgets.NewsWidget) error {
 	if news_widget == nil {
 		return errors.New("NewsWidget cannot be nil")
 	}
@@ -45,7 +45,7 @@ func (s *NewsService) CreateNewsWidget(news_widget *widgets.NewsWidget) error {
 }
 
 // Create multiple news widgets in bulk
-func (s *NewsService) CreateNewsWidgetsBulk(news_widgets []widgets.NewsWidget) error {
+func (s *NewsWidgetService) CreateNewsWidgetsBulk(news_widgets []widgets.NewsWidget) error {
 	if len(news_widgets) == 0 {
 		return errors.New("no news widgets to create")
 	}
@@ -58,7 +58,7 @@ func (s *NewsService) CreateNewsWidgetsBulk(news_widgets []widgets.NewsWidget) e
 }
 
 // Retrieve a news widget by its ID
-func (s *NewsService) GetNewsWidgetByID(id int) (*widgets.NewsWidget, error) {
+func (s *NewsWidgetService) GetNewsWidgetByID(id int) (*widgets.NewsWidget, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid NewsWidget ID")
 	}
@@ -73,7 +73,7 @@ func (s *NewsService) GetNewsWidgetByID(id int) (*widgets.NewsWidget, error) {
 }
 
 // Retrieve all news widgets for given carepartner and caregiver
-func (s *NewsService) GetNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.NewsWidget, error) {
+func (s *NewsWidgetService) GetNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.NewsWidget, error) {
 	if carepartner_id <= 0 || caregiver_id <= 0 {
 		return nil, errors.New("invalid Carepartner ID or Caregiver ID")
 	}
@@ -81,7 +81,7 @@ func (s *NewsService) GetNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int
 }
 
 // Retrieve all news widgets for a carepartner
-func (s *NewsService) GetNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.NewsWidget, error) {
+func (s *NewsWidgetService) GetNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.NewsWidget, error) {
 	if carepartner_id <= 0 {
 		return nil, errors.New("invalid Carepartner ID")
 	}
@@ -92,7 +92,7 @@ func (s *NewsService) GetNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, da
 }
 
 // Update an existing news widget
-func (s *NewsService) UpdateNewsWidget(news_widget *widgets.NewsWidget) error {
+func (s *NewsWidgetService) UpdateNewsWidget(news_widget *widgets.NewsWidget) error {
 	if news_widget == nil {
 		return errors.New("NewsWidget cannot be nil")
 	}
@@ -103,7 +103,7 @@ func (s *NewsService) UpdateNewsWidget(news_widget *widgets.NewsWidget) error {
 }
 
 // Delete a news widget by its ID
-func (s *NewsService) DeleteNewsWidget(id int) error {
+func (s *NewsWidgetService) DeleteNewsWidget(id int) error {
 	if id <= 0 {
 		return errors.New("invalid NewsWidget ID")
 	}
@@ -111,11 +111,11 @@ func (s *NewsService) DeleteNewsWidget(id int) error {
 }
 
 // Get total number of news widgets
-func (s *NewsService) GetNewsWidgetStats() (int, error) {
+func (s *NewsWidgetService) GetNewsWidgetStats() (int, error) {
 	return widgets.GetNewsStats(s.db)
 }
 
-func (s *NewsService) GetGoodNews() (*NewsAPIResponse, error) {
+func (s *NewsWidgetService) GetGoodNews() (*NewsAPIResponse, error) {
 	url := "https://newsapi.org/v2/everything?domains=goodnewsnetwork.org"
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -139,7 +139,7 @@ func (s *NewsService) GetGoodNews() (*NewsAPIResponse, error) {
 	return &newsResponse, nil
 }
 
-func (s *NewsService) GetJoke() (string, error) {
+func (s *NewsWidgetService) GetJoke() (string, error) {
 	url := "https://icanhazdadjoke.com/"
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
