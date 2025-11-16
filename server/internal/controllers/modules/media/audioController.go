@@ -4,17 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"mime/multipart"
+	"io"
 
 	models "server/internal/models/modules/media"
 )
 
+const MAX_FILE_SIZE_MB = 100
 // ---- Interface ----
 type AudioServiceInterface interface {
 	CreateAudio(audio *models.AudioMedia) error
+	CreateAudioFile(file multipart.File, handler *multipart.FileHeader, uri string) error
 	GetAudioByID(id int) (*models.AudioMedia, error)
+	GetAudioFile(uri string) (multipart.File, error)
 	GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.AudioMedia, error)
 	UpdateAudio(audio *models.AudioMedia) error
+	UpdateAudioFile(file multipart.File, handler *multipart.FileHeader, uri string) error
 	DeleteAudio(id int) error
+	DeleteAudioFile(uri string) error
 	SearchAudios(keyword string) ([]models.AudioMedia, error)
 	GetMediaStats() (*models.MediaStats, error)
 }
@@ -44,6 +51,36 @@ func (c *AudioController) CreateAudioHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(audio)
 }
 
+// Create a new audio file
+func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(MAX_FILE_SIZE_MB << 20); err != nil {
+        http.Error(w, "failed to parse request", http.StatusBadRequest)
+        return
+    }
+
+	file, handler, err := r.FormFile("file")
+    if err != nil {
+        http.Error(w, "file is required", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+
+	userID := r.FormValue("id")
+	
+	uri := "users/" + userID + "/" + handler.Filename
+
+	if err := c.services.CreateAudioFile(file, handler, uri); err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+	response := map[string]string{
+		"filename": handler.Filename,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 // Get audio by ID
 func (c *AudioController) GetAudioByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
@@ -60,6 +97,34 @@ func (c *AudioController) GetAudioByIDHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	json.NewEncoder(w).Encode(audio)
+}
+
+// Get audio file by ID
+func (c *AudioController) GetAudioFileByIDHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid audio ID", http.StatusBadRequest)
+		return
+	}
+
+	audio, err := c.services.GetAudioByID(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+    file, err := c.services.GetAudioFile(audio.URI)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer file.Close()
+
+    w.Header().Set("Content-Type", "application/octet-stream")
+    w.Header().Set("Content-Disposition", "attachment; filename=\"" + audio.Filename + "\"")
+
+    io.Copy(w, file)
 }
 
 // Get all audios for a carepartner and caregiver
@@ -92,6 +157,36 @@ func (c *AudioController) UpdateAudioHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(audio)
 }
 
+// Update an audio file
+func (c *AudioController) UpdateAudioFileHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(MAX_FILE_SIZE_MB << 20); err != nil {
+        http.Error(w, "failed to parse request", http.StatusBadRequest)
+        return
+    }
+
+	file, handler, err := r.FormFile("file")
+    if err != nil {
+        http.Error(w, "file is required", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
+	
+	userID := r.FormValue("id")
+	
+	uri := "users/" + userID + "/" + handler.Filename
+
+	if err := c.services.UpdateAudioFile(file, handler, uri); err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+	response := map[string]string{
+		"filename": handler.Filename,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 // Delete an audio
 func (c *AudioController) DeleteAudioHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
@@ -101,6 +196,27 @@ func (c *AudioController) DeleteAudioHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := c.services.DeleteAudio(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (c *AudioController) DeleteAudioFileHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid audio ID", http.StatusBadRequest)
+		return
+	}
+
+	audio, err := c.services.GetAudioByID(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := c.services.DeleteAudioFile(audio.URI); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,10 +16,14 @@ import (
 // Mock service implementing AudioServiceInterface
 type mockAudioService struct {
 	CreateAudioFunc                        func(audio *models.AudioMedia) error
+	CreateAudioFileFunc                    func(file multipart.File, handler *multipart.FileHeader, uri string) error
 	GetAudioByIDFunc                       func(id int) (*models.AudioMedia, error)
+	GetAudioFileFunc                       func(uri string) (multipart.File, error)
 	GetAudiosByCarepartnerAndCaregiverFunc func(carepartnerID, caregiverID int) ([]models.AudioMedia, error)
 	UpdateAudioFunc                        func(audio *models.AudioMedia) error
+	UpdateAudioFileFunc                    func(file multipart.File, handler *multipart.FileHeader, uri string) error
 	DeleteAudioFunc                        func(id int) error
+	DeleteAudioFileFunc                    func(uri string) error
 	SearchAudiosFunc                       func(keyword string) ([]models.AudioMedia, error)
 	GetMediaStatsFunc                      func() (*models.MediaStats, error)
 }
@@ -26,8 +31,14 @@ type mockAudioService struct {
 func (m *mockAudioService) CreateAudio(a *models.AudioMedia) error {
 	return m.CreateAudioFunc(a)
 }
+func (m *mockAudioService) CreateAudioFile(f multipart.File, h *multipart.FileHeader, u string) error {
+	return m.CreateAudioFileFunc(f, h, u)
+}
 func (m *mockAudioService) GetAudioByID(id int) (*models.AudioMedia, error) {
 	return m.GetAudioByIDFunc(id)
+}
+func (m *mockAudioService) GetAudioFile(uri string) (multipart.File, error) {
+	return m.GetAudioFileFunc(uri)
 }
 func (m *mockAudioService) GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.AudioMedia, error) {
 	return m.GetAudiosByCarepartnerAndCaregiverFunc(carepartnerID, caregiverID)
@@ -35,8 +46,14 @@ func (m *mockAudioService) GetAudiosByCarepartnerAndCaregiver(carepartnerID, car
 func (m *mockAudioService) UpdateAudio(a *models.AudioMedia) error {
 	return m.UpdateAudioFunc(a)
 }
+func (m *mockAudioService) UpdateAudioFile(f multipart.File, h *multipart.FileHeader, u string) error {
+	return m.UpdateAudioFileFunc(f, h, u)
+}
 func (m *mockAudioService) DeleteAudio(id int) error {
 	return m.DeleteAudioFunc(id)
+}
+func (m *mockAudioService) DeleteAudioFile(uri string) error {
+	return m.DeleteAudioFileFunc(uri)
 }
 func (m *mockAudioService) SearchAudios(keyword string) ([]models.AudioMedia, error) {
 	return m.SearchAudiosFunc(keyword)
