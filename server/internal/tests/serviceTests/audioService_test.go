@@ -68,17 +68,14 @@ func TestCreateAudioFileService(t *testing.T) {
 		t.Fatalf("failed to create form file: %v", err)
 	}
 
-	// Copy file content into the form field
 	if _, err := io.Copy(part, file); err != nil {
 		t.Fatalf("failed to copy file content: %v", err)
 	}
 
-	// Close the writer to finalize the form
 	if err := writer.Close(); err != nil {
 		t.Fatalf("failed to close writer: %v", err)
 	}
 
-	// Create the HTTP request
 	r := httptest.NewRequest(http.MethodPost, "/upload", body)
 	r.Header.Set("Content-Type", writer.FormDataContentType())
 
@@ -234,17 +231,14 @@ func TestUpdateAudioFileService(t *testing.T) {
 		t.Fatalf("failed to create form file: %v", err)
 	}
 
-	// Copy file content into the form field
 	if _, err := io.Copy(part, file); err != nil {
 		t.Fatalf("failed to copy file content: %v", err)
 	}
 
-	// Close the writer to finalize the form
 	if err := writer.Close(); err != nil {
 		t.Fatalf("failed to close writer: %v", err)
 	}
 
-	// Create the HTTP request
 	r := httptest.NewRequest(http.MethodPost, "/upload", body)
 	r.Header.Set("Content-Type", writer.FormDataContentType())
 

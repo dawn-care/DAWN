@@ -204,7 +204,7 @@ func (s *AudioService) DeleteAudioFile(uri string) error {
 	}
 	removeErr := s.BLOB.RemoveObject(context.Background(), s.Bucket, uri, minio.RemoveObjectOptions{})
     if removeErr != nil {
-        return fmt.Errorf("unable to fetch audio: %w", removeErr)
+        return fmt.Errorf("unable to delete audio: %w", removeErr)
     }
 	return nil
 }

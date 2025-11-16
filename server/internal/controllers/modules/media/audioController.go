@@ -9,8 +9,15 @@ import (
 
 	models "server/internal/models/modules/media"
 )
+var VALID_AUDIO_TYPES = map[string]bool{
+    "audio/mpeg": true, 
+    "audio/wav": true,
+    "audio/ogg": true,
+    "audio/flac": true,
+    "audio/aac": true,
+}
 
-const MAX_FILE_SIZE_MB = 100
+const MAX_AUDIO_FILE_SIZE_MB = 100
 // ---- Interface ----
 type AudioServiceInterface interface {
 	CreateAudio(audio *models.AudioMedia) error
@@ -53,7 +60,7 @@ func (c *AudioController) CreateAudioHandler(w http.ResponseWriter, r *http.Requ
 
 // Create a new audio file
 func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(MAX_FILE_SIZE_MB << 20); err != nil {
+	if err := r.ParseMultipartForm(MAX_AUDIO_FILE_SIZE_MB << 20); err != nil {
         http.Error(w, "failed to parse request", http.StatusBadRequest)
         return
     }
@@ -64,6 +71,19 @@ func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.
         return
     }
     defer file.Close()
+
+	buf := make([]byte, 512)
+	_, err = file.Read(buf)
+	if err != nil {
+		http.Error(w, "unable to read file content", http.StatusBadRequest)
+		return
+	}
+
+	detectedType := http.DetectContentType(buf)
+	if !VALID_AUDIO_TYPES[detectedType] {
+		http.Error(w, "file is not a valid audio file", http.StatusBadRequest)
+		return
+	}
 
 	userID := r.FormValue("id")
 	
@@ -159,7 +179,7 @@ func (c *AudioController) UpdateAudioHandler(w http.ResponseWriter, r *http.Requ
 
 // Update an audio file
 func (c *AudioController) UpdateAudioFileHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(MAX_FILE_SIZE_MB << 20); err != nil {
+	if err := r.ParseMultipartForm(MAX_AUDIO_FILE_SIZE_MB << 20); err != nil {
         http.Error(w, "failed to parse request", http.StatusBadRequest)
         return
     }
@@ -170,6 +190,19 @@ func (c *AudioController) UpdateAudioFileHandler(w http.ResponseWriter, r *http.
         return
     }
     defer file.Close()
+
+	buf := make([]byte, 512)
+	_, err = file.Read(buf)
+	if err != nil {
+		http.Error(w, "unable to read file content", http.StatusBadRequest)
+		return
+	}
+
+	detectedType := http.DetectContentType(buf)
+	if !VALID_AUDIO_TYPES[detectedType] {
+		http.Error(w, "file is not a valid audio file", http.StatusBadRequest)
+		return
+	}
 	
 	userID := r.FormValue("id")
 	
@@ -203,6 +236,7 @@ func (c *AudioController) DeleteAudioHandler(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Delete an audio file
 func (c *AudioController) DeleteAudioFileHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {

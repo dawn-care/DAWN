@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,10 +16,14 @@ import (
 // Mock service implementing VideoServiceInterface
 type mockVideoService struct {
 	CreateVideoFn                        func(*models.VideoMedia) error
+	CreateVideoFileFn                    func(multipart.File, *multipart.FileHeader, string) error
 	GetVideoByIDFn                       func(int) (*models.VideoMedia, error)
+	GetVideoFileFn                       func(string) (multipart.File, error)
 	GetVideosByCarepartnerAndCaregiverFn func(int, int) ([]models.VideoMedia, error)
 	UpdateVideoFn                        func(*models.VideoMedia) error
+	UpdateVideoFileFn					 func(multipart.File, *multipart.FileHeader, string) error
 	DeleteVideoFn                        func(int) error
+	DeleteVideoFileFn					 func(string) error
 	GetVideoStatsFn                      func() (int, error)
 }
 
@@ -26,8 +31,16 @@ func (m *mockVideoService) CreateVideo(v *models.VideoMedia) error {
 	return m.CreateVideoFn(v)
 }
 
+func (m *mockVideoService) CreateVideoFile(f multipart.File, h *multipart.FileHeader, u string) error  {
+	return m.CreateVideoFileFn(f, h, u)
+}
+
 func (m *mockVideoService) GetVideoByID(id int) (*models.VideoMedia, error) {
 	return m.GetVideoByIDFn(id)
+}
+
+func (m *mockVideoService) GetVideoFile(u string) (multipart.File, error) {
+	return m.GetVideoFileFn(u)
 }
 
 func (m *mockVideoService) GetVideosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.VideoMedia, error) {
@@ -38,8 +51,16 @@ func (m *mockVideoService) UpdateVideo(v *models.VideoMedia) error {
 	return m.UpdateVideoFn(v)
 }
 
+func (m *mockVideoService) UpdateVideoFile(f multipart.File, h *multipart.FileHeader, u string) error {
+	return m.UpdateVideoFileFn(f, h, u)
+}
+
 func (m *mockVideoService) DeleteVideo(id int) error {
 	return m.DeleteVideoFn(id)
+}
+
+func (m *mockVideoService) DeleteVideoFile(u string) error {
+	return m.DeleteVideoFileFn(u)
 }
 
 func (m *mockVideoService) GetVideoStats() (int, error) {

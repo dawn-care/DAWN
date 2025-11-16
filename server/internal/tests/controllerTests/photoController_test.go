@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,16 +21,21 @@ type mockPhotoService struct {
 	deleteErr   error
 	statsErr    error
 	photoResult *models.PhotoMedia
+	photoFile   multipart.File
 	photoList   []models.PhotoMedia
 	statsResult int
 }
 
-func (m *mockPhotoService) CreatePhoto(p *models.PhotoMedia) error                        			 { return m.createErr }
-func (m *mockPhotoService) GetPhotoByID(id int) (*models.PhotoMedia, error)                			 { return m.photoResult, m.getErr }
-func (m *mockPhotoService) GetPhotosByCarepartnerAndCaregiver(c, g int) ([]models.PhotoMedia, error) { return m.photoList, m.getErr }
-func (m *mockPhotoService) UpdatePhoto(p *models.PhotoMedia) error 									 { return m.updateErr }
-func (m *mockPhotoService) DeletePhoto(id int) error               									 { return m.deleteErr }
-func (m *mockPhotoService) GetPhotoStats() (int, error)           									 { return m.statsResult, m.statsErr }
+func (m *mockPhotoService) CreatePhoto(p *models.PhotoMedia) error                        			 				{ return m.createErr }
+func (m *mockPhotoService) CreatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error	{ return m.createErr }
+func (m *mockPhotoService) GetPhotoByID(id int) (*models.PhotoMedia, error)                			 				{ return m.photoResult, m.getErr }
+func (m *mockPhotoService) GetPhotoFile(uri string) (multipart.File, error)											{ return m.photoFile, m.getErr }
+func (m *mockPhotoService) GetPhotosByCarepartnerAndCaregiver(c, g int) ([]models.PhotoMedia, error) 				{ return m.photoList, m.getErr }
+func (m *mockPhotoService) UpdatePhoto(p *models.PhotoMedia) error 									 				{ return m.updateErr }
+func (m *mockPhotoService) UpdatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error	{ return m.updateErr }
+func (m *mockPhotoService) DeletePhoto(id int) error               									 				{ return m.deleteErr }
+func (m *mockPhotoService) DeletePhotoFile(uri string) error														{ return m.deleteErr }
+func (m *mockPhotoService) GetPhotoStats() (int, error)           									 				{ return m.statsResult, m.statsErr }
 
 // --- Tests ---
 
