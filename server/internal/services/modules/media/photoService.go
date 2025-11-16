@@ -39,7 +39,10 @@ func (s *PhotoService) CreatePhotoFile(file multipart.File, handler *multipart.F
 		return errors.New("file data cannot be nil")
 	}
 	if handler == nil {
-		return errors.New("file header cannot be nil")
+    	return errors.New("file header cannot be nil")
+	}
+	if uri == "" {
+		return errors.New("uri cannot be empty")
 	}
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
@@ -111,6 +114,15 @@ func (s *PhotoService) UpdatePhoto(photo *media.PhotoMedia) error {
 
 // Update an existing photo file
 func (s *PhotoService) UpdatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
+	if file == nil {
+		return errors.New("file data cannot be nil")
+	}
+	if handler == nil {
+    	return errors.New("file header cannot be nil")
+	}
+	if uri == "" {
+		return errors.New("uri cannot be empty")
+	}
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"

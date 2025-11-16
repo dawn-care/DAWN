@@ -43,6 +43,9 @@ func (s *AudioService) CreateAudioFile(file multipart.File, handler *multipart.F
 	if handler == nil {
     	return errors.New("file header cannot be nil")
 	}
+	if uri == "" {
+		return errors.New("uri cannot be empty")
+	}
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -173,6 +176,15 @@ func (s *AudioService) UpdateAudio(audio *media.AudioMedia) error {
 }
 
 func (s *AudioService) UpdateAudioFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
+	if file == nil {
+		return errors.New("file data cannot be nil")
+	}
+	if handler == nil {
+    	return errors.New("file header cannot be nil")
+	}
+	if uri == "" {
+		return errors.New("uri cannot be empty")
+	}
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
