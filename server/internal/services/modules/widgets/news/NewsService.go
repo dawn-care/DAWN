@@ -2,8 +2,11 @@ package news
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 
 	"server/internal/models/modules/widgets"
 )
@@ -116,24 +119,24 @@ func (s *NewsService) GetGoodNews() (*NewsAPIResponse, error) {
 	url := "https://newsapi.org/v2/everything?domains=goodnewsnetwork.org"
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed creating http request: %v", err)
+		return nil, fmt.Errorf("failed creating http request: %v", err)
 	}
-	reuest.Header.Set("X-Api-Key", s.apiKey)
+	request.Header.Set("X-Api-Key", s.apiKey)
 	response, err := s.client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed news API request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("news API returned status %d", resp.StatusCode)
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("news API returned status %d", response.StatusCode)
 	}
 
 	var newsResponse NewsAPIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&newsResponse); err != nil {
-		return "", fmt.Errorf("failed parsing news API response: %v", err)
+	if err := json.NewDecoder(response.Body).Decode(&newsResponse); err != nil {
+		return nil, fmt.Errorf("failed parsing news API response: %v", err)
 	}
-	return newsResponse, nil
+	return &newsResponse, nil
 }
 
 func (s *NewsService) GetJoke() (string, error) {
@@ -151,7 +154,8 @@ func (s *NewsService) GetJoke() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed reading joke API response: %v", err)
 	}
+	defer response.Body.Close()
+
 	bodyStr := string(body)
-	defer resp.Body.Close()
 	return bodyStr, nil
 }
