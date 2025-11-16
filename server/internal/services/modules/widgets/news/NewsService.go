@@ -9,11 +9,25 @@ import (
 )
 
 type NewsService struct {
-	db *sql.DB
+	db     *sql.DB
+	apiKey string
+	client *http.Client
 }
 
-func NewNewsService(db *sql.DB) *NewsService {
-	return &NewsService{db: db}
+type NewsAPIResponse struct {
+	Articles []struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		URLToImage  string `json:"urlToImage"`
+	} `json:"articles"`
+}
+
+func NewNewsService(db *sql.DB, apiKey string) *NewsService {
+	return &NewsService{
+		db:     db,
+		apiKey: apiKey,
+		client: &http.Client{},
+	}
 }
 
 // Create a new news widget module
@@ -96,4 +110,48 @@ func (s *NewsService) DeleteNewsWidget(id int) error {
 // Get total number of news widgets
 func (s *NewsService) GetNewsWidgetStats() (int, error) {
 	return widgets.GetNewsStats(s.db)
+}
+
+func (s *NewsService) GetGoodNews() (*NewsAPIResponse, error) {
+	url := "https://newsapi.org/v2/everything?domains=goodnewsnetwork.org"
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed creating http request: %v", err)
+	}
+	reuest.Header.Set("X-Api-Key", s.apiKey)
+	response, err := s.client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed news API request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("news API returned status %d", resp.StatusCode)
+	}
+
+	var newsResponse NewsAPIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&newsResponse); err != nil {
+		return "", fmt.Errorf("failed parsing news API response: %v", err)
+	}
+	return newsResponse, nil
+}
+
+func (s *NewsService) GetJoke() (string, error) {
+	url := "https://icanhazdadjoke.com/"
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed creating http request: %v", err)
+	}
+	request.Header.Set("Accept", "text/plain")
+	response, err := s.client.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("failed joke API request: %v", err)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed reading joke API response: %v", err)
+	}
+	bodyStr := string(body)
+	defer resp.Body.Close()
+	return bodyStr, nil
 }

@@ -2,19 +2,43 @@ package weather
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 
 	"server/internal/models/modules/widgets"
 )
 
 type WeatherService struct {
-	db *sql.DB
+	db     *sql.DB
+	apiKey string
+	client *http.Client
 }
 
-func NewWeatherService(db *sql.DB) *WeatherService {
-	return &WeatherService{db: db}
+type CoordinateResponse struct {
+	Lat  float64 `json:"lat"`
+	Lon  float64 `json:"lon"`
+	Name string  `json:"name"`
+	Zip  string  `json:"zip"`
+}
+
+type OneCallOverviewResponse struct {
+	Lat             float64 `json:"lat"`
+	Lon             float64 `json:"lon"`
+	TZ              string  `json:"tz"`
+	Date            string  `json:"date"`
+	Units           string  `json:"units"`
+	WeatherOverview string  `json:"weather_overview"`
+}
+
+func NewWeatherService(db *sql.DB, apiKey string) *WeatherService {
+	return &WeatherService{
+		db:     db,
+		apiKey: apiKey,
+		client: &http.Client{},
+	}
 }
 
 // Create a new weather widget module
@@ -96,6 +120,65 @@ func (s *WeatherService) DeleteWeatherWidget(id int) error {
 		return errors.New("invalid WeatherWidget ID")
 	}
 	return widgets.DeleteWeather(s.db, id)
+}
+
+func (s *WeatherService) GetCoordinatesFromZip(zip string) (*CoordinateResponse, error) {
+	url := fmt.Sprintf(
+		"https://api.openweathermap.org/geo/1.0/zip?zip=%s,US&appid=%s",
+		zip,
+		s.apiKey,
+	)
+
+	resp, err := s.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed geocode request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("geocode API returned status %d", resp.StatusCode)
+	}
+
+	var response CoordinateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed parsing geocode response: %v", err)
+	}
+
+	return &response, nil
+}
+
+func (s *WeatherService) GetWeatherOverview(coordinate_response *CoordinateResponse) (string, error) {
+	if coordinate_response == nil {
+		return "", fmt.Errorf("coordinate response cannot be nil")
+	}
+
+	unitsParam := "imperial"
+
+	url := fmt.Sprintf(
+		"https://api.openweathermap.org/data/3.0/onecall/overview?lon=%f&lat=%f&units=%s&appid=%s",
+		coordinate_response.Lon, coordinate_response.Lat, unitsParam, s.apiKey,
+	)
+
+	resp, err := s.client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed overview request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("overview API returned status %d", resp.StatusCode)
+	}
+
+	var oneCallResponse OneCallOverviewResponse
+	if err := json.NewDecoder(resp.Body).Decode(&oneCallResponse); err != nil {
+		return "", fmt.Errorf("failed parsing overview response: %v", err)
+	}
+
+	if oneCallResponse.WeatherOverview == "" {
+		return "", fmt.Errorf("overview response missing weather_overview")
+	}
+
+	return oneCallResponse.WeatherOverview, nil
 }
 
 // Get total number of weather widgets
