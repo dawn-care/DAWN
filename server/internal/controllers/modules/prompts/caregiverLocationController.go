@@ -27,7 +27,7 @@ func NewCaregiverLocationController(services CaregiverLocationServiceInterface) 
 
 // Create a new caregiver location
 func (c *CaregiverLocationController) CreateCaregiverLocationHandler(w http.ResponseWriter, r *http.Request) {
-	var loc models.CaregiverLocationModel
+	var loc models.CaregiverLocationPrompt
 
 	if err := json.NewDecoder(r.Body).Decode(&loc); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
