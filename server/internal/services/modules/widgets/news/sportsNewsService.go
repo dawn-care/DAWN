@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"time"
 
 	"server/internal/models/modules/widgets"
@@ -22,7 +21,7 @@ type SportAPIResponse struct {
 		Competitions []struct {
 			Date        string `json:"date"`
 			Competitors []struct {
-				HomeAway bool `json:"homeAway"`
+				HomeAway string `json:"homeAway"`
 				Score    struct {
 					Value float64 `json:"value"`
 				} `json:"score"`
@@ -37,11 +36,10 @@ type SportAPIResponse struct {
 
 type Team struct {
 	Name     string
-	HomeAway bool
+	HomeAway string
 	Score    float64
 }
 
-var VALID_SPORTS_LEAGUES = []string{"nfl", "nba", "mlb", "nhl"}
 var SPORTS_LEAGUES_MAP = map[string]string{"nfl": "football", "nba": "basketball", "mlb": "baseball", "nhl": "hockey"}
 
 func NewSportsNewsWidgetService(db *sql.DB) *SportsNewsWidgetService {
@@ -59,7 +57,7 @@ func (s *SportsNewsWidgetService) CreateSportsNewsWidget(sports_news_widget *wid
 	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" || sports_news_widget.CATEGORY == "" {
 		return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
 	}
-	if slices.Contains(VALID_SPORTS_LEAGUES, sports_news_widget.COUNTRY) {
+	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
 		return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
 	}
 	return widgets.CreateNews(s.db, sports_news_widget)
@@ -74,7 +72,7 @@ func (s *SportsNewsWidgetService) CreateSportsNewsWidgetsBulk(sports_news_widget
 		if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" || sports_news_widget.CATEGORY == "" {
 			return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
 		}
-		if slices.Contains(VALID_SPORTS_LEAGUES, sports_news_widget.COUNTRY) {
+		if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
 			return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
 		}
 	}
@@ -126,7 +124,7 @@ func (s *SportsNewsWidgetService) UpdateSportsNewsWidget(sports_news_widget *wid
 	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" || sports_news_widget.CATEGORY == "" {
 		return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
 	}
-	if slices.Contains(VALID_SPORTS_LEAGUES, sports_news_widget.COUNTRY) {
+	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
 		return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
 	}
 	return widgets.UpdateNews(s.db, sports_news_widget)
@@ -146,15 +144,15 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 }
 
 // Gets the the schedule for a team then calls the helper function to parse that data into a game summary
-func (s *SportsNewsWidgetService) GetTeamGame(league, team string) (string, error) {
-	if league == "" || team == "" {
+func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *widgets.NewsWidget) (string, error) {
+	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
 		return "", errors.New("league and team cannot be empty")
 	}
-	sport := SPORTS_LEAGUES_MAP[league]
+	sport := SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY]
 
 	url := fmt.Sprintf(
 		"http://site.api.espn.com/apis/site/v2/sports/%s/%s/teams/%s/schedule",
-		sport, league, team,
+		sport, sports_news_widget.COUNTRY, sports_news_widget.LANGUAGE,
 	)
 	resp, err := s.client.Get(url)
 	if err != nil {
@@ -169,7 +167,7 @@ func (s *SportsNewsWidgetService) GetTeamGame(league, team string) (string, erro
 		return "", fmt.Errorf("Failed to parse team schedule response: %v", err)
 	}
 
-	game_summary, err := CreateGameSummary(&apiResponse, team)
+	game_summary, err := CreateGameSummary(&apiResponse, sports_news_widget.LANGUAGE)
 	if err != nil {
 		return "", fmt.Errorf("Failed to create game summary: %v", err)
 	}
@@ -186,7 +184,7 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (string, erro
 	game_index := 0
 	now := time.Now().UTC()
 	for i := len(apiResponse.Events) - 1; i >= 0; i-- {
-		date, err := time.Parse(time.RFC3339, apiResponse.Events[i].Competitions[0].Date)
+		date, err := time.Parse("2006-01-02T15:04Z", apiResponse.Events[i].Competitions[0].Date)
 		if err != nil {
 			return "", err
 		}
@@ -215,16 +213,16 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (string, erro
 	}
 
 	if user_team.Score > opponent_team.Score {
-		if user_team.HomeAway {
-			return fmt.Sprintf("In the last game, your team, the %s won against the %s at home, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
+		if user_team.HomeAway == "home" {
+			return fmt.Sprintf("In the last game, your team the %s won against the %s at home, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
 		} else {
-			return fmt.Sprintf("In the last game, your team, the %s won against the %s away, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
+			return fmt.Sprintf("In the last game, your team the %s won against the %s away, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
 		}
 	} else {
-		if user_team.HomeAway {
-			return fmt.Sprintf("In the last game, your team, the %s lost against the %s at home, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
+		if user_team.HomeAway == "home" {
+			return fmt.Sprintf("In the last game, your team the %s lost against the %s at home, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
 		} else {
-			return fmt.Sprintf("In the last game, your team, the %s lost against the %s away, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
+			return fmt.Sprintf("In the last game, your team the %s lost against the %s away, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
 		}
 	}
 }

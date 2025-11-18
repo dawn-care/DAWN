@@ -117,8 +117,6 @@ func (s *NewsWidgetService) GetNewsWidgetStats() (int, error) {
 
 /*
 Uses News API to search for reacent stories from goodnewsnetwork.org
-If you need an API key for testing you can use this one:
-3bc060a2d2c146bf92e6d9b94341d739 ***REMOVE LATER***
 */
 func (s *NewsWidgetService) GetGoodNews() (*NewsAPIResponse, error) {
 	url := "https://newsapi.org/v2/everything?domains=goodnewsnetwork.org"
