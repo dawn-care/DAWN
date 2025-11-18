@@ -33,18 +33,6 @@ services:
     networks:
       - app-network
 
-  carepartner:
-    build:
-      context: ./carepartner
-      dockerfile: Dockerfile
-    container_name: carepartner
-    ports:
-      - "3002:80"
-    depends_on:
-      - server
-    networks:
-      - app-network
-
   db:
     image: postgres:15
     environment:
