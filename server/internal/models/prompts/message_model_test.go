@@ -1,98 +1,107 @@
 package prompts
 
 import (
-	"fmt"
-	"log"
+	"regexp"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 )
 
-// Uses the same ConnectToDB as caregiver_location_model_test
+// CREATE
 
-// Insert single message
 func TestCreateMessage(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
 	message := &MessagePrompt{
 		Message: "We love you!!",
 		URI:     "C:\\image1.png",
 	}
-	if err := CreateMessage(db, message); err != nil {
-		log.Fatal("CreateMessage failed:", err)
-	}
-	fmt.Println("Inserted message:", message.ID)
 
-	// Clean up
-	if err := DeleteMessage(db, message.ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		INSERT INTO "MessagePrompt" (message, image_uri)
+		VALUES ($1, $2)
+		RETURNING id;
+	`)).
+		WithArgs(message.Message, message.URI).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+	err := CreateMessage(db, message)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, message.ID)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Read message by ID
+// READ
+
 func TestReadMessageByID(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	message := &MessagePrompt{
-		Message: "We love you!!",
-		URI:     "C:\\image1.png",
-	}
-	if err := CreateMessage(db, message); err != nil {
-		log.Fatal("CreateMessage failed:", err)
-	}
+	// Column names must match the function: image_uri
+	rows := sqlmock.NewRows([]string{"id", "message", "image_uri"}).
+		AddRow(1, "We love you!!", "C:\\image1.png")
 
-	got, err := GetMessageByID(db, message.ID)
-	if err != nil {
-		log.Fatal("GetMessageByID failed:", err)
-	}
-	fmt.Println("Got message:", got)
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, message, image_uri
+		FROM "MessagePrompt"
+		WHERE id = $1;
+	`)).
+		WithArgs(1).
+		WillReturnRows(rows)
 
-	// Clean up
-	if err := DeleteMessage(db, message.ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	got, err := GetMessageByID(db, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, got)
+	assert.Equal(t, "We love you!!", got.Message)
+	assert.Equal(t, "C:\\image1.png", got.URI)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Update message
+// UPDATE
+
 func TestUpdateMessage(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
 	message := &MessagePrompt{
-		Message: "We love you!!",
+		ID:      1,
+		Message: "Don't forget to drink water!",
 		URI:     "C:\\image1.png",
 	}
-	if err := CreateMessage(db, message); err != nil {
-		log.Fatal("CreateMessage failed:", err)
-	}
 
-	message.Message = "Don't forget to drink water!"
-	if err := UpdateMessagePrompt(db, message); err != nil {
-		log.Fatal("UpdateMessagePrompt failed:", err)
-	}
-	fmt.Println("Updated message:", message.ID)
+	mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE "MessagePrompt"
+		SET message = $1, image_uri = $2
+		WHERE id = $3;
+	`)).
+		WithArgs(message.Message, message.URI, message.ID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	// Clean up
-	if err := DeleteMessage(db, message.ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	err := UpdateMessagePrompt(db, message)
+	assert.NoError(t, err)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Delete message
+// DELETE
+
 func TestDeleteMessage(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	message := &MessagePrompt{
-		Message: "We love you!!",
-		URI:     "C:\\image1.png",
-	}
-	if err := CreateMessage(db, message); err != nil {
-		log.Fatal("CreateMessage failed:", err)
-	}
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE FROM "MessagePrompt"
+		WHERE id = $1;
+	`)).
+		WithArgs(1).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	if err := DeleteMessage(db, message.ID); err != nil {
-		log.Fatal("DeleteMessage failed:", err)
-	}
-	fmt.Println("Deleted message:", message.ID)
+	err := DeleteMessage(db, 1)
+	assert.NoError(t, err)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

@@ -1,151 +1,184 @@
 package widgets
 
 import (
+	"regexp"
 	"testing"
 
-	_ "github.com/lib/pq"
-	// "github.com/joho/godotenv"
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 )
 
-// Helper Function to Clear Test News Table
-func clearNewsTable(t *testing.T) {
-	_, err := testDB.Exec(`DELETE FROM "NewsWidget";`)
-	if err != nil {
-		t.Fatalf("Failed to clear table: %v", err)
-	}
-}
+// CREATE
 
-// Tests CreateNews and GetNewsByID
 func TestCreateNewsWidget(t *testing.T) {
-	clearNewsTable(t)
+	db, mock := setupMockDB(t)
+	defer db.Close()
 
-	news_widget := &NewsWidget{
+	w := &NewsWidget{
 		CATEGORY: "Animals",
 		LANGUAGE: "en",
 		COUNTRY:  "us",
 	}
 
-	err := CreateNews(testDB, news_widget)
-	if err != nil {
-		t.Fatalf("CreateNews Failed: %v", err)
-	}
-	if news_widget.ID == 0 {
-		t.Errorf("News Widget ID Not Set")
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		INSERT INTO "NewsWidget" (category, language, country)
+		VALUES ($1, $2, $3)
+		RETURNING id;
+	`)).
+		WithArgs(w.CATEGORY, w.LANGUAGE, w.COUNTRY).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
-	found_widget, err := GetNewsByID(testDB, news_widget.ID)
-	if err != nil {
-		t.Fatalf("GetNewsByID Failed: %v", err)
-	}
-	if found_widget == nil {
-		t.Fatalf("Widget Not Found")
-	}
-	if found_widget.CATEGORY != "Animals" {
-		t.Errorf("Unexpected Widget Returned (CreateNews): %+v", found_widget)
-	}
-	if found_widget.LANGUAGE != "en" {
-		t.Errorf("Unexpected Widget Returned (CreateNews): %+v", found_widget)
-	}
-	if found_widget.COUNTRY != "us" {
-		t.Errorf("Unexpected Widget Returned (CreateNews): %+v", found_widget)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, category, language, country
+		FROM "NewsWidget"
+		WHERE id = $1;
+	`)).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "category", "language", "country",
+		}).AddRow(1, "Animals", "en", "us"))
+
+	err := CreateNews(db, w)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, w.ID)
+
+	found, err := GetNewsByID(db, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, "Animals", found.CATEGORY)
+	assert.Equal(t, "en", found.LANGUAGE)
+	assert.Equal(t, "us", found.COUNTRY)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Tests UpdateNews
+func TestCreateNewsBulkWidgets(t *testing.T) {
+	db, mock := setupMockDB(t)
+	defer db.Close()
+
+	widgets := []NewsWidget{
+		{CATEGORY: "Animals", LANGUAGE: "en", COUNTRY: "us"},
+		{CATEGORY: "Charity", LANGUAGE: "fr", COUNTRY: "ca"},
+		{CATEGORY: "Good News", LANGUAGE: "es", COUNTRY: "mx"},
+	}
+
+	mock.ExpectBegin()
+
+	mock.ExpectPrepare(regexp.QuoteMeta(`
+		INSERT INTO "NewsWidget" (category, language, country)
+		VALUES ($1, $2, $3)
+		RETURNING id;
+	`))
+
+	for i, w := range widgets {
+		mock.ExpectQuery(regexp.QuoteMeta(`
+			INSERT INTO "NewsWidget" (category, language, country)
+			VALUES ($1, $2, $3)
+			RETURNING id;
+		`)).
+			WithArgs(w.CATEGORY, w.LANGUAGE, w.COUNTRY).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(i + 1))
+	}
+
+	mock.ExpectCommit()
+
+	err := CreateNewsBulk(db, widgets)
+	assert.NoError(t, err)
+
+	for i, w := range widgets {
+		assert.Equal(t, i+1, w.ID)
+	}
+
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// RETRIEVE
+
 func TestUpdateNewsWidget(t *testing.T) {
-	clearNewsTable(t)
+	db, mock := setupMockDB(t)
+	defer db.Close()
 
-	news_widget := &NewsWidget{
+	w := &NewsWidget{
+		ID:       1,
 		CATEGORY: "Animals",
-		LANGUAGE: "en",
+		LANGUAGE: "es",
 		COUNTRY:  "us",
 	}
 
-	err := CreateNews(testDB, news_widget)
-	if err != nil {
-		t.Fatalf("CreateNews Failed: %v", err)
-	}
+	mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE "NewsWidget"
+		SET category = $1, language = $2, country = $3
+		WHERE id = $4;
+	`)).
+		WithArgs(w.CATEGORY, w.LANGUAGE, w.COUNTRY, w.ID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	news_widget.LANGUAGE = "es"
-	err = UpdateNews(testDB, news_widget)
-	if err != nil {
-		t.Fatalf("UpdateNews Failed: %v", err)
-	}
-	found_widget, _ := GetNewsByID(testDB, news_widget.ID)
-	if found_widget.LANGUAGE != "es" {
-		t.Errorf("Unexpected Widget Returned (UpdateNews): %+v", found_widget)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, category, language, country
+		FROM "NewsWidget"
+		WHERE id = $1;
+	`)).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "category", "language", "country",
+		}).AddRow(1, "Animals", "es", "us"))
+
+	err := UpdateNews(db, w)
+	assert.NoError(t, err)
+
+	found, err := GetNewsByID(db, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, "es", found.LANGUAGE)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Tests DeleteNews
+// DELETE
 
 func TestDeleteNewsWidget(t *testing.T) {
-	clearNewsTable(t)
+	db, mock := setupMockDB(t)
+	defer db.Close()
 
-	news_widget := &NewsWidget{
-		CATEGORY: "Animals",
-		LANGUAGE: "en",
-		COUNTRY:  "us",
-	}
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE FROM "NewsWidget"
+		WHERE id = $1;
+	`)).
+		WithArgs(1).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err := CreateNews(testDB, news_widget)
-	if err != nil {
-		t.Fatalf("CreateNews Failed: %v", err)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, category, language, country
+		FROM "NewsWidget"
+		WHERE id = $1;
+	`)).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{}))
 
-	err = DeleteNews(testDB, news_widget.ID)
-	if err != nil {
-		t.Fatalf("DeleteNews Failed: %v", err)
-	}
-	found_widget, _ := GetNewsByID(testDB, news_widget.ID)
-	if found_widget != nil {
-		t.Errorf("Unexpected Widget Returned (DeleteNews): %+v", found_widget)
-	}
+	err := DeleteNews(db, 1)
+	assert.NoError(t, err)
+
+	found, err := GetNewsByID(db, 1)
+	assert.NoError(t, err)
+	assert.Nil(t, found)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Tests CreateNewsBulk
-func TestCreateNewsBulkWidgets(t *testing.T) {
-	clearNewsTable(t)
+// ANALYSIS/STATS
 
-	news_widgets := []NewsWidget{
-		{CATEGORY: "Animals", LANGUAGE: "en", COUNTRY: "us"},
-		{CATEGORY: "Charity", LANGUAGE: "fr", COUNTRY: "ca"},
-		{CATEGORY: "Good News", LANGUAGE: "es", COUNTRY: "mx"},
-	}
-	err := CreateNewsBulk(testDB, news_widgets)
-	if err != nil {
-		t.Fatalf("CreateNewsBulk Failed: %v", err)
-	}
-	found_widget, _ := GetNewsByID(testDB, news_widgets[0].ID)
-	if found_widget == nil {
-		t.Error("CreateNewsBulk widget[0] Not Found")
-	}
-	found_widget, _ = GetNewsByID(testDB, news_widgets[1].ID)
-	if found_widget == nil {
-		t.Error("CreateNewsBulk widget[1] Not Found")
-	}
-	found_widget, _ = GetNewsByID(testDB, news_widgets[2].ID)
-	if found_widget == nil {
-		t.Error("CreateNewsBulk widget[2] Not Found")
-	}
-}
-
-// Test GetNewsStats
 func TestGetNewsStatsWidget(t *testing.T) {
-	clearNewsTable(t)
+	db, mock := setupMockDB(t)
+	defer db.Close()
 
-	news_widgets := []NewsWidget{
-		{CATEGORY: "Animals", LANGUAGE: "en", COUNTRY: "us"},
-		{CATEGORY: "Charity", LANGUAGE: "fr", COUNTRY: "ca"},
-		{CATEGORY: "Good News", LANGUAGE: "es", COUNTRY: "mx"},
-	}
-	err := CreateNewsBulk(testDB, news_widgets)
-	if err != nil {
-		t.Fatalf("CreateNewsBulk Failed: %v", err)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT COUNT(*)
+		FROM "NewsWidget";
+	`)).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
 
-	count, _ := GetNewsStats(testDB)
-	if count != 3 {
-		t.Errorf("Unexpected Count Returned: %d", count)
-	}
+	count, err := GetNewsStats(db)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

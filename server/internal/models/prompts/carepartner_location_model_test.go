@@ -1,115 +1,101 @@
 package prompts
 
 import (
-	"fmt"
-	"log"
+	"regexp"
 	"testing"
 
-	_ "github.com/lib/pq"
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 )
 
-// Uses the same ConnectToDB as caregiver_location_model_test
+// CREATE
 
-// Insert single carepartner location
 func TestCreateCarepartnerLocation(t *testing.T) {
-	// Initialize connection
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	// Create carepartner location
 	location := &CarepartnerLocationPrompt{
 		Location: "Care facility",
 		Message:  "You are here.",
 		URI:      "C:\\image1.png",
 	}
-	if err := CreateCarepartnerLocation(db, location); err != nil {
-		log.Fatal("CreateCarepartnerLocation failed:", err)
-	}
-	fmt.Println("Inserted carepartner location:", location.ID)
 
-	// Clean up
-	if err := DeleteCarepartnerLocation(db, location.ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`INSERT INTO "CarepartnerLocationPrompt" (location, message, image_uri) VALUES ($1, $2, $3) RETURNING id;`,
+	)).
+		WithArgs(location.Location, location.Message, location.URI).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+	err := CreateCarepartnerLocation(db, location)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, location.ID)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Read carepartner location by ID
+// READ
+
 func TestReadCarepartnerLocationByID(t *testing.T) {
-	// Initialize connection
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	// Create carepartner location
-	location := &CarepartnerLocationPrompt{
-		Location: "Care facility",
-		Message:  "You are here.",
-		URI:      "C:\\image1.png",
-	}
-	if err := CreateCarepartnerLocation(db, location); err != nil {
-		log.Fatal("CreateCarepartnerLocation failed:", err)
-	}
+	rows := sqlmock.NewRows([]string{"id", "location", "message", "image_uri"}).
+		AddRow(
+			1,
+			"Care facility",
+			"You are here.",
+			"C:\\image1.png",
+		)
 
-	// Read the created carepartner location
-	got, err := GetCarepartnerLocationByID(db, location.ID)
-	if err != nil {
-		log.Fatal("GetCarepartnerLocationByID failed:", err)
-	}
-	fmt.Println("Got carepartner location:", got)
+	mock.ExpectQuery(`(?s)SELECT\s+id,\s+location,\s+message,\s+image_uri\s+FROM\s+"CarepartnerLocationPrompt"\s+WHERE\s+id\s*=\s*\$1`).
+		WithArgs(1).
+		WillReturnRows(rows)
 
-	// Clean up
-	if err := DeleteCarepartnerLocation(db, location.ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	got, err := GetCarepartnerLocationByID(db, 1)
+	assert.NoError(t, err)
+	assert.NotNil(t, got)
+	assert.Equal(t, "Care facility", got.Location)
+	assert.Equal(t, "You are here.", got.Message)
+	assert.Equal(t, "C:\\image1.png", got.URI)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Update carepartner location
+// UPDATE
+
 func TestUpdateCarepartnerLocation(t *testing.T) {
-	// Initialize connection
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	// Create carepartner location
 	location := &CarepartnerLocationPrompt{
+		ID:       1,
 		Location: "Care facility",
-		Message:  "You are here.",
+		Message:  "You chose to be here, your family will visit!",
 		URI:      "C:\\image1.png",
 	}
-	if err := CreateCarepartnerLocation(db, location); err != nil {
-		log.Fatal("CreateCarepartnerLocation failed:", err)
-	}
 
-	// Update carepartner location
-	location.Message = "You chose to be here, your family will visit!"
-	if err := UpdateCarepartnerLocation(db, location); err != nil {
-		log.Fatal("UpdateCarepartnerLocation failed:", err)
-	}
-	fmt.Println("Updated carepartner location:", location.ID)
+	mock.ExpectExec(`(?s)UPDATE\s+"CarepartnerLocationPrompt"\s+SET\s+location\s*=\s*\$1,\s+message\s*=\s*\$2,\s+image_uri\s*=\s*\$3\s+WHERE\s+id\s*=\s*\$4`).
+		WithArgs(location.Location, location.Message, location.URI, location.ID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	// Clean up
-	if err := DeleteCarepartnerLocation(db, location.ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	err := UpdateCarepartnerLocation(db, location)
+	assert.NoError(t, err)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Delete carepartner location
+// DELETE
+
 func TestDeleteCarepartnerLocation(t *testing.T) {
-	// Initialize connection
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	// Create carepartner location
-	location := &CarepartnerLocationPrompt{
-		Location: "Care facility",
-		Message:  "You are here.",
-		URI:      "C:\\image1.png",
-	}
-	if err := CreateCarepartnerLocation(db, location); err != nil {
-		log.Fatal("CreateCarepartnerLocation failed:", err)
-	}
+	mock.ExpectExec(`(?s)DELETE\s+FROM\s+"CarepartnerLocationPrompt"\s+WHERE\s+id\s*=\s*\$1`).
+		WithArgs(1).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	// Delete carepartner location
-	if err := DeleteCarepartnerLocation(db, location.ID); err != nil {
-		log.Fatal("DeleteCarepartnerLocation failed:", err)
-	}
-	fmt.Println("Deleted carepartner location:", location.ID)
+	err := DeleteCarepartnerLocation(db, 1)
+	assert.NoError(t, err)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

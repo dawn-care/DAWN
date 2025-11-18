@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// CREATE
+
 func TestCreateVideo(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -33,6 +35,8 @@ func TestCreateVideo(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// RETRIEVE
+
 func TestGetVideoByID(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -56,6 +60,8 @@ func TestGetVideoByID(t *testing.T) {
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// UPDATE
 
 func TestUpdateVideo(t *testing.T) {
 	db, mock := setupMockDB(t)
@@ -81,6 +87,8 @@ func TestUpdateVideo(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// DELETE
+
 func TestDeleteVideo(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -96,6 +104,8 @@ func TestDeleteVideo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// ANALYSIS & STATS
 
 func TestGetVideoStats(t *testing.T) {
 	db, mock := setupMockDB(t)

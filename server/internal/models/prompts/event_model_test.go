@@ -1,108 +1,126 @@
 package prompts
 
 import (
-	"fmt"
-	"log"
+	"regexp"
 	"testing"
 	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 )
 
-// Uses the same ConnectToDB as caregiver_location_model_test
+// CREATE
 
-// Insert an new event list
 func TestCreateEventList(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	eventList := []*EventPrompt{
-		{List_ID: 123456789, Time: time.Now(), Text: "Take Meds"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Grandkids coming to visit"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Lunch"},
-	}
-	if err := CreateEventList(db, eventList); err != nil {
-		log.Fatal("CreateEventList failed:", err)
-	}
-	fmt.Println("Inserted Event List:", eventList[0].List_ID)
+	listID := 5
+	now := time.Now()
 
-	// Clean up
-	if err := DeleteEventList(db, &eventList[0].List_ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
+	eventList := []*EventPrompt{
+		{List_ID: listID, Time: now, Text: "Take Meds"},
+		{List_ID: listID, Time: now, Text: "Grandkids coming to visit"},
+		{List_ID: listID, Time: now, Text: "Lunch"},
 	}
+
+	mock.ExpectBegin()
+
+	prep := mock.ExpectPrepare(regexp.QuoteMeta(`
+		INSERT INTO "EventPrompt" (list_id, time, text)
+		VALUES ($1, $2, $3)
+		RETURNING id
+	`))
+
+	for i, ev := range eventList {
+		prep.ExpectQuery().
+			WithArgs(ev.List_ID, ev.Time, ev.Text).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(i + 1))
+	}
+
+	mock.ExpectCommit()
+
+	err := CreateEventList(db, eventList)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, eventList[0].ID)
+	assert.Equal(t, 2, eventList[1].ID)
+	assert.Equal(t, 3, eventList[2].ID)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Get Event List by list_id
-func TestGetEventList(t *testing.T) {
-	db := ConnectToDB(t)
+// RETRIEVE
+
+func TestGetEventListByListID(t *testing.T) {
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	eventList := []*EventPrompt{
-		{List_ID: 123456789, Time: time.Now(), Text: "Take Meds"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Grandkids coming to visit"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Lunch"},
-	}
-	if err := CreateEventList(db, eventList); err != nil {
-		log.Fatal("CreateEventList failed:", err)
-	}
+	listID := 5
+	now := time.Now()
 
-	got, err := GetEventListByListID(db, &eventList[0].List_ID)
-	if err != nil {
-		log.Fatal("GetEventListByListID failed:", err)
-	}
-	fmt.Println("Got List:", got)
+	rows := sqlmock.NewRows([]string{"id", "list_id", "time", "text"}).
+		AddRow(1, listID, now, "Take Meds").
+		AddRow(2, listID, now, "Grandkids coming to visit").
+		AddRow(3, listID, now, "Lunch")
 
-	// Clean up
-	if err := DeleteEventList(db, &eventList[0].List_ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT *
+		FROM "EventPrompt"
+		WHERE list_id = $1;
+	`)).
+		WithArgs(listID).
+		WillReturnRows(rows)
+
+	got, err := GetEventListByListID(db, &listID)
+	assert.NoError(t, err)
+	assert.Len(t, got, 3)
+	assert.Equal(t, "Take Meds", got[0].Text)
+	assert.Equal(t, "Grandkids coming to visit", got[1].Text)
+	assert.Equal(t, "Lunch", got[2].Text)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Update Event
+// UPDATE
+
 func TestUpdateEvent(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	eventList := []*EventPrompt{
-		{List_ID: 123456789, Time: time.Now(), Text: "Take Meds"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Grandkids coming to visit"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Lunch"},
-	}
-	if err := CreateEventList(db, eventList); err != nil {
-		log.Fatal("CreateEventList failed:", err)
+	ev := &EventPrompt{
+		ID:      1,
+		List_ID: 123456789,
+		Time:    time.Now(),
+		Text:    "Don't take meds",
 	}
 
-	got, err := GetEventListByListID(db, &eventList[0].List_ID)
-	if err != nil {
-		log.Fatal("GetEventListByListID failed:", err)
-	}
-	var newEvent = &got[0]
-	newEvent.Text = "Don't take meds"
+	mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE "EventPrompt"
+		SET list_id = $1, time = $2, text = $3
+		WHERE id = $4;
+	`)).
+		WithArgs(ev.List_ID, sqlmock.AnyArg(), ev.Text, ev.ID). // <- AnyArg() for time
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	if err := UpdateEvent(db, newEvent); err != nil {
-		log.Fatal("UpdateEvent failed:", err)
-	}
-	fmt.Println("Updated event with id:", newEvent.ID)
-	// Clean up
-	if err := DeleteEventList(db, &eventList[0].List_ID); err != nil {
-		log.Fatal("Cleanup failed:", err)
-	}
+	err := UpdateEvent(db, ev)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Delete Event List
+// DELETE
+
 func TestDeleteEventList(t *testing.T) {
-	db := ConnectToDB(t)
+	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	eventList := []*EventPrompt{
-		{List_ID: 123456789, Time: time.Now(), Text: "Take Meds"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Grandkids coming to visit"},
-		{List_ID: 123456789, Time: time.Now(), Text: "Lunch"},
-	}
-	if err := CreateEventList(db, eventList); err != nil {
-		log.Fatal("CreateEventList failed:", err)
-	}
+	listID := 5
 
-	if err := DeleteEventList(db, &eventList[0].List_ID); err != nil {
-		log.Fatal("DeleteEventList failed:", err)
-	}
-	fmt.Println("Deleted Event List:", eventList[0].List_ID)
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE FROM "EventPrompt"
+		WHERE list_id = $1;
+	`)).
+		WithArgs(listID).
+		WillReturnResult(sqlmock.NewResult(1, 3))
+
+	err := DeleteEventList(db, &listID)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

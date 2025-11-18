@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// SETUP
+
 func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -16,6 +18,8 @@ func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	}
 	return db, mock
 }
+
+// CREATE
 
 func TestCreateAudio(t *testing.T) {
 	db, mock := setupMockDB(t)
@@ -42,6 +46,8 @@ func TestCreateAudio(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// RETRIEVE
+
 func TestGetAudioByID(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -66,6 +72,8 @@ func TestGetAudioByID(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// UPDATE
+
 func TestUpdateAudio(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -89,6 +97,8 @@ func TestUpdateAudio(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// DELETE
 
 func TestDeleteAudio(t *testing.T) {
 	db, mock := setupMockDB(t)

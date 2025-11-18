@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// SETUP
+
 func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -16,6 +18,8 @@ func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	}
 	return db, mock
 }
+
+// CREATE
 
 func TestCreateModule(t *testing.T) {
 	db, mock := setupMockDB(t)
@@ -42,6 +46,8 @@ func TestCreateModule(t *testing.T) {
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// RETRIEVE
 
 func TestGetModuleByID(t *testing.T) {
 	db, mock := setupMockDB(t)

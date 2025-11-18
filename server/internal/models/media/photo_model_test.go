@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// CREATE
+
 func TestCreatePhoto(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -64,6 +66,8 @@ func TestCreatePhotosBulk(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// RETRIEVE
+
 func TestGetPhotoByID(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -111,6 +115,8 @@ func TestGetPhotosByCarepartnerAndCaregiver(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// UPDATE
+
 func TestUpdatePhoto(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -135,6 +141,8 @@ func TestUpdatePhoto(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// DELETE
+
 func TestDeletePhoto(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -150,6 +158,8 @@ func TestDeletePhoto(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+// ANALYSIS & STATS
 
 func TestGetPhotoStats(t *testing.T) {
 	db, mock := setupMockDB(t)
