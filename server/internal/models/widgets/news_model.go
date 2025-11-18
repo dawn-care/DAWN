@@ -5,6 +5,13 @@ import (
 	"fmt"
 )
 
+/*
+NewsWidget represents info required to retrieve news information for the news widget
+ID - the ID of the entry inthe database
+CATEGORY - the category of news
+LANGUAGE - the language of the news
+COUNTRY - the country the news should be for
+*/
 type NewsWidget struct {
 	ID       int    `json:"id"`
 	CATEGORY string `json:"category"`
@@ -12,7 +19,13 @@ type NewsWidget struct {
 	COUNTRY  string `json:"country"`
 }
 
-// Add News Widget
+// CREATE OPERATIONS
+
+/*
+Create a new NewsWidget
+db - instance of the database
+news_widget - information regarding the type of news
+*/
 func CreateNews(db *sql.DB, news_widget *NewsWidget) error {
 	query := `
 		INSERT INTO "NewsWidget" (category, language, country)
@@ -22,7 +35,11 @@ func CreateNews(db *sql.DB, news_widget *NewsWidget) error {
 	return db.QueryRow(query, news_widget.CATEGORY, news_widget.LANGUAGE, news_widget.COUNTRY).Scan(&news_widget.ID)
 }
 
-// Add Multiple News Widgets
+/*
+Add multiple news widgets at once
+db - instance of the database
+news_widgets - array of news widgets to be added
+*/
 func CreateNewsBulk(db *sql.DB, news_widgets []NewsWidget) error {
 	transaction, err := db.Begin()
 	if err != nil {
@@ -52,7 +69,13 @@ func CreateNewsBulk(db *sql.DB, news_widgets []NewsWidget) error {
 	return transaction.Commit()
 }
 
-// Get One News Widget by ID
+// RETRIEVE OPERATIONS
+
+/*
+Get a single news widget by the ID
+db - instance of the database
+id - the ID of the news widget
+*/
 func GetNewsByID(db *sql.DB, id int) (*NewsWidget, error) {
 	news_widget := &NewsWidget{}
 	query := `
@@ -70,7 +93,14 @@ func GetNewsByID(db *sql.DB, id int) (*NewsWidget, error) {
 	return news_widget, nil
 }
 
-// Get Multiple News Widgets by Day and User
+/*
+Get multiple news widgets by Day and User
+db - instance of the database
+carepartner_id - the ID of the carepartner responsible for the news widget
+day - day the news widget should be applicable to
+month - month the news widget should be applicable to
+day_of_week - the day of the week the news widget should be applicable to
+*/
 func GetNewsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]NewsWidget, error) {
 	dayStr := fmt.Sprintf("%d", day)                        // For Monthly
 	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]           // For Weekly
@@ -114,7 +144,11 @@ func GetNewsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_
 	return news_widgets, nil
 }
 
-// Get All News Widgets by User
+/*
+Get all news widgets for the user
+db - instance of the database
+carepartner_id - the ID of the carepartner who is responsible for the news widget
+*/
 func GetUserNews(db *sql.DB, carepartner_id int) ([]NewsWidget, error) {
 	var news_widgets []NewsWidget
 	query := `
@@ -146,7 +180,13 @@ func GetUserNews(db *sql.DB, carepartner_id int) ([]NewsWidget, error) {
 	return news_widgets, nil
 }
 
-// Update a News Widget
+// UPDATE OPERATION
+
+/*
+Update a news widget
+db - instance of the database
+news_widget - news widget content to be updated
+*/
 func UpdateNews(db *sql.DB, news_widget *NewsWidget) error {
 	query := `
 		UPDATE "NewsWidget"
@@ -164,7 +204,13 @@ func UpdateNews(db *sql.DB, news_widget *NewsWidget) error {
 	return nil
 }
 
-// Delete a News Widget
+// DELETE OPERATION
+
+/*
+Deletes the specified news widget
+db - instance of the database
+id - the ID of the news widget in the database
+*/
 func DeleteNews(db *sql.DB, id int) error {
 	query := `
 		DELETE FROM "NewsWidget"
@@ -181,7 +227,12 @@ func DeleteNews(db *sql.DB, id int) error {
 	return nil
 }
 
-// Get News Widget Stats (i.e., total count)
+// ANALYTICS & STATS
+
+/*
+Get stats on news widgets, i.e. the total number of them
+db - instance of the database
+*/
 func GetNewsStats(db *sql.DB) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM "NewsWidget";`

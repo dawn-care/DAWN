@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+/*
+WeatherWidget contains information that is required by the weather widget
+ID - the ID of the weather widget in the database
+ZIPCODE - the zipcode of the carepartner so their weather information is accurate to their location
+*/
 type WeatherWidget struct {
 	ID      int `json:"id"`
 	ZIPCODE int `json:"zipcode"`
@@ -13,7 +18,13 @@ type WeatherWidget struct {
 var DAYS_OF_WEEK_STR = [7]string{"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat"}
 var MONTH_STR = [12]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 
-// Add Weather Widget
+// CREATE OPERATIONS
+
+/*
+Add a new weather widget
+db - instance of the database
+weather_widget - the weather widge to be added
+*/
 func CreateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
 	query := `
 			INSERT INTO "WeatherWidget" (zipcode)
@@ -23,7 +34,11 @@ func CreateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
 	return db.QueryRow(query, weather_widget.ZIPCODE).Scan(&weather_widget.ID)
 }
 
-// Add Multiple Weather Widgets
+/*
+Add multiple weather widgets at once (ex. for their location and their caregivers location, their family, etc.)
+db - instance of the database
+weather_widgets - array of weather widgets to be added
+*/
 func CreateWeathersBulk(db *sql.DB, weather_widgets []WeatherWidget) error {
 	transaction, err := db.Begin()
 	if err != nil {
@@ -49,7 +64,13 @@ func CreateWeathersBulk(db *sql.DB, weather_widgets []WeatherWidget) error {
 	return transaction.Commit()
 }
 
-// Get One Weather Widget by ID
+// RETRIEVE OPERATIONS
+
+/*
+Get one weather widget by the ID in the database
+db - instance of the database
+id - the ID of the weather widget entry
+*/
 func GetWeatherByID(db *sql.DB, id int) (*WeatherWidget, error) {
 	weather_widget := &WeatherWidget{}
 
@@ -68,7 +89,12 @@ func GetWeatherByID(db *sql.DB, id int) (*WeatherWidget, error) {
 	return weather_widget, nil
 }
 
-// Get Multiple Weather Widgets by Day and User
+/*
+Get all weather widgets applicable to a certain user (carepartner) for a certain date
+db - instance of the database
+carepartner_id - the ID of the carepartner who the weather widgets should be displayed to
+day, month, day_of_week - the date the weather widget is applicable to
+*/
 func GetWeatherByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]WeatherWidget, error) {
 	dayStr := fmt.Sprintf("%d", day)                        //For Monthly Type - int 1 - 31
 	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]           //For Weekly Type - string "Sun" - "Sat"
@@ -112,7 +138,11 @@ func GetWeatherByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, d
 	return weather_widgets, nil
 }
 
-// Get All Weather Widgets by User
+/*
+Get all weather widgets for a specific user
+db - instance of the database
+carepartner_id - the ID of the carepartner who the weather widgets are for
+*/
 func GetUserWeather(db *sql.DB, carepartner_id int) ([]WeatherWidget, error) {
 	var weather_widgets []WeatherWidget
 	query := `
@@ -144,7 +174,13 @@ func GetUserWeather(db *sql.DB, carepartner_id int) ([]WeatherWidget, error) {
 	return weather_widgets, nil
 }
 
-// Update a Weather Widget
+// UPDATE OPERATION
+
+/*
+Update the weather widget
+db - instance of the database
+weather_widget - the weather widget that should be updated
+*/
 func UpdateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
 	query := `
 			UPDATE "WeatherWidget"
@@ -162,7 +198,13 @@ func UpdateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
 	return nil
 }
 
-// Delete a Weather Widget
+// DELETE OPERATION
+
+/*
+Delete a weather widget
+db - instance of the database
+id - the ID of the weather widget to be deleted
+*/
 func DeleteWeather(db *sql.DB, id int) error {
 	query := `
 			DELETE FROM "WeatherWidget"
@@ -179,7 +221,12 @@ func DeleteWeather(db *sql.DB, id int) error {
 	return nil
 }
 
-// Get Weather Widget Stats (i.e Total Weather Widgets)
+// ANALYTICS & STATS
+
+/*
+Get weather widget stats (total count of weather widgets)
+db - instance of the database
+*/
 func GetWeatherStats(db *sql.DB) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM "WeatherWidget";`
