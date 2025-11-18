@@ -5,19 +5,27 @@ import (
 	"fmt"
 )
 
-// AudioMedia represents one audio media record
+/*
+AudioMedia represents one audio media record
+ID - the ID in the database
+URI - the URL of the file
+Filename - the name of the file
+Extension - the file extension, i.e. what file type it is
+*/
 type AudioMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
 	Filename  string `json:"filename"`
-	Extension string `json:"extension"` // replace with string later if needed
+	Extension string `json:"extension"`
 }
 
-// ─────────────────────────────────────────────
 // CREATE OPERATIONS
-// ─────────────────────────────────────────────
 
-// Add one audio file
+/*
+Add one audio file
+db - the instance of the database
+audio - an audio media record
+*/
 func CreateAudio(db *sql.DB, audio *AudioMedia) error {
 	query := `
 		INSERT INTO "AudioMedia" (uri, filename, extension)
@@ -27,7 +35,11 @@ func CreateAudio(db *sql.DB, audio *AudioMedia) error {
 	return db.QueryRow(query, audio.URI, audio.Filename, audio.Extension).Scan(&audio.ID)
 }
 
-// Add multiple audio files at once
+/*
+Add multiple audio files at once
+db - the instance of the database
+audios - an array of audio media files
+*/
 func CreateAudiosBulk(db *sql.DB, audios []AudioMedia) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -53,11 +65,13 @@ func CreateAudiosBulk(db *sql.DB, audios []AudioMedia) error {
 	return tx.Commit()
 }
 
-// ─────────────────────────────────────────────
 // READ OPERATIONS
-// ─────────────────────────────────────────────
 
-// Get one audio record by ID
+/*
+Get one audio record by ID
+db - the instance of the database
+id - the ID of the audio record in the database
+*/
 func GetAudioByID(db *sql.DB, id int) (*AudioMedia, error) {
 	query := `
 		SELECT id, uri, filename, extension
@@ -75,7 +89,13 @@ func GetAudioByID(db *sql.DB, id int) (*AudioMedia, error) {
 	return audio, nil
 }
 
-// Get multiple audio IDs by date and users (assuming filename/URI encodes date)
+/*
+Get multiple audio IDs by date and users (assuming filename/URI encodes date)
+db - the instance of the database
+date - date related to the audio record
+carereceiverID - the ID of the carepartner
+caregiverID - the ID of the caregiver who uploaded the file
+*/
 func GetAudiosByDayAndUsers(db *sql.DB, date string, carereceiverID, caregiverID int) ([]int, error) {
 	query := `
 		SELECT a.id
@@ -101,7 +121,13 @@ func GetAudiosByDayAndUsers(db *sql.DB, date string, carereceiverID, caregiverID
 	return ids, nil
 }
 
-// Get all media (video, audio, photo) by type and user (returns IDs)
+/*
+Get all media (video, audio, photo) by type and user (returns IDs)
+db - instance of the database
+mediaType - type of media to get
+carereceiverID - ID of the carepartner
+caregiverID - ID of the caregiver who uploaded the media
+*/
 func GetMediaByTypeAndUser(db *sql.DB, mediaType string, carereceiverID, caregiverID int) ([]int, error) {
 	validTables := map[string]string{
 		"audio": "AudioMedia",
@@ -137,7 +163,12 @@ func GetMediaByTypeAndUser(db *sql.DB, mediaType string, carereceiverID, caregiv
 	return ids, nil
 }
 
-// Get all audio files by user (full records)
+/*
+Get all audio files by user (full records)
+db - instance of the database
+carereceiverID - ID of the carepartner
+caregiverID - ID of the caregiver who uploaded the audio record
+*/
 func GetAudiosByUsers(db *sql.DB, carereceiverID, caregiverID int) ([]AudioMedia, error) {
 	query := `
 		SELECT a.id, a.uri, a.filename, a.extension
@@ -162,11 +193,13 @@ func GetAudiosByUsers(db *sql.DB, carereceiverID, caregiverID int) ([]AudioMedia
 	return audios, nil
 }
 
-// ─────────────────────────────────────────────
-// UPDATE / DELETE
-// ─────────────────────────────────────────────
+// UPDATE OPERATION
 
-// Update an existing audio entry
+/*
+Update an existing audio entry
+db - instance of the database
+audio - the audio record to update
+*/
 func UpdateAudio(db *sql.DB, audio *AudioMedia) error {
 	query := `
 		UPDATE "AudioMedia"
@@ -184,7 +217,13 @@ func UpdateAudio(db *sql.DB, audio *AudioMedia) error {
 	return nil
 }
 
-// Delete an audio record by ID
+// DELETE OPERATION
+
+/*
+Delete an audio record by ID
+db - instance of the database
+id - the ID of the audio record to be deleted
+*/
 func DeleteAudio(db *sql.DB, id int) error {
 	query := `DELETE FROM "AudioMedia" WHERE id = $1;`
 	res, err := db.Exec(query, id)
@@ -198,11 +237,15 @@ func DeleteAudio(db *sql.DB, id int) error {
 	return nil
 }
 
-// ─────────────────────────────────────────────
-// ANALYTICS / STATS
-// ─────────────────────────────────────────────
+// ANALYTICS & STATISTICS
 
-// Get media stats: count of videos, audio, and photos
+/*
+Stats on the current media uploaded: count of videos, audio, and photos
+AudioCount - the number of audio records uploaded
+VideoCount - the number of video records uploaded
+PhotoCount - the number of photos uploaded
+Total - total media records available
+*/
 type MediaStats struct {
 	AudioCount int `json:"audio_count"`
 	VideoCount int `json:"video_count"`
@@ -226,11 +269,13 @@ func GetMediaStats(db *sql.DB) (*MediaStats, error) {
 	return stats, nil
 }
 
-// ─────────────────────────────────────────────
-// ADDITIONAL USEFUL FUNCTIONALITY
-// ─────────────────────────────────────────────
+// ADDITIONAL FUNCTIONALITY
 
-// Search audios by filename keyword (partial match)
+/*
+Search audios by filename keyword (partial match)
+db - instance of the database
+keyword - string we are matching when searching the audios
+*/
 func SearchAudios(db *sql.DB, keyword string) ([]AudioMedia, error) {
 	query := `
 		SELECT id, uri, filename, extension
