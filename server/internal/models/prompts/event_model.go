@@ -6,14 +6,27 @@ import (
 	"time"
 )
 
+/*
+EventPrompt holds information provided regarding an event that will occur, ex. "There will be a band today at 3 PM"
+List_ID - the ID of the event in the listing
+ID - the ID of the event in the database table
+Time - the time the event will occur
+Text - information regarding the event
+*/
 type EventPrompt struct {
-	List_ID   int        `json:"list_id"`
-	ID        int        `json:"id"`
-	Time      time.Time  `json:"time"`
-	Text      string     `json:"text"`
+	List_ID int       `json:"list_id"`
+	ID      int       `json:"id"`
+	Time    time.Time `json:"time"`
+	Text    string    `json:"text"`
 }
 
-// Create a list of events
+// CREATE OPERATION
+
+/*
+Create a list of events
+db - instance of the database
+events - array of event detail entries
+*/
 func CreateEventList(db *sql.DB, events []*EventPrompt) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -39,7 +52,13 @@ func CreateEventList(db *sql.DB, events []*EventPrompt) error {
 	return tx.Commit()
 }
 
-// get a list of events based on list_id
+// RETRIEVE OPERATIONS
+
+/*
+Get a list of events based on list_id
+db - instance of the database
+list_id - the list ID value to retrieve events associated with
+*/
 func GetEventListByListID(db *sql.DB, list_id *int) ([]EventPrompt, error) {
 	query := `
 		SELECT *
@@ -64,7 +83,13 @@ func GetEventListByListID(db *sql.DB, list_id *int) ([]EventPrompt, error) {
 	return eventlist, nil
 }
 
-// Update an event
+// UPDATE OPERATION
+
+/*
+Update the content of an event
+db - instance of the database
+event - an event entry with updated information
+*/
 func UpdateEvent(db *sql.DB, event *EventPrompt) error {
 	query := `
 		UPDATE "EventPrompt"
@@ -82,7 +107,13 @@ func UpdateEvent(db *sql.DB, event *EventPrompt) error {
 	return nil
 }
 
-// Delete an event by it's id
+// DELETE OPERATION
+
+/*
+Delete an event by the ID
+db - instance of the database
+id - the ID of the event in the database
+*/
 func DeleteEvent(db *sql.DB, id *int) error {
 	query := `
 		DELETE FROM "EventPrompt"
@@ -99,6 +130,13 @@ func DeleteEvent(db *sql.DB, id *int) error {
 	return nil
 }
 
+// DELETE OPERATION
+
+/*
+Delete an event entry from a list
+db - instance of the database
+list_id - list ID that identifies what entry to delete
+*/
 func DeleteEventList(db *sql.DB, list_id *int) error {
 	query := `
 		DELETE FROM "EventPrompt"
@@ -114,4 +152,3 @@ func DeleteEventList(db *sql.DB, list_id *int) error {
 	}
 	return nil
 }
-

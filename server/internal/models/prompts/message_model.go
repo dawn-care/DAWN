@@ -5,13 +5,25 @@ import (
 	"fmt"
 )
 
+/*
+MessagePrompt defines a general message accompanied by an image if desired
+ID - the ID of the entry in the database
+Message - the message content submitted by the caregiver
+URI - the URI of the accompanying image
+*/
 type MessagePrompt struct {
 	ID      int    `json:"id"`
 	Message string `json:"message"`
 	URI     string `json:"image_uri"`
 }
 
-// Create a message
+// CREATE OPERATION
+
+/*
+Create a message entry
+db - instance of database
+message - the message content
+*/
 func CreateMessage(db *sql.DB, message *MessagePrompt) error {
 	query := `
 		INSERT INTO "MessagePrompt" (message, image_uri)
@@ -21,7 +33,13 @@ func CreateMessage(db *sql.DB, message *MessagePrompt) error {
 	return db.QueryRow(query, message.Message, message.URI).Scan(&message.ID)
 }
 
-// Read a message by its ID
+// RETRIEVE OPERATION
+
+/*
+Retrieve message entry by ID
+db - instance of the database
+id - the ID of the message in the database
+*/
 func GetMessageByID(db *sql.DB, id int) (*MessagePrompt, error) {
 	query := `
 		SELECT id, message, image_uri
@@ -39,7 +57,11 @@ func GetMessageByID(db *sql.DB, id int) (*MessagePrompt, error) {
 	return message, nil
 }
 
-// Update the message and image of a message prompt
+/*
+Update the message and image of a message prompt
+db - instance of the database
+message - message prompt data to be updated
+*/
 func UpdateMessagePrompt(db *sql.DB, message *MessagePrompt) error {
 	query := `
 		UPDATE "MessagePrompt"
@@ -57,7 +79,13 @@ func UpdateMessagePrompt(db *sql.DB, message *MessagePrompt) error {
 	return nil
 }
 
-// Delete a carepartner location prompt by its ID
+// DELETE OPERATION
+
+/*
+Delete a carepartner location prompt by its ID
+db - instance of the database
+id - the ID of the message to be deleted
+*/
 func DeleteMessage(db *sql.DB, id int) error {
 	query := `
 		DELETE FROM "MessagePrompt"

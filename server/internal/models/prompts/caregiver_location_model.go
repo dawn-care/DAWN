@@ -5,6 +5,13 @@ import (
 	"fmt"
 )
 
+/*
+CaregiverLocationPrompt entries contain data the caregiver has been prompted to provide regarding their location
+ID - the ID of the CaregiverLocationPrompt in the database
+Location - the response provided by the caregiver regarding their location
+Message - any additional message content supplied by the caregiver regarding their location, ex. "I am 15 minutes away and will be visiting at 3 PM today"
+URI - the URI an image file to accompany this information, if desired
+*/
 type CaregiverLocationPrompt struct {
 	ID       int    `json:"id"`
 	Location string `json:"location"`
@@ -12,7 +19,13 @@ type CaregiverLocationPrompt struct {
 	URI      string `json:"image_uri"`
 }
 
-// Create a caregiver location
+// CREATE OPERATION
+
+/*
+Create a caregiver location entry
+db - instance of the database
+location - location information provided by the caregiver
+*/
 func CreateCaregiverLocation(db *sql.DB, location *CaregiverLocationPrompt) error {
 	query := `
 		INSERT INTO "CaregiverLocationPrompt" (location, message, image_uri)
@@ -22,7 +35,13 @@ func CreateCaregiverLocation(db *sql.DB, location *CaregiverLocationPrompt) erro
 	return db.QueryRow(query, location.Location, location.Message, location.URI).Scan(&location.ID)
 }
 
-// Read a caregiver location by its ID
+// RETRIEVE OPERATION
+
+/*
+Retrieve stored caregiver location information by its ID
+db - instance of the database
+id - the ID of the entry in the database
+*/
 func GetCaregiverLocationByID(db *sql.DB, id int) (*CaregiverLocationPrompt, error) {
 	query := `
 		SELECT id, location, message, image_uri
@@ -40,7 +59,11 @@ func GetCaregiverLocationByID(db *sql.DB, id int) (*CaregiverLocationPrompt, err
 	return location, nil
 }
 
-// Update the location, message, and image of a caregiver location
+/*
+Update the location, message, and image of a caregiver location entry
+db - instance of the database
+location - location information submitted by a caregiver
+*/
 func UpdateCaregiverLocation(db *sql.DB, location *CaregiverLocationPrompt) error {
 	query := `
 		UPDATE "CaregiverLocationPrompt"
@@ -58,7 +81,13 @@ func UpdateCaregiverLocation(db *sql.DB, location *CaregiverLocationPrompt) erro
 	return nil
 }
 
-// Delete a caregiver location prompt by its ID
+// DELETE OPERATION
+
+/*
+Delete a caregiver location prompt by its ID
+db - instance of the database
+id - ID of the caregiver location entry in the database
+*/
 func DeleteCaregiverLocation(db *sql.DB, id int) error {
 	query := `
 		DELETE FROM "CaregiverLocationPrompt"
