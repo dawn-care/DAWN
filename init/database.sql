@@ -123,7 +123,16 @@ BEGIN
     END LOOP;
 
     FOR new_row IN SELECT * FROM tmp_configs ORDER BY position ASC LOOP
-        UPDATE "Configuration" SET position = position + 1 WHERE carepartner_id = p_carepartner_id AND position >= new_row.position;
+        UPDATE "Configuration"
+        SET position = "Configuration".position + 1
+        FROM (
+            SELECT id, position
+            FROM "Configuration"
+            WHERE carepartner_id = p_carepartner_id
+              AND position >= new_row.position
+            ORDER BY position DESC
+        ) desc_positions
+        WHERE "Configuration".id = desc_positions.id;
         IF new_row.id IS NOT NULL THEN
             INSERT INTO "Configuration" (
                 id,
@@ -163,12 +172,12 @@ $$;
 
 CREATE OR REPLACE PROCEDURE delete_configurations(
     p_carepartner_id INT,
-    id_list TEXT[]
+    id_list INT[]
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    current_id TEXT;
+    current_id INT;
     pos INT;
 BEGIN
     FOREACH current_id IN ARRAY id_list
