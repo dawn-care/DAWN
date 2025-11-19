@@ -1,22 +1,31 @@
 package mediaTests
 
 import (
+	"bytes"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 
-	"server/internal/tests"
 	modelsMedia "server/internal/models/modules/media"
 	servicesMedia "server/internal/services/modules/media"
+	"server/internal/tests"
 )
 
 func TestCreateAudioService(t *testing.T) {
 	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
-	service := servicesMedia.NewAudioService(db)
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	audio := &modelsMedia.AudioMedia{
 		URI:       "https://example.com/test.mp3",
@@ -37,10 +46,60 @@ func TestCreateAudioService(t *testing.T) {
 	assert.Equal(t, 1, audio.ID)
 }
 
+func TestCreateAudioFileService(t *testing.T) {
+	db, _ := tests.SetupMockDB(t)
+	defer db.Close()
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
+
+	file, err := os.Open("..\\testFiles\\test_audio.mp3")
+	if err != nil {
+		t.Fatalf("failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", filepath.Base("server\\internal\\tests\\testFiles\\test_audio.mp3"))
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+
+	if _, err := io.Copy(part, file); err != nil {
+		t.Fatalf("failed to copy file content: %v", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("failed to close writer: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/upload", body)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+        t.Fatalf("bad file: %v", err)
+    }
+
+	reqfile, handler, err := r.FormFile("file")
+    if err != nil {
+        t.Fatalf("bad file: %v", err)
+    }
+    defer file.Close()
+
+	serviceErr := service.CreateAudioFile(reqfile, handler, "users/test-user/test_audio.mp3")
+	assert.NoError(t, serviceErr)
+}
+
 func TestCreateAudioService_NilAudio(t *testing.T) {
 	db, _ := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+	
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	err := service.CreateAudio(nil)
 	assert.EqualError(t, err, "audio cannot be nil")
@@ -49,7 +108,10 @@ func TestCreateAudioService_NilAudio(t *testing.T) {
 func TestCreateAudioService_InvalidAudio(t *testing.T) {
 	db, _ := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	audio := &modelsMedia.AudioMedia{}
 	err := service.CreateAudio(audio)
@@ -60,7 +122,9 @@ func TestGetAudioByIDService(t *testing.T) {
 	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
 
-	service := servicesMedia.NewAudioService(db)
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	expectedAudio := &modelsMedia.AudioMedia{
 		ID:        1,
@@ -83,10 +147,36 @@ func TestGetAudioByIDService(t *testing.T) {
 	assert.Equal(t, expectedAudio, audio)
 }
 
+func TestGetAudioFileService(t *testing.T) {
+	db, _ := tests.SetupMockDB(t)
+	defer db.Close()
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
+
+	file, err := service.GetAudioFile("users/test-user/test_audio.mp3")
+	assert.NoError(t, err)
+	defer file.Close()
+
+	gotBytes, err := io.ReadAll(file)
+	assert.NoError(t, err)
+
+	localPath := "../testFiles/test_audio.mp3"
+	expectedBytes, err := os.ReadFile(localPath)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedBytes, gotBytes)
+}
+
+
 func TestGetAudioByIDService_InvalidID(t *testing.T) {
 	db, _ := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	_, err := service.GetAudioByID(0)
 	assert.EqualError(t, err, "invalid audio ID")
@@ -95,7 +185,10 @@ func TestGetAudioByIDService_InvalidID(t *testing.T) {
 func TestUpdateAudioService(t *testing.T) {
 	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	audio := &modelsMedia.AudioMedia{
 		ID:        1,
@@ -116,10 +209,59 @@ func TestUpdateAudioService(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestUpdateAudioFileService(t *testing.T) {
+	db, _ := tests.SetupMockDB(t)
+	defer db.Close()
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
+
+	file, err := os.Open("..\\testFiles\\test_audio.mp3")
+	if err != nil {
+		t.Fatalf("failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", filepath.Base("server\\internal\\tests\\testFiles\\test_audio.mp3"))
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+
+	if _, err := io.Copy(part, file); err != nil {
+		t.Fatalf("failed to copy file content: %v", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("failed to close writer: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/upload", body)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+        t.Fatalf("bad file: %v", err)
+    }
+
+	reqfile, handler, err := r.FormFile("file")
+    if err != nil {
+        t.Fatalf("bad file: %v", err)
+    }
+    defer file.Close()
+
+	serviceErr := service.UpdateAudioFile(reqfile, handler, "users/test-user/test_audio.mp3")
+	assert.NoError(t, serviceErr)
+}
+
 func TestUpdateAudioService_InvalidAudio(t *testing.T) {
 	db, _ := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	err := service.UpdateAudio(nil)
 	assert.EqualError(t, err, "audio cannot be nil")
@@ -131,7 +273,10 @@ func TestUpdateAudioService_InvalidAudio(t *testing.T) {
 func TestDeleteAudioService(t *testing.T) {
 	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	mock.ExpectExec(regexp.QuoteMeta(
 		`DELETE FROM "AudioMedia" WHERE id = $1;`,
@@ -143,10 +288,26 @@ func TestDeleteAudioService(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestDeleteAudioFileService(t *testing.T) {
+	db, _ := tests.SetupMockDB(t)
+	defer db.Close()
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
+
+	err := service.DeleteAudioFile("users/test-user/test_audio.mp3")
+	assert.NoError(t, err)
+}
+
+
 func TestDeleteAudioService_InvalidID(t *testing.T) {
 	db, _ := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	err := service.DeleteAudio(0)
 	assert.EqualError(t, err, "invalid audio ID")
@@ -155,7 +316,10 @@ func TestDeleteAudioService_InvalidID(t *testing.T) {
 func TestGetMediaStatsService(t *testing.T) {
 	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	mock.ExpectQuery(regexp.QuoteMeta(
 		`SELECT
@@ -175,7 +339,10 @@ func TestGetMediaStatsService(t *testing.T) {
 func TestSearchAudiosService(t *testing.T) {
 	db, mock := tests.SetupMockDB(t)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	keyword := "test"
 	expectedResults := []modelsMedia.AudioMedia{
@@ -197,7 +364,10 @@ func TestSearchAudiosService(t *testing.T) {
 func TestSearchAudiosService_EmptyKeyword(t *testing.T) {
 	db, _ := tests.SetupMockDB(nil)
 	defer db.Close()
-	service := servicesMedia.NewAudioService(db)
+
+	minio := tests.SetupMockMinIO(t)
+
+	service := servicesMedia.NewAudioService(db, minio, "test-audio")
 
 	_, err := service.SearchAudios("")
 	assert.EqualError(t, err, "keyword cannot be empty")
