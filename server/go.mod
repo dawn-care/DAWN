@@ -5,15 +5,23 @@ go 1.25.2
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/go-chi/chi/v5 v5.2.3
+<<<<<<< HEAD
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.97
+=======
+	github.com/lib/pq v1.10.9
+>>>>>>> main
 	github.com/stretchr/testify v1.11.1
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+<<<<<<< HEAD
 	github.com/klauspost/crc32 v1.3.0 // indirect
+=======
+	github.com/go-chi/chi/v5 v5.2.3 // indirect
+>>>>>>> main
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
