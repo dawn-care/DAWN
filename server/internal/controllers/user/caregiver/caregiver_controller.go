@@ -1,12 +1,12 @@
-package controllers
+package caregiver
 
 import (
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
-	caregiver "server/internal/models/user"
-	services "server/internal/services/user"
+	caregiver "server/internal/models/user/caregiver"
+	services "server/internal/services/user/caregiver"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"

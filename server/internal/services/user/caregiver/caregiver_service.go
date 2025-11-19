@@ -1,11 +1,10 @@
-package services
+package caregiver
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	"server/internal/models/user"
+	"server/internal/models/user/caregiver"
 )
 
 // CaregiverService defines all caregiver operations
