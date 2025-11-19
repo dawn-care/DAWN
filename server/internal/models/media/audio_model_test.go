@@ -1,28 +1,17 @@
 package media
 
 import (
-	"database/sql"
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+
+	"server/internal/utils"
 )
 
-// SETUP
-
-func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to open sqlmock database: %v", err)
-	}
-	return db, mock
-}
-
-// CREATE
-
 func TestCreateAudio(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	audio := &AudioMedia{
@@ -46,10 +35,8 @@ func TestCreateAudio(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// RETRIEVE
-
 func TestGetAudioByID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
@@ -72,10 +59,8 @@ func TestGetAudioByID(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// UPDATE
-
 func TestUpdateAudio(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	audio := &AudioMedia{
@@ -98,10 +83,8 @@ func TestUpdateAudio(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// DELETE
-
 func TestDeleteAudio(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -117,7 +100,7 @@ func TestDeleteAudio(t *testing.T) {
 }
 
 func TestGetMediaStats(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"audio_count", "video_count", "photo_count"}).

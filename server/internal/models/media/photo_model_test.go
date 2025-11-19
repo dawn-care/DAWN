@@ -2,6 +2,7 @@ package media
 
 import (
 	"regexp"
+	"server/internal/utils"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -11,7 +12,7 @@ import (
 // CREATE
 
 func TestCreatePhoto(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	photo := &PhotoMedia{
@@ -35,7 +36,7 @@ func TestCreatePhoto(t *testing.T) {
 }
 
 func TestCreatePhotosBulk(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	photos := []PhotoMedia{
@@ -69,7 +70,7 @@ func TestCreatePhotosBulk(t *testing.T) {
 // RETRIEVE
 
 func TestGetPhotoByID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
@@ -92,7 +93,7 @@ func TestGetPhotoByID(t *testing.T) {
 }
 
 func TestGetPhotosByCarepartnerAndCaregiver(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
@@ -118,7 +119,7 @@ func TestGetPhotosByCarepartnerAndCaregiver(t *testing.T) {
 // UPDATE
 
 func TestUpdatePhoto(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	photo := &PhotoMedia{
@@ -144,7 +145,7 @@ func TestUpdatePhoto(t *testing.T) {
 // DELETE
 
 func TestDeletePhoto(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -162,7 +163,7 @@ func TestDeletePhoto(t *testing.T) {
 // ANALYSIS & STATS
 
 func TestGetPhotoStats(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`

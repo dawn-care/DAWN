@@ -5,13 +5,6 @@ import (
 	"fmt"
 )
 
-/*
-PhotoMedia represents one photo record
-ID - the ID of the photo in the database
-URI - the URI of the photo in the database
-Filename - the name of the file
-Extension - the file extension, i.e. what type of file it is
-*/
 type PhotoMedia struct {
 	ID        int    `json:"id"`
 	URI       string `json:"uri"`
@@ -19,27 +12,24 @@ type PhotoMedia struct {
 	Extension string `json:"extension"`
 }
 
-// CREATE OPERATIONS
-
-/*
-Create a single photo record
-db - instance of the database
-photo - the photo record to be added to the database
-*/
+// Create photo (DB)
 func CreatePhoto(db *sql.DB, photo *PhotoMedia) error {
+	return CreatePhotoTx(db, photo)
+}
+
+// Create photo (Tx)
+func CreatePhotoTx(exec interface {
+	QueryRow(query string, args ...any) *sql.Row
+}, photo *PhotoMedia) error {
 	query := `
 		INSERT INTO "PhotoMedia" (uri, filename, extension)
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
-	return db.QueryRow(query, photo.URI, photo.Filename, photo.Extension).Scan(&photo.ID)
+	return exec.QueryRow(query, photo.URI, photo.Filename, photo.Extension).Scan(&photo.ID)
 }
 
-/*
-Create multiple photo records at once
-db - instance of the database
-photos - array of photo records to be added to the database
-*/
+// Create multiple photos
 func CreatePhotosBulk(db *sql.DB, photos []PhotoMedia) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -65,13 +55,7 @@ func CreatePhotosBulk(db *sql.DB, photos []PhotoMedia) error {
 	return tx.Commit()
 }
 
-// RETRIEVE OPERATIONS
-
-/*
-Retrieve a single photo by the ID
-db - instance of the database
-id - ID of the photo in the database
-*/
+// Retrieve a single photo by its ID
 func GetPhotoByID(db *sql.DB, id int) (*PhotoMedia, error) {
 	query := `
 		SELECT id, uri, filename, extension
@@ -89,12 +73,7 @@ func GetPhotoByID(db *sql.DB, id int) (*PhotoMedia, error) {
 	return photo, nil
 }
 
-/*
-Retrieve all photos exchanged between a given carepartner and caregiver
-db - instance of the database
-carepartnerID - the ID of the carepartner who receives the media
-caregiverID - the ID of the caregiver who uploaded the media
-*/
+// Retrieve all photos for a given carepartner and caregiver
 func GetPhotosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID int) ([]PhotoMedia, error) {
 	query := `
 		SELECT p.id, p.uri, p.filename, p.extension
@@ -119,13 +98,7 @@ func GetPhotosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID i
 	return photos, nil
 }
 
-// UPDATE OPERATION
-
-/*
-Update the URI, filename, and extension of a photo
-db - instance of the database
-photo - the photo record to update in the database
-*/
+// Update the URI, filename, and extension of a photo
 func UpdatePhoto(db *sql.DB, photo *PhotoMedia) error {
 	query := `
 		UPDATE "PhotoMedia"
@@ -143,13 +116,7 @@ func UpdatePhoto(db *sql.DB, photo *PhotoMedia) error {
 	return nil
 }
 
-// DELETE OPERATION
-
-/*
-Delete a photo by its ID
-db - instance of the database
-id - ID of the photo in the database
-*/
+// Delete a photo by its ID
 func DeletePhoto(db *sql.DB, id int) error {
 	query := `
 		DELETE FROM "PhotoMedia"
@@ -166,12 +133,7 @@ func DeletePhoto(db *sql.DB, id int) error {
 	return nil
 }
 
-// ANALYTICS & STATS
-
-/*
-Get a count of how many photo uploads are available for all users cumulative
-db - instance of the database
-*/
+// Get total photo count
 func GetPhotoStats(db *sql.DB) (int, error) {
 	query := `SELECT COUNT(*) FROM "PhotoMedia";`
 	var count int

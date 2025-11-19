@@ -2,6 +2,7 @@ package media
 
 import (
 	"regexp"
+	"server/internal/utils"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -11,7 +12,7 @@ import (
 // CREATE
 
 func TestCreateVideo(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	video := &VideoMedia{
@@ -38,7 +39,7 @@ func TestCreateVideo(t *testing.T) {
 // RETRIEVE
 
 func TestGetVideoByID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
@@ -64,7 +65,7 @@ func TestGetVideoByID(t *testing.T) {
 // UPDATE
 
 func TestUpdateVideo(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	video := &VideoMedia{
@@ -90,7 +91,7 @@ func TestUpdateVideo(t *testing.T) {
 // DELETE
 
 func TestDeleteVideo(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -108,7 +109,7 @@ func TestDeleteVideo(t *testing.T) {
 // ANALYSIS & STATS
 
 func TestGetVideoStats(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
