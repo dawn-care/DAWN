@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	controllers "server/internal/controllers/media"
 	models "server/internal/models/media"
 )
 
@@ -74,7 +73,7 @@ func TestCreateVideoHandler(t *testing.T) {
 		CreateVideoFn: func(v *models.VideoMedia) error { return nil },
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 
 	video := models.VideoMedia{URI: "test.com/video.mp4", Filename: "video.mp4", Extension: "mp4"}
 	body, _ := json.Marshal(video)
@@ -95,7 +94,7 @@ func TestGetVideoByIDHandler(t *testing.T) {
 		},
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 	req := httptest.NewRequest(http.MethodGet, "/videos?id=1", nil)
 	rec := httptest.NewRecorder()
 
@@ -113,7 +112,7 @@ func TestGetVideosByCarepartnerAndCaregiverHandler(t *testing.T) {
 		},
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 	req := httptest.NewRequest(http.MethodGet, "/videos?carepartner_id=1&caregiver_id=2", nil)
 	rec := httptest.NewRecorder()
 
@@ -129,7 +128,7 @@ func TestUpdateVideoHandler(t *testing.T) {
 		UpdateVideoFn: func(v *models.VideoMedia) error { return nil },
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 
 	video := models.VideoMedia{ID: 1, URI: "updated.mp4"}
 	body, _ := json.Marshal(video)
@@ -148,7 +147,7 @@ func TestDeleteVideoHandler(t *testing.T) {
 		DeleteVideoFn: func(id int) error { return nil },
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 	req := httptest.NewRequest(http.MethodDelete, "/videos?id=1", nil)
 	rec := httptest.NewRecorder()
 
@@ -164,7 +163,7 @@ func TestGetVideoStatsHandler(t *testing.T) {
 		GetVideoStatsFn: func() (int, error) { return 42, nil },
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 	req := httptest.NewRequest(http.MethodGet, "/videos/stats", nil)
 	rec := httptest.NewRecorder()
 
@@ -182,7 +181,7 @@ func TestGetVideoByIDHandler_Error(t *testing.T) {
 		},
 	}
 
-	controller := controllers.NewVideoController(mockSvc)
+	controller := NewVideoController(mockSvc)
 	req := httptest.NewRequest(http.MethodGet, "/videos?id=1", nil)
 	rec := httptest.NewRecorder()
 
