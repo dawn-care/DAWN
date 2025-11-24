@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	modules "server/internal/models/modules"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // ---- Interface ----
@@ -57,8 +59,9 @@ func (c *ModuleController) CreateModuleHandler(w http.ResponseWriter, r *http.Re
 }
 
 // Get a module by ID
+
 func (c *ModuleController) GetModuleByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "invalid module ID", http.StatusBadRequest)
