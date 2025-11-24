@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func RegisterUserRoutes(db *sql.DB) chi.Router {
+func RegisterCaregiverRoutes(db *sql.DB) chi.Router {
 	r := chi.NewRouter()
 
 	// Initialize caregiver service & controller
@@ -25,9 +25,6 @@ func RegisterUserRoutes(db *sql.DB) chi.Router {
 		r.Put("/", cCtrlr.UpdateCaregiver)                                           // PUT /users/caregivers
 		r.Delete("/{id}", cCtrlr.DeleteCaregiver)                                    // DELETE /users/caregivers/{id}
 	})
-
-	// Caregiver routes
-	// TBD
 
 	return r
 }
