@@ -1,4 +1,4 @@
-package routes
+package modules
 
 import (
 	moduleCtrl "server/internal/controllers/modules"
@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func RegisterModuleRoutes(r chi.Router) {
+func RegisterModulesRoutes(r chi.Router) {
 	r.Route("/modules", func(r chi.Router) {
 		svc := moduleSvc.NewModuleService(db.GetDB())
 		ctrl := moduleCtrl.NewModuleController(svc)
