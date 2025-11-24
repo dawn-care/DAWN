@@ -12,14 +12,23 @@ import (
 	"time"
 
 	mediaCtrlr "server/internal/controllers/media"
+	modulesCtrlr "server/internal/controllers/modules"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
+	newsCtrlr "server/internal/controllers/widgets/news"
+	weatherCtrlr "server/internal/controllers/widgets/weather"
 	mediaRts "server/internal/routes/media"
+	modulesRts "server/internal/routes/modules"
 	caregiverRts "server/internal/routes/user"
+	newsRts "server/internal/routes/widgets/news"
+	weatherRts "server/internal/routes/widgets/weather"
 	mediaSvc "server/internal/services/media"
+	modulesSvc "server/internal/services/modules"
 	caregiverSvc "server/internal/services/user/caregiver"
+	newsSvc "server/internal/services/widgets/news"
+	weatherSvc "server/internal/services/widgets/weather"
 
 	"github.com/go-chi/chi/v5"
-	_ "github.com/lib/pq" // or whatever driver you use
+	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -53,7 +62,7 @@ func main() {
 	// MINIO SETUP
 	minioClient, bloberr := minio.New("localhost:9000", &minio.Options{
 		Creds:  credentials.NewStaticV4("minio-access-key", "minio-secret-key", ""),
-		Secure: false, // true if using https
+		Secure: false,
 	})
 	if bloberr != nil {
 		log.Fatal("failed to connect to MinIO:", bloberr)
@@ -66,6 +75,12 @@ func main() {
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
 	// User
 	caregiverService := caregiverSvc.NewCaregiverService(db)
+	// Widgets
+	newsService := newsSvc.NewNewsWidgetService(db, "api key (insert here)")
+	// sportsNewsService := newsSvc.NewSportsNewsWidgetService(db) // see TODO in ctrlrs initialization
+	weatherService := weatherSvc.NewWeatherService(db, "api key (insert here)")
+	// Modules
+	modulesService := modulesSvc.NewModuleService(db)
 
 	// INITIALIZE CTRLRS
 	// Media
@@ -74,6 +89,12 @@ func main() {
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 	// User
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
+	// Widgets
+	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
+	// sportsNewsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsNewsService) // TODO: mismatch between service and controller, doesn't properly match interface
+	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
+	// Modules
+	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 
 	// ROUTE INITIALIZATION
 	// Media
@@ -82,6 +103,12 @@ func main() {
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 	// User
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
+	// Widgets
+	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
+	// newsRts.RegisterSportsNewsWidgetRoutes(r, sportsNewsCtrl)
+	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
+	// Modules
+	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 
 	// Launch
 	port := os.Getenv("PORT")
@@ -94,5 +121,4 @@ func main() {
 	if err != nil {
 		fmt.Println("Error starting server:", err)
 	}
-
 }
