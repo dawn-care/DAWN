@@ -1,7 +1,7 @@
 package prompts
 
 import (
-	prompts "server/internal/services/prompts"
+	prompts "server/internal/controllers/prompts"
 
 	"github.com/go-chi/chi/v5"
 )

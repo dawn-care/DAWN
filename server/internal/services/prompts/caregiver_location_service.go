@@ -1,102 +1,65 @@
 package prompts
 
 import (
-	"encoding/json"
-	"net/http"
+	"database/sql"
+	"errors"
+	"fmt"
+
 	prompts "server/internal/models/prompts"
-	"strconv"
 )
 
-// ---- Interface ----
-type CaregiverLocationServiceInterface interface {
-	CreateCaregiverLocation(loc *prompts.CaregiverLocationPrompt) error
-	GetCaregiverLocationByID(id int) (*prompts.CaregiverLocationPrompt, error)
-	UpdateCaregiverLocation(loc *prompts.CaregiverLocationPrompt) error
-	DeleteCaregiverLocation(id int) error
+type CaregiverLocationService struct {
+	DB *sql.DB
 }
 
-// ---- Controller ----
-type CaregiverLocationController struct {
-	services CaregiverLocationServiceInterface
-}
-
-func NewCaregiverLocationController(services CaregiverLocationServiceInterface) *CaregiverLocationController {
-	return &CaregiverLocationController{services: services}
+func NewCaregiverLocationService(db *sql.DB) *CaregiverLocationService {
+	return &CaregiverLocationService{DB: db}
 }
 
 // Create a new caregiver location
-func (c *CaregiverLocationController) CreateCaregiverLocationHandler(w http.ResponseWriter, r *http.Request) {
-	var loc prompts.CaregiverLocationPrompt
-
-	if err := json.NewDecoder(r.Body).Decode(&loc); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+func (s *CaregiverLocationService) CreateCaregiverLocation(loc *prompts.CaregiverLocationPrompt) error {
+	if loc == nil {
+		return errors.New("caregiver location cannot be nil")
+	}
+	if loc.Location == "" {
+		return errors.New("location is required")
 	}
 
-	if err := c.services.CreateCaregiverLocation(&loc); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(loc)
+	return prompts.CreateCaregiverLocation(s.DB, loc)
 }
 
-// Get caregiver location by ID
-func (c *CaregiverLocationController) GetCaregiverLocationByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
-		http.Error(w, "invalid caregiver location ID", http.StatusBadRequest)
-		return
+// Retrieve caregiver location by ID
+func (s *CaregiverLocationService) GetCaregiverLocationByID(id int) (*prompts.CaregiverLocationPrompt, error) {
+	if id <= 0 {
+		return nil, errors.New("invalid caregiver location ID")
 	}
 
-	loc, err := c.services.GetCaregiverLocationByID(id)
+	loc, err := prompts.GetCaregiverLocationByID(s.DB, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if loc == nil {
-		http.Error(w, "caregiver location not found", http.StatusNotFound)
-		return
+		return nil, fmt.Errorf("failed to retrieve caregiver location: %w", err)
 	}
 
-	json.NewEncoder(w).Encode(loc)
+	// loc may be nil if not found — let controller handle 404
+	return loc, nil
 }
 
 // Update caregiver location
-func (c *CaregiverLocationController) UpdateCaregiverLocationHandler(w http.ResponseWriter, r *http.Request) {
-	var loc prompts.CaregiverLocationPrompt
-
-	if err := json.NewDecoder(r.Body).Decode(&loc); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+func (s *CaregiverLocationService) UpdateCaregiverLocation(loc *prompts.CaregiverLocationPrompt) error {
+	if loc == nil {
+		return errors.New("caregiver location cannot be nil")
 	}
-
 	if loc.ID <= 0 {
-		http.Error(w, "location ID is required", http.StatusBadRequest)
-		return
+		return errors.New("invalid caregiver location ID")
 	}
 
-	if err := c.services.UpdateCaregiverLocation(&loc); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(loc)
+	return prompts.UpdateCaregiverLocation(s.DB, loc)
 }
 
-// Delete caregiver location
-func (c *CaregiverLocationController) DeleteCaregiverLocationHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Query().Get("id"))
-	if err != nil || id <= 0 {
-		http.Error(w, "invalid caregiver location ID", http.StatusBadRequest)
-		return
+// Delete caregiver location by ID
+func (s *CaregiverLocationService) DeleteCaregiverLocation(id int) error {
+	if id <= 0 {
+		return errors.New("invalid caregiver location ID")
 	}
 
-	if err := c.services.DeleteCaregiverLocation(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+	return prompts.DeleteCaregiverLocation(s.DB, id)
 }
