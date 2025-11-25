@@ -10,7 +10,6 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"time"
 
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
@@ -62,14 +61,20 @@ func main() {
 
 	// Actual
 	// DB SETUP
-	db, dberr := sql.Open("postgres", "postgres://user:password@localhost:5432/dbname?sslmode=disable")
+	dbHost := os.Getenv("DB_HOST")         // "db"
+	dbPort := os.Getenv("DB_PORT")         // "5432"
+	dbUser := os.Getenv("DB_USER")         // "myuser"
+	dbPassword := os.Getenv("DB_PASSWORD") // "mypassword"
+	dbName := os.Getenv("DB_NAME")         // "mydb"
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	db, dberr := sql.Open("postgres", connStr)
 	if dberr != nil {
 		log.Fatal("failed to connect to DB:", dberr)
 	}
-	defer db.Close()
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
+
 	// MINIO SETUP
 	minioClient, bloberr := minio.New("localhost:9000", &minio.Options{
 		Creds:  credentials.NewStaticV4("minio-access-key", "minio-secret-key", ""),

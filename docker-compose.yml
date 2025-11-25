@@ -9,9 +9,9 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: username
-      DB_PASSWORD: password
-      DB_NAME: db
+      DB_USER: myuser
+      DB_PASSWORD: mypassword
+      DB_NAME: mydb
     depends_on:
       - db
       - minio
