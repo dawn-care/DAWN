@@ -87,6 +87,8 @@ func main() {
 	// Prompts
 	eventsService := promptsSvc.NewEventService(db)
 	messageService := promptsSvc.NewMessageService(db)
+	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
+	carepartnerLocationService := promptsSvc.NewCarepartnerLocationService(db)
 
 	// INITIALIZE CTRLRS
 	// Media
@@ -104,6 +106,8 @@ func main() {
 	// Prompts
 	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
+	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
+	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
 
 	// ROUTE INITIALIZATION
 	// Media
@@ -121,6 +125,8 @@ func main() {
 	// Prompts
 	promptsRts.RegisterEventRoutes(r, eventsCtrl)
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
+	promptsRts.RegisterCaregiverLocationRoutes(r, caregiverLocationCtrl)
+	promptsRts.RegisterCarepartnerLocationRoutes(r, carepartnerLocationCtrl)
 
 	// Launch
 	port := os.Getenv("PORT")
