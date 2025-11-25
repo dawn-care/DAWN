@@ -39,6 +39,11 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+// @title StartUp API
+// @version 1.0
+// @description This is the API documentation service
+// @host localhost:8080
+// @BasePath /
 func main() {
 	// Router Setup
 	r := chi.NewRouter()
@@ -132,7 +137,7 @@ func main() {
 	promptsRts.RegisterCarepartnerLocationRoutes(r, carepartnerLocationCtrl)
 
 	// Swaggo Docs
-	r.Handle("/swagger/", httpSwagger.WrapHandler)
+	r.Mount("/swagger", httpSwagger.WrapHandler)
 
 	// Launch
 	port := os.Getenv("PORT")

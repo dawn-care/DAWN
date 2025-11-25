@@ -21,17 +21,17 @@ services:
     networks:
       - app-network
 
-  caregiver:
-    build:
-      context: ./caregiver
-      dockerfile: Dockerfile
-    container_name: caregiver
-    ports:
-      - "3001:80"
-    depends_on:
-      - server
-    networks:
-      - app-network
+  # caregiver:
+  #   build:
+  #     context: ./caregiver
+  #     dockerfile: Dockerfile
+  #   container_name: caregiver
+  #   ports:
+  #     - "3001:80"
+  #   depends_on:
+  #     - server
+  #   networks:
+  #     - app-network
 
   db:
     image: postgres:15
