@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	"database/sql"
 	"log"
@@ -29,6 +30,8 @@ import (
 	caregiverSvc "server/internal/services/user/caregiver"
 	newsSvc "server/internal/services/widgets/news"
 	weatherSvc "server/internal/services/widgets/weather"
+
+	_ "server/cmd/docs"
 
 	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
@@ -127,6 +130,9 @@ func main() {
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
 	promptsRts.RegisterCaregiverLocationRoutes(r, caregiverLocationCtrl)
 	promptsRts.RegisterCarepartnerLocationRoutes(r, carepartnerLocationCtrl)
+
+	// Swaggo Docs
+	r.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	// Launch
 	port := os.Getenv("PORT")
