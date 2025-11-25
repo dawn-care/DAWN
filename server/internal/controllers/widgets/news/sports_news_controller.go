@@ -3,18 +3,18 @@ package widgets
 import (
 	"encoding/json"
 	"net/http"
-	models "server/internal/models/widgets/news"
+	widgets "server/internal/models/widgets/news"
 	"strconv"
 )
 
 // Service Interface
 type SportsNewsWidgetServiceInterface interface {
-	CreateSportsNewsWidget(weather_widget *models.NewsWidget) error
-	CreateSportsNewsWidgetsBulk(weather_widgets []models.NewsWidget) error
-	GetSportsNewsWidgetByID(id int) (*models.NewsWidget, error)
-	GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]models.NewsWidget, error)
-	GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]models.NewsWidget, error)
-	UpdateSportsNewsWidget(weather_widget *models.NewsWidget) error
+	CreateSportsNewsWidget(weather_widget *widgets.NewsWidget) error
+	CreateSportsNewsWidgetsBulk(weather_widgets []widgets.NewsWidget) error
+	GetSportsNewsWidgetByID(id int) (*widgets.NewsWidget, error)
+	GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.NewsWidget, error)
+	GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.NewsWidget, error)
+	UpdateSportsNewsWidget(weather_widget *widgets.NewsWidget) error
 	DeleteSportsNewsWidget(id int) error
 	GetSportsNewsWidgetStats() (int, error)
 	GetTeamGame(league, team string) (string, error)
@@ -29,9 +29,19 @@ func NewSportsNewsWidgetController(service SportsNewsWidgetServiceInterface) *Sp
 	return &SportsNewsWidgetController{service: service}
 }
 
-// Handler for creating a new sports news widget
+// CreateSportsNewsWidgetHandler godoc
+// @Summary Create a sports news widget
+// @Description Creates a new sports news widget
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param sports_news_widget body widgets.NewsWidget true "Sports News Widget to create"
+// @Success 200 {object} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets [post]
 func (c *SportsNewsWidgetController) CreateSportsNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget models.NewsWidget
+	var weather_widget widgets.NewsWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -45,7 +55,17 @@ func (c *SportsNewsWidgetController) CreateSportsNewsWidgetHandler(w http.Respon
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for getting a sports news widget by ID
+// GetSportsNewsWidgetByIDHandler godoc
+// @Summary Get a sports news widget by ID
+// @Description Retrieves a sports news widget by its ID
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param id query int true "Sports News Widget ID"
+// @Success 200 {object} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets/{id} [get]
 func (c *SportsNewsWidgetController) GetSportsNewsWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idSTR := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idSTR)
@@ -63,7 +83,18 @@ func (c *SportsNewsWidgetController) GetSportsNewsWidgetByIDHandler(w http.Respo
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for getting a sports news widget by carepartner and caregiver IDs
+// GetSportsNewsWidgetsByCarepartnerAndCaregiverHandler godoc
+// @Summary Get sports news widgets by carepartner and caregiver
+// @Description Retrieves all sports news widgets for a given carepartner and caregiver
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param caregiver_id query int true "Caregiver ID"
+// @Success 200 {array} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid IDs"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets/by-carepartner-and-caregiver [get]
 func (c *SportsNewsWidgetController) GetSportsNewsWidgetsByCarepartnerAndCaregiverHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
@@ -84,7 +115,20 @@ func (c *SportsNewsWidgetController) GetSportsNewsWidgetsByCarepartnerAndCaregiv
 	json.NewEncoder(w).Encode(weather_widgets)
 }
 
-// Handler for getting a sports news widget by carepartner ID and date
+// GetSportsNewsByDayAndCarepartnerHandler godoc
+// @Summary Get sports news widgets by carepartner and date
+// @Description Retrieves sports news widgets for a carepartner filtered by day, month, and year
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param day query int true "Day"
+// @Param month query int true "Month"
+// @Param year query int true "Year"
+// @Success 200 {array} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid IDs or date"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets/by-day [get]
 func (c *SportsNewsWidgetController) GetSportsNewsByDayAndCarepartnerHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
@@ -104,9 +148,19 @@ func (c *SportsNewsWidgetController) GetSportsNewsByDayAndCarepartnerHandler(w h
 	json.NewEncoder(w).Encode(weather_widgets)
 }
 
-// Handler for updating a sports news widget
+// UpdateSportsNewsWidgetHandler godoc
+// @Summary Update a sports news widget
+// @Description Updates an existing sports news widget
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param sports_news_widget body widgets.NewsWidget true "Sports News Widget to update"
+// @Success 200 {object} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets [put]
 func (c *SportsNewsWidgetController) UpdateSportsNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget models.NewsWidget
+	var weather_widget widgets.NewsWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -120,7 +174,17 @@ func (c *SportsNewsWidgetController) UpdateSportsNewsWidgetHandler(w http.Respon
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for deleting a sports news widget by ID
+// DeleteSportsNewsWidgetHandler godoc
+// @Summary Delete a sports news widget
+// @Description Deletes a sports news widget by ID
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param id query int true "Sports News Widget ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string "invalid ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets/{id} [delete]
 func (c *SportsNewsWidgetController) DeleteSportsNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
@@ -136,7 +200,15 @@ func (c *SportsNewsWidgetController) DeleteSportsNewsWidgetHandler(w http.Respon
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Handler for getting sports news widget statistics
+// GetSportsNewsWidgetStatsHandler godoc
+// @Summary Get total number of sports news widgets
+// @Description Retrieves the total count of sports news widgets
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Success 200 {integer} int "Total count"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets/stats [get]
 func (c *SportsNewsWidgetController) GetSportsNewsWidgetStatsHandler(w http.ResponseWriter, r *http.Request) {
 	count, err := c.service.GetSportsNewsWidgetStats()
 	if err != nil {
@@ -147,7 +219,18 @@ func (c *SportsNewsWidgetController) GetSportsNewsWidgetStatsHandler(w http.Resp
 	json.NewEncoder(w).Encode(count)
 }
 
-// Handler for getting a team's game summary
+// GetTeamGameHandler godoc
+// @Summary Get a team's game summary
+// @Description Retrieves the latest game summary for a specific team in a league
+// @Tags sports-news-widget
+// @Accept json
+// @Produce json
+// @Param league query string true "League"
+// @Param team query string true "Team"
+// @Success 200 {string} string "Game summary"
+// @Failure 400 {object} map[string]string "league and team cannot be empty"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /sports-news-widgets/team-game [get]
 func (c *SportsNewsWidgetController) GetTeamGameHandler(w http.ResponseWriter, r *http.Request) {
 	league := r.URL.Query().Get("league")
 	team := r.URL.Query().Get("team")
