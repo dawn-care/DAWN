@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	models "server/internal/models/media"
+	"server/internal/models/media"
 )
 
 var VALID_VIDEO_TYPES = map[string]bool{
@@ -20,12 +20,12 @@ const MAX_VIDEO_FILE_SIZE_MB = 100
 
 // ---- Interface ----
 type VideoServiceInterface interface {
-	CreateVideo(video *models.VideoMedia) error
+	CreateVideo(video *media.VideoMedia) error
 	CreateVideoFile(file multipart.File, handler *multipart.FileHeader, uri string) error
-	GetVideoByID(id int) (*models.VideoMedia, error)
+	GetVideoByID(id int) (*media.VideoMedia, error)
 	GetVideoFile(uri string) (multipart.File, error)
-	GetVideosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.VideoMedia, error)
-	UpdateVideo(video *models.VideoMedia) error
+	GetVideosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]media.VideoMedia, error)
+	UpdateVideo(video *media.VideoMedia) error
 	UpdateVideoFile(file multipart.File, handler *multipart.FileHeader, uri string) error
 	DeleteVideo(id int) error
 	DeleteVideoFile(uri string) error
@@ -41,9 +41,19 @@ func NewVideoController(services VideoServiceInterface) *VideoController {
 	return &VideoController{services: services}
 }
 
-// Create a new video
+// CreateVideoHandler godoc
+// @Summary Create a new video record
+// @Description Creates a new video entry in the database
+// @Tags video
+// @Accept json
+// @Produce json
+// @Param video body media.VideoMedia true "Video data"
+// @Success 200 {object} media.VideoMedia
+// @Failure 400 {string} string "invalid request body"
+// @Failure 500 {string} string "internal server error"
+// @Router /video [post]
 func (c *VideoController) CreateVideoHandler(w http.ResponseWriter, r *http.Request) {
-	var video models.VideoMedia
+	var video media.VideoMedia
 	if err := json.NewDecoder(r.Body).Decode(&video); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -57,7 +67,18 @@ func (c *VideoController) CreateVideoHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(video)
 }
 
-// Create a new video file
+// CreateVideoFileHandler godoc
+// @Summary Upload a video file
+// @Description Uploads a new video file for a user
+// @Tags video
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Video file"
+// @Param id formData string true "User ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "invalid file or request"
+// @Failure 500 {string} string "internal server error"
+// @Router /video/file [post]
 func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_VIDEO_FILE_SIZE_MB << 20); err != nil {
 		http.Error(w, "failed to parse request", http.StatusBadRequest)
@@ -100,7 +121,17 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(response)
 }
 
-// Get video by ID
+// GetVideoByIDHandler godoc
+// @Summary Get a video record by ID
+// @Description Retrieves metadata for a video
+// @Tags video
+// @Accept json
+// @Produce json
+// @Param id query int true "Video ID"
+// @Success 200 {object} media.VideoMedia
+// @Failure 400 {string} string "invalid video ID"
+// @Failure 500 {string} string "internal server error"
+// @Router /video [get]
 func (c *VideoController) GetVideoByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
@@ -118,7 +149,17 @@ func (c *VideoController) GetVideoByIDHandler(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(video)
 }
 
-// Get video file by ID
+// GetVideoFileByIDHandler godoc
+// @Summary Download a video file by ID
+// @Description Returns the raw video file for a given video ID
+// @Tags video
+// @Accept json
+// @Produce application/octet-stream
+// @Param id query int true "Video ID"
+// @Success 200 {file} file "Video file"
+// @Failure 400 {string} string "invalid video ID"
+// @Failure 500 {string} string "internal server error"
+// @Router /video/file [get]
 func (c *VideoController) GetVideoFileByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
@@ -146,7 +187,17 @@ func (c *VideoController) GetVideoFileByIDHandler(w http.ResponseWriter, r *http
 	io.Copy(w, file)
 }
 
-// Get all videos for a carepartner and caregiver
+// GetVideosByCarepartnerAndCaregiverHandler godoc
+// @Summary Get all videos for a carepartner and caregiver
+// @Description Returns all video records associated with a carepartner and caregiver
+// @Tags video
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param caregiver_id query int true "Caregiver ID"
+// @Success 200 {array} media.VideoMedia
+// @Failure 500 {string} string "internal server error"
+// @Router /video/list [get]
 func (c *VideoController) GetVideosByCarepartnerAndCaregiverHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
@@ -160,9 +211,19 @@ func (c *VideoController) GetVideosByCarepartnerAndCaregiverHandler(w http.Respo
 	json.NewEncoder(w).Encode(videos)
 }
 
-// Update an existing video
+// UpdateVideoHandler godoc
+// @Summary Update a video record
+// @Description Updates metadata for an existing video
+// @Tags video
+// @Accept json
+// @Produce json
+// @Param video body media.VideoMedia true "Video data"
+// @Success 200 {object} media.VideoMedia
+// @Failure 400 {string} string "invalid request body"
+// @Failure 500 {string} string "internal server error"
+// @Router /video [put]
 func (c *VideoController) UpdateVideoHandler(w http.ResponseWriter, r *http.Request) {
-	var video models.VideoMedia
+	var video media.VideoMedia
 	if err := json.NewDecoder(r.Body).Decode(&video); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -176,7 +237,18 @@ func (c *VideoController) UpdateVideoHandler(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(video)
 }
 
-// Updaate an existing video file
+// UpdateVideoFileHandler godoc
+// @Summary Update a video file
+// @Description Updates the uploaded video file for a user
+// @Tags video
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Video file"
+// @Param id formData string true "User ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string "invalid file or request"
+// @Failure 500 {string} string "internal server error"
+// @Router /video/file [put]
 func (c *VideoController) UpdateVideoFileHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_VIDEO_FILE_SIZE_MB << 20); err != nil {
 		http.Error(w, "failed to parse request", http.StatusBadRequest)
@@ -219,7 +291,17 @@ func (c *VideoController) UpdateVideoFileHandler(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(response)
 }
 
-// Delete a video
+// DeleteVideoHandler godoc
+// @Summary Delete a video record
+// @Description Deletes a video metadata record by ID
+// @Tags video
+// @Accept json
+// @Produce json
+// @Param id query int true "Video ID"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {string} string "invalid video ID"
+// @Failure 500 {string} string "internal server error"
+// @Router /video [delete]
 func (c *VideoController) DeleteVideoHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
@@ -235,7 +317,17 @@ func (c *VideoController) DeleteVideoHandler(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete a video file
+// DeleteVideoFileHandler godoc
+// @Summary Delete a video file
+// @Description Deletes the uploaded video file for a given video ID
+// @Tags video
+// @Accept json
+// @Produce json
+// @Param id query int true "Video ID"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {string} string "invalid video ID"
+// @Failure 500 {string} string "internal server error"
+// @Router /video/file [delete]
 func (c *VideoController) DeleteVideoFileHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
@@ -257,7 +349,15 @@ func (c *VideoController) DeleteVideoFileHandler(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Get video stats
+// GetVideoStatsHandler godoc
+// @Summary Get video statistics
+// @Description Returns the total number of uploaded videos
+// @Tags video
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]int "total_videos"
+// @Failure 500 {string} string "internal server error"
+// @Router /video/stats [get]
 func (c *VideoController) GetVideoStatsHandler(w http.ResponseWriter, r *http.Request) {
 	stats, err := c.services.GetVideoStats()
 	if err != nil {
