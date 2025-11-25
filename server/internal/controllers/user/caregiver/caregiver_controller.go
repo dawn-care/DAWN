@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	caregiver "server/internal/models/user/caregiver"
+	"server/internal/models/user/caregiver"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -61,10 +61,17 @@ func extractIDFromParam(r *http.Request, name string) (int, error) {
 	return id, nil
 }
 
-// -----------------------------------------------------
-// CREATE
-// -----------------------------------------------------
-
+// CreateCaregiver godoc
+// @Summary Create a new caregiver
+// @Description Creates a new caregiver record
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param caregiver body caregiver.Caregiver true "Caregiver to create"
+// @Success 201 {object} caregiver.Caregiver
+// @Failure 400 {object} map[string]string "invalid request body or validation error"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers [post]
 func (cc *CaregiverController) CreateCaregiver(w http.ResponseWriter, r *http.Request) {
 	var cg caregiver.Caregiver
 
@@ -81,10 +88,18 @@ func (cc *CaregiverController) CreateCaregiver(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusCreated, cg)
 }
 
-// -----------------------------------------------------
-// READ
-// -----------------------------------------------------
-
+// GetCaregiverByID godoc
+// @Summary Get a caregiver by ID
+// @Description Retrieves a single caregiver by ID
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param id path int true "Caregiver ID"
+// @Success 200 {object} caregiver.Caregiver
+// @Failure 400 {object} map[string]string "invalid ID"
+// @Failure 404 {object} map[string]string "caregiver not found"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers/{id} [get]
 func (cc *CaregiverController) GetCaregiverByID(w http.ResponseWriter, r *http.Request) {
 	id, err := extractIDFromParam(r, "id")
 	if err != nil {
@@ -105,6 +120,15 @@ func (cc *CaregiverController) GetCaregiverByID(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusOK, cg)
 }
 
+// GetAllCaregivers godoc
+// @Summary Get all caregivers
+// @Description Retrieves a list of all caregivers
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Success 200 {array} caregiver.Caregiver
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers [get]
 func (cc *CaregiverController) GetAllCaregivers(w http.ResponseWriter, r *http.Request) {
 	list, err := cc.Service.GetAllCaregivers()
 	if err != nil {
@@ -114,6 +138,18 @@ func (cc *CaregiverController) GetAllCaregivers(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusOK, list)
 }
 
+// GetCaregiverByCarereceiverID godoc
+// @Summary Get a caregiver by carereceiver ID
+// @Description Retrieves a caregiver associated with a specific carereceiver
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param carereceiverId path int true "Carereceiver ID"
+// @Success 200 {object} caregiver.Caregiver
+// @Failure 400 {object} map[string]string "invalid carereceiver ID"
+// @Failure 404 {object} map[string]string "caregiver not found"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers/carereceiver/{carereceiverId} [get]
 func (cc *CaregiverController) GetCaregiverByCarereceiverID(w http.ResponseWriter, r *http.Request) {
 	id, err := extractIDFromParam(r, "carereceiverId")
 	if err != nil {
@@ -134,6 +170,17 @@ func (cc *CaregiverController) GetCaregiverByCarereceiverID(w http.ResponseWrite
 	writeJSON(w, http.StatusOK, cg)
 }
 
+// SearchCaregivers godoc
+// @Summary Search caregivers
+// @Description Searches caregivers by query string (minimum 2 characters)
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param q query string true "Search query"
+// @Success 200 {array} caregiver.Caregiver
+// @Failure 400 {object} map[string]string "query too short or invalid"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers/search [get]
 func (cc *CaregiverController) SearchCaregivers(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if len(query) < 2 {
@@ -150,10 +197,17 @@ func (cc *CaregiverController) SearchCaregivers(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusOK, results)
 }
 
-// -----------------------------------------------------
-// UPDATE
-// -----------------------------------------------------
-
+// UpdateCaregiver godoc
+// @Summary Update a caregiver
+// @Description Updates an existing caregiver by ID
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param caregiver body caregiver.Caregiver true "Caregiver to update (must include ID)"
+// @Success 200 {object} map[string]string "caregiver updated successfully"
+// @Failure 400 {object} map[string]string "invalid request body or missing ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers [put]
 func (cc *CaregiverController) UpdateCaregiver(w http.ResponseWriter, r *http.Request) {
 	var cg caregiver.Caregiver
 
@@ -175,10 +229,18 @@ func (cc *CaregiverController) UpdateCaregiver(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, map[string]string{"message": "caregiver updated successfully"})
 }
 
-// -----------------------------------------------------
-// DELETE
-// -----------------------------------------------------
-
+// DeleteCaregiver godoc
+// @Summary Delete a caregiver
+// @Description Deletes a caregiver by ID
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param id path int true "Caregiver ID"
+// @Success 200 {object} map[string]string "caregiver deleted successfully"
+// @Failure 400 {object} map[string]string "invalid ID or deletion error"
+// @Failure 404 {object} map[string]string "caregiver not found"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers/{id} [delete]
 func (cc *CaregiverController) DeleteCaregiver(w http.ResponseWriter, r *http.Request) {
 	id, err := extractIDFromParam(r, "id")
 	if err != nil {
