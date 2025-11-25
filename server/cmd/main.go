@@ -13,16 +13,19 @@ import (
 
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
+	promptsCtrlr "server/internal/controllers/prompts"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	newsCtrlr "server/internal/controllers/widgets/news"
 	weatherCtrlr "server/internal/controllers/widgets/weather"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
+	promptsRts "server/internal/routes/prompts"
 	caregiverRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
 	weatherRts "server/internal/routes/widgets/weather"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
+	promptsSvc "server/internal/services/prompts"
 	caregiverSvc "server/internal/services/user/caregiver"
 	newsSvc "server/internal/services/widgets/news"
 	weatherSvc "server/internal/services/widgets/weather"
@@ -81,6 +84,9 @@ func main() {
 	weatherService := weatherSvc.NewWeatherService(db, "api key (insert here)")
 	// Modules
 	modulesService := modulesSvc.NewModuleService(db)
+	// Prompts
+	eventsService := promptsSvc.NewEventService(db)
+	messageService := promptsSvc.NewMessageService(db)
 
 	// INITIALIZE CTRLRS
 	// Media
@@ -95,6 +101,9 @@ func main() {
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
 	// Modules
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
+	// Prompts
+	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
+	messageCtrl := promptsCtrlr.NewMessageController(messageService)
 
 	// ROUTE INITIALIZATION
 	// Media
@@ -109,6 +118,9 @@ func main() {
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 	// Modules
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
+	// Prompts
+	promptsRts.RegisterEventRoutes(r, eventsCtrl)
+	promptsRts.RegisterMessageRoutes(r, messageCtrl)
 
 	// Launch
 	port := os.Getenv("PORT")
