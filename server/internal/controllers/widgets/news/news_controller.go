@@ -3,22 +3,22 @@ package widgets
 import (
 	"encoding/json"
 	"net/http"
-	news "server/internal/models/widgets/news"
-	service "server/internal/services/widgets/news"
+	widgets "server/internal/models/widgets/news"
+	"server/internal/services/widgets/news"
 	"strconv"
 )
 
 // Service Interface
 type NewsWidgetServiceInterface interface {
-	CreateNewsWidget(weather_widget *news.NewsWidget) error
-	CreateNewsWidgetsBulk(weather_widgets []news.NewsWidget) error
-	GetNewsWidgetByID(id int) (*news.NewsWidget, error)
-	GetNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]news.NewsWidget, error)
-	GetNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]news.NewsWidget, error)
-	UpdateNewsWidget(weather_widget *news.NewsWidget) error
+	CreateNewsWidget(weather_widget *widgets.NewsWidget) error
+	CreateNewsWidgetsBulk(weather_widgets []widgets.NewsWidget) error
+	GetNewsWidgetByID(id int) (*widgets.NewsWidget, error)
+	GetNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.NewsWidget, error)
+	GetNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.NewsWidget, error)
+	UpdateNewsWidget(weather_widget *widgets.NewsWidget) error
 	DeleteNewsWidget(id int) error
 	GetNewsWidgetStats() (int, error)
-	GetGoodNews() (*service.NewsAPIResponse, error)
+	GetGoodNews() (*news.NewsAPIResponse, error)
 	GetJoke() (string, error)
 }
 
@@ -31,9 +31,19 @@ func NewNewsWidgetController(service NewsWidgetServiceInterface) *NewsWidgetCont
 	return &NewsWidgetController{service: service}
 }
 
-// Handler for creating a new news widget
+// CreateNewsWidgetHandler godoc
+// @Summary Create a news widget
+// @Description Creates a new news widget
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Param news_widget body widgets.NewsWidget true "News Widget to create"
+// @Success 200 {object} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets [post]
 func (c *NewsWidgetController) CreateNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget news.NewsWidget
+	var weather_widget widgets.NewsWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -47,7 +57,17 @@ func (c *NewsWidgetController) CreateNewsWidgetHandler(w http.ResponseWriter, r 
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for getting a news widget by ID
+// GetNewsWidgetByIDHandler godoc
+// @Summary Get a news widget by ID
+// @Description Retrieves a news widget by its ID
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Param id query int true "News Widget ID"
+// @Success 200 {object} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/{id} [get]
 func (c *NewsWidgetController) GetNewsWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idSTR := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idSTR)
@@ -65,7 +85,18 @@ func (c *NewsWidgetController) GetNewsWidgetByIDHandler(w http.ResponseWriter, r
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for getting news widgets by carepartner and caregiver IDs
+// GetNewsWidgetsByCarepartnerAndCaregiverHandler godoc
+// @Summary Get news widgets by carepartner and caregiver
+// @Description Retrieves all news widgets for a given carepartner and caregiver
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param caregiver_id query int true "Caregiver ID"
+// @Success 200 {array} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid IDs"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/by-carepartner-and-caregiver [get]
 func (c *NewsWidgetController) GetNewsWidgetsByCarepartnerAndCaregiverHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
@@ -86,7 +117,20 @@ func (c *NewsWidgetController) GetNewsWidgetsByCarepartnerAndCaregiverHandler(w 
 	json.NewEncoder(w).Encode(weather_widgets)
 }
 
-// Handler for getting news widgets by carepartner ID and date
+// GetNewsByDayAndCarepartnerHandler godoc
+// @Summary Get news widgets by carepartner and date
+// @Description Retrieves news widgets for a carepartner filtered by day, month, and year
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param day query int true "Day"
+// @Param month query int true "Month"
+// @Param year query int true "Year"
+// @Success 200 {array} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid IDs or date"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/by-day [get]
 func (c *NewsWidgetController) GetNewsByDayAndCarepartnerHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
@@ -106,9 +150,19 @@ func (c *NewsWidgetController) GetNewsByDayAndCarepartnerHandler(w http.Response
 	json.NewEncoder(w).Encode(weather_widgets)
 }
 
-// Handler for updating an existing news widget
+// UpdateNewsWidgetHandler godoc
+// @Summary Update a news widget
+// @Description Updates an existing news widget
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Param news_widget body widgets.NewsWidget true "News Widget to update"
+// @Success 200 {object} widgets.NewsWidget
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets [put]
 func (c *NewsWidgetController) UpdateNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget news.NewsWidget
+	var weather_widget widgets.NewsWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -122,7 +176,17 @@ func (c *NewsWidgetController) UpdateNewsWidgetHandler(w http.ResponseWriter, r 
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for deleting a news widget by ID
+// DeleteNewsWidgetHandler godoc
+// @Summary Delete a news widget
+// @Description Deletes a news widget by ID
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Param id query int true "News Widget ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string "invalid ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/{id} [delete]
 func (c *NewsWidgetController) DeleteNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
@@ -138,7 +202,15 @@ func (c *NewsWidgetController) DeleteNewsWidgetHandler(w http.ResponseWriter, r 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Handler for getting total number of news widgets
+// GetNewsWidgetStatsHandler godoc
+// @Summary Get total number of news widgets
+// @Description Retrieves the total count of news widgets
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Success 200 {integer} int "Total count"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/stats [get]
 func (c *NewsWidgetController) GetNewsWidgetStatsHandler(w http.ResponseWriter, r *http.Request) {
 	count, err := c.service.GetNewsWidgetStats()
 	if err != nil {
@@ -149,7 +221,15 @@ func (c *NewsWidgetController) GetNewsWidgetStatsHandler(w http.ResponseWriter, 
 	json.NewEncoder(w).Encode(count)
 }
 
-// Handler for getting good news articles
+// GetGoodNewsHandler godoc
+// @Summary Get good news articles
+// @Description Retrieves curated good news articles
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Success 200 {object} news.NewsAPIResponse
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/good-news [get]
 func (c *NewsWidgetController) GetGoodNewsHandler(w http.ResponseWriter, r *http.Request) {
 	newsResponse, err := c.service.GetGoodNews()
 	if err != nil {
@@ -160,7 +240,15 @@ func (c *NewsWidgetController) GetGoodNewsHandler(w http.ResponseWriter, r *http
 	json.NewEncoder(w).Encode(newsResponse)
 }
 
-// Handler for getting a joke
+// GetJokeHandler godoc
+// @Summary Get a joke
+// @Description Retrieves a random joke
+// @Tags news-widget
+// @Accept json
+// @Produce json
+// @Success 200 {string} string "Joke text"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /news-widgets/joke [get]
 func (c *NewsWidgetController) GetJokeHandler(w http.ResponseWriter, r *http.Request) {
 	jokeResponse, err := c.service.GetJoke()
 	if err != nil {

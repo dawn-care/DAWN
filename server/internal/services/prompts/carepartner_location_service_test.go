@@ -1,142 +1,103 @@
 package prompts
 
 import (
-	"errors"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"database/sql"
 	"testing"
 
-	models "server/internal/models/prompts"
+	"server/internal/models/prompts"
 )
 
-// --- Mock service implementing CarepartnerLocationServiceInterface ---
+func TestCreateCarepartnerLocation_Success(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
 
-type mockCarepartnerLocationService struct {
-	createErr error
-	getErr    error
-	updateErr error
-	deleteErr error
-	locResult *models.CarepartnerLocationPrompt
-}
-
-func (m *mockCarepartnerLocationService) CreateCarepartnerLocation(loc *models.CarepartnerLocationPrompt) error {
-	if loc == nil || loc.Location == "" || loc.Message == "" {
-		return errors.New("invalid input")
+	loc := &prompts.CarepartnerLocationPrompt{
+		Location: "Rochester, NY",
+		Message:  "You are safe in a home",
+		URI:      "photo.jpg",
 	}
-	loc.ID = 10
-	return m.createErr
-}
 
-func (m *mockCarepartnerLocationService) GetCarepartnerLocationByID(id int) (*models.CarepartnerLocationPrompt, error) {
-	if id <= 0 {
-		return nil, errors.New("invalid id")
-	}
-	return m.locResult, m.getErr
-}
-
-func (m *mockCarepartnerLocationService) UpdateCarepartnerLocation(loc *models.CarepartnerLocationPrompt) error {
-	if loc == nil || loc.ID <= 0 {
-		return errors.New("invalid input")
-	}
-	return m.updateErr
-}
-
-func (m *mockCarepartnerLocationService) DeleteCarepartnerLocation(id int) error {
-	if id <= 0 {
-		return errors.New("invalid id")
-	}
-	return m.deleteErr
-}
-
-// --- Tests ---
-
-func TestCreateCarepartnerLocationHandler_Success(t *testing.T) {
-	mockSvc := &mockCarepartnerLocationService{}
-	controller := NewCarepartnerLocationController(mockSvc)
-
-	reqBody := `{"location":"Home","message":"OK"}`
-	req := httptest.NewRequest(http.MethodPost, "/carepartner-location", strings.NewReader(reqBody))
-	w := httptest.NewRecorder()
-
-	controller.CreateCarepartnerLocationHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	err := svc.CreateCarepartnerLocation(loc)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-func TestGetCarepartnerLocationByIDHandler_Success(t *testing.T) {
-	mockSvc := &mockCarepartnerLocationService{
-		locResult: &models.CarepartnerLocationPrompt{
-			ID:       1,
-			Location: "Home",
-			Message:  "OK",
-		},
+func TestCreateCarepartnerLocation_Invalid_NoLocation(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
+
+	loc := &prompts.CarepartnerLocationPrompt{
+		Location: "",
+		Message:  "Missing location",
 	}
-	controller := NewCarepartnerLocationController(mockSvc)
 
-	req := httptest.NewRequest(http.MethodGet, "/carepartner-location?id=1", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetCarepartnerLocationByIDHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	err := svc.CreateCarepartnerLocation(loc)
+	if err == nil {
+		t.Fatalf("expected error due to missing location, got nil")
 	}
 }
 
-func TestGetCarepartnerLocationByIDHandler_InvalidID(t *testing.T) {
-	controller := NewCarepartnerLocationController(&mockCarepartnerLocationService{})
+func TestGetCarepartnerLocationByID_Success(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
 
-	req := httptest.NewRequest(http.MethodGet, "/carepartner-location?id=abc", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetCarepartnerLocationByIDHandler(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	_, err := svc.GetCarepartnerLocationByID(1)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-func TestUpdateCarepartnerLocationHandler_Success(t *testing.T) {
-	mockSvc := &mockCarepartnerLocationService{}
-	controller := NewCarepartnerLocationController(mockSvc)
+func TestGetCarepartnerLocationByID_InvalidID(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
 
-	reqBody := `{"id":5,"location":"Work","message":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/carepartner-location", strings.NewReader(reqBody))
-	w := httptest.NewRecorder()
-
-	controller.UpdateCarepartnerLocationHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	_, err := svc.GetCarepartnerLocationByID(0)
+	if err == nil {
+		t.Fatalf("expected error for invalid ID, got nil")
 	}
 }
 
-func TestDeleteCarepartnerLocationHandler_Success(t *testing.T) {
-	mockSvc := &mockCarepartnerLocationService{}
-	controller := NewCarepartnerLocationController(mockSvc)
+func TestUpdateCarepartnerLocation_Success(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/carepartner-location?id=10", nil)
-	w := httptest.NewRecorder()
+	loc := &prompts.CarepartnerLocationPrompt{
+		ID:       1,
+		Location: "Buffalo, NY",
+		Message:  "Updated info",
+		URI:      "",
+	}
 
-	controller.DeleteCarepartnerLocationHandler(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", w.Code)
+	err := svc.UpdateCarepartnerLocation(loc)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-func TestDeleteCarepartnerLocationHandler_InvalidID(t *testing.T) {
-	controller := NewCarepartnerLocationController(&mockCarepartnerLocationService{})
+func TestUpdateCarepartnerLocation_InvalidID(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/carepartner-location?id=0", nil)
-	w := httptest.NewRecorder()
+	loc := &prompts.CarepartnerLocationPrompt{
+		ID:       0,
+		Location: "Anywhere",
+	}
 
-	controller.DeleteCarepartnerLocationHandler(w, req)
+	err := svc.UpdateCarepartnerLocation(loc)
+	if err == nil {
+		t.Fatalf("expected error for invalid ID, got nil")
+	}
+}
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+func TestDeleteCarepartnerLocation_Success(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
+
+	err := svc.DeleteCarepartnerLocation(1)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+}
+
+func TestDeleteCarepartnerLocation_InvalidID(t *testing.T) {
+	svc := NewCarepartnerLocationService(&sql.DB{})
+
+	err := svc.DeleteCarepartnerLocation(0)
+	if err == nil {
+		t.Fatalf("expected error for invalid ID, got nil")
 	}
 }

@@ -9,9 +9,9 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: username
-      DB_PASSWORD: password
-      DB_NAME: db
+      DB_USER: myuser
+      DB_PASSWORD: mypassword
+      DB_NAME: mydb
     depends_on:
       - db
       - minio
@@ -21,17 +21,17 @@ services:
     networks:
       - app-network
 
-  caregiver:
-    build:
-      context: ./caregiver
-      dockerfile: Dockerfile
-    container_name: caregiver
-    ports:
-      - "3001:80"
-    depends_on:
-      - server
-    networks:
-      - app-network
+  # caregiver:
+  #   build:
+  #     context: ./caregiver
+  #     dockerfile: Dockerfile
+  #   container_name: caregiver
+  #   ports:
+  #     - "3001:80"
+  #   depends_on:
+  #     - server
+  #   networks:
+  #     - app-network
 
   db:
     image: postgres:15

@@ -1,142 +1,103 @@
 package prompts
 
 import (
-	"errors"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"database/sql"
 	"testing"
 
-	models "server/internal/models/prompts"
+	"server/internal/models/prompts"
 )
 
-// --- Mock service implementing CaregiverLocationServiceInterface ---
+func TestCreateCaregiverLocation_Success(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
 
-type mockCaregiverLocationService struct {
-	createErr error
-	getErr    error
-	updateErr error
-	deleteErr error
-	locResult *models.CaregiverLocationPrompt
-}
-
-func (m *mockCaregiverLocationService) CreateCaregiverLocation(loc *models.CaregiverLocationPrompt) error {
-	if loc == nil || loc.Location == "" || loc.Message == "" {
-		return errors.New("invalid input")
+	loc := &prompts.CaregiverLocationPrompt{
+		Location: "Home",
+		Message:  "Arrived safely",
+		URI:      "image.jpg",
 	}
-	loc.ID = 10
-	return m.createErr
-}
 
-func (m *mockCaregiverLocationService) GetCaregiverLocationByID(id int) (*models.CaregiverLocationPrompt, error) {
-	if id <= 0 {
-		return nil, errors.New("invalid id")
-	}
-	return m.locResult, m.getErr
-}
-
-func (m *mockCaregiverLocationService) UpdateCaregiverLocation(loc *models.CaregiverLocationPrompt) error {
-	if loc == nil || loc.ID <= 0 {
-		return errors.New("invalid input")
-	}
-	return m.updateErr
-}
-
-func (m *mockCaregiverLocationService) DeleteCaregiverLocation(id int) error {
-	if id <= 0 {
-		return errors.New("invalid id")
-	}
-	return m.deleteErr
-}
-
-// --- Tests ---
-
-func TestCreateCaregiverLocationHandler_Success(t *testing.T) {
-	mockSvc := &mockCaregiverLocationService{}
-	controller := NewCaregiverLocationController(mockSvc)
-
-	reqBody := `{"location":"Home","message":"OK"}`
-	req := httptest.NewRequest(http.MethodPost, "/caregiver-location", strings.NewReader(reqBody))
-	w := httptest.NewRecorder()
-
-	controller.CreateCaregiverLocationHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	err := svc.CreateCaregiverLocation(loc)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-func TestGetCaregiverLocationByIDHandler_Success(t *testing.T) {
-	mockSvc := &mockCaregiverLocationService{
-		locResult: &models.CaregiverLocationPrompt{
-			ID:       1,
-			Location: "Home",
-			Message:  "OK",
-		},
+func TestCreateCaregiverLocation_Invalid_NoLocation(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
+
+	loc := &prompts.CaregiverLocationPrompt{
+		Location: "",
+		Message:  "Missing location field",
 	}
-	controller := NewCaregiverLocationController(mockSvc)
 
-	req := httptest.NewRequest(http.MethodGet, "/caregiver-location?id=1", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetCaregiverLocationByIDHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	err := svc.CreateCaregiverLocation(loc)
+	if err == nil {
+		t.Fatalf("expected error for missing location, got nil")
 	}
 }
 
-func TestGetCaregiverLocationByIDHandler_InvalidID(t *testing.T) {
-	controller := NewCaregiverLocationController(&mockCaregiverLocationService{})
+func TestGetCaregiverLocationByID_Success(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
 
-	req := httptest.NewRequest(http.MethodGet, "/caregiver-location?id=abc", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetCaregiverLocationByIDHandler(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	_, err := svc.GetCaregiverLocationByID(1)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-func TestUpdateCaregiverLocationHandler_Success(t *testing.T) {
-	mockSvc := &mockCaregiverLocationService{}
-	controller := NewCaregiverLocationController(mockSvc)
+func TestGetCaregiverLocationByID_InvalidID(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
 
-	reqBody := `{"id":5,"location":"Work","message":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/caregiver-location", strings.NewReader(reqBody))
-	w := httptest.NewRecorder()
-
-	controller.UpdateCaregiverLocationHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
+	_, err := svc.GetCaregiverLocationByID(0)
+	if err == nil {
+		t.Fatalf("expected error for invalid ID, got nil")
 	}
 }
 
-func TestDeleteCaregiverLocationHandler_Success(t *testing.T) {
-	mockSvc := &mockCaregiverLocationService{}
-	controller := NewCaregiverLocationController(mockSvc)
+func TestUpdateCaregiverLocation_Success(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/caregiver-location?id=10", nil)
-	w := httptest.NewRecorder()
+	loc := &prompts.CaregiverLocationPrompt{
+		ID:       1,
+		Location: "Clinic",
+		Message:  "On the way",
+		URI:      "",
+	}
 
-	controller.DeleteCaregiverLocationHandler(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", w.Code)
+	err := svc.UpdateCaregiverLocation(loc)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
 	}
 }
 
-func TestDeleteCaregiverLocationHandler_InvalidID(t *testing.T) {
-	controller := NewCaregiverLocationController(&mockCaregiverLocationService{})
+func TestUpdateCaregiverLocation_Invalid_NoID(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
 
-	req := httptest.NewRequest(http.MethodDelete, "/caregiver-location?id=0", nil)
-	w := httptest.NewRecorder()
+	loc := &prompts.CaregiverLocationPrompt{
+		ID:       0,
+		Location: "Home",
+	}
 
-	controller.DeleteCaregiverLocationHandler(w, req)
+	err := svc.UpdateCaregiverLocation(loc)
+	if err == nil {
+		t.Fatalf("expected error for missing ID, got nil")
+	}
+}
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+func TestDeleteCaregiverLocation_Success(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
+
+	err := svc.DeleteCaregiverLocation(1)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+}
+
+func TestDeleteCaregiverLocation_InvalidID(t *testing.T) {
+	svc := NewCaregiverLocationService(&sql.DB{})
+
+	err := svc.DeleteCaregiverLocation(0)
+	if err == nil {
+		t.Fatalf("expected error for invalid ID, got nil")
 	}
 }

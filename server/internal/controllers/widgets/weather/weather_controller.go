@@ -3,20 +3,20 @@ package widgets
 import (
 	"encoding/json"
 	"net/http"
-	models "server/internal/models/widgets/weather"
+	widgets "server/internal/models/widgets/weather"
 	"strconv"
 )
 
 // Service Interface
 type WeatherWidgetServiceInterface interface {
-	CreateWeatherWidget(weather_widget *models.WeatherWidget) error
-	CreateWeatherWidgetsBulk(weather_widgets []models.WeatherWidget) error
-	GetWeatherWidgetByID(id int) (*models.WeatherWidget, error)
-	GetWeatherWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]models.WeatherWidget, error)
-	GetWeatherWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]models.WeatherWidget, error)
-	UpdateWeatherWidget(weather_widget *models.WeatherWidget) error
+	CreateWeatherWidget(weather_widget *widgets.WeatherWidget) error
+	CreateWeatherWidgetsBulk(weather_widgets []widgets.WeatherWidget) error
+	GetWeatherWidgetByID(id int) (*widgets.WeatherWidget, error)
+	GetWeatherWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.WeatherWidget, error)
+	GetWeatherWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.WeatherWidget, error)
+	UpdateWeatherWidget(weather_widget *widgets.WeatherWidget) error
 	DeleteWeatherWidget(id int) error
-	GetWeatherOverview(weather_widget *models.WeatherWidget) (string, error)
+	GetWeatherOverview(weather_widget *widgets.WeatherWidget) (string, error)
 	GetWeatherWidgetStats() (int, error)
 }
 
@@ -29,9 +29,19 @@ func NewWeatherWidgetController(service WeatherWidgetServiceInterface) *WeatherW
 	return &WeatherWidgetController{service: service}
 }
 
-// Handler for creating a new weather widget
+// CreateWeatherWidgetHandler godoc
+// @Summary Create a weather widget
+// @Description Creates a new weather widget
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param weather_widget body widgets.WeatherWidget true "Weather Widget to create"
+// @Success 200 {object} widgets.WeatherWidget
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets [post]
 func (c *WeatherWidgetController) CreateWeatherWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget models.WeatherWidget
+	var weather_widget widgets.WeatherWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -45,7 +55,17 @@ func (c *WeatherWidgetController) CreateWeatherWidgetHandler(w http.ResponseWrit
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for getting a weather widget by ID
+// GetWeatherWidgetByIDHandler godoc
+// @Summary Get a weather widget by ID
+// @Description Retrieves a weather widget by its ID
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param id query int true "Weather Widget ID"
+// @Success 200 {object} widgets.WeatherWidget
+// @Failure 400 {object} map[string]string "invalid WeatherWidget ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets/{id} [get]
 func (c *WeatherWidgetController) GetWeatherWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idSTR := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idSTR)
@@ -63,7 +83,18 @@ func (c *WeatherWidgetController) GetWeatherWidgetByIDHandler(w http.ResponseWri
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for getting weather widgets by carepartner and caregiver IDs
+// GetWeatherWidgetsByCarepartnerAndCaregiverHandler godoc
+// @Summary Get weather widgets by carepartner and caregiver
+// @Description Retrieves all weather widgets for a given carepartner and caregiver
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param caregiver_id query int true "Caregiver ID"
+// @Success 200 {array} widgets.WeatherWidget
+// @Failure 400 {object} map[string]string "invalid Carepartner or Caregiver ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets/by-carepartner-and-caregiver [get]
 func (c *WeatherWidgetController) GetWeatherWidgetsByCarepartnerAndCaregiverHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
@@ -84,7 +115,20 @@ func (c *WeatherWidgetController) GetWeatherWidgetsByCarepartnerAndCaregiverHand
 	json.NewEncoder(w).Encode(weather_widgets)
 }
 
-// Handler for getting weather widgets by carepartner ID and date
+// GetWeatherByDayAndCarepartnerHandler godoc
+// @Summary Get weather widgets by carepartner and date
+// @Description Retrieves weather widgets for a carepartner filtered by day, month, and year
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param day query int true "Day"
+// @Param month query int true "Month"
+// @Param year query int true "Year"
+// @Success 200 {array} widgets.WeatherWidget
+// @Failure 400 {object} map[string]string "invalid Carepartner ID or date"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets/by-day [get]
 func (c *WeatherWidgetController) GetWeatherByDayAndCarepartnerHandler(w http.ResponseWriter, r *http.Request) {
 	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
@@ -104,9 +148,19 @@ func (c *WeatherWidgetController) GetWeatherByDayAndCarepartnerHandler(w http.Re
 	json.NewEncoder(w).Encode(weather_widgets)
 }
 
-// Handler for updating an existing weather widget
+// UpdateWeatherWidgetHandler godoc
+// @Summary Update a weather widget
+// @Description Updates an existing weather widget
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param weather_widget body widgets.WeatherWidget true "Weather Widget to update"
+// @Success 200 {object} widgets.WeatherWidget
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets [put]
 func (c *WeatherWidgetController) UpdateWeatherWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget models.WeatherWidget
+	var weather_widget widgets.WeatherWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -120,7 +174,17 @@ func (c *WeatherWidgetController) UpdateWeatherWidgetHandler(w http.ResponseWrit
 	json.NewEncoder(w).Encode(weather_widget)
 }
 
-// Handler for deleting a weather widget by ID
+// DeleteWeatherWidgetHandler godoc
+// @Summary Delete a weather widget
+// @Description Deletes a weather widget by ID
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param id query int true "Weather Widget ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string "invalid WeatherWidget ID"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets/{id} [delete]
 func (c *WeatherWidgetController) DeleteWeatherWidgetHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
@@ -136,9 +200,19 @@ func (c *WeatherWidgetController) DeleteWeatherWidgetHandler(w http.ResponseWrit
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Handler for getting daily weather overview
+// GetWeatherOverviewHandler godoc
+// @Summary Get daily weather overview
+// @Description Generates a daily weather overview for a given weather widget
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Param weather_widget body widgets.WeatherWidget true "Weather Widget"
+// @Success 200 {string} string "Weather overview"
+// @Failure 400 {object} map[string]string "invalid request body"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets/overview [post]
 func (c *WeatherWidgetController) GetWeatherOverviewHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget models.WeatherWidget
+	var weather_widget widgets.WeatherWidget
 	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -153,7 +227,15 @@ func (c *WeatherWidgetController) GetWeatherOverviewHandler(w http.ResponseWrite
 	json.NewEncoder(w).Encode(overview)
 }
 
-// Handler for getting total number of weather widgets
+// GetWeatherWidgetStatsHandler godoc
+// @Summary Get total number of weather widgets
+// @Description Retrieves the total count of weather widgets
+// @Tags weather-widget
+// @Accept json
+// @Produce json
+// @Success 200 {integer} int "Total count"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /weather-widgets/stats [get]
 func (c *WeatherWidgetController) GetWeatherWidgetStatsHandler(w http.ResponseWriter, r *http.Request) {
 	count, err := c.service.GetWeatherWidgetStats()
 	if err != nil {
