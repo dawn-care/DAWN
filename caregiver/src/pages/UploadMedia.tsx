@@ -55,6 +55,7 @@ export default function UploadMedia() {
         return;
       }
 
+      alert("Saved!")
       setFile(null);
       setMediaName("");
     } catch (err: any) {
