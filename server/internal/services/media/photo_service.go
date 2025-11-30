@@ -1,10 +1,12 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 
 	"server/internal/models/media"
@@ -44,11 +46,18 @@ func (s *PhotoService) CreatePhotoFile(file multipart.File, handler *multipart.F
 	if uri == "" {
 		return errors.New("uri cannot be empty")
 	}
+
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	_, err := s.BLOB.PutObject(context.Background(), s.Bucket, uri, file, handler.Size, minio.PutObjectOptions{
+
+	buf, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	_, err = s.BLOB.PutObject(context.Background(), s.Bucket, uri, bytes.NewReader(buf), int64(len(buf)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
@@ -89,7 +98,6 @@ func (s *PhotoService) GetPhotoFile(uri string) (multipart.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch photo: %w", err)
 	}
-
 	return file, nil
 }
 
@@ -123,12 +131,18 @@ func (s *PhotoService) UpdatePhotoFile(file multipart.File, handler *multipart.F
 	if uri == "" {
 		return errors.New("uri cannot be empty")
 	}
+
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	// PutObject will override existing file, thus "Update"
-	_, err := s.BLOB.PutObject(context.Background(), s.Bucket, uri, file, handler.Size, minio.PutObjectOptions{
+
+	buf, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	_, err = s.BLOB.PutObject(context.Background(), s.Bucket, uri, bytes.NewReader(buf), int64(len(buf)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {

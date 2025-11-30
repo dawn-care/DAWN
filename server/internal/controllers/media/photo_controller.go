@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"server/internal/models/media"
 )
@@ -81,45 +82,61 @@ func (c *PhotoController) CreatePhotoHandler(w http.ResponseWriter, r *http.Requ
 // @Failure 500 {string} string "internal server error"
 // @Router /photo/file [post]
 func (c *PhotoController) CreatePhotoFileHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(MAX_PHOTO_FILE_SIZE_MB << 20); err != nil {
-		http.Error(w, "failed to parse request", http.StatusBadRequest)
-		return
-	}
+    file, handler, err := r.FormFile("file")
+    if err != nil {
+        http.Error(w, "file is required", http.StatusBadRequest)
+        return
+    }
+    defer file.Close()
 
-	file, handler, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "file is required", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
+    buf := make([]byte, 512)
+    _, err = file.Read(buf)
+    if err != nil {
+        http.Error(w, "unable to read file content", http.StatusBadRequest)
+        return
+    }
 
-	buf := make([]byte, 512)
-	_, err = file.Read(buf)
-	if err != nil {
-		http.Error(w, "unable to read file content", http.StatusBadRequest)
-		return
-	}
+    detectedType := http.DetectContentType(buf)
+    if !VALID_IMAGE_TYPES[detectedType] {
+        http.Error(w, "file is not a valid photo file", http.StatusBadRequest)
+        return
+    }
 
-	detectedType := http.DetectContentType(buf)
-	if !VALID_IMAGE_TYPES[detectedType] {
-		http.Error(w, "file is not a valid photo file", http.StatusBadRequest)
-		return
-	}
+    if seeker, ok := file.(io.Seeker); ok {
+        seeker.Seek(0, io.SeekStart)
+    }
 
-	userID := r.FormValue("id")
+    userID := r.FormValue("id")
+    uri := "users/" + userID + "/" + handler.Filename
+    extension := "." + handler.Filename[strings.LastIndex(handler.Filename, ".")+1:]
 
-	uri := "users/" + userID + "/" + handler.Filename
+    // Upload to MinIO
+    if err := c.services.CreatePhotoFile(file, handler, uri); err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
 
-	if err := c.services.CreatePhotoFile(file, handler, uri); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+    // Create database record
+    photo := &media.PhotoMedia{
+        URI:       uri,
+        Filename:  handler.Filename,
+        Extension: extension,
+    }
 
-	response := map[string]string{
-		"filename": handler.Filename,
-	}
+    if err := c.services.CreatePhoto(photo); err != nil {
+        http.Error(w, "failed to save photo metadata: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
 
-	json.NewEncoder(w).Encode(response)
+    response := map[string]interface{}{
+        "id":       photo.ID,
+        "filename": photo.Filename,
+        "uri":      photo.URI,
+        "extension": photo.Extension,
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(response)
 }
 
 // GetPhotoByIDHandler godoc
