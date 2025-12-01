@@ -13,7 +13,7 @@ func RegisterAudioRoutes(r chi.Router, audioCtrl *media.AudioController) {
 		r.Post("/upload", audioCtrl.CreateAudioFileHandler)
 		r.Get("/", audioCtrl.GetAudioByIDHandler)
 		r.Get("/file", audioCtrl.GetAudioFileByIDHandler)
-		r.Get("/list", audioCtrl.GetAudiosByCarepartnerAndCaregiverHandler)
+		// r.Get("/list", audioCtrl.GetAudiosByCarepartnerAndCaregiverHandler)
 		r.Put("/", audioCtrl.UpdateAudioHandler)
 		r.Put("/file", audioCtrl.UpdateAudioFileHandler)
 		r.Delete("/", audioCtrl.DeleteAudioHandler)

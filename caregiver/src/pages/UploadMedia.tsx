@@ -6,7 +6,7 @@ type RepeatType = "daily" | "weekly" | "monthly" | "yearly" | "never";
 const allowedExtensions = {
   video: [".mp4", ".mov", ".avi"],
   photo: [".jpg", ".jpeg", ".png", ".heic"],
-  audio: [".mp3", ".wav", ".ogg"],
+  audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
@@ -41,7 +41,7 @@ export default function UploadMedia() {
 
     const formData = new FormData();
     formData.append("file", file, file.name);
-    formData.append("id", "1");
+    formData.append("id", "1"); // temp user ID
     formData.append("repeat", repeat);
     if (repeat === "weekly") formData.append("weeklyDay", weeklyDay);
     if (repeat === "monthly") formData.append("monthlyDay", monthlyDay.toString());
