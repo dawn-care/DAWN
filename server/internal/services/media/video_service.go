@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
+	"path/filepath"
 
 	"server/internal/models/media"
 
@@ -44,16 +46,46 @@ func (s *VideoService) CreateVideoFile(file multipart.File, handler *multipart.F
 	if uri == "" {
 		return errors.New("uri cannot be empty")
 	}
+
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	_, err := s.BLOB.PutObject(context.Background(), s.Bucket, uri, file, handler.Size, minio.PutObjectOptions{
-		ContentType: contentType,
-	})
-	if err != nil {
-		return fmt.Errorf("unable to upload media to blob storage: %w", err)
+
+	size := handler.Size
+	if size == 0 {
+		stat, err := file.Seek(0, io.SeekEnd)
+		if err == nil {
+			size = stat
+			_, _ = file.Seek(0, io.SeekStart)
+		}
 	}
+
+	_, err := s.BLOB.PutObject(
+		context.Background(),
+		s.Bucket,
+		uri,
+		file,
+		size,
+		minio.PutObjectOptions{
+			ContentType: contentType,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("unable to upload video to blob storage: %w", err)
+	}
+
+	video := &media.VideoMedia{
+		URI:          uri,
+		Filename:     handler.Filename,
+		Extension:    filepath.Ext(handler.Filename),
+	}
+
+	err = s.CreateVideo(video)
+	if err != nil {
+		return fmt.Errorf("failed to save video metadata to DB: %w", err)
+	}
+
 	return nil
 }
 
@@ -85,6 +117,7 @@ func (s *VideoService) GetVideoFile(uri string) (multipart.File, error) {
 	if uri == "" {
 		return nil, errors.New("invalid filename")
 	}
+
 	file, err := s.BLOB.GetObject(context.Background(), s.Bucket, uri, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch video: %w", err)
@@ -123,17 +156,35 @@ func (s *VideoService) UpdateVideoFile(file multipart.File, handler *multipart.F
 	if uri == "" {
 		return errors.New("uri cannot be empty")
 	}
+
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	// PutObject will override existing file, thus "Update"
-	_, err := s.BLOB.PutObject(context.Background(), s.Bucket, uri, file, handler.Size, minio.PutObjectOptions{
-		ContentType: contentType,
-	})
+
+	size := handler.Size
+	if size == 0 {
+		stat, err := file.Seek(0, io.SeekEnd)
+		if err == nil {
+			size = stat
+			_, _ = file.Seek(0, io.SeekStart)
+		}
+	}
+
+	_, err := s.BLOB.PutObject(
+		context.Background(),
+		s.Bucket,
+		uri,
+		file,
+		size,
+		minio.PutObjectOptions{
+			ContentType: contentType,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("unable to update video: %w", err)
 	}
+
 	return nil
 }
 
@@ -150,6 +201,7 @@ func (s *VideoService) DeleteVideoFile(uri string) error {
 	if uri == "" {
 		return errors.New("invalid filename")
 	}
+
 	removeErr := s.BLOB.RemoveObject(context.Background(), s.Bucket, uri, minio.RemoveObjectOptions{})
 	if removeErr != nil {
 		return fmt.Errorf("unable to delete video: %w", removeErr)
