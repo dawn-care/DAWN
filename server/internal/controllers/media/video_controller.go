@@ -80,14 +80,11 @@ func (c *VideoController) CreateVideoHandler(w http.ResponseWriter, r *http.Requ
 // @Failure 500 {string} string "internal server error"
 // @Router /video/file [post]
 func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(MAX_VIDEO_FILE_SIZE_MB << 20); err != nil {
-		http.Error(w, "failed to parse request", http.StatusBadRequest)
-		return
-	}
+	r.ParseMultipartForm(10 << 20)
 
 	file, handler, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "file is required", http.StatusBadRequest)
+		http.Error(w, "unable to get file", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -95,30 +92,27 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	buf := make([]byte, 512)
 	_, err = file.Read(buf)
 	if err != nil {
-		http.Error(w, "unable to read file content", http.StatusBadRequest)
+		http.Error(w, "unable to read file", http.StatusBadRequest)
 		return
 	}
 
 	detectedType := http.DetectContentType(buf)
-	if !VALID_IMAGE_TYPES[detectedType] {
+	if !VALID_VIDEO_TYPES[detectedType] {
 		http.Error(w, "file is not a valid video file", http.StatusBadRequest)
 		return
 	}
 
-	userID := r.FormValue("id")
+	file.Seek(0, io.SeekStart)
 
+	userID := r.FormValue("id")
 	uri := "users/" + userID + "/" + handler.Filename
 
 	if err := c.services.CreateVideoFile(file, handler, uri); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to save video: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	response := map[string]string{
-		"filename": handler.Filename,
-	}
-
-	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(http.StatusOK)
 }
 
 // GetVideoByIDHandler godoc

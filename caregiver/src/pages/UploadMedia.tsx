@@ -6,18 +6,21 @@ type RepeatType = "daily" | "weekly" | "monthly" | "yearly" | "never";
 const allowedExtensions = {
   video: [".mp4", ".mov", ".avi"],
   photo: [".jpg", ".jpeg", ".png", ".heic"],
-  audio: [".mp3", ".wav", ".ogg"],
+  audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function UploadMedia() {
   const [mediaName, setMediaName] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("video");
   const [repeat, setRepeat] = useState<RepeatType>("daily");
-  const [weeklyDay, setWeeklyDay] = useState("");
-  const [monthlyDay, setMonthlyDay] = useState<number | null>(null);
-  const [yearlyDate, setYearlyDate] = useState("");
+  const [weeklyDay, setWeeklyDay] = useState("Monday");
+  const [monthlyDay, setMonthlyDay] = useState<number>(1);
+  const [yearlyDate, setYearlyDate] = useState("2025-01-01");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("");
 
   function validateFile(f: File) {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
@@ -30,11 +33,52 @@ export default function UploadMedia() {
     }
   }
 
+  async function handleUpload() {
+    if (!file) {
+      setFileError("Please select a file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file, file.name);
+    formData.append("id", "1"); // temp user ID
+    formData.append("repeat", repeat);
+    if (repeat === "weekly") formData.append("weeklyDay", weeklyDay);
+    if (repeat === "monthly") formData.append("monthlyDay", monthlyDay.toString());
+    if (repeat === "yearly") formData.append("yearlyDate", yearlyDate);
+
+    const endpoint =
+      mediaType === "video"
+        ? "/video/upload"
+        : mediaType === "photo"
+        ? "/photo/upload"
+        : "/audio/upload";
+
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        setUploadStatus(`Error: ${text}`);
+        return;
+      }
+
+      setUploadStatus("Saved!");
+      setFile(null);
+      setMediaName("");
+    } catch (err: any) {
+      setUploadStatus("Upload failed: " + err.message);
+    }
+  }
+
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Add Media</h1>
-
       <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+
         {/* Media Name */}
         <div className="mb-6">
           <label className="text-lg font-medium">Media Name:</label>
@@ -61,41 +105,9 @@ export default function UploadMedia() {
           </select>
         </div>
 
-        {/* Upload Media */}
+        {/* Repeat Option */}
         <div className="mb-6">
-          <label className="text-lg font-medium">Upload Media:</label>
-
-          <div
-            className="mt-2 p-6 border-2 border-dashed border-gray-400 rounded cursor-pointer bg-purple-50 text-center"
-            onClick={() => document.getElementById("fileInput")?.click()}
-          >
-            {file ? (
-              <span className="font-medium">{file.name}</span>
-            ) : (
-              <span className="text-gray-500">
-                Drag and drop or click to upload
-              </span>
-            )}
-          </div>
-
-          <input
-            id="fileInput"
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) validateFile(f);
-            }}
-          />
-
-          {fileError && (
-            <p className="text-red-500 mt-2 text-sm">{fileError}</p>
-          )}
-        </div>
-
-        {/* Repeats */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Repeats:</label>
+          <label className="text-lg font-medium">Repeat:</label>
           <select
             value={repeat}
             onChange={(e) => setRepeat(e.target.value as RepeatType)}
@@ -109,40 +121,32 @@ export default function UploadMedia() {
           </select>
         </div>
 
-        {/* Conditional Fields */}
+        {/* Conditional Repeat Inputs */}
         {repeat === "weekly" && (
           <div className="mb-6">
-            <label className="text-lg font-medium">Every:</label>
+            <label className="text-lg font-medium">Select Weekday:</label>
             <select
               value={weeklyDay}
               onChange={(e) => setWeeklyDay(e.target.value)}
               className="w-full mt-2 p-3 border rounded bg-purple-50"
             >
-              <option value="">Select a weekday</option>
-              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(
-                (day) => (
-                  <option key={day} value={day.toLowerCase()}>
-                    {day}
-                  </option>
-                )
-              )}
+              {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(day => (
+                <option key={day} value={day}>{day}</option>
+              ))}
             </select>
           </div>
         )}
 
         {repeat === "monthly" && (
           <div className="mb-6">
-            <label className="text-lg font-medium">Day of Month:</label>
+            <label className="text-lg font-medium">Select Day:</label>
             <select
-              value={monthlyDay ?? ""}
-              onChange={(e) => setMonthlyDay(Number(e.target.value))}
+              value={monthlyDay}
+              onChange={(e) => setMonthlyDay(parseInt(e.target.value))}
               className="w-full mt-2 p-3 border rounded bg-purple-50"
             >
-              <option value="">Select day</option>
-              {Array.from({ length: 29 }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
+              {Array.from({length:28}, (_,i)=>i+1).map(day => (
+                <option key={day} value={day}>{day}</option>
               ))}
             </select>
           </div>
@@ -150,7 +154,7 @@ export default function UploadMedia() {
 
         {repeat === "yearly" && (
           <div className="mb-6">
-            <label className="text-lg font-medium">Date:</label>
+            <label className="text-lg font-medium">Select Date:</label>
             <input
               type="date"
               value={yearlyDate}
@@ -160,13 +164,38 @@ export default function UploadMedia() {
           </div>
         )}
 
-        {/* Save Button */}
+        {/* Upload */}
+        <div className="mb-6">
+          <label className="text-lg font-medium">Upload Media:</label>
+          <div
+            className="mt-2 p-6 border-2 border-dashed border-gray-400 rounded cursor-pointer bg-purple-50 text-center"
+            onClick={() => document.getElementById("fileInput")?.click()}
+          >
+            {file ? <span>{file.name}</span> : <span>Drag and drop or click to upload</span>}
+          </div>
+
+          <input
+            id="fileInput"
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              f && validateFile(f);
+            }}
+          />
+
+          {fileError && <p className="text-red-500 mt-2 text-sm">{fileError}</p>}
+        </div>
+
+        {/* Save */}
         <button
           className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
-          onClick={() => alert("Saved!")}
+          onClick={handleUpload}
         >
           Save
         </button>
+
+        {uploadStatus && <p className="mt-2 text-sm">{uploadStatus}</p>}
       </div>
     </div>
   );

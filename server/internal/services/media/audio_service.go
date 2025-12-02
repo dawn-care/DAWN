@@ -1,10 +1,12 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 
 	"github.com/minio/minio-go/v7"
@@ -46,11 +48,19 @@ func (s *AudioService) CreateAudioFile(file multipart.File, handler *multipart.F
 	if uri == "" {
 		return errors.New("uri cannot be empty")
 	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file for upload: %w", err)
+	}
+	reader := bytes.NewReader(data)
+
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	_, err := s.BLOB.PutObject(context.Background(), s.Bucket, uri, file, handler.Size, minio.PutObjectOptions{
+
+	_, err = s.BLOB.PutObject(context.Background(), s.Bucket, uri, reader, int64(len(data)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
@@ -74,28 +84,35 @@ func (s *AudioService) CreateAudioFilesBulk(files []multipart.File, handlers []*
 		file := files[i]
 		handler := handlers[i]
 
+		data, err := io.ReadAll(file)
+		if err != nil {
+			ctx := context.Background()
+			for _, name := range uploaded {
+				_ = s.BLOB.RemoveObject(ctx, s.Bucket, name, minio.RemoveObjectOptions{})
+			}
+			return fmt.Errorf("failed to read file for upload: %w", err)
+		}
+		reader := bytes.NewReader(data)
+
 		contentType := handler.Header.Get("Content-Type")
 		if contentType == "" {
 			contentType = "application/octet-stream"
 		}
 
-		_, err := s.BLOB.PutObject(
+		_, err = s.BLOB.PutObject(
 			context.Background(),
 			s.Bucket,
 			handler.Filename,
-			file,
-			handler.Size,
+			reader,
+			int64(len(data)),
 			minio.PutObjectOptions{ContentType: contentType},
 		)
 		if err != nil {
 			ctx := context.Background()
-
 			for _, name := range uploaded {
-				err := s.BLOB.RemoveObject(ctx, s.Bucket, name, minio.RemoveObjectOptions{})
-				if err != nil {
-					return fmt.Errorf("database insert failed: %w", err)
-				}
+				_ = s.BLOB.RemoveObject(ctx, s.Bucket, name, minio.RemoveObjectOptions{})
 			}
+			return fmt.Errorf("failed to upload file: %w", err)
 		}
 
 		uploaded = append(uploaded, handler.Filename)
@@ -185,12 +202,18 @@ func (s *AudioService) UpdateAudioFile(file multipart.File, handler *multipart.F
 	if uri == "" {
 		return errors.New("uri cannot be empty")
 	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+	reader := bytes.NewReader(data)
+
 	contentType := handler.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	// PutObject will override existing file, thus "Update"
-	_, err := s.BLOB.PutObject(context.Background(), s.Bucket, uri, file, handler.Size, minio.PutObjectOptions{
+	_, err = s.BLOB.PutObject(context.Background(), s.Bucket, uri, reader, int64(len(data)), minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
