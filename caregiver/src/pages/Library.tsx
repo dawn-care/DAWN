@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Play } from "lucide-react";
 
 type MediaType = "video" | "photo" | "audio";
 
