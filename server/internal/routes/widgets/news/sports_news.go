@@ -11,7 +11,7 @@ func RegisterSportsNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.SportsNe
 	r.Route("/sports-news", func(r chi.Router) {
 
 		// CRUD operations
-		r.Post("/", controller.CreateSportsNewsWidgetHandler) // Create single sports news widget
+		r.Post("/upload", controller.CreateSportsNewsWidgetHandler) // Create single sports news widget
 		// r.Post("/bulk", newsService.CreateSportsNewsWidgetsBulk) // TODO: Missing bulk create handler (unless it is supposed to use the news one?)
 		r.Get("/", controller.GetSportsNewsWidgetByIDHandler)   // Get by ID (?id=)
 		r.Put("/", controller.UpdateSportsNewsWidgetHandler)    // Update
