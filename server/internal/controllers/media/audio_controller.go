@@ -1,6 +1,7 @@
 package media
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -16,6 +17,7 @@ type AudioServiceInterface interface {
 	CreateAudioFile(f multipart.File, h *multipart.FileHeader, uri string) error
 	GetAudioByID(id int) (*models.AudioMedia, error)
 	GetAudioFile(uri string) (multipart.File, error)
+	GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.AudioMedia, error)
 	UpdateAudio(a *models.AudioMedia) error
 	UpdateAudioFile(f multipart.File, h *multipart.FileHeader, uri string) error
 	DeleteAudio(id int) error
@@ -26,11 +28,11 @@ type AudioServiceInterface interface {
 
 // ---- Controller ----
 type AudioController struct {
-	services AudioServiceInterface
+	Services AudioServiceInterface
 }
 
 func NewAudioController(s AudioServiceInterface) *AudioController {
-	return &AudioController{services: s}
+	return &AudioController{Services: s}
 }
 
 // CreateAudioHandler godoc
@@ -47,11 +49,17 @@ func NewAudioController(s AudioServiceInterface) *AudioController {
 func (c *AudioController) CreateAudioHandler(w http.ResponseWriter, r *http.Request) {
 	var audio models.AudioMedia
 
-	audio.URI = r.FormValue("uri")
-	audio.Filename = r.FormValue("filename")
-	audio.Extension = r.FormValue("extension")
+	if err := json.NewDecoder(r.Body).Decode(&audio); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
 
-	err := c.services.CreateAudio(&audio)
+	if audio.URI == "" || audio.Filename == "" || audio.Extension == "" {
+		http.Error(w, "uri, filename, and extension are required", http.StatusBadRequest)
+		return
+	}
+
+	err := c.Services.CreateAudio(&audio)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to create audio: %v", err), http.StatusInternalServerError)
 		return
@@ -94,21 +102,24 @@ func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.
 
 	uri := fmt.Sprintf("audio/%s", filename)
 
+	displayedName := r.FormValue("displayed_name")
+
 	audio := models.AudioMedia{
-		URI:       uri,
-		Filename:  filename,
-		Extension: extension,
+		URI:           uri,
+		DisplayedName: displayedName,
+		Filename:      filename,
+		Extension:     extension,
 	}
 
 	// Save metadata
-	err = c.services.CreateAudio(&audio)
+	err = c.Services.CreateAudio(&audio)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to save audio metadata: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	// Upload file
-	err = c.services.CreateAudioFile(file, handler, uri)
+	err = c.Services.CreateAudioFile(file, handler, uri)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to upload audio file: %v", err), http.StatusInternalServerError)
 		return
@@ -131,7 +142,7 @@ func (c *AudioController) GetAudioByIDHandler(w http.ResponseWriter, r *http.Req
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
 
-	audio, err := c.services.GetAudioByID(id)
+	audio, err := c.Services.GetAudioByID(id)
 	if err != nil {
 		http.Error(w, "Audio not found", http.StatusNotFound)
 		return
@@ -157,13 +168,52 @@ func (c *AudioController) GetAudioFileByIDHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	obj, err := c.services.GetAudioFile(uri)
+	obj, err := c.Services.GetAudioFile(uri)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to fetch file: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	io.Copy(w, obj)
+}
+
+// GetAudiosByCarepartnerAndCaregiverHandler godoc
+// @Summary Get audios by carepartner and caregiver
+// @Description Retrieves a list of audios filtered by carepartner ID and caregiver ID
+// @Tags audio
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param caregiver_id query int true "Caregiver ID"
+// @Success 200 {array} media.AudioMedia
+// @Failure 400 {string} string "invalid or missing parameters"
+// @Failure 500 {string} string "internal server error"
+// @Router /audio/list [get]
+func (c *AudioController) GetAudiosByCarepartnerAndCaregiverHandler(w http.ResponseWriter, r *http.Request) {
+	carepartnerIDStr := r.URL.Query().Get("carepartner_id")
+	caregiverIDStr := r.URL.Query().Get("caregiver_id")
+
+	carepartnerID, err := strconv.Atoi(carepartnerIDStr)
+	if err != nil {
+		http.Error(w, "invalid carepartner_id", http.StatusBadRequest)
+		return
+	}
+
+	caregiverID, err := strconv.Atoi(caregiverIDStr)
+	if err != nil {
+		http.Error(w, "invalid caregiver_id", http.StatusBadRequest)
+		return
+	}
+
+	// Call the service and handle both return values
+	audios, err := c.Services.GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get audios: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(audios)
 }
 
 // UpdateAudioHandler godoc
@@ -183,10 +233,11 @@ func (c *AudioController) UpdateAudioHandler(w http.ResponseWriter, r *http.Requ
 	id, _ := strconv.Atoi(r.FormValue("id"))
 	audio.ID = id
 	audio.URI = r.FormValue("uri")
+	audio.DisplayedName = r.FormValue("displayed_name")
 	audio.Filename = r.FormValue("filename")
 	audio.Extension = r.FormValue("extension")
 
-	err := c.services.UpdateAudio(&audio)
+	err := c.Services.UpdateAudio(&audio)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to update audio: %v", err), http.StatusInternalServerError)
 		return
@@ -223,7 +274,7 @@ func (c *AudioController) UpdateAudioFileHandler(w http.ResponseWriter, r *http.
 	}
 	defer file.Close()
 
-	err = c.services.UpdateAudioFile(file, handler, uri)
+	err = c.Services.UpdateAudioFile(file, handler, uri)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to update file: %v", err), http.StatusInternalServerError)
 		return
@@ -244,7 +295,7 @@ func (c *AudioController) UpdateAudioFileHandler(w http.ResponseWriter, r *http.
 func (c *AudioController) DeleteAudioHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
 
-	err := c.services.DeleteAudio(id)
+	err := c.Services.DeleteAudio(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to delete: %v", err), http.StatusInternalServerError)
 		return
@@ -265,7 +316,7 @@ func (c *AudioController) DeleteAudioHandler(w http.ResponseWriter, r *http.Requ
 func (c *AudioController) DeleteAudioFileHandler(w http.ResponseWriter, r *http.Request) {
 	uri := r.URL.Query().Get("uri")
 
-	err := c.services.DeleteAudioFile(uri)
+	err := c.Services.DeleteAudioFile(uri)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to delete file: %v", err), http.StatusInternalServerError)
 		return
@@ -287,7 +338,7 @@ func (c *AudioController) DeleteAudioFileHandler(w http.ResponseWriter, r *http.
 func (c *AudioController) SearchAudiosHandler(w http.ResponseWriter, r *http.Request) {
 	keyword := r.URL.Query().Get("keyword")
 
-	audios, err := c.services.SearchAudios(keyword)
+	audios, err := c.Services.SearchAudios(keyword)
 	if err != nil {
 		http.Error(w, "search failed", http.StatusInternalServerError)
 		return
@@ -305,7 +356,7 @@ func (c *AudioController) SearchAudiosHandler(w http.ResponseWriter, r *http.Req
 // @Failure 500 {string} string "internal server error"
 // @Router /audio/stats [get]
 func (c *AudioController) GetMediaStatsHandler(w http.ResponseWriter, r *http.Request) {
-	stats, err := c.services.GetMediaStats()
+	stats, err := c.Services.GetMediaStats()
 	if err != nil {
 		http.Error(w, "failed to get stats", http.StatusInternalServerError)
 		return

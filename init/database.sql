@@ -37,6 +37,7 @@ CREATE TABLE "Exception" (
 CREATE TABLE "PhotoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
+  "displayed_name" text,
   "filename" text,
   "extension" text
 );
@@ -44,6 +45,7 @@ CREATE TABLE "PhotoMedia" (
 CREATE TABLE "VideoMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
+  "displayed_name" text,
   "filename" text,
   "extension" text
 );
@@ -51,6 +53,7 @@ CREATE TABLE "VideoMedia" (
 CREATE TABLE "AudioMedia" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "uri" text,
+  "displayed_name" text,
   "filename" text,
   "extension" text
 );

@@ -36,11 +36,11 @@ type PhotoServiceInterface interface {
 
 // ---- Controller ----
 type PhotoController struct {
-	services PhotoServiceInterface
+	Services PhotoServiceInterface
 }
 
-func NewPhotoController(services PhotoServiceInterface) *PhotoController {
-	return &PhotoController{services: services}
+func NewPhotoController(Services PhotoServiceInterface) *PhotoController {
+	return &PhotoController{Services: Services}
 }
 
 // CreatePhotoHandler godoc
@@ -61,7 +61,7 @@ func (c *PhotoController) CreatePhotoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := c.services.CreatePhoto(&photo); err != nil {
+	if err := c.Services.CreatePhoto(&photo); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -82,61 +82,65 @@ func (c *PhotoController) CreatePhotoHandler(w http.ResponseWriter, r *http.Requ
 // @Failure 500 {string} string "internal server error"
 // @Router /photo/file [post]
 func (c *PhotoController) CreatePhotoFileHandler(w http.ResponseWriter, r *http.Request) {
-    file, handler, err := r.FormFile("file")
-    if err != nil {
-        http.Error(w, "file is required", http.StatusBadRequest)
-        return
-    }
-    defer file.Close()
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "file is required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
 
-    buf := make([]byte, 512)
-    _, err = file.Read(buf)
-    if err != nil {
-        http.Error(w, "unable to read file content", http.StatusBadRequest)
-        return
-    }
+	buf := make([]byte, 512)
+	_, err = file.Read(buf)
+	if err != nil {
+		http.Error(w, "unable to read file content", http.StatusBadRequest)
+		return
+	}
 
-    detectedType := http.DetectContentType(buf)
-    if !VALID_IMAGE_TYPES[detectedType] {
-        http.Error(w, "file is not a valid photo file", http.StatusBadRequest)
-        return
-    }
+	detectedType := http.DetectContentType(buf)
+	if !VALID_IMAGE_TYPES[detectedType] {
+		http.Error(w, "file is not a valid photo file", http.StatusBadRequest)
+		return
+	}
 
-    if seeker, ok := file.(io.Seeker); ok {
-        seeker.Seek(0, io.SeekStart)
-    }
+	if seeker, ok := file.(io.Seeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	}
 
-    userID := r.FormValue("id")
-    uri := "users/" + userID + "/" + handler.Filename
-    extension := "." + handler.Filename[strings.LastIndex(handler.Filename, ".")+1:]
+	userID := r.FormValue("id")
+	displayedName := r.FormValue("displayed_name")
 
-    // Upload to MinIO
-    if err := c.services.CreatePhotoFile(file, handler, uri); err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
+	uri := "users/" + userID + "/" + handler.Filename
+	extension := "." + handler.Filename[strings.LastIndex(handler.Filename, ".")+1:]
 
-    // Create database record
-    photo := &media.PhotoMedia{
-        URI:       uri,
-        Filename:  handler.Filename,
-        Extension: extension,
-    }
+	// Upload to MinIO
+	if err := c.Services.CreatePhotoFile(file, handler, uri); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-    if err := c.services.CreatePhoto(photo); err != nil {
-        http.Error(w, "failed to save photo metadata: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
+	// Create database record
+	photo := &media.PhotoMedia{
+		URI:           uri,
+		DisplayedName: displayedName,
+		Filename:      handler.Filename,
+		Extension:     extension,
+	}
 
-    response := map[string]interface{}{
-        "id":       photo.ID,
-        "filename": photo.Filename,
-        "uri":      photo.URI,
-        "extension": photo.Extension,
-    }
+	if err := c.Services.CreatePhoto(photo); err != nil {
+		http.Error(w, "failed to save photo metadata: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(response)
+	response := map[string]interface{}{
+		"id":            photo.ID,
+		"filename":      photo.Filename,
+		"uri":           photo.URI,
+		"extension":     photo.Extension,
+		"displayed_name": photo.DisplayedName,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // GetPhotoByIDHandler godoc
@@ -158,7 +162,7 @@ func (c *PhotoController) GetPhotoByIDHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	photo, err := c.services.GetPhotoByID(id)
+	photo, err := c.Services.GetPhotoByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -186,13 +190,13 @@ func (c *PhotoController) GetPhotoFileByIDHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	photo, err := c.services.GetPhotoByID(id)
+	photo, err := c.Services.GetPhotoByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	file, err := c.services.GetPhotoFile(photo.URI)
+	file, err := c.Services.GetPhotoFile(photo.URI)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -220,7 +224,7 @@ func (c *PhotoController) GetPhotosByCarepartnerAndCaregiverHandler(w http.Respo
 	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
 
-	photos, err := c.services.GetPhotosByCarepartnerAndCaregiver(carepartnerID, caregiverID)
+	photos, err := c.Services.GetPhotosByCarepartnerAndCaregiver(carepartnerID, caregiverID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -247,7 +251,7 @@ func (c *PhotoController) UpdatePhotoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := c.services.UpdatePhoto(&photo); err != nil {
+	if err := c.Services.UpdatePhoto(&photo); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -297,7 +301,7 @@ func (c *PhotoController) UpdatePhotoFileHandler(w http.ResponseWriter, r *http.
 
 	uri := "users/" + userID + "/" + handler.Filename
 
-	if err := c.services.UpdatePhotoFile(file, handler, uri); err != nil {
+	if err := c.Services.UpdatePhotoFile(file, handler, uri); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -327,7 +331,7 @@ func (c *PhotoController) DeletePhotoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := c.services.DeletePhoto(id); err != nil {
+	if err := c.Services.DeletePhoto(id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -353,13 +357,13 @@ func (c *PhotoController) DeletePhotoFileHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	photo, err := c.services.GetPhotoByID(id)
+	photo, err := c.Services.GetPhotoByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := c.services.DeletePhotoFile(photo.URI); err != nil {
+	if err := c.Services.DeletePhotoFile(photo.URI); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -377,7 +381,7 @@ func (c *PhotoController) DeletePhotoFileHandler(w http.ResponseWriter, r *http.
 // @Failure 500 {string} string "internal server error"
 // @Router /photo/stats [get]
 func (c *PhotoController) GetPhotoStatsHandler(w http.ResponseWriter, r *http.Request) {
-	count, err := c.services.GetPhotoStats()
+	count, err := c.Services.GetPhotoStats()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

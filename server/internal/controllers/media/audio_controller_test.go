@@ -14,51 +14,84 @@ import (
 
 // Mock service implementing AudioServiceInterface
 type mockAudioService struct {
-	CreateAudioFunc                        func(audio *models.AudioMedia) error
-	CreateAudioFileFunc                    func(file multipart.File, handler *multipart.FileHeader, uri string) error
-	GetAudioByIDFunc                       func(id int) (*models.AudioMedia, error)
-	GetAudioFileFunc                       func(uri string) (multipart.File, error)
-	GetAudiosByCarepartnerAndCaregiverFunc func(carepartnerID, caregiverID int) ([]models.AudioMedia, error)
-	UpdateAudioFunc                        func(audio *models.AudioMedia) error
-	UpdateAudioFileFunc                    func(file multipart.File, handler *multipart.FileHeader, uri string) error
-	DeleteAudioFunc                        func(id int) error
-	DeleteAudioFileFunc                    func(uri string) error
-	SearchAudiosFunc                       func(keyword string) ([]models.AudioMedia, error)
-	GetMediaStatsFunc                      func() (*models.MediaStats, error)
+	CreateAudioFunc                         func(audio *models.AudioMedia) error
+	CreateAudioFileFunc                     func(file multipart.File, handler *multipart.FileHeader, uri string) error
+	GetAudioByIDFunc                        func(id int) (*models.AudioMedia, error)
+	GetAudioFileFunc                        func(uri string) (multipart.File, error)
+	GetAudiosByCarepartnerAndCaregiverFunc  func(carepartnerID, caregiverID int) ([]models.AudioMedia, error)
+	UpdateAudioFunc                         func(audio *models.AudioMedia) error
+	UpdateAudioFileFunc                     func(file multipart.File, handler *multipart.FileHeader, uri string) error
+	DeleteAudioFunc                         func(id int) error
+	DeleteAudioFileFunc                     func(uri string) error
+	SearchAudiosFunc                        func(keyword string) ([]models.AudioMedia, error)
+	GetMediaStatsFunc                       func() (*models.MediaStats, error)
 }
 
 func (m *mockAudioService) CreateAudio(a *models.AudioMedia) error {
-	return m.CreateAudioFunc(a)
+	if m.CreateAudioFunc != nil {
+		return m.CreateAudioFunc(a)
+	}
+	return nil
 }
 func (m *mockAudioService) CreateAudioFile(f multipart.File, h *multipart.FileHeader, u string) error {
-	return m.CreateAudioFileFunc(f, h, u)
+	if m.CreateAudioFileFunc != nil {
+		return m.CreateAudioFileFunc(f, h, u)
+	}
+	return nil
 }
 func (m *mockAudioService) GetAudioByID(id int) (*models.AudioMedia, error) {
-	return m.GetAudioByIDFunc(id)
+	if m.GetAudioByIDFunc != nil {
+		return m.GetAudioByIDFunc(id)
+	}
+	return nil, nil
 }
 func (m *mockAudioService) GetAudioFile(uri string) (multipart.File, error) {
-	return m.GetAudioFileFunc(uri)
+	if m.GetAudioFileFunc != nil {
+		return m.GetAudioFileFunc(uri)
+	}
+	return nil, nil
 }
 func (m *mockAudioService) GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]models.AudioMedia, error) {
-	return m.GetAudiosByCarepartnerAndCaregiverFunc(carepartnerID, caregiverID)
+	if m.GetAudiosByCarepartnerAndCaregiverFunc != nil {
+		return m.GetAudiosByCarepartnerAndCaregiverFunc(carepartnerID, caregiverID)
+	}
+	return nil, nil
 }
 func (m *mockAudioService) UpdateAudio(a *models.AudioMedia) error {
-	return m.UpdateAudioFunc(a)
+	if m.UpdateAudioFunc != nil {
+		return m.UpdateAudioFunc(a)
+	}
+	return nil
 }
 func (m *mockAudioService) UpdateAudioFile(f multipart.File, h *multipart.FileHeader, u string) error {
-	return m.UpdateAudioFileFunc(f, h, u)
+	if m.UpdateAudioFileFunc != nil {
+		return m.UpdateAudioFileFunc(f, h, u)
+	}
+	return nil
 }
 func (m *mockAudioService) DeleteAudio(id int) error {
-	return m.DeleteAudioFunc(id)
+	if m.DeleteAudioFunc != nil {
+		return m.DeleteAudioFunc(id)
+	}
+	return nil
 }
 func (m *mockAudioService) DeleteAudioFile(uri string) error {
-	return m.DeleteAudioFileFunc(uri)
+	if m.DeleteAudioFileFunc != nil {
+		return m.DeleteAudioFileFunc(uri)
+	}
+	return nil
 }
 func (m *mockAudioService) SearchAudios(keyword string) ([]models.AudioMedia, error) {
-	return m.SearchAudiosFunc(keyword)
+	if m.SearchAudiosFunc != nil {
+		return m.SearchAudiosFunc(keyword)
+	}
+	return nil, nil
 }
 func (m *mockAudioService) GetMediaStats() (*models.MediaStats, error) {
-	return m.GetMediaStatsFunc()
+	if m.GetMediaStatsFunc != nil {
+		return m.GetMediaStatsFunc()
+	}
+	return nil, nil
 }
 
 // ---- Tests ----
@@ -82,7 +115,10 @@ func TestCreateAudioHandler_Success(t *testing.T) {
 }
 
 func TestCreateAudioHandler_InvalidBody(t *testing.T) {
-	ctrl := NewAudioController(&mockAudioService{})
+	// Provide a no-op CreateAudioFunc to avoid nil panic
+	ctrl := NewAudioController(&mockAudioService{
+		CreateAudioFunc: func(a *models.AudioMedia) error { return nil },
+	})
 	req := httptest.NewRequest(http.MethodPost, "/audio", bytes.NewReader([]byte("invalid")))
 	w := httptest.NewRecorder()
 
@@ -119,7 +155,7 @@ func TestGetAudioByIDHandler_Error(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctrl.GetAudioByIDHandler(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d", w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
 	}
 }
