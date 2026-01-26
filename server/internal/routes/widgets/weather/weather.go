@@ -11,7 +11,7 @@ func RegisterWeatherWidgetRoutes(r chi.Router, controller *weatherCtrlr.WeatherW
 	r.Route("/weather", func(r chi.Router) {
 
 		// CRUD operations
-		r.Post("/", controller.CreateWeatherWidgetHandler) // Create single weather widget
+		r.Post("/upload", controller.CreateWeatherWidgetHandler) // Create single weather widget
 		// r.Post("/bulk", weatherCtrlr.CreateWeatherWidgetsBulkHandler) // TODO: Also missing bulk handler?
 		r.Get("/", controller.GetWeatherWidgetByIDHandler)   // Get by ID (?id=)
 		r.Put("/", controller.UpdateWeatherWidgetHandler)    // Update

@@ -4,6 +4,7 @@ import UploadMedia from "./pages/UploadMedia";
 import Header from "./components/Header";
 import AgendaView from "./pages/AgendaView";
 import Library from "./pages/Library";
+import CreateWidget from "./pages/CreateWidget";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/upload" element={<UploadMedia />} />
         <Route path="/agenda/:date" element={<AgendaView />} />
         <Route path="/library" element={<Library />} />
+        <Route path="/widget" element={<CreateWidget />} />
       </Routes>
     </>
   );
