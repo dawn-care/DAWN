@@ -38,7 +38,7 @@ interface AgendaListProps {
     setModules: (modules: Module[]) => void;
 }
 
-export default function AgendaList({ items, setItems, modules, setModules }: AgendaListProps) {
+export default function AgendaList({ items, setItems, modules }: AgendaListProps) {
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
 
     const getModuleTitle = (moduleId: number): string => {
