@@ -32,8 +32,8 @@ func (s *AudioService) CreateAudio(audio *media.AudioMedia) error {
 	if audio == nil {
 		return errors.New("audio cannot be nil")
 	}
-	if audio.URI == "" || audio.Filename == "" || audio.Extension == "" {
-		return errors.New("uri, filename, and extension are required")
+	if audio.URI == "" || audio.Filename == "" || audio.Extension == "" || audio.DisplayedName == "" {
+		return errors.New("uri, displayed_name, filename, and extension are required")
 	}
 	return media.CreateAudio(s.DB, audio)
 }
@@ -60,9 +60,14 @@ func (s *AudioService) CreateAudioFile(file multipart.File, handler *multipart.F
 		contentType = "application/octet-stream"
 	}
 
-	_, err = s.BLOB.PutObject(context.Background(), s.Bucket, uri, reader, int64(len(data)), minio.PutObjectOptions{
-		ContentType: contentType,
-	})
+	_, err = s.BLOB.PutObject(
+		context.Background(),
+		s.Bucket,
+		uri,
+		reader,
+		int64(len(data)),
+		minio.PutObjectOptions{ContentType: contentType},
+	)
 	if err != nil {
 		return fmt.Errorf("unable to upload media to blob storage: %w", err)
 	}
@@ -74,21 +79,35 @@ func (s *AudioService) CreateAudiosBulk(audios []media.AudioMedia) error {
 		return errors.New("no audio entries provided")
 	}
 
+	for _, a := range audios {
+		if a.URI == "" || a.DisplayedName == "" || a.Filename == "" || a.Extension == "" {
+			return errors.New("all audio entries must include uri, displayed_name, filename, and extension")
+		}
+	}
+
 	return media.CreateAudiosBulk(s.DB, audios)
 }
 
-func (s *AudioService) CreateAudioFilesBulk(files []multipart.File, handlers []*multipart.FileHeader) error {
+func (s *AudioService) CreateAudioFilesBulk(
+	files []multipart.File,
+	handlers []*multipart.FileHeader,
+	uris []string,
+) error {
+	if len(files) != len(handlers) || len(files) != len(uris) {
+		return errors.New("files, handlers, and uris length mismatch")
+	}
+
 	uploaded := make([]string, 0, len(files))
 
 	for i := range files {
 		file := files[i]
 		handler := handlers[i]
+		uri := uris[i]
 
 		data, err := io.ReadAll(file)
 		if err != nil {
-			ctx := context.Background()
 			for _, name := range uploaded {
-				_ = s.BLOB.RemoveObject(ctx, s.Bucket, name, minio.RemoveObjectOptions{})
+				_ = s.BLOB.RemoveObject(context.Background(), s.Bucket, name, minio.RemoveObjectOptions{})
 			}
 			return fmt.Errorf("failed to read file for upload: %w", err)
 		}
@@ -102,20 +121,19 @@ func (s *AudioService) CreateAudioFilesBulk(files []multipart.File, handlers []*
 		_, err = s.BLOB.PutObject(
 			context.Background(),
 			s.Bucket,
-			handler.Filename,
+			uri,
 			reader,
 			int64(len(data)),
 			minio.PutObjectOptions{ContentType: contentType},
 		)
 		if err != nil {
-			ctx := context.Background()
 			for _, name := range uploaded {
-				_ = s.BLOB.RemoveObject(ctx, s.Bucket, name, minio.RemoveObjectOptions{})
+				_ = s.BLOB.RemoveObject(context.Background(), s.Bucket, name, minio.RemoveObjectOptions{})
 			}
 			return fmt.Errorf("failed to upload file: %w", err)
 		}
 
-		uploaded = append(uploaded, handler.Filename)
+		uploaded = append(uploaded, uri)
 	}
 
 	return nil
@@ -141,17 +159,20 @@ func (s *AudioService) GetAudioByID(id int) (*media.AudioMedia, error) {
 
 func (s *AudioService) GetAudioFile(uri string) (multipart.File, error) {
 	if uri == "" {
-		return nil, errors.New("invalid filename")
+		return nil, errors.New("invalid uri")
 	}
 	file, err := s.BLOB.GetObject(context.Background(), s.Bucket, uri, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch audio: %w", err)
 	}
-
 	return file, nil
 }
 
-func (s *AudioService) GetAudiosByDayCarepartnerandCaregiver(date string, carepartnerID, caregiverID int) ([]int, error) {
+func (s *AudioService) GetAudiosByDayCarepartnerandCaregiver(
+	date string,
+	carepartnerID,
+	caregiverID int,
+) ([]int, error) {
 	if date == "" {
 		return nil, errors.New("date is required")
 	}
@@ -161,7 +182,11 @@ func (s *AudioService) GetAudiosByDayCarepartnerandCaregiver(date string, carepa
 	return media.GetAudiosByDayCarepartnerandCaregiver(s.DB, date, carepartnerID, caregiverID)
 }
 
-func (s *AudioService) GetMediaByTypeCarepartnerAndCaregiver(mediaType string, carepartnerID, caregiverID int) ([]int, error) {
+func (s *AudioService) GetMediaByTypeCarepartnerAndCaregiver(
+	mediaType string,
+	carepartnerID,
+	caregiverID int,
+) ([]int, error) {
 	if mediaType == "" {
 		return nil, errors.New("media type is required")
 	}
@@ -171,7 +196,10 @@ func (s *AudioService) GetMediaByTypeCarepartnerAndCaregiver(mediaType string, c
 	return media.GetMediaByTypeCarepartnerAndCaregiver(s.DB, mediaType, carepartnerID, caregiverID)
 }
 
-func (s *AudioService) GetAudiosByCarepartnerAndCaregiver(carepartnerID, caregiverID int) ([]media.AudioMedia, error) {
+func (s *AudioService) GetAudiosByCarepartnerAndCaregiver(
+	carepartnerID,
+	caregiverID int,
+) ([]media.AudioMedia, error) {
 	if carepartnerID <= 0 || caregiverID <= 0 {
 		return nil, errors.New("invalid user IDs")
 	}
@@ -188,6 +216,9 @@ func (s *AudioService) UpdateAudio(audio *media.AudioMedia) error {
 	}
 	if audio.ID <= 0 {
 		return errors.New("invalid audio ID")
+	}
+	if audio.DisplayedName == "" {
+		return errors.New("displayed_name cannot be empty")
 	}
 	return media.UpdateAudio(s.DB, audio)
 }
@@ -213,9 +244,15 @@ func (s *AudioService) UpdateAudioFile(file multipart.File, handler *multipart.F
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	_, err = s.BLOB.PutObject(context.Background(), s.Bucket, uri, reader, int64(len(data)), minio.PutObjectOptions{
-		ContentType: contentType,
-	})
+
+	_, err = s.BLOB.PutObject(
+		context.Background(),
+		s.Bucket,
+		uri,
+		reader,
+		int64(len(data)),
+		minio.PutObjectOptions{ContentType: contentType},
+	)
 	if err != nil {
 		return fmt.Errorf("unable to update audio: %w", err)
 	}
@@ -226,20 +263,15 @@ func (s *AudioService) DeleteAudio(id int) error {
 	if id <= 0 {
 		return errors.New("invalid audio ID")
 	}
-	_, err := media.GetAudioByID(s.DB, id)
-	if err != nil {
-		return fmt.Errorf("failed to get audio with that id: %w", err)
-	}
 	return media.DeleteAudio(s.DB, id)
 }
 
 func (s *AudioService) DeleteAudioFile(uri string) error {
 	if uri == "" {
-		return errors.New("invalid filename")
+		return errors.New("invalid uri")
 	}
-	removeErr := s.BLOB.RemoveObject(context.Background(), s.Bucket, uri, minio.RemoveObjectOptions{})
-	if removeErr != nil {
-		return fmt.Errorf("unable to delete audio: %w", removeErr)
+	if err := s.BLOB.RemoveObject(context.Background(), s.Bucket, uri, minio.RemoveObjectOptions{}); err != nil {
+		return fmt.Errorf("unable to delete audio: %w", err)
 	}
 	return nil
 }

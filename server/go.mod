@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/ajg/form v1.5.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -22,6 +23,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-chi/cors v1.2.2
+	github.com/go-chi/render v1.0.3
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.3 // indirect
 	github.com/go-openapi/jsonreference v0.21.3 // indirect

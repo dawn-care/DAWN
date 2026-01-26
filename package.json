@@ -22,5 +22,6 @@
   },
   "homepage": "https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp#readme",
   "dependencies": {
+    "lucide-react": "^0.563.0"
   }
 }

@@ -34,6 +34,11 @@ export default function UploadMedia() {
   }
 
   async function handleUpload() {
+    if (!mediaName.trim()) {
+      setUploadStatus("Please enter a media name.");
+      return;
+    }
+
     if (!file) {
       setFileError("Please select a file.");
       return;
@@ -41,6 +46,7 @@ export default function UploadMedia() {
 
     const formData = new FormData();
     formData.append("file", file, file.name);
+    formData.append("displayed_name", mediaName);
     formData.append("id", "1"); // temp user ID
     formData.append("repeat", repeat);
     if (repeat === "weekly") formData.append("weeklyDay", weeklyDay);
