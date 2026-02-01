@@ -6,6 +6,7 @@ import AgendaView from "./pages/AgendaView";
 import Library from "./pages/Library";
 import CreatePrompt from "./pages/CreatePrompt"
 import CreateWidget from "./pages/CreateWidget";
+import CalendarView from "./pages/CalendarView";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/upload" element={<UploadMedia />} />
+        <Route path="/agenda" element={<CalendarView />} />
         <Route path="/agenda/:date" element={<AgendaView />} />
         <Route path="/library" element={<Library />} />
         <Route path="/CreatePrompt" element={<CreatePrompt />} />
