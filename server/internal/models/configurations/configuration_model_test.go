@@ -35,6 +35,7 @@ func TestCreateConfiguration(t *testing.T) {
 		OCCURENCE_TYPE:       "Weekly",
 		OCCURENCE_DEFINITION: occ,
 		POSITION:             1,
+		DURATION:             60,
 	}
 
 	jsonConfig := fmt.Sprintf(`[
@@ -43,9 +44,10 @@ func TestCreateConfiguration(t *testing.T) {
 				"module_id": %d,
 				"occurence_type": "%s",
 				"occurence_definition": ["%s"],
-				"position": %d
+				"position": %d,
+				"duration": %d
 			}
-		]`, cfg.MODULE_ID, cfg.OCCURENCE_TYPE, strings.Join(cfg.OCCURENCE_DEFINITION, `","`), cfg.POSITION)
+		]`, cfg.MODULE_ID, cfg.OCCURENCE_TYPE, strings.Join(cfg.OCCURENCE_DEFINITION, `","`), cfg.POSITION, cfg.DURATION)
 
 	mock.ExpectExec(regexp.QuoteMeta(`
 		CALL insert_configurations($1, $2::jsonb);
@@ -82,12 +84,13 @@ func TestGetConfigurationByID(t *testing.T) {
 		"occurence_type",
 		"occurence_definition",
 		"position",
+		"duration",
 	}).AddRow(
-		1, 1000, 10, "Weekly", pq.Array([]string{"Mon"}), 1,
+		1, 1000, 10, "Weekly", pq.Array([]string{"Mon"}), 1, 60,
 	)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position
+		SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position, duration
 		FROM "Configuration"
 		WHERE id = $1;
 	`)).
@@ -107,15 +110,15 @@ func TestGetConfigurationsByDayAndCarepartner(t *testing.T) {
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{
-		"id", "carepartner_id", "module_id", "occurence_type", "occurence_definition", "position",
+		"id", "carepartner_id", "module_id", "occurence_type", "occurence_definition", "position", "duration",
 	}).
-		AddRow(1, 1000, 10, "Daily", pq.Array([]string{""}), 1).
-		AddRow(2, 1000, 11, "Weekly", pq.Array([]string{"mon"}), 2).
-		AddRow(3, 1000, 12, "Monthly", pq.Array([]string{"17"}), 3).
-		AddRow(4, 1000, 13, "Yearly", pq.Array([]string{"Nov 17"}), 4)
+		AddRow(1, 1000, 10, "Daily", pq.Array([]string{""}), 1, 60).
+		AddRow(2, 1000, 11, "Weekly", pq.Array([]string{"mon"}), 2, 120).
+		AddRow(3, 1000, 12, "Monthly", pq.Array([]string{"17"}), 3, 300).
+		AddRow(4, 1000, 13, "Yearly", pq.Array([]string{"Nov 17"}), 4, 600)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-	SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position
+	SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position, duration
 	FROM "Configuration"
 	WHERE carepartner_id = $1
 	  AND (
@@ -157,6 +160,7 @@ func TestUpdateConfiguration(t *testing.T) {
 		OCCURENCE_TYPE:       "Weekly",
 		OCCURENCE_DEFINITION: []string{"mon"},
 		POSITION:             1,
+		DURATION:             60,
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(`
@@ -174,9 +178,10 @@ func TestUpdateConfiguration(t *testing.T) {
 				"module_id": %d,
 				"occurence_type": "%s",
 				"occurence_definition": ["%s"],
-				"position": %d
+				"position": %d,
+				"duration": %d
 			}
-		]`, cfg.MODULE_ID, cfg.OCCURENCE_TYPE, strings.Join(cfg.OCCURENCE_DEFINITION, `","`), cfg.POSITION)
+		]`, cfg.MODULE_ID, cfg.OCCURENCE_TYPE, strings.Join(cfg.OCCURENCE_DEFINITION, `","`), cfg.POSITION, cfg.DURATION)
 
 	mock.ExpectExec(regexp.QuoteMeta(`
 		CALL insert_configurations($1, $2::jsonb);

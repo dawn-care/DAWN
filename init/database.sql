@@ -25,6 +25,7 @@ CREATE TABLE "Configuration" (
   "occurence_type" text,
   "occurence_definition" text[],
   "position" integer,
+  "duration" integer,
   PRIMARY KEY ("carepartner_id", "position")
 );
 
@@ -113,7 +114,8 @@ BEGIN
         (conf->>'module_id')::INT AS module_id,
         conf->>'occurence_type' AS occurence_type,
         ARRAY(SELECT jsonb_array_elements_text(conf->'occurence_definition')) AS occurence_definition,
-        (conf->>'position')::INT AS position
+        (conf->>'position')::INT AS position,
+        (conf->>'duration')::INT AS duration
     FROM jsonb_array_elements(p_configs) AS conf;
 
     FOR to_delete_row IN SELECT * FROM tmp_configs ORDER BY position ASC LOOP
@@ -143,14 +145,16 @@ BEGIN
                 module_id,
                 occurence_type,
                 occurence_definition,
-                position
+                position,
+                duration
             ) VALUES (
                 new_row.id,
                 p_carepartner_id,
                 new_row.module_id,
                 new_row.occurence_type,
                 new_row.occurence_definition,
-                new_row.position
+                new_row.position,
+                new_row.duration
             );
         ELSE
             INSERT INTO "Configuration" (
@@ -158,13 +162,15 @@ BEGIN
                 module_id,
                 occurence_type,
                 occurence_definition,
-                position
+                position,
+                duration
             ) VALUES (
                 p_carepartner_id,
                 new_row.module_id,
                 new_row.occurence_type,
                 new_row.occurence_definition,
-                new_row.position
+                new_row.position,
+                new_row.duration
             );
         END IF;
     END LOOP;

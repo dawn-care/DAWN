@@ -4,9 +4,9 @@ import widgetIcon from '../assets/module_symbols/widget-svgrepo-com.svg';
 import promptIcon from '../assets/module_symbols/prompt-edit-svgrepo-com.svg';
 
 export type ModuleMetadata =
-    | { type: 'photo'; id: number; uri: string; filename: string; extension: string }
-    | { type: 'video'; id: number; uri: string; filename: string; extension: string }
-    | { type: 'audio'; id: number; uri: string; filename: string; extension: string }
+    | { type: 'photo'; id: number; uri: string; displayed_name: string; filename: string; extension: string }
+    | { type: 'video'; id: number; uri: string; displayed_name: string; filename: string; extension: string }
+    | { type: 'audio'; id: number; uri: string; displayed_name: string; filename: string; extension: string }
     | { type: 'weather'; id: number; zipcode: string }
     | { type: 'news'; id: number; category: string; language: string; country: string }
     | { type: 'carepartner_location'; id: number; location: string; message: string; image_uri: string }
@@ -16,10 +16,15 @@ export type ModuleMetadata =
 
 export type Module = {
     id: number;
-    module_type: string;
+    module_type: 'media' | 'widget' | 'prompt';
     caregiver_id?: number | null;
     carepartner_id?: number | null;
-    metadata: ModuleMetadata | null;
+    metadata_id: number;
+};
+
+// For fetched metadata - use this to extend Module when metadata is resolved
+export type ModuleWithMetadata = Module & {
+    metadata: ModuleMetadata;
 };
 
 export type ConfigurationItem = {
@@ -29,6 +34,7 @@ export type ConfigurationItem = {
     occurence_type: string;
     occurence_definition: string[];
     position: number;
+    duration: number;
 }
 
 interface AgendaListProps {
@@ -36,23 +42,29 @@ interface AgendaListProps {
     setItems: (items: ConfigurationItem[]) => void;
     modules: Module[];
     setModules: (modules: Module[]) => void;
+    metadata: Record<number, ModuleMetadata>;
+    setMetadata: (metadata: Record<number, ModuleMetadata>) => void;
 }
 
-export default function AgendaList({ items, setItems, modules }: AgendaListProps) {
+export default function AgendaList({ items, setItems, modules, setModules, metadata, setMetadata}: AgendaListProps) {
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
 
-    const getModuleTitle = (moduleId: number): string => {
+    const getModuleMetadata = (moduleId: number): ModuleMetadata | null => {
         const module = modules.find(m => m.id === moduleId);
-        if (!module?.metadata) return `Module ${moduleId}`;
+        if (!module) return null;
+        return metadata[module.metadata_id] || null;
+    };
 
-        const metadata = module.metadata;
+    const getModuleTitle = (moduleId: number): string => {
+        const metadata = getModuleMetadata(moduleId);
+        if (!metadata) return `Module ${moduleId}`;
         switch (metadata.type) {
             case 'video':
-                return metadata.filename;
+                return metadata.displayed_name;
             case 'photo':
-                return metadata.filename;
+                return metadata.displayed_name;
             case 'audio':
-                return metadata.filename;
+                return metadata.displayed_name;
             case 'weather':
                 return `Weather - Zip Code: ${metadata.zipcode}`;
             case 'news':
