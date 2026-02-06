@@ -22,7 +22,6 @@ export type Module = {
     metadata_id: number;
 };
 
-// For fetched metadata - use this to extend Module when metadata is resolved
 export type ModuleWithMetadata = Module & {
     metadata: ModuleMetadata;
 };
@@ -97,8 +96,6 @@ export default function AgendaList({ items, setItems, modules, setModules, metad
                 return widgetIcon;
         }
     };
-
-
 
     /* Handlers for drag and drop */
     const handleDragStart = (index: number) => {

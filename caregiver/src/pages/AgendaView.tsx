@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState } from 'react';
 import AgendaList, { type ConfigurationItem, type Module, type ModuleMetadata }  from '../components/AgendaList';
+import Library from './Library';
 
 export default function AgendaView() {
     const { date } = useParams();
@@ -12,6 +13,7 @@ export default function AgendaView() {
         { id: 4, carepartner_id: 1, module_id: 4, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 15, duration: 180 },
         { id: 5, carepartner_id: 1, module_id: 5, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 27, duration: 90 },
     ]);
+    const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
 
     const [modules, setModules] = useState<Module[]>([
         {
@@ -133,12 +135,28 @@ export default function AgendaView() {
                         <button className="px-8 py-3 border-2 border-cyan-400 text-cyan-400 rounded-lg font-semibold hover:bg-cyan-50">
                             Preview
                         </button>
-                        <button className="px-8 py-3 border-2 border-cyan-400 bg-white text-cyan-400 rounded-lg text-3xl font-bold hover:bg-cyan-50">
+                        <button onClick={() => setIsLibraryModalOpen(true)} className="px-8 py-3 border-2 border-cyan-400 bg-white text-cyan-400 rounded-lg text-3xl font-bold hover:bg-cyan-50">
                             +
                         </button>
                     </div>
                 </div>
             </div>
+
+            {isLibraryModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+                        <button
+                            onClick={() => setIsLibraryModalOpen(false)}
+                            className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+                        >
+                            ✕
+                        </button>
+                        <div className="p-8">
+                            <Library />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
