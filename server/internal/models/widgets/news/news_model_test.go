@@ -47,8 +47,9 @@ func TestCreateNewsWidget(t *testing.T) {
 			"id", "category", "language", "country",
 		}).AddRow(1, "Animals", "en", "us"))
 
-	err := CreateNews(db, w)
+	id, err := CreateNews(db, w)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, id)
 	assert.Equal(t, 1, w.ID)
 
 	found, err := GetNewsByID(db, 1)

@@ -6,16 +6,18 @@ import (
 	widgets "server/internal/models/widgets/news"
 	"server/internal/services/widgets/news"
 	"strconv"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // Service Interface
 type NewsWidgetServiceInterface interface {
-	CreateNewsWidget(weather_widget *widgets.NewsWidget) error
-	CreateNewsWidgetsBulk(weather_widgets []widgets.NewsWidget) error
+	CreateNewsWidget(news_widget *widgets.NewsWidget) error
+	CreateNewsWidgetsBulk(news_widgets []widgets.NewsWidget) error
 	GetNewsWidgetByID(id int) (*widgets.NewsWidget, error)
 	GetNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.NewsWidget, error)
 	GetNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.NewsWidget, error)
-	UpdateNewsWidget(weather_widget *widgets.NewsWidget) error
+	UpdateNewsWidget(news_widget *widgets.NewsWidget) error
 	DeleteNewsWidget(id int) error
 	GetNewsWidgetStats() (int, error)
 	GetGoodNews() (*news.NewsAPIResponse, error)
@@ -43,18 +45,18 @@ func NewNewsWidgetController(service NewsWidgetServiceInterface) *NewsWidgetCont
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /news-widgets [post]
 func (c *NewsWidgetController) CreateNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget widgets.NewsWidget
-	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
+	var news_widget widgets.NewsWidget
+	if err := json.NewDecoder(r.Body).Decode(&news_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := c.service.CreateNewsWidget(&weather_widget); err != nil {
+	if err := c.service.CreateNewsWidget(&news_widget); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widget)
+	json.NewEncoder(w).Encode(news_widget)
 }
 
 // GetNewsWidgetByIDHandler godoc
@@ -69,20 +71,20 @@ func (c *NewsWidgetController) CreateNewsWidgetHandler(w http.ResponseWriter, r 
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /news-widgets/{id} [get]
 func (c *NewsWidgetController) GetNewsWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idSTR := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(idSTR)
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "Invalid NewsWidget ID", http.StatusBadRequest)
 		return
 	}
 
-	weather_widget, err := c.service.GetNewsWidgetByID(id)
+	news_widget, err := c.service.GetNewsWidgetByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widget)
+	json.NewEncoder(w).Encode(news_widget)
 }
 
 // GetNewsWidgetsByCarepartnerAndCaregiverHandler godoc
@@ -108,13 +110,13 @@ func (c *NewsWidgetController) GetNewsWidgetsByCarepartnerAndCaregiverHandler(w 
 		http.Error(w, "Invalid Caregiver ID", http.StatusBadRequest)
 		return
 	}
-	weather_widgets, err := c.service.GetNewsWidgetsByCarepartnerAndCaregiver(carepartnerID, caregiverID)
+	news_widgets, err := c.service.GetNewsWidgetsByCarepartnerAndCaregiver(carepartnerID, caregiverID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widgets)
+	json.NewEncoder(w).Encode(news_widgets)
 }
 
 // GetNewsByDayAndCarepartnerHandler godoc
@@ -141,13 +143,13 @@ func (c *NewsWidgetController) GetNewsByDayAndCarepartnerHandler(w http.Response
 	month, err := strconv.Atoi(r.URL.Query().Get("month"))
 	year, err := strconv.Atoi(r.URL.Query().Get("year"))
 
-	weather_widgets, err := c.service.GetNewsWidgetsByCarepartnerIDAndDay(carepartnerID, day, month, year)
+	news_widgets, err := c.service.GetNewsWidgetsByCarepartnerIDAndDay(carepartnerID, day, month, year)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widgets)
+	json.NewEncoder(w).Encode(news_widgets)
 }
 
 // UpdateNewsWidgetHandler godoc
@@ -162,18 +164,18 @@ func (c *NewsWidgetController) GetNewsByDayAndCarepartnerHandler(w http.Response
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /news-widgets [put]
 func (c *NewsWidgetController) UpdateNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget widgets.NewsWidget
-	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
+	var news_widget widgets.NewsWidget
+	if err := json.NewDecoder(r.Body).Decode(&news_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := c.service.UpdateNewsWidget(&weather_widget); err != nil {
+	if err := c.service.UpdateNewsWidget(&news_widget); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widget)
+	json.NewEncoder(w).Encode(news_widget)
 }
 
 // DeleteNewsWidgetHandler godoc

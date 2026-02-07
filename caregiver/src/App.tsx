@@ -5,7 +5,7 @@ import Header from "./components/Header";
 import AgendaView from "./pages/AgendaView";
 import Library from "./pages/Library";
 import CreatePrompt from "./pages/CreatePrompt"
-import CreateWidget from "./pages/CreateWidget";
+import WidgetForm from "./pages/WidgetForm";
 
 function App() {
   return (
@@ -18,7 +18,8 @@ function App() {
         <Route path="/agenda/:date" element={<AgendaView />} />
         <Route path="/library" element={<Library />} />
         <Route path="/CreatePrompt" element={<CreatePrompt />} />
-        <Route path="/widget" element={<CreateWidget />} />
+        <Route path="/widget" element={<WidgetForm />} />
+        <Route path="/widget/:moduleId" element={<WidgetForm />} />
       </Routes>
     </>
   );

@@ -27,13 +27,14 @@ Create a new NewsWidget
 db - instance of the database
 news_widget - information regarding the type of news
 */
-func CreateNews(db *sql.DB, news_widget *NewsWidget) error {
+func CreateNews(db *sql.DB, news_widget *NewsWidget) (int, error) {
 	query := `
 		INSERT INTO "NewsWidget" (category, language, country)
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
-	return db.QueryRow(query, news_widget.CATEGORY, news_widget.LANGUAGE, news_widget.COUNTRY).Scan(&news_widget.ID)
+	err := db.QueryRow(query, news_widget.CATEGORY, news_widget.LANGUAGE, news_widget.COUNTRY).Scan(&news_widget.ID)
+	return news_widget.ID, err
 }
 
 /*
