@@ -14,12 +14,12 @@ func RegisterMessageRoutes(r chi.Router, controller *ctrlr.MessageController) {
 		r.Post("/", controller.CreateMessageHandler)
 
 		// Get a message by ID
-		r.Get("/", controller.GetMessageByIDHandler)
+		r.Get("/{id}", controller.GetMessageByIDHandler)
 
 		// Update a message
-		r.Put("/", controller.UpdateMessageHandler)
+		r.Put("/update/{id}", controller.UpdateMessageHandler)
 
 		// Delete a message by ID
-		r.Delete("/", controller.DeleteMessageHandler)
+		r.Delete("/delete/{id}", controller.DeleteMessageHandler)
 	})
 }
