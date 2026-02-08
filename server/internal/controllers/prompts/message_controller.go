@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"server/internal/models/prompts"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type MessageServiceInterface interface {
@@ -55,13 +57,13 @@ func (c *MessageController) CreateMessageHandler(w http.ResponseWriter, r *http.
 // @Tags message
 // @Accept json
 // @Produce json
-// @Param id query int true "Message ID"
+// @Param id path int true "Message ID"
 // @Success 200 {object} prompts.MessagePrompt
 // @Failure 400 {string} string "invalid message ID"
 // @Failure 500 {string} string "internal server error"
-// @Router /messages [get]
+// @Router /messages/{id} [get]
 func (c *MessageController) GetMessageByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "invalid message ID", http.StatusBadRequest)
@@ -83,20 +85,31 @@ func (c *MessageController) GetMessageByIDHandler(w http.ResponseWriter, r *http
 // @Tags message
 // @Accept json
 // @Produce json
-// @Param message body prompts.MessagePrompt true "Message prompt to update (must include ID)"
+// @Param id path int true "Message ID"
+// @Param message body prompts.MessagePrompt true "Message prompt to update"
 // @Success 200 {object} prompts.MessagePrompt
 // @Failure 400 {string} string "invalid request body or missing message ID"
 // @Failure 500 {string} string "internal server error"
-// @Router /messages [put]
+// @Router /messages/update/{id} [put]
 func (c *MessageController) UpdateMessageHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid message ID", http.StatusBadRequest)
+		return
+	}
+
 	var msg prompts.MessagePrompt
 	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if msg.ID <= 0 {
-		http.Error(w, "message ID is required", http.StatusBadRequest)
+	// Ensure the ID comes from the URL, not the request body
+	msg.ID = id
+
+	if msg.Message == "" {
+		http.Error(w, "message text is required", http.StatusBadRequest)
 		return
 	}
 
@@ -114,13 +127,13 @@ func (c *MessageController) UpdateMessageHandler(w http.ResponseWriter, r *http.
 // @Tags message
 // @Accept json
 // @Produce json
-// @Param id query int true "Message ID"
+// @Param id path int true "Message ID"
 // @Success 204 {string} string "No Content"
 // @Failure 400 {string} string "invalid message ID"
 // @Failure 500 {string} string "internal server error"
-// @Router /messages [delete]
+// @Router /messages/delete/{id} [delete]
 func (c *MessageController) DeleteMessageHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "invalid message ID", http.StatusBadRequest)
