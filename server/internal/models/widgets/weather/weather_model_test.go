@@ -41,8 +41,9 @@ func TestCreateWeatherWidget(t *testing.T) {
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "zipcode"}).AddRow(1, "14623"))
 
-	err := CreateWeather(db, w)
+	id, err := CreateWeather(db, w)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, id)
 	assert.Equal(t, 1, w.ID)
 
 	found, err := GetWeatherByID(db, 1)

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 type WidgetType = "weather" | "sports" | "good";
-type RepeatType = "daily" | "weekly" | "monthly" | "yearly" | "never";
 type SportsType = "nfl" | "nba" | "mlb" | "nhl";
 
 type Team = {
@@ -149,37 +149,71 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function CreateWidget() {
+export default function WidgetForm() {
+    //For Edit Mode
+    const { moduleId } = useParams<{ moduleId: string }>();
+    const isEditMode = Boolean(moduleId);
+
     const [widgetType, setWidgetType] = useState<WidgetType>("weather");
+    const [widgetId, setWidgetId] = useState<number | null>(null);
     const [sportsType, setSportsType] = useState<SportsType>("nfl");
     const [sportsTeam, setSportsTeam] = useState<Team | null>(null);
     const [zipCode, setZipCode] = useState<string>("10001");
-    const [repeat, setRepeat] = useState<RepeatType>("daily");
-    const [weeklyDay, setWeeklyDay] = useState("Monday");
-    const [monthlyDay, setMonthlyDay] = useState<number>(1);
-    const [yearlyDate, setYearlyDate] = useState("2025-01-01");
-    const [showsFor, setShowsFor] = useState<number>(10);
     const [uploadStatus, setUploadStatus] = useState("");
 
+    useEffect(() => {
+        if (!moduleId) return;
 
-    async function handleUpload() {
+        async function loadWidget() {
+            var res = await fetch(`${API_URL}/modules/${moduleId}`);
+            const module = await res.json();
 
-        const formData = new FormData();
-        formData.append("id", "1"); // temp user ID
-        formData.append("repeat", repeat);
-        if (repeat === "weekly") formData.append("weeklyDay", weeklyDay);
-        if (repeat === "monthly") formData.append("monthlyDay", monthlyDay.toString());
-        if (repeat === "yearly") formData.append("yearlyDate", yearlyDate);
-        if (widgetType === "weather") formData.append("zipcode", zipCode);
-        if (widgetType === "sports") {
-            formData.append("country", sportsType);
+            setWidgetType(module.module_type);
+            setWidgetId(module.metadata_id);
 
-            if (sportsTeam) {
-                formData.append("language", sportsTeam.abbr);
+            if (module.module_type === "weather") {
+                res = await fetch(`${API_URL}/weather/${module.metadata_id}`);
+                const widget = await res.json();
+                setZipCode(widget.zipcode);
+            }
+
+            if (module.module_type === "sports") {
+                res = await fetch(`${API_URL}/sports-news/${module.metadata_id}`);
+                const widget = await res.json();
+                const teamAbbr = widget.language;
+                const country = widget.country as SportsType;
+                const foundTeam = SPORTS_TEAMS[country].find(
+                                (team) => team.abbr.toUpperCase() === teamAbbr.toUpperCase()
+                            );
+                setSportsType(country);
+                setSportsTeam(foundTeam || null);
             }
         }
 
-        const endpoint =
+        loadWidget();
+    }, [moduleId]);
+
+    async function handleUpload() {
+        var data;
+        if (widgetType === "weather") {
+            data = {
+                ZIPCODE: zipCode,
+            };
+        } else if (widgetType === "sports") {
+            data = {
+                CATEGORY: "",
+                COUNTRY: sportsType,
+                LANGUAGE: sportsTeam?.abbr || "",
+            };
+        } else {
+            data = {
+                CATEGORY: "",
+                COUNTRY: "",
+                LANGUAGE: "",
+            };
+        }
+
+        var endpoint =
             widgetType === "weather"
                 ? "/weather/upload"
                 : widgetType === "sports"
@@ -187,9 +221,12 @@ export default function CreateWidget() {
                 : "/news/upload";
         
         try {
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        var response = await fetch(`${API_URL}${endpoint}`, {
             method: "POST",
-            body: formData,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
         });
 
         if (!response.ok) {
@@ -204,10 +241,84 @@ export default function CreateWidget() {
         }
     }
 
+    async function handleUpdate() {
+        var data;
+        if (widgetType === "weather") {
+            data = {
+                ZIPCODE: zipCode,
+            };
+        } else if (widgetType === "sports") {
+            data = {
+                CATEGORY: "",
+                COUNTRY: sportsType,
+                LANGUAGE: sportsTeam?.abbr || "",
+            };
+        } else {
+            data = {
+                CATEGORY: "",
+                COUNTRY: "",
+                LANGUAGE: "",
+            };
+        }
+
+        const endpoint =
+            widgetType === "weather"
+                ? "/weather/update"
+                : widgetType === "sports"
+                ? "/sports-news/update"
+                : "/news/update";
+        
+        try {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            setUploadStatus(`Error: ${text}`);
+            return;
+        }
+
+        setUploadStatus("Updated Successfully!");
+        } catch (err: any) {
+        setUploadStatus("Update failed: " + err.message);
+        }
+    }
+
+    async function handleDelete() {
+        if (!moduleId) return;
+
+        const endpoint =
+            widgetType === "weather"
+                ? `/weather/delete/${widgetId}`
+                : widgetType === "sports"
+                ? `/sports-news/delete/${widgetId}`
+                : `/news/delete/${widgetId}`;
+        try{
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: "DELETE",
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                setUploadStatus(`Error: ${text}`);
+                return;
+            }
+
+            setUploadStatus("Deleted!");
+        } catch (err: any) {
+            setUploadStatus("Delete failed: " + err.message);
+        }
+    }
 
     return (
         <div className="w-full flex flex-col items-center mt-8 px-6">
-            <h1 className="text-3xl font-semibold mb-6">Add Media</h1>
+            {isEditMode ? (<h1 className="text-3xl font-semibold mb-6">Edit Widget</h1>) : 
+                (<h1 className="text-3xl font-semibold mb-6">Add Widget</h1>)}
             <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
 
                 {/* Widget Type */}
@@ -259,10 +370,10 @@ export default function CreateWidget() {
                     <div className="mb-6">
                         <label className="text-lg font-medium">Select Team:</label>
                         <select
-                        value={sportsTeam?.abbr || ""}
+                        value={sportsTeam?.name || ""}
                         onChange={(e) => {
                             const selected = SPORTS_TEAMS[sportsType].find(
-                            (t) => t.abbr === e.target.value
+                            (t) => t.name === e.target.value
                             );
                             setSportsTeam(selected || null);
                         }}
@@ -270,98 +381,41 @@ export default function CreateWidget() {
                         >
                         <option value=""></option>
                         {SPORTS_TEAMS[sportsType].map((team) => (
-                            <option key={team.abbr} value={team.abbr}>
-                            {team.name} ({team.abbr})
+                            <option key={team.abbr} value={team.name}>
+                            {team.name}
                             </option>
                         ))}
                         </select>
                     </div>
                 )}
 
-                {/* Shows For Option */}
-                <div className="mb-6">
-                <label className="text-lg font-medium">Shows For:</label>
-                <select
-                    value={showsFor}
-                    onChange={(e) => setShowsFor(Number(e.target.value))}
-                    className="w-full mt-2 p-3 border rounded bg-purple-50"
-                >
-                    <option value="10">10 Seconds</option>
-                    <option value="20">20 Seconds</option>
-                    <option value="30">30 Seconds</option>
-                    <option value="40">40 Second</option>
-                    <option value="50">50 Seconds</option>
-                    <option value="60">60 Seconds</option>
-                </select>
-                </div>
-
-                {/* Repeat Option */}
-                <div className="mb-6">
-                <label className="text-lg font-medium">Repeat:</label>
-                <select
-                    value={repeat}
-                    onChange={(e) => setRepeat(e.target.value as RepeatType)}
-                    className="w-full mt-2 p-3 border rounded bg-purple-50"
-                >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="never">Never</option>
-                </select>
-                </div>
-
-                {/* Conditional Repeat Inputs */}
-                {repeat === "weekly" && (
-                <div className="mb-6">
-                    <label className="text-lg font-medium">Select Weekday:</label>
-                    <select
-                    value={weeklyDay}
-                    onChange={(e) => setWeeklyDay(e.target.value)}
-                    className="w-full mt-2 p-3 border rounded bg-purple-50"
-                    >
-                    {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(day => (
-                        <option key={day} value={day}>{day}</option>
-                    ))}
-                    </select>
-                </div>
+                {isEditMode ? (
+                    <>
+                        {/* Edit Mode */}
+                        <button
+                        className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                        onClick={handleUpdate}
+                        >
+                        Update
+                        </button>
+                        <button
+                        className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                        onClick={handleDelete}
+                        >
+                        Delete
+                        </button>
+                    </>
+                    ) : (
+                    <>
+                        {/* Create Mode */}
+                        <button
+                        className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                        onClick={handleUpload}
+                        >
+                        Save
+                        </button>
+                    </>
                 )}
-
-                {repeat === "monthly" && (
-                <div className="mb-6">
-                    <label className="text-lg font-medium">Select Day:</label>
-                    <select
-                    value={monthlyDay}
-                    onChange={(e) => setMonthlyDay(parseInt(e.target.value))}
-                    className="w-full mt-2 p-3 border rounded bg-purple-50"
-                    >
-                    {Array.from({length:28}, (_,i)=>i+1).map(day => (
-                        <option key={day} value={day}>{day}</option>
-                    ))}
-                    </select>
-                </div>
-                )}
-
-                {repeat === "yearly" && (
-                <div className="mb-6">
-                    <label className="text-lg font-medium">Select Date:</label>
-                    <input
-                    type="date"
-                    value={yearlyDate}
-                    onChange={(e) => setYearlyDate(e.target.value)}
-                    className="w-full mt-2 p-3 border rounded bg-purple-50"
-                    />
-                </div>
-                )}
-
-                {/* Save */}
-                <button
-                className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
-                onClick={handleUpload}
-                >
-                Save
-                </button>
-
                 {uploadStatus && <p className="mt-2 text-sm">{uploadStatus}</p>}
             </div>
         </div>

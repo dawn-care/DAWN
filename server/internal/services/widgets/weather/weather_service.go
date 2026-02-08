@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"regexp"
 
-	"server/internal/models/widgets/weather"
+	widgets "server/internal/models/widgets/weather"
+	modules "server/internal/services/modules"
 )
 
 type WeatherService struct {
@@ -51,7 +52,13 @@ func (s *WeatherService) CreateWeatherWidget(weather_widget *widgets.WeatherWidg
 	if !match {
 		return errors.New("ZIPCODE must be in valid zip code format")
 	}
-	return widgets.CreateWeather(s.db, weather_widget)
+	metadata_id, err := widgets.CreateWeather(s.db, weather_widget)
+	if err != nil {
+		return fmt.Errorf("failed to create weather widget: %v", err)
+	}
+	moduleService := modules.NewModuleService(s.db)
+	_, err = moduleService.CreateModule("weather", 1, 1, metadata_id)
+	return err
 }
 
 // Create multiple weather widgets in bulk

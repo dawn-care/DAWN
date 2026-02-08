@@ -9,6 +9,7 @@ import (
 	"time"
 
 	models "server/internal/models/widgets/news"
+	modules "server/internal/services/modules"
 )
 
 type SportsNewsWidgetService struct {
@@ -54,13 +55,19 @@ func (s *SportsNewsWidgetService) CreateSportsNewsWidget(sports_news_widget *mod
 	if sports_news_widget == nil {
 		return errors.New("NewsWidget cannot be nil")
 	}
-	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" || sports_news_widget.CATEGORY == "" {
-		return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
+	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
+		return errors.New("COUNTRY and LANGUAGE cannot be empty")
 	}
 	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
 		return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
 	}
-	return models.CreateNews(s.db, sports_news_widget)
+	metadata_id, err := models.CreateNews(s.db, sports_news_widget)
+	if err != nil {
+		return fmt.Errorf("failed to create sports news widget: %v", err)
+	}
+	moduleService := modules.NewModuleService(s.db)
+	_, err = moduleService.CreateModule("sports", 1, 1, metadata_id)
+	return err
 }
 
 // Create multiple sports widgets in bulk
