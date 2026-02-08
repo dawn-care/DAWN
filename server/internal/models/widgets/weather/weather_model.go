@@ -25,13 +25,14 @@ Add a new weather widget
 db - instance of the database
 weather_widget - the weather widge to be added
 */
-func CreateWeather(db *sql.DB, weather_widget *WeatherWidget) error {
+func CreateWeather(db *sql.DB, weather_widget *WeatherWidget) (int, error) {
 	query := `
 			INSERT INTO "WeatherWidget" (zipcode)
 			VALUES ($1)
 			RETURNING id;
 	`
-	return db.QueryRow(query, weather_widget.ZIPCODE).Scan(&weather_widget.ID)
+	err := db.QueryRow(query, weather_widget.ZIPCODE).Scan(&weather_widget.ID)
+	return weather_widget.ID, err
 }
 
 /*

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	models "server/internal/models/widgets/news"
+	modules "server/internal/services/modules"
 )
 
 type NewsWidgetService struct {
@@ -37,10 +38,13 @@ func (s *NewsWidgetService) CreateNewsWidget(news_widget *models.NewsWidget) err
 	if news_widget == nil {
 		return errors.New("NewsWidget cannot be nil")
 	}
-	if news_widget.COUNTRY == "" || news_widget.LANGUAGE == "" || news_widget.CATEGORY == "" {
-		return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
+	metadata_id, err := models.CreateNews(s.db, news_widget)
+	if err != nil {
+		return fmt.Errorf("failed to create news widget: %v", err)
 	}
-	return models.CreateNews(s.db, news_widget)
+	moduleService := modules.NewModuleService(s.db)
+	_, err = moduleService.CreateModule("news", 1, 1, metadata_id)
+	return err
 }
 
 // Create multiple news widgets in bulk

@@ -33,10 +33,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -58,7 +58,7 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedOrigins:   []string{"http://localhost:3001"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -82,7 +82,7 @@ func main() {
 	// --- MinIO Setup with fallback defaults ---
 	minioAccess := getEnvOrDefault("MINIO_ACCESS_KEY", "localuser")
 	minioSecret := getEnvOrDefault("MINIO_SECRET_KEY", "localpass123")
-	
+
 	minioClient, bloberr := minio.New("localhost:9000", &minio.Options{
 		Creds:  credentials.NewStaticV4(minioAccess, minioSecret, ""),
 		Secure: false,
@@ -96,8 +96,9 @@ func main() {
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "photo-bucket")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
 	caregiverService := caregiverSvc.NewCaregiverService(db)
-	newsService := newsSvc.NewNewsWidgetService(db, "api key (insert here)")
-	weatherService := weatherSvc.NewWeatherService(db, "api key (insert here)")
+	newsService := newsSvc.NewNewsWidgetService(db, os.Getenv("NEWS_API_KEY"))
+	weatherService := weatherSvc.NewWeatherService(db, os.Getenv("OPENWEATHER_API_KEY"))
+	sportsNewsService := newsSvc.NewSportsNewsWidgetService(db)
 	modulesService := modulesSvc.NewModuleService(db)
 	eventsService := promptsSvc.NewEventService(db)
 	messageService := promptsSvc.NewMessageService(db)
@@ -111,6 +112,7 @@ func main() {
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
+	sportsNewsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsNewsService)
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
@@ -124,6 +126,7 @@ func main() {
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
+	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsNewsCtrl)
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	promptsRts.RegisterEventRoutes(r, eventsCtrl)
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)

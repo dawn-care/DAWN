@@ -5,19 +5,21 @@ import (
 	"net/http"
 	widgets "server/internal/models/widgets/news"
 	"strconv"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // Service Interface
 type SportsNewsWidgetServiceInterface interface {
-	CreateSportsNewsWidget(weather_widget *widgets.NewsWidget) error
-	CreateSportsNewsWidgetsBulk(weather_widgets []widgets.NewsWidget) error
+	CreateSportsNewsWidget(sport_news_widget *widgets.NewsWidget) error
+	CreateSportsNewsWidgetsBulk(sport_news_widgets []widgets.NewsWidget) error
 	GetSportsNewsWidgetByID(id int) (*widgets.NewsWidget, error)
 	GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.NewsWidget, error)
 	GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.NewsWidget, error)
-	UpdateSportsNewsWidget(weather_widget *widgets.NewsWidget) error
+	UpdateSportsNewsWidget(sport_news_widget *widgets.NewsWidget) error
 	DeleteSportsNewsWidget(id int) error
 	GetSportsNewsWidgetStats() (int, error)
-	GetTeamGame(league, team string) (string, error)
+	GetTeamGame(sports_news_widget *widgets.NewsWidget) (string, error)
 }
 
 // Controller
@@ -41,18 +43,18 @@ func NewSportsNewsWidgetController(service SportsNewsWidgetServiceInterface) *Sp
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /sports-news-widgets [post]
 func (c *SportsNewsWidgetController) CreateSportsNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget widgets.NewsWidget
-	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
+	var sport_news_widget widgets.NewsWidget
+	if err := json.NewDecoder(r.Body).Decode(&sport_news_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := c.service.CreateSportsNewsWidget(&weather_widget); err != nil {
+	if err := c.service.CreateSportsNewsWidget(&sport_news_widget); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widget)
+	json.NewEncoder(w).Encode(sport_news_widget)
 }
 
 // GetSportsNewsWidgetByIDHandler godoc
@@ -67,20 +69,20 @@ func (c *SportsNewsWidgetController) CreateSportsNewsWidgetHandler(w http.Respon
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /sports-news-widgets/{id} [get]
 func (c *SportsNewsWidgetController) GetSportsNewsWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idSTR := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(idSTR)
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "Invalid SportsNewsWidget ID", http.StatusBadRequest)
 		return
 	}
 
-	weather_widget, err := c.service.GetSportsNewsWidgetByID(id)
+	sport_news_widget, err := c.service.GetSportsNewsWidgetByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widget)
+	json.NewEncoder(w).Encode(sport_news_widget)
 }
 
 // GetSportsNewsWidgetsByCarepartnerAndCaregiverHandler godoc
@@ -106,13 +108,13 @@ func (c *SportsNewsWidgetController) GetSportsNewsWidgetsByCarepartnerAndCaregiv
 		http.Error(w, "Invalid Caregiver ID", http.StatusBadRequest)
 		return
 	}
-	weather_widgets, err := c.service.GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartnerID, caregiverID)
+	sport_news_widgets, err := c.service.GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartnerID, caregiverID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widgets)
+	json.NewEncoder(w).Encode(sport_news_widgets)
 }
 
 // GetSportsNewsByDayAndCarepartnerHandler godoc
@@ -139,13 +141,13 @@ func (c *SportsNewsWidgetController) GetSportsNewsByDayAndCarepartnerHandler(w h
 	month, err := strconv.Atoi(r.URL.Query().Get("month"))
 	year, err := strconv.Atoi(r.URL.Query().Get("year"))
 
-	weather_widgets, err := c.service.GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartnerID, day, month, year)
+	sport_news_widgets, err := c.service.GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartnerID, day, month, year)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widgets)
+	json.NewEncoder(w).Encode(sport_news_widgets)
 }
 
 // UpdateSportsNewsWidgetHandler godoc
@@ -160,18 +162,18 @@ func (c *SportsNewsWidgetController) GetSportsNewsByDayAndCarepartnerHandler(w h
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /sports-news-widgets [put]
 func (c *SportsNewsWidgetController) UpdateSportsNewsWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var weather_widget widgets.NewsWidget
-	if err := json.NewDecoder(r.Body).Decode(&weather_widget); err != nil {
+	var sport_news_widget widgets.NewsWidget
+	if err := json.NewDecoder(r.Body).Decode(&sport_news_widget); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if err := c.service.UpdateSportsNewsWidget(&weather_widget); err != nil {
+	if err := c.service.UpdateSportsNewsWidget(&sport_news_widget); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(weather_widget)
+	json.NewEncoder(w).Encode(sport_news_widget)
 }
 
 // DeleteSportsNewsWidgetHandler godoc
@@ -232,14 +234,13 @@ func (c *SportsNewsWidgetController) GetSportsNewsWidgetStatsHandler(w http.Resp
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /sports-news-widgets/team-game [get]
 func (c *SportsNewsWidgetController) GetTeamGameHandler(w http.ResponseWriter, r *http.Request) {
-	league := r.URL.Query().Get("league")
-	team := r.URL.Query().Get("team")
-	if league == "" || team == "" {
-		http.Error(w, "league and team cannot be empty", http.StatusBadRequest)
+	var sport_news_widget widgets.NewsWidget
+	if err := json.NewDecoder(r.Body).Decode(&sport_news_widget); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	game_summary, err := c.service.GetTeamGame(league, team)
+	game_summary, err := c.service.GetTeamGame(&sport_news_widget)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

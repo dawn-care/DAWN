@@ -12,6 +12,7 @@ import (
 
 // ---- Interface ----
 type ModuleServiceInterface interface {
+	CreateModule(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error)
 	CreateModuleWithMedia(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error)
 	GetModuleByID(id int) (*modules.Module, error)
 	GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID int, moduleType string) ([]int, error)

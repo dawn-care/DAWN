@@ -17,6 +17,25 @@ func NewModuleService(db *sql.DB) *ModuleService {
 	return &ModuleService{DB: db}
 }
 
+func (s *ModuleService) CreateModule(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error) {
+	if moduleType == "" || caregiverID <= 0 || carepartnerID <= 0 || metadataID <= 0 {
+		return nil, errors.New("all parameters are required and must be valid")
+	}
+
+	mod := &modules.Module{
+		ModuleType:    moduleType,
+		CaregiverID:   caregiverID,
+		CarepartnerID: carepartnerID,
+		MetadataID:    metadataID,
+	}
+
+	if err := modules.CreateModule(s.DB, mod); err != nil {
+		return nil, err
+	}
+
+	return mod, nil
+}
+
 // Create a new module and the corresponding media
 func (s *ModuleService) CreateModuleWithMedia(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error) {
 	if moduleType == "" || caregiverID <= 0 || carepartnerID <= 0 || uri == "" || filename == "" || extension == "" {
