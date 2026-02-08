@@ -1,0 +1,253 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+
+const allowedExtensions = [".jpg", ".jpeg", ".png", ".heic"];
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+export default function PromptForm() {
+  // Creating Variables
+  const [promptMessage, setPromptMessage] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("");
+  // Editing Variables
+  const { moduleId } = useParams<{ moduleId: string }>();
+  const isEditMode = Boolean(moduleId);
+  const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
+  // Deleting Variables
+  const navigate = useNavigate();
+
+  /*******************************************
+   * If form is in edit mode, load message
+   *******************************************/
+  useEffect(() => {
+    if (!moduleId) return;
+
+    fetch(`${API_URL}/messages/${moduleId}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load message");
+        return res.json();
+      })
+      .then(data => {
+        setPromptMessage(data.message);
+        setExistingImageUri(data.image_uri ?? null);
+      })
+      .catch(err => setUploadStatus(err.message));
+  }, [moduleId]);
+
+  /*******************************************
+   * Check if the uploaded file is a picture
+   *******************************************/ 
+  function validateFile(f: File) {
+    const ext = "." + f.name.split(".").pop()?.toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      setFileError(`Invalid file type for prompts.`);
+      setFile(null);
+    } else {
+      setFileError("");
+      setFile(f);
+    }
+  }
+
+  /*******************************************
+   * Message Creation and Photo Upload
+   *******************************************/ 
+  async function handleUpload() {
+    if (!promptMessage.trim()) {
+      setUploadStatus("Please enter text to go alongside this picture.");
+      return;
+    }
+
+    try {
+      let imageUri: string | null = null;
+
+      // If image is included, upload it to the photo library first
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+
+        const imageResponse = await fetch(`${API_URL}/photo/upload`, {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!imageResponse.ok) {
+            const text = await imageResponse.text();
+            throw new Error(text || "Image upload failed");
+        }
+
+        // After image is uploaded, get the URI
+        const imageData = await imageResponse.json();
+        imageUri = imageData.uri;
+      }
+
+      // Create the prompt 
+      const promptResponse = await fetch(`${API_URL}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: promptMessage,
+          image_uri: imageUri,
+          /*
+          NOTE: This currently works for message prompts. But do we really need different models for caregiver/partner locations?
+                Seems like the locations could be easily included in the message text and a picture of a map can be included without needing a separate model
+          */
+        }),
+      });
+
+      if (!promptResponse.ok) {
+        const text = await promptResponse.text();
+        throw new Error(text || "Message creation failed");
+      }
+
+      // Success
+      setUploadStatus("Saved");
+      setFile(null);
+      setPromptMessage("");
+    } catch (err: any) {
+      setUploadStatus("Upload failed: " + err.message);
+    }
+  }
+
+  /*******************************************
+   * Update/Edit
+   *******************************************/ 
+  async function handleUpdate() {
+    if (!promptMessage.trim()) {
+      setUploadStatus("Message text cannot be empty.");
+      return;
+    }
+
+    try {
+      let imageUri = existingImageUri;
+
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch(`${API_URL}/photo/upload`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error("Image upload failed");
+        imageUri = (await res.json()).uri;
+      }
+
+      const res = await fetch(`${API_URL}/messages/update/${moduleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: promptMessage,
+          image_uri: imageUri,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Update failed");
+
+      setUploadStatus("Updated");
+    } catch (err: any) {
+      setUploadStatus(err.message);
+    }
+  }
+
+  /*******************************************
+   * Delete
+   *******************************************/ 
+  async function handleDelete() {
+    if (!confirm("Are you sure you want to delete this message?")) return;
+
+    try {
+      const res = await fetch(`${API_URL}/messages/delete/${moduleId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Delete failed");
+
+      navigate("/library");
+    } catch (err: any) {
+      setUploadStatus(err.message);
+    }
+  }
+
+  /*******************************************
+   * Returned Webpage
+   *******************************************/ 
+  return (
+    <div className="w-full flex flex-col items-center mt-8 px-6">
+      <h1 className="text-3xl font-semibold mb-6">
+        {isEditMode ? "Edit Message" : "Create Message"}
+      </h1>
+      <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+
+        {/* Prompt Message */}
+        <div className="mb-6">
+          <label className="text-lg font-medium">Message Text:</label>
+          <textarea
+            value={promptMessage}
+            maxLength={300}
+            onChange={(e) => setPromptMessage(e.target.value)}
+            className="w-full mt-2 p-3 border rounded bg-purple-50"
+            placeholder="Enter text to display on the care partners screen (300 character limit)"
+          />
+        </div>
+
+        {/* Optional Picture to Include */}
+        <div className="mb-6">
+          <label className="text-lg font-medium">Picture to Display Above Text (Optional):</label>
+          <div
+            className="mt-2 p-6 border-2 border-dashed border-gray-400 rounded cursor-pointer bg-purple-50 text-center"
+            onClick={() => document.getElementById("fileInput")?.click()}
+          >
+            {file ? <span>{file.name}</span> : <span>Drag and drop or click to upload</span>}
+          </div>
+
+          <input
+            id="fileInput"
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              f && validateFile(f);
+            }}
+          />
+
+          {fileError && <p className="text-red-500 mt-2 text-sm">{fileError}</p>}
+        </div>
+
+        {isEditMode ? (
+          <>
+            {/* Edit Mode */}
+              <button
+                className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                onClick={handleUpdate}
+              >
+                Update
+              </button>
+                        
+              <button
+                className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                onClick={handleDelete}
+              >
+                Delete
+              </button>          
+          </>
+          ) : (
+          <>
+            {/* Create Mode */}
+              <button
+                className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                onClick={handleUpload}
+              >
+                Save
+              </button>
+
+              {uploadStatus && <p className="mt-2 text-sm">{uploadStatus}</p>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
