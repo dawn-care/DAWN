@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	models "server/internal/models/widgets/news"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type mockSportsNewsWidgetService struct {
@@ -19,43 +21,35 @@ type mockSportsNewsWidgetService struct {
 	UpdateSportsNewsWidgetFunc                        func(news_widget *models.NewsWidget) error
 	DeleteSportsNewsWidgetFunc                        func(id int) error
 	GetSportsNewsWidgetStatsFunc                      func() (int, error)
-	GetTeamGameFunc                                   func(league, team string) (string, error)
+	GetTeamGameFunc                                   func(news_widget *models.NewsWidget) (string, error)
 }
 
 func (m *mockSportsNewsWidgetService) CreateSportsNewsWidget(news_widget *models.NewsWidget) error {
 	return m.CreateSportsNewsWidgetFunc(news_widget)
 }
-
 func (m *mockSportsNewsWidgetService) CreateSportsNewsWidgetsBulk(news_widgets []models.NewsWidget) error {
 	return m.CreateSportsNewsWidgetsBulkFunc(news_widgets)
 }
-
 func (m *mockSportsNewsWidgetService) GetSportsNewsWidgetByID(id int) (*models.NewsWidget, error) {
 	return m.GetSportsNewsWidgetByIDFunc(id)
 }
-
 func (m *mockSportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]models.NewsWidget, error) {
 	return m.GetSportsNewsWidgetsByCarepartnerAndCaregiverFunc(carepartner_id, caregiver_id)
 }
-
 func (m *mockSportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]models.NewsWidget, error) {
 	return m.GetSportsNewsWidgetsByCarepartnerIDAndDayFunc(carepartner_id, day, month, year)
 }
-
 func (m *mockSportsNewsWidgetService) UpdateSportsNewsWidget(news_widget *models.NewsWidget) error {
 	return m.UpdateSportsNewsWidgetFunc(news_widget)
 }
-
 func (m *mockSportsNewsWidgetService) DeleteSportsNewsWidget(id int) error {
 	return m.DeleteSportsNewsWidgetFunc(id)
 }
-
 func (m *mockSportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 	return m.GetSportsNewsWidgetStatsFunc()
 }
-
-func (m *mockSportsNewsWidgetService) GetTeamGame(league, team string) (string, error) {
-	return m.GetTeamGameFunc(league, team)
+func (m *mockSportsNewsWidgetService) GetTeamGame(news_widget *models.NewsWidget) (string, error) {
+	return m.GetTeamGameFunc(news_widget)
 }
 
 func TestCreateSportsNewsWidgetHandler(t *testing.T) {
@@ -64,6 +58,7 @@ func TestCreateSportsNewsWidgetHandler(t *testing.T) {
 			return nil
 		},
 	}
+
 	controller := NewSportsNewsWidgetController(mockService)
 
 	news_widget := models.NewsWidget{
@@ -71,8 +66,9 @@ func TestCreateSportsNewsWidgetHandler(t *testing.T) {
 		LANGUAGE: "buf",
 		COUNTRY:  "nfl",
 	}
+
 	body, _ := json.Marshal(news_widget)
-	req := httptest.NewRequest("POST", "/sportsnews", bytes.NewBuffer(body))
+	req := httptest.NewRequest("POST", "/sports-news-widgets", bytes.NewBuffer(body))
 	rec := httptest.NewRecorder()
 
 	controller.CreateSportsNewsWidgetHandler(rec, req)
@@ -85,21 +81,19 @@ func TestCreateSportsNewsWidgetHandler(t *testing.T) {
 func TestGetSportsNewsWidgetByIDHandler(t *testing.T) {
 	mockService := &mockSportsNewsWidgetService{
 		GetSportsNewsWidgetByIDFunc: func(id int) (*models.NewsWidget, error) {
-			return &models.NewsWidget{
-				ID:       id,
-				CATEGORY: "sports",
-				LANGUAGE: "buf",
-				COUNTRY:  "nfl",
-			}, nil
+			return &models.NewsWidget{ID: id}, nil
 		},
 	}
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	req := httptest.NewRequest("GET", "/sportsnews?id=1", nil)
+	r := chi.NewRouter()
+	r.Get("/sports-news-widgets/{id}", controller.GetSportsNewsWidgetByIDHandler)
+
+	req := httptest.NewRequest("GET", "/sports-news-widgets/1", nil)
 	rec := httptest.NewRecorder()
 
-	controller.GetSportsNewsWidgetByIDHandler(rec, req)
+	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("Expected status code 200, got %d", rec.Code)
@@ -109,18 +103,13 @@ func TestGetSportsNewsWidgetByIDHandler(t *testing.T) {
 func TestGetSportsNewsWidgetsByCarepartnerAndCaregiverHandler(t *testing.T) {
 	mockService := &mockSportsNewsWidgetService{
 		GetSportsNewsWidgetsByCarepartnerAndCaregiverFunc: func(carepartner_id int, caregiver_id int) ([]models.NewsWidget, error) {
-			return []models.NewsWidget{{
-				ID:       1,
-				CATEGORY: "sports",
-				LANGUAGE: "buf",
-				COUNTRY:  "nfl",
-			}}, nil
+			return []models.NewsWidget{{ID: 1}}, nil
 		},
 	}
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	req := httptest.NewRequest("GET", "/sportsnews?carepartner_id=1&caregiver_id=1", nil)
+	req := httptest.NewRequest("GET", "/sports-news-widgets/by-carepartner-and-caregiver?carepartner_id=1&caregiver_id=1", nil)
 	rec := httptest.NewRecorder()
 
 	controller.GetSportsNewsWidgetsByCarepartnerAndCaregiverHandler(rec, req)
@@ -130,21 +119,16 @@ func TestGetSportsNewsWidgetsByCarepartnerAndCaregiverHandler(t *testing.T) {
 	}
 }
 
-func TestGetSportsNewsWidgetsByCarepartnerIDAndDayHandler(t *testing.T) {
+func TestGetSportsNewsByDayAndCarepartnerHandler(t *testing.T) {
 	mockService := &mockSportsNewsWidgetService{
 		GetSportsNewsWidgetsByCarepartnerIDAndDayFunc: func(carepartner_id int, day, month, year int) ([]models.NewsWidget, error) {
-			return []models.NewsWidget{{
-				ID:       1,
-				CATEGORY: "sports",
-				LANGUAGE: "buf",
-				COUNTRY:  "nfl",
-			}}, nil
+			return []models.NewsWidget{{ID: 1}}, nil
 		},
 	}
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	req := httptest.NewRequest("GET", "/sportsnews?carepartner_id=1&day=1&month=1&year=2024", nil)
+	req := httptest.NewRequest("GET", "/sports-news-widgets/by-day?carepartner_id=1&day=1&month=1&year=2024", nil)
 	rec := httptest.NewRecorder()
 
 	controller.GetSportsNewsByDayAndCarepartnerHandler(rec, req)
@@ -163,14 +147,10 @@ func TestUpdateSportsNewsWidgetHandler(t *testing.T) {
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	news_widget := models.NewsWidget{
-		ID:       1,
-		CATEGORY: "sports",
-		LANGUAGE: "buf",
-		COUNTRY:  "nfl",
-	}
+	news_widget := models.NewsWidget{ID: 1}
 	body, _ := json.Marshal(news_widget)
-	req := httptest.NewRequest("PUT", "/sportsnews", bytes.NewBuffer(body))
+
+	req := httptest.NewRequest("PUT", "/sports-news-widgets", bytes.NewBuffer(body))
 	rec := httptest.NewRecorder()
 
 	controller.UpdateSportsNewsWidgetHandler(rec, req)
@@ -189,7 +169,7 @@ func TestDeleteSportsNewsWidgetHandler(t *testing.T) {
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	req := httptest.NewRequest("DELETE", "/sportsnews?id=1", nil)
+	req := httptest.NewRequest("DELETE", "/sports-news-widgets?id=1", nil)
 	rec := httptest.NewRecorder()
 
 	controller.DeleteSportsNewsWidgetHandler(rec, req)
@@ -208,7 +188,7 @@ func TestGetSportsNewsWidgetStatsHandler(t *testing.T) {
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	req := httptest.NewRequest("GET", "/sportsnews/stats", nil)
+	req := httptest.NewRequest("GET", "/sports-news-widgets/stats", nil)
 	rec := httptest.NewRecorder()
 
 	controller.GetSportsNewsWidgetStatsHandler(rec, req)
@@ -220,14 +200,21 @@ func TestGetSportsNewsWidgetStatsHandler(t *testing.T) {
 
 func TestGetTeamGameHandler(t *testing.T) {
 	mockService := &mockSportsNewsWidgetService{
-		GetTeamGameFunc: func(league, team string) (string, error) {
+		GetTeamGameFunc: func(news_widget *models.NewsWidget) (string, error) {
 			return "you win!", nil
 		},
 	}
 
 	controller := NewSportsNewsWidgetController(mockService)
 
-	req := httptest.NewRequest("GET", "/sportsnews?league=nfl&team=buf", nil)
+	body := models.NewsWidget{
+		CATEGORY: "sports",
+		LANGUAGE: "buf",
+		COUNTRY:  "nfl",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req := httptest.NewRequest("GET", "/sports-news-widgets/team-game", bytes.NewBuffer(jsonBody))
 	rec := httptest.NewRecorder()
 
 	controller.GetTeamGameHandler(rec, req)

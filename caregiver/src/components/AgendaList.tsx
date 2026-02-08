@@ -45,7 +45,7 @@ interface AgendaListProps {
     setMetadata: (metadata: Record<number, ModuleMetadata>) => void;
 }
 
-export default function AgendaList({ items, setItems, modules, setModules, metadata, setMetadata}: AgendaListProps) {
+export default function AgendaList({ items, setItems, modules, setModules: _setModules, metadata, setMetadata: _setMetadata }: AgendaListProps) {
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
 
     const getModuleMetadata = (moduleId: number): ModuleMetadata | null => {
