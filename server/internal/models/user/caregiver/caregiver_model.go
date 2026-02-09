@@ -7,10 +7,11 @@ import (
 
 // Caregiver represents a caregiver "user"
 type Caregiver struct {
-	ID             int    `json:"id"`
-	CarereceiverID int    `json:"carereceiver_id"`
-	Username       string `json:"username"`
-	Role           string `json:"role"`
+	ID             int     `json:"id"`
+	CarereceiverID int     `json:"carereceiver_id"`
+	Username       string  `json:"username"`
+	Role           string  `json:"role"`
+	GoogleID       *string `json:"google_id"`
 }
 
 // ─────────────────────────────────────────────
@@ -20,11 +21,11 @@ type Caregiver struct {
 // CreateCaregiver inserts a single caregiver
 func CreateCaregiver(db *sql.DB, c *Caregiver) error {
 	query := `
-		INSERT INTO "Caregiver" (carereceiver_id, username, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO "Caregiver" (carereceiver_id, username, role, google_id)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`
-	return db.QueryRow(query, c.CarereceiverID, c.Username, c.Role).Scan(&c.ID)
+	return db.QueryRow(query, c.CarereceiverID, c.Username, c.Role, c.GoogleID).Scan(&c.ID)
 }
 
 // CreateCaregiversBulk inserts many caregivers
@@ -209,4 +210,30 @@ func DeleteCaregiver(db *sql.DB, id int) error {
 	}
 
 	return nil
+}
+
+// Get Caregiver by Google ID (OAuth Implementation)
+func GetCaregiverByGoogleID(db *sql.DB, googleID string) (*Caregiver, error) {
+	query := `
+		SELECT id, carereceiver_id, username, role, google_id
+		FROM "Caregiver"
+		WHERE google_id = $1;
+	`
+
+	c := &Caregiver{}
+	err := db.QueryRow(query, googleID).Scan(
+		&c.ID,
+		&c.CarereceiverID,
+		&c.Username,
+		&c.Role,
+		&c.GoogleID,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }

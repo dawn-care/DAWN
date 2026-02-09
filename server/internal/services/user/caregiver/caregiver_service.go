@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/models/user/caregiver"
+	"server/internal/services/user"
 )
 
 // CaregiverService defines all caregiver operations
@@ -120,4 +121,30 @@ func (s *CaregiverService) CountModulesForCaregiver(caregiverID int) (int, error
 	var count int
 	err := s.DB.QueryRow(query, caregiverID).Scan(&count)
 	return count, err
+}
+
+func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (*caregiver.Caregiver, error) {
+
+	// First try to find existing caregiver by Google ID
+	existing, err := caregiver.GetCaregiverByGoogleID(s.DB, googleUser.ID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+
+	// if not found -> create new caregiver
+	c := &caregiver.Caregiver{
+		Username:       googleUser.Name,
+		Role:           "caregiver",
+		CarereceiverID: 0, // set later (?)
+		GoogleID:       &googleUser.ID,
+	}
+
+	if err := caregiver.CreateCaregiver(s.DB, c); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }

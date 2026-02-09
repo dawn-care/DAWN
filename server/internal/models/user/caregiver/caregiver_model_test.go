@@ -31,18 +31,20 @@ func TestCreateCaregiver(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
 
+	google_id := "12345"
 	c := &Caregiver{
 		CarereceiverID: 101,
 		Username:       "john",
 		Role:           "admin",
+		GoogleID:       &google_id,
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "Caregiver" (carereceiver_id, username, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO "Caregiver" (carereceiver_id, username, role, google_id)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`)).
-		WithArgs(c.CarereceiverID, c.Username, c.Role).
+		WithArgs(c.CarereceiverID, c.Username, c.Role, c.GoogleID).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
 
 	err := CreateCaregiver(db, c)
@@ -54,19 +56,21 @@ func TestCreateCaregiver(t *testing.T) {
 func TestCreateCaregiver_Error(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
+	google_id := "12345"
 
 	c := &Caregiver{
 		CarereceiverID: 999,
 		Username:       "bad",
 		Role:           "role",
+		GoogleID:       &google_id,
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "Caregiver" (carereceiver_id, username, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO "Caregiver" (carereceiver_id, username, role, google_id)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`)).
-		WithArgs(c.CarereceiverID, c.Username, c.Role).
+		WithArgs(c.CarereceiverID, c.Username, c.Role, c.GoogleID).
 		WillReturnError(errors.New("insert error"))
 
 	err := CreateCaregiver(db, c)

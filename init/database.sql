@@ -2,7 +2,8 @@ CREATE TABLE "Caregiver" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "carepartner_id" integer,
   "name" text,
-  "role" text
+  "role" text, 
+  "google_id" text UNIQUE
 );
 
 CREATE TABLE "Carepartner" (
@@ -96,6 +97,14 @@ CREATE TABLE "EventPrompt" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "time" time,
   "text" text
+);
+
+CREATE TABLE "Session" (
+    id SERIAL PRIMARY KEY,
+    session_id TEXT UNIQUE NOT NULL,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL
 );
 
 CREATE OR REPLACE PROCEDURE insert_configurations(

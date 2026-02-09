@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	authCtrlr "server/internal/controllers/auth"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
@@ -21,6 +22,7 @@ import (
 	newsRts "server/internal/routes/widgets/news"
 	weatherRts "server/internal/routes/widgets/weather"
 
+	authSvc "server/internal/services/auth"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
@@ -37,6 +39,8 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger"
+
+	mw "server/internal/middleware"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -47,11 +51,6 @@ func getEnvOrDefault(key, fallback string) string {
 	return val
 }
 
-// @title StartUp API
-// @version 1.0
-// @description This is the API documentation service
-// @host localhost:8080
-// @BasePath /
 func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -64,7 +63,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// --- Database Setup with fallback defaults ---
+	// DB setup
 	dbHost := getEnvOrDefault("DB_HOST", "localhost")
 	dbPort := getEnvOrDefault("DB_PORT", "5432")
 	dbUser := getEnvOrDefault("DB_USER", "myuser")
@@ -79,7 +78,7 @@ func main() {
 		log.Fatal("failed to connect to DB:", dberr)
 	}
 
-	// --- MinIO Setup with fallback defaults ---
+	// MinIO setup
 	minioAccess := getEnvOrDefault("MINIO_ACCESS_KEY", "localuser")
 	minioSecret := getEnvOrDefault("MINIO_SECRET_KEY", "localpass123")
 
@@ -91,11 +90,11 @@ func main() {
 		log.Fatal("failed to connect to MinIO:", bloberr)
 	}
 
-	// --- Initialize Services ---
+	// Services
 	audioService := mediaSvc.NewAudioService(db, minioClient, "audio-bucket")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "photo-bucket")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
-	caregiverService := caregiverSvc.NewCaregiverService(db)
+	caregiverService := caregiverSvc.NewCaregiverService(db) // ONLY ONE
 	newsService := newsSvc.NewNewsWidgetService(db, os.Getenv("NEWS_API_KEY"))
 	weatherService := weatherSvc.NewWeatherService(db, os.Getenv("OPENWEATHER_API_KEY"))
 	sportsNewsService := newsSvc.NewSportsNewsWidgetService(db)
@@ -105,7 +104,22 @@ func main() {
 	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
 	carepartnerLocationService := promptsSvc.NewCarepartnerLocationService(db)
 
-	// --- Controllers ---
+	// Auth services
+	googleService := authSvc.NewGoogleAuthService()
+	sessionService := authSvc.NewSessionService(db)
+	authService := authSvc.NewAuthService(googleService, caregiverService, sessionService)
+	authController := authCtrlr.AuthController{AuthService: authService}
+
+	// Auth routes
+	r.Post("/api/auth/google", authController.GoogleLogin)
+
+	// Protected route (test route - update later w protected routes)
+	r.Group(func(r chi.Router) {
+		r.Use(mw.RequireAuth(sessionService))
+		r.Get("/api/me", authController.MeHandler)
+	})
+
+	// Controllers
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
@@ -119,7 +133,7 @@ func main() {
 	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
 	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
 
-	// --- Routes ---
+	// Routes
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
@@ -135,11 +149,7 @@ func main() {
 
 	r.Mount("/swagger", httpSwagger.WrapHandler)
 
-	// --- Start Server ---
 	port := getEnvOrDefault("PORT", "8080")
-
 	fmt.Printf("Starting server on port %s...\n", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		fmt.Println("Error starting server:", err)
-	}
+	http.ListenAndServe(":"+port, r)
 }
