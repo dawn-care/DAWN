@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	models "server/internal/models/media"
 	modules "server/internal/models/modules"
 )
 
@@ -17,6 +16,7 @@ func NewModuleService(db *sql.DB) *ModuleService {
 	return &ModuleService{DB: db}
 }
 
+// Create a new module with an existing metadata_id
 func (s *ModuleService) CreateModule(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error) {
 	if moduleType == "" || caregiverID <= 0 || carepartnerID <= 0 || metadataID <= 0 {
 		return nil, errors.New("all parameters are required and must be valid")
@@ -30,78 +30,7 @@ func (s *ModuleService) CreateModule(moduleType string, caregiverID, carepartner
 	}
 
 	if err := modules.CreateModule(s.DB, mod); err != nil {
-		return nil, err
-	}
-
-	return mod, nil
-}
-
-// Create a new module and the corresponding media
-func (s *ModuleService) CreateModuleWithMedia(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error) {
-	if moduleType == "" || caregiverID <= 0 || carepartnerID <= 0 || uri == "" || filename == "" || extension == "" {
-		return nil, errors.New("all parameters are required and must be valid")
-	}
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-
-	var metadataID int
-
-	switch moduleType {
-	case "audio":
-		audio := &models.AudioMedia{
-			URI:       uri,
-			Filename:  filename,
-			Extension: extension,
-		}
-		if err := models.CreateAudioTx(tx, audio); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		metadataID = audio.ID
-	case "video":
-		video := &models.VideoMedia{
-			URI:       uri,
-			Filename:  filename,
-			Extension: extension,
-		}
-		if err := models.CreateVideoTx(tx, video); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		metadataID = video.ID
-	case "photo":
-		photo := &models.PhotoMedia{
-			URI:       uri,
-			Filename:  filename,
-			Extension: extension,
-		}
-		if err := models.CreatePhotoTx(tx, photo); err != nil {
-			tx.Rollback()
-			return nil, err
-		}
-		metadataID = photo.ID
-	default:
-		tx.Rollback()
-		return nil, fmt.Errorf("unsupported module type: %s", moduleType)
-	}
-
-	mod := &modules.Module{
-		ModuleType:    moduleType,
-		CaregiverID:   caregiverID,
-		CarepartnerID: carepartnerID,
-		MetadataID:    metadataID,
-	}
-
-	if err := modules.CreateModuleTx(tx, mod); err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create module: %w", err)
 	}
 
 	return mod, nil
@@ -112,6 +41,7 @@ func (s *ModuleService) GetModuleByID(id int) (*modules.Module, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid module ID")
 	}
+
 	mod, err := modules.GetModuleByID(s.DB, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get module: %w", err)
@@ -130,9 +60,45 @@ func (s *ModuleService) GetMetadataByCaregiverCarepartnerAndType(caregiverID, ca
 	if moduleType == "" {
 		return nil, errors.New("module type is required")
 	}
+
 	metadataIDs, err := modules.GetMetadataByCaregiverCarepartnerAndType(s.DB, caregiverID, carepartnerID, moduleType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metadata: %w", err)
 	}
 	return metadataIDs, nil
+}
+
+// Get all metadata IDs for a caregiver and carepartner (any module type)
+func (s *ModuleService) GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID int) ([]int, error) {
+	if caregiverID <= 0 || carepartnerID <= 0 {
+		return nil, errors.New("invalid caregiver or carepartner ID")
+	}
+
+	query := `
+		SELECT metadata_id
+		FROM "Module"
+		WHERE caregiver_id = $1 AND carepartner_id = $2;
+	`
+
+	rows, err := s.DB.Query(query, caregiverID, carepartnerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all metadata: %w", err)
+	}
+	defer rows.Close()
+
+	var metadataIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		metadataIDs = append(metadataIDs, id)
+	}
+
+	return metadataIDs, nil
+}
+
+// DeleteModule deletes a module by its ID
+func (s *ModuleService) DeleteModule(id int) error {
+	return modules.DeleteModule(s.DB, id)
 }

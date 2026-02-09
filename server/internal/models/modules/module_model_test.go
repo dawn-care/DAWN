@@ -1,28 +1,22 @@
 package modules
 
 import (
-	"database/sql"
 	"regexp"
 	"testing"
 
+	"server/internal/utils"
+
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )
 
-// SETUP
-
-func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to open sqlmock database: %v", err)
-	}
-	return db, mock
-}
-
+// ---------------------------
 // CREATE
+// ---------------------------
 
 func TestCreateModule(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	mod := &Module{
@@ -47,10 +41,12 @@ func TestCreateModule(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// ---------------------------
 // RETRIEVE
+// ---------------------------
 
 func TestGetModuleByID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"id", "module_type", "caregiver_id", "carepartner_id", "metadata_id"}).
@@ -75,8 +71,12 @@ func TestGetModuleByID(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+// ---------------------------
+// METADATA
+// ---------------------------
+
 func TestGetMetadataByCaregiverCarepartnerAndType(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{"metadata_id"}).
@@ -94,6 +94,32 @@ func TestGetMetadataByCaregiverCarepartnerAndType(t *testing.T) {
 	metadataIDs, err := GetMetadataByCaregiverCarepartnerAndType(db, 301, 201, "video")
 	assert.NoError(t, err)
 	assert.Equal(t, []int{1, 2}, metadataIDs)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ---------------------------
+// CHILD RECORDS (generic fetch test example)
+// ---------------------------
+
+func TestFetchChildRecords(t *testing.T) {
+	db, mock := utils.SetupMockDB(t)
+	defer db.Close()
+
+	ids := []int{1, 2}
+	rows := sqlmock.NewRows([]string{"id", "uri", "filename"}).
+		AddRow(1, "uri1", "file1").
+		AddRow(2, "uri2", "file2")
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "PhotoMedia" WHERE id = ANY($1)`)).
+		WithArgs(pq.Array(ids)).
+		WillReturnRows(rows)
+
+	results, err := GetPhotoMediaByIDs(db, ids)
+	assert.NoError(t, err)
+	assert.Len(t, results, 2)
+	assert.Equal(t, "uri1", results[0]["uri"])
+	assert.Equal(t, "file2", results[1]["filename"])
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

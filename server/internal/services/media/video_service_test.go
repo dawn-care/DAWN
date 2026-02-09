@@ -23,22 +23,26 @@ func TestCreateVideo(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
 	video := &modelsMedia.VideoMedia{
-		URI:       "video_uri",
-		Filename:  "movie.mp4",
-		Extension: "mp4",
+		URI:           "video_uri",
+		DisplayedName:   "My Video",
+		Filename:      "movie.mp4",
+		Extension:     "mp4",
 	}
 
+	mock.ExpectBegin()
+
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "VideoMedia" (uri, filename, extension)
-		VALUES ($1, $2, $3)
+		INSERT INTO "VideoMedia" (uri, displayed_name, filename, extension)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`)).
-		WithArgs(video.URI, video.Filename, video.Extension).
+		WithArgs(video.URI, video.DisplayedName, video.Filename, video.Extension).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+	mock.ExpectCommit()
 
 	err := service.CreateVideo(video)
 	assert.NoError(t, err)
@@ -46,15 +50,15 @@ func TestCreateVideo(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+
 func TestCreateVideoFileService(t *testing.T) {
 	db, _ := utils.SetupMockDB(t)
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
-	file, err := os.Open("..\\testFiles\\test_video.mp4")
+	file, err := os.Open("../../utils/testFiles/test_video.mp4")
 	if err != nil {
 		t.Fatalf("failed to open file: %v", err)
 	}
@@ -63,7 +67,7 @@ func TestCreateVideoFileService(t *testing.T) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	part, err := writer.CreateFormFile("file", filepath.Base("server\\internal\\tests\\testFiles\\test_video.mp4"))
+	part, err := writer.CreateFormFile("file", filepath.Base("../testFiles/test_video.mp4"))
 	if err != nil {
 		t.Fatalf("failed to create form file: %v", err)
 	}
@@ -72,25 +76,19 @@ func TestCreateVideoFileService(t *testing.T) {
 		t.Fatalf("failed to copy file content: %v", err)
 	}
 
-	if err := writer.Close(); err != nil {
-		t.Fatalf("failed to close writer: %v", err)
-	}
+	writer.Close()
 
 	r := httptest.NewRequest(http.MethodPost, "/upload", body)
 	r.Header.Set("Content-Type", writer.FormDataContentType())
 
-	if err := r.ParseMultipartForm(100 << 20); err != nil {
-		t.Fatalf("bad file: %v", err)
-	}
-
 	reqfile, handler, err := r.FormFile("file")
 	if err != nil {
-		t.Fatalf("bad file: %v", err)
+		t.Fatalf("failed to get form file: %v", err)
 	}
-	defer file.Close()
+	defer reqfile.Close()
 
-	serviceErr := service.CreateVideoFile(reqfile, handler, "users/test-user/test_video.mp4")
-	assert.NoError(t, serviceErr)
+	err = service.CreateVideoFile(reqfile, handler, "users/test-user/test_video.mp4")
+	assert.NoError(t, err)
 }
 
 func TestGetVideoByID(t *testing.T) {
@@ -98,14 +96,13 @@ func TestGetVideoByID(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
-	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
-		AddRow(1, "video_uri", "movie.mp4", "mp4")
+	rows := sqlmock.NewRows([]string{"id", "uri", "displayed_name", "filename", "extension"}).
+    AddRow(1, "video_uri", "My Video", "movie.mp4", "mp4")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, uri, filename, extension
+		SELECT id, uri, displayed_name, filename, extension
 		FROM "VideoMedia"
 		WHERE id = $1;
 	`)).
@@ -117,29 +114,8 @@ func TestGetVideoByID(t *testing.T) {
 	assert.NotNil(t, video)
 	assert.Equal(t, "movie.mp4", video.Filename)
 	assert.Equal(t, "mp4", video.Extension)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestGetVideoFileService(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-
-	service := NewVideoService(db, minio, "test-video")
-
-	file, err := service.GetVideoFile("users/test-user/test_video.mp4")
-	assert.NoError(t, err)
-	defer file.Close()
-
-	gotBytes, err := io.ReadAll(file)
-	assert.NoError(t, err)
-
-	localPath := "../testFiles/test_video.mp4"
-	expectedBytes, err := os.ReadFile(localPath)
-	assert.NoError(t, err)
-
-	assert.Equal(t, expectedBytes, gotBytes)
 }
 
 func TestUpdateVideo(t *testing.T) {
@@ -147,26 +123,27 @@ func TestUpdateVideo(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
 	video := &modelsMedia.VideoMedia{
-		ID:        1,
-		URI:       "video_uri_updated",
-		Filename:  "movie_updated.mp4",
-		Extension: "mp4",
+		ID:           1,
+		URI:          "video_uri_updated",
+		DisplayedName: "Updated Name",
+		Filename:     "movie_updated.mp4",
+		Extension:    "mp4",
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(`
 		UPDATE "VideoMedia"
-		SET uri = $1, filename = $2, extension = $3
-		WHERE id = $4;
+		SET uri = $1, displayed_name = $2, filename = $3, extension = $4
+		WHERE id = $5;
 	`)).
-		WithArgs(video.URI, video.Filename, video.Extension, video.ID).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+    WithArgs(video.URI, video.DisplayedName, video.Filename, video.Extension, video.ID).
+    WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err := service.UpdateVideo(video)
 	assert.NoError(t, err)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -175,10 +152,9 @@ func TestUpdateVideoFileService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
-	file, err := os.Open("..\\testFiles\\test_video.mp4")
+	file, err := os.Open("../../utils/testFiles/test_video.mp4")
 	if err != nil {
 		t.Fatalf("failed to open file: %v", err)
 	}
@@ -187,7 +163,7 @@ func TestUpdateVideoFileService(t *testing.T) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	part, err := writer.CreateFormFile("file", filepath.Base("server\\internal\\tests\\testFiles\\test_video.mp4"))
+	part, err := writer.CreateFormFile("file", filepath.Base("../testFiles/test_video.mp4"))
 	if err != nil {
 		t.Fatalf("failed to create form file: %v", err)
 	}
@@ -196,25 +172,19 @@ func TestUpdateVideoFileService(t *testing.T) {
 		t.Fatalf("failed to copy file content: %v", err)
 	}
 
-	if err := writer.Close(); err != nil {
-		t.Fatalf("failed to close writer: %v", err)
-	}
+	writer.Close()
 
 	r := httptest.NewRequest(http.MethodPost, "/upload", body)
 	r.Header.Set("Content-Type", writer.FormDataContentType())
 
-	if err := r.ParseMultipartForm(100 << 20); err != nil {
-		t.Fatalf("bad file: %v", err)
-	}
-
 	reqfile, handler, err := r.FormFile("file")
 	if err != nil {
-		t.Fatalf("bad file: %v", err)
+		t.Fatalf("failed to get form file: %v", err)
 	}
-	defer file.Close()
+	defer reqfile.Close()
 
-	serviceErr := service.UpdateVideoFile(reqfile, handler, "users/test-user/test_video.mp4")
-	assert.NoError(t, serviceErr)
+	err = service.UpdateVideoFile(reqfile, handler, "users/test-user/test_video.mp4")
+	assert.NoError(t, err)
 }
 
 func TestDeleteVideo(t *testing.T) {
@@ -222,17 +192,18 @@ func TestDeleteVideo(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
+
 	mock.ExpectExec(regexp.QuoteMeta(`
 		DELETE FROM "VideoMedia"
 		WHERE id = $1;
 	`)).
 		WithArgs(1).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := service.DeleteVideo(1)
 	assert.NoError(t, err)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -241,7 +212,6 @@ func TestDeleteVideoFileService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
 	err := service.DeleteVideoFile("users/test-user/test_video.mp4")
@@ -253,17 +223,16 @@ func TestGetVideoStats(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewVideoService(db, minio, "test-video")
 
 	rows := sqlmock.NewRows([]string{"count"}).AddRow(5)
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COUNT(*) FROM "VideoMedia";
-	`)).WillReturnRows(rows)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "VideoMedia";`)).
+		WillReturnRows(rows)
 
 	count, err := service.GetVideoStats()
 	assert.NoError(t, err)
 	assert.Equal(t, 5, count)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

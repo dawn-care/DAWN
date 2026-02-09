@@ -75,7 +75,7 @@ func CreateAudiosBulk(db *sql.DB, audios []AudioMedia) error {
 }
 
 // ─────────────────────────────────────────────
-// READ OPERATIONS
+// READ
 // ─────────────────────────────────────────────
 
 // Get one audio record by ID
@@ -171,9 +171,8 @@ func GetAudiosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID i
 	query := `
 		SELECT a.id, a.uri, a.filename, a.extension, a.displayed_name
 		FROM "AudioMedia" a
-		JOIN "Module" m ON m.metadata = a.id
-		WHERE m.carepartner_id = $1
-		  AND m.caregiver_id = $2;
+		JOIN "Module" m ON m.metadata_id = a.id
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
 	`
 	rows, err := db.Query(query, carepartnerID, caregiverID)
 	if err != nil {

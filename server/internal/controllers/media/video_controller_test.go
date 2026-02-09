@@ -12,7 +12,8 @@ import (
 	models "server/internal/models/media"
 )
 
-// Mock service implementing VideoServiceInterface
+// ---- Mock Service ----
+
 type mockVideoService struct {
 	CreateVideoFn                        func(*models.VideoMedia) error
 	CreateVideoFileFn                    func(multipart.File, *multipart.FileHeader, string) error
@@ -70,12 +71,19 @@ func (m *mockVideoService) GetVideoStats() (int, error) {
 
 func TestCreateVideoHandler(t *testing.T) {
 	mockSvc := &mockVideoService{
-		CreateVideoFn: func(v *models.VideoMedia) error { return nil },
+		CreateVideoFn: func(v *models.VideoMedia) error {
+			return nil
+		},
 	}
 
 	controller := NewVideoController(mockSvc)
 
-	video := models.VideoMedia{URI: "test.com/video.mp4", Filename: "video.mp4", Extension: "mp4"}
+	video := models.VideoMedia{
+		URI:       "test.com/video.mp4",
+		Filename:  "video.mp4",
+		Extension: ".mp4",
+	}
+
 	body, _ := json.Marshal(video)
 	req := httptest.NewRequest(http.MethodPost, "/videos", bytes.NewBuffer(body))
 	rec := httptest.NewRecorder()

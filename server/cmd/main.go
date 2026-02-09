@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -33,10 +34,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -58,48 +59,75 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3001"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedOrigins: []string{
+			"http://localhost:3001",
+			"http://localhost:5173",
+		},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
+		MaxAge:           300,
 	}))
 
-	// --- Database Setup with fallback defaults ---
-	dbHost := getEnvOrDefault("DB_HOST", "localhost")
+	// --- Database Setup ---
+	dbHost := getEnvOrDefault("DB_HOST", "db")
 	dbPort := getEnvOrDefault("DB_PORT", "5432")
 	dbUser := getEnvOrDefault("DB_USER", "myuser")
 	dbPassword := getEnvOrDefault("DB_PASSWORD", "mypassword")
 	dbName := getEnvOrDefault("DB_NAME", "mydb")
 
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		dbUser, dbPassword, dbHost, dbPort, dbName)
+	connStr := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser, dbPassword, dbHost, dbPort, dbName,
+	)
 
-	db, dberr := sql.Open("postgres", connStr)
-	if dberr != nil {
-		log.Fatal("failed to connect to DB:", dberr)
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal("failed to connect to DB:", err)
 	}
 
-	// --- MinIO Setup with fallback defaults ---
+	// --- MinIO Setup ---
+	minioHost := getEnvOrDefault("MINIO_HOST", "minio")
+	minioPort := getEnvOrDefault("MINIO_PORT", "9000")
 	minioAccess := getEnvOrDefault("MINIO_ACCESS_KEY", "localuser")
 	minioSecret := getEnvOrDefault("MINIO_SECRET_KEY", "localpass123")
 
-	minioClient, bloberr := minio.New("localhost:9000", &minio.Options{
+	minioClient, err := minio.New(fmt.Sprintf("%s:%s", minioHost, minioPort), &minio.Options{
 		Creds:  credentials.NewStaticV4(minioAccess, minioSecret, ""),
 		Secure: false,
 	})
-	if bloberr != nil {
-		log.Fatal("failed to connect to MinIO:", bloberr)
+	if err != nil {
+		log.Fatal("failed to connect to MinIO:", err)
+	}
+
+	// --- Ensure buckets exist ---
+	ctx := context.Background()
+	for _, bucket := range []string{"audio-bucket", "photo-bucket", "video-bucket"} {
+		exists, err := minioClient.BucketExists(ctx, bucket)
+		if err != nil {
+			log.Fatalf("failed to check bucket %s: %v", bucket, err)
+		}
+		if !exists {
+			err := minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{})
+			if err != nil {
+				log.Fatalf("failed to create bucket %s: %v", bucket, err)
+			}
+			log.Println("created bucket:", bucket)
+		} else {
+			log.Println("bucket exists:", bucket)
+		}
 	}
 
 	// --- Initialize Services ---
 	audioService := mediaSvc.NewAudioService(db, minioClient, "audio-bucket")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "photo-bucket")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
+
 	caregiverService := caregiverSvc.NewCaregiverService(db)
-	newsService := newsSvc.NewNewsWidgetService(db, os.Getenv("NEWS_API_KEY"))
-	weatherService := weatherSvc.NewWeatherService(db, os.Getenv("OPENWEATHER_API_KEY"))
-	sportsNewsService := newsSvc.NewSportsNewsWidgetService(db)
+	newsService := newsSvc.NewNewsWidgetService(db, "api key")
+	weatherService := weatherSvc.NewWeatherService(db, "api key")
 	modulesService := modulesSvc.NewModuleService(db)
+
 	eventsService := promptsSvc.NewEventService(db)
 	messageService := promptsSvc.NewMessageService(db)
 	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
@@ -109,11 +137,12 @@ func main() {
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
+
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
-	sportsNewsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsNewsService)
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
+
 	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
 	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
@@ -123,10 +152,11 @@ func main() {
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
+
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
-	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsNewsCtrl)
+
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	promptsRts.RegisterEventRoutes(r, eventsCtrl)
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
@@ -136,10 +166,7 @@ func main() {
 	r.Mount("/swagger", httpSwagger.WrapHandler)
 
 	// --- Start Server ---
-	port := getEnvOrDefault("PORT", "8080")
-
+	port := getEnvOrDefault("SERVER_PORT", "8080")
 	fmt.Printf("Starting server on port %s...\n", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
-		fmt.Println("Error starting server:", err)
-	}
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }

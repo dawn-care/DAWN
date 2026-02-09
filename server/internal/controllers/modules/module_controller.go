@@ -13,9 +13,10 @@ import (
 // ---- Interface ----
 type ModuleServiceInterface interface {
 	CreateModule(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error)
-	CreateModuleWithMedia(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error)
 	GetModuleByID(id int) (*modules.Module, error)
 	GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID int, moduleType string) ([]int, error)
+	GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID int) ([]int, error)
+	DeleteModule(id int) error
 }
 
 // ---- Controller ----
@@ -27,25 +28,27 @@ func NewModuleController(service ModuleServiceInterface) *ModuleController {
 	return &ModuleController{Service: service}
 }
 
+// ---------------------------
+// CREATE Module only
+// ---------------------------
+
 // CreateModuleHandler godoc
-// @Summary Create a new module with associated media
-// @Description Creates a new module record and associates media (audio, video, photo) with it
+// @Summary Create a new module referencing existing media
+// @Description Creates a new module record pointing to an existing media metadata_id
 // @Tags module
 // @Accept json
 // @Produce json
-// @Param module body object{module_type=string,caregiver_id=int,carepartner_id=int,uri=string,filename=string,extension=string} true "Module creation request"
+// @Param module body object{module_type=string,caregiver_id=int,carepartner_id=int,metadata_id=int} true "Module creation request"
 // @Success 200 {object} modules.Module
 // @Failure 400 {string} string "invalid request body"
 // @Failure 500 {string} string "internal server error"
-// @Router /module [post]
+// @Router /modules [post]
 func (c *ModuleController) CreateModuleHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ModuleType    string `json:"module_type"`
 		CaregiverID   int    `json:"caregiver_id"`
 		CarepartnerID int    `json:"carepartner_id"`
-		URI           string `json:"uri"`
-		Filename      string `json:"filename"`
-		Extension     string `json:"extension"`
+		MetadataID    int    `json:"metadata_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -53,33 +56,24 @@ func (c *ModuleController) CreateModuleHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	mod, err := c.Service.CreateModuleWithMedia(
+	mod, err := c.Service.CreateModule(
 		req.ModuleType,
 		req.CaregiverID,
 		req.CarepartnerID,
-		req.URI,
-		req.Filename,
-		req.Extension,
+		req.MetadataID,
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(mod)
 }
 
-// GetModuleByIDHandler godoc
-// @Summary Get a module by ID
-// @Description Retrieves a module record by its unique ID
-// @Tags module
-// @Accept json
-// @Produce json
-// @Param id path int true "Module ID"
-// @Success 200 {object} modules.Module
-// @Failure 400 {string} string "invalid module ID"
-// @Failure 500 {string} string "internal server error"
-// @Router /module/{id} [get]
+// ---------------------------
+// READ
+// ---------------------------
 func (c *ModuleController) GetModuleByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -94,21 +88,10 @@ func (c *ModuleController) GetModuleByIDHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(mod)
 }
 
-// GetMetadataHandler godoc
-// @Summary Get metadata IDs for modules
-// @Description Retrieves metadata IDs for modules filtered by caregiver, carepartner, and module type
-// @Tags module
-// @Accept json
-// @Produce json
-// @Param caregiver_id query int true "Caregiver ID"
-// @Param carepartner_id query int true "Carepartner ID"
-// @Param module_type query string true "Module type"
-// @Success 200 {array} int "Array of metadata IDs"
-// @Failure 500 {string} string "internal server error"
-// @Router /module/metadata [get]
 func (c *ModuleController) GetMetadataHandler(w http.ResponseWriter, r *http.Request) {
 	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
 	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
@@ -120,5 +103,42 @@ func (c *ModuleController) GetMetadataHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(metadataIDs)
+}
+
+func (c *ModuleController) GetAllMetadataHandler(w http.ResponseWriter, r *http.Request) {
+	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
+	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+
+	metadataIDs, err := c.Service.GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(metadataIDs)
+}
+
+// ---------------------------
+// DELETE
+// ---------------------------
+
+// DeleteModuleHandler deletes a module by ID
+func (c *ModuleController) DeleteModuleHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid module ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := c.Service.DeleteModule(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("module deleted"))
 }

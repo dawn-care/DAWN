@@ -1,13 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
+import { Trash2, Plus, Check } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-type MediaType = "video" | "photo" | "audio";
+type ModuleType =
+  | "photo"
+  | "video"
+  | "audio"
+  | "weather"
+  | "news"
+  | "message_prompt"
+  | "caregiver_location_prompt"
+  | "carepartner_location_prompt";
 
-interface MediaItem {
-  id: number;
-  name: string;
-  filename: string;
-  type: MediaType;
-  uri: string;
+interface ModuleItem {
+  module_id: number;
+  metadata_id: number;
+  type: ModuleType;
+
+  // Media fields
+  displayed_name?: string;
+  filename?: string;
+  uri?: string;
+  extension?: string;
+
+  // Widget fields
+  zipcode?: string;
+  category?: string;
+  language?: string;
+  country?: string;
+
+  // Prompt fields
+  message?: string;
+  location?: string;
+  image_uri?: string;
 }
 
 type Filter = {
@@ -20,53 +45,115 @@ const FILTERS: Filter[] = [
   { key: "pictures", label: "Pictures", value: "photo" },
   { key: "videos", label: "Videos", value: "video" },
   { key: "music", label: "Music", value: "audio" },
-  { key: "png", label: ".png", value: ".png" },
-  { key: "jpg", label: ".jpg", value: ".jpg" },
-  { key: "mov", label: ".mov", value: ".mov" },
-  { key: "wav", label: ".wav", value: ".wav" },
-  { key: "mp3", label: ".mp3", value: ".mp3" },
-  { key: "ogg", label: ".ogg", value: ".ogg" },
+  { key: "widgets", label: "Widgets", value: "widget" },
+  { key: "prompts", label: "Prompts", value: "prompt" },
 ];
 
-const MOCK_MEDIA: MediaItem[] = [
-  { id: 1, name: "Sunset Beach", filename: "sunset.png", type: "photo", uri: "/temp_media/Sunset.png" },
-  { id: 2, name: "Mountain View", filename: "mountain.jpg", type: "photo", uri: "/temp_media/Mountain.jpg" },
-  { id: 3, name: "City Skyline", filename: "city.png", type: "photo", uri: "/temp_media/Skyline.png" },
-  { id: 5, name: "Fly Me to the Moon", filename: "FrankSinatraMusic.mp3", type: "audio", uri: "/temp_media/Fly Me to the Moon.mp3" },
-];
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function Library() {
-  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [modules, setModules] = useState<ModuleItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const navigate = useNavigate();
 
+  const caregiverID = 1; // temporary
+  const carepartnerID = 1; // temporary
+
+  // Fetch all metadata on mount
   useEffect(() => {
-    setMedia(MOCK_MEDIA);
+    async function fetchMetadata() {
+      try {
+        const url = new URL(`${API_URL}/modules/metadata/all`);
+        url.searchParams.append("caregiver_id", caregiverID.toString());
+        url.searchParams.append("carepartner_id", carepartnerID.toString());
+
+        const res = await fetch(url.toString());
+        if (!res.ok) {
+          console.error("Failed to fetch metadata");
+          return;
+        }
+
+        const data: ModuleItem[] = await res.json();
+        setModules(data);
+      } catch (err) {
+        console.error("Error fetching metadata:", err);
+      }
+    }
+
+    fetchMetadata();
   }, []);
 
-  const filteredMedia = useMemo(() => {
-    return media.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.filename.toLowerCase().includes(search.toLowerCase());
+  const handleDelete = async (moduleId: number) => {
+    if (!confirm("Are you sure you want to delete?")) return;
 
-      const matchesFilter = !activeFilter
-        ? true
-        : activeFilter.startsWith(".")
-        ? item.filename.toLowerCase().endsWith(activeFilter)
-        : item.type === activeFilter;
+    try {
+      // const res = await fetch(`${API_URL}/module?id=${moduleId}`, {
+      //   method: "DELETE",
+      // });
 
-      return matchesSearch && matchesFilter;
+      setModules((prev) => prev.filter((m) => m.module_id !== moduleId));
+
+      // if (!res.ok) throw new Error("Failed to delete module");
+    } catch (err) {
+      console.error("Failed to delete module:", err);
+    }
+  };
+
+  const handleRename = async (moduleId: number, newName: string) => {
+    try {
+      const res = await fetch(`${API_URL}/module/rename`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module_id: moduleId, name: newName }),
+      });
+
+      if (!res.ok) throw new Error("Rename failed");
+
+      setModules((prev) =>
+        prev.map((m) =>
+          m.module_id === moduleId
+            ? { ...m, displayed_name: newName }
+            : m
+        )
+      );
+    } catch (err) {
+      console.error("Rename failed:", err);
+    }
+  };
+
+  const filteredModules = useMemo(() => {
+    return modules.filter((item) => {
+      const name =
+        item.displayed_name || item.filename || item.message || "";
+
+      const matchesSearch = name
+        .toLowerCase()
+        .includes(search.toLowerCase());
+
+      if (!activeFilter) return matchesSearch;
+
+      if (activeFilter === "widget") {
+        return (
+          (item.type === "weather" || item.type === "news") &&
+          matchesSearch
+        );
+      }
+
+      if (activeFilter === "prompt") {
+        return item.type.includes("prompt") && matchesSearch;
+      }
+
+      return item.type === activeFilter && matchesSearch;
     });
-  }, [media, search, activeFilter]);
+  }, [modules, search, activeFilter]);
 
   return (
-    <div className="w-full px-8 py-10">
+    <div className="relative w-full px-8 py-10">
       <h1 className="text-4xl font-medium text-center mb-8">
         Your Uploaded Content
       </h1>
 
-      {/* Search */}
       <div className="max-w-3xl mx-auto mb-4">
         <input
           type="text"
@@ -77,7 +164,6 @@ export default function Library() {
         />
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap justify-center gap-2 mb-10">
         {FILTERS.map((filter) => (
           <button
@@ -99,40 +185,131 @@ export default function Library() {
         ))}
       </div>
 
-      {/* Media Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
-        {filteredMedia.map((item) => (
-          <MediaCard key={item.id} item={item} />
+        {filteredModules.map((item) => (
+          <ModuleCard
+            key={item.module_id}
+            item={item}
+            onDelete={handleDelete}
+            onRename={handleRename}
+          />
         ))}
       </div>
+
+      <button
+        onClick={() => navigate("/upload")}
+        className="fixed bottom-6 right-6 bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-full shadow-lg"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
     </div>
   );
 }
 
-function MediaCard({ item }: { item: MediaItem }) {
+function ModuleCard({
+  item,
+  onDelete,
+  onRename,
+}: {
+  item: ModuleItem;
+  onDelete: (moduleId: number) => void;
+  onRename: (moduleId: number, newName: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempName, setTempName] = useState(
+    item.displayed_name || item.filename || item.message || ""
+  );
+
+  const handleSave = async () => {
+    if (tempName.trim()) {
+      await onRename(item.module_id, tempName.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const renderContent = () => {
+    switch (item.type) {
+      case "photo":
+        return (
+          <img
+            src={item.uri}
+            alt={item.displayed_name}
+            className="w-full aspect-video object-cover rounded mb-4"
+          />
+        );
+
+      case "video":
+        return (
+          <video
+            controls
+            className="w-full aspect-video rounded mb-4"
+            src={item.uri}
+          />
+        );
+
+      case "audio":
+        return (
+          <audio controls className="w-full mb-4">
+            <source src={item.uri} />
+          </audio>
+        );
+
+      case "weather":
+        return (
+          <div className="w-full aspect-video bg-blue-100 rounded mb-4 flex items-center justify-center">
+            Weather Widget ({item.zipcode})
+          </div>
+        );
+
+      case "news":
+        return (
+          <div className="w-full aspect-video bg-yellow-100 rounded mb-4 flex items-center justify-center">
+            News ({item.category})
+          </div>
+        );
+
+      default:
+        return (
+          <div className="w-full aspect-video bg-gray-200 rounded mb-4 flex items-center justify-center text-center px-4">
+            {item.message}
+          </div>
+        );
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center text-center">
-      {item.type === "photo" ? (
-        <img
-          src={item.uri}
-          alt={item.name}
-          className="w-full aspect-video object-cover rounded mb-4"
-        />
-      ) : item.type === "video" ? (
-        <div className="w-full aspect-video bg-gray-300 rounded mb-4 flex items-center justify-center">
-          <span className="text-gray-700 font-medium">VIDEO</span>
+    <div className="relative flex flex-col items-center text-center">
+      {renderContent()}
+
+      {isEditing ? (
+        <div className="flex items-center gap-1">
+          <input
+            value={tempName}
+            autoFocus
+            onChange={(e) => setTempName(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={(e) => e.key === "Enter" && handleSave()}
+            className="border-b border-teal-500 focus:outline-none text-lg font-medium text-center"
+          />
+          <button onClick={handleSave}>
+            <Check className="h-4 w-4 text-teal-500" />
+          </button>
         </div>
       ) : (
-        <div className="w-full aspect-video bg-gray-200 rounded mb-4 flex items-center justify-center">
-          <audio controls className="w-full px-4">
-            <source src={item.uri} type="audio/mpeg" />
-            Your browser does not support the audio element.
-          </audio>
-        </div>
+        <h3
+          className="text-lg font-medium cursor-pointer hover:text-teal-500"
+          onClick={() => setIsEditing(true)}
+        >
+          {tempName}
+        </h3>
       )}
 
-      <h3 className="text-lg font-medium">{item.name}</h3>
-      <p className="text-sm text-gray-500">{item.filename}</p>
+      <button
+        onClick={() => onDelete(item.module_id)}
+        className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
     </div>
   );
 }

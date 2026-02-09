@@ -13,12 +13,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Mock service implementing ModuleServiceInterface
+// --- Mock service implementing ModuleServiceInterface ---
 type mockModuleService struct {
-	CreateModuleFunc                           func(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error)
-	CreateModuleWithMediaFunc                   func(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error)
-	GetModuleByIDFunc                           func(id int) (*modules.Module, error)
+	CreateModuleFunc                             func(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error)
+	GetModuleByIDFunc                            func(id int) (*modules.Module, error)
 	GetMetadataByCaregiverCarepartnerAndTypeFunc func(caregiverID, carepartnerID int, moduleType string) ([]int, error)
+	GetAllMetadataByCaregiverCarepartnerFunc     func(caregiverID, carepartnerID int) ([]int, error)
+	DeleteModuleFunc							 func(id int) error
 }
 
 func (m *mockModuleService) CreateModule(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error) {
@@ -29,9 +30,7 @@ func (m *mockModuleService) CreateModule(moduleType string, caregiverID, carepar
 }
 
 func (m *mockModuleService) CreateModuleWithMedia(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error) {
-	if m.CreateModuleWithMediaFunc != nil {
-		return m.CreateModuleWithMediaFunc(moduleType, caregiverID, carepartnerID, uri, filename, extension)
-	}
+	// no longer called by controller
 	return nil, nil
 }
 
@@ -49,14 +48,26 @@ func (m *mockModuleService) GetMetadataByCaregiverCarepartnerAndType(caregiverID
 	return nil, nil
 }
 
+func (m *mockModuleService) GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID int) ([]int, error) {
+	if m.GetAllMetadataByCaregiverCarepartnerFunc != nil {
+		return m.GetAllMetadataByCaregiverCarepartnerFunc(caregiverID, carepartnerID)
+	}
+	return nil, nil
+}
+
+func (m *mockModuleService) DeleteModule(id int) error {
+    return nil
+}
+
 // --- Tests ---
 
 func TestCreateModuleHandler_Success(t *testing.T) {
 	mockService := &mockModuleService{
-		CreateModuleWithMediaFunc: func(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error) {
+		CreateModuleFunc: func(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error) {
 			return &modules.Module{
 				ID:         1,
 				ModuleType: moduleType,
+				MetadataID: metadataID,
 			}, nil
 		},
 	}
@@ -67,9 +78,7 @@ func TestCreateModuleHandler_Success(t *testing.T) {
 		"module_type":    "video",
 		"caregiver_id":   2,
 		"carepartner_id": 3,
-		"uri":            "test.mp4",
-		"filename":       "testfile",
-		"extension":      "mp4",
+		"metadata_id":    42,
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -90,6 +99,9 @@ func TestCreateModuleHandler_Success(t *testing.T) {
 	if mod.ModuleType != "video" {
 		t.Errorf("expected ModuleType 'video', got %s", mod.ModuleType)
 	}
+	if mod.MetadataID != 42 {
+		t.Errorf("expected MetadataID 42, got %d", mod.MetadataID)
+	}
 }
 
 func TestCreateModuleHandler_InvalidBody(t *testing.T) {
@@ -107,7 +119,7 @@ func TestCreateModuleHandler_InvalidBody(t *testing.T) {
 
 func TestCreateModuleHandler_ServiceError(t *testing.T) {
 	mockService := &mockModuleService{
-		CreateModuleWithMediaFunc: func(moduleType string, caregiverID, carepartnerID int, uri, filename, extension string) (*modules.Module, error) {
+		CreateModuleFunc: func(moduleType string, caregiverID, carepartnerID, metadataID int) (*modules.Module, error) {
 			return nil, errors.New("database failure")
 		},
 	}
@@ -118,9 +130,7 @@ func TestCreateModuleHandler_ServiceError(t *testing.T) {
 		"module_type":    "photo",
 		"caregiver_id":   1,
 		"carepartner_id": 1,
-		"uri":            "photo.jpg",
-		"filename":       "photo",
-		"extension":      "jpg",
+		"metadata_id":    99,
 	}
 
 	body, _ := json.Marshal(reqBody)

@@ -1,3 +1,4 @@
+
 package media
 
 import (
@@ -45,6 +46,7 @@ func NewVideoController(Services VideoServiceInterface) *VideoController {
 // CreateVideoHandler godoc
 func (c *VideoController) CreateVideoHandler(w http.ResponseWriter, r *http.Request) {
 	var video media.VideoMedia
+
 	if err := json.NewDecoder(r.Body).Decode(&video); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -55,13 +57,14 @@ func (c *VideoController) CreateVideoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(video)
 }
 
 // CreateVideoFileHandler godoc
 func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_VIDEO_FILE_SIZE_MB << 20); err != nil {
-		http.Error(w, "failed to parse request", http.StatusBadRequest)
+		http.Error(w, "failed to parse multipart form", http.StatusBadRequest)
 		return
 	}
 
@@ -72,11 +75,10 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	}
 	defer file.Close()
 
-	// Validate MIME
+	// Read first 512 bytes for MIME detection
 	buf := make([]byte, 512)
-	_, err = file.Read(buf)
-	if err != nil {
-		http.Error(w, "unable to read file", http.StatusBadRequest)
+	if _, err := file.Read(buf); err != nil {
+		http.Error(w, "unable to read file content", http.StatusBadRequest)
 		return
 	}
 
@@ -86,37 +88,62 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if seeker, ok := file.(io.Seeker); ok {
-		seeker.Seek(0, io.SeekStart)
-	}
-
-	userID := r.FormValue("id")
-	displayedName := r.FormValue("displayed_name")
-
-	if displayedName == "" {
-		http.Error(w, "displayed_name is required", http.StatusBadRequest)
+	// Reset file pointer
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		http.Error(w, "failed to reset file pointer", http.StatusInternalServerError)
 		return
 	}
 
+	// Required form values
+	userID := r.FormValue("user_id")
+	if userID == "" {
+		http.Error(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	caregiverIDStr := r.FormValue("caregiver_id")
+	carepartnerIDStr := r.FormValue("carepartner_id")
+
+	caregiverID, err := strconv.Atoi(caregiverIDStr)
+	if err != nil || caregiverID <= 0 {
+		http.Error(w, "invalid caregiver_id", http.StatusBadRequest)
+		return
+	}
+
+	carepartnerID, err := strconv.Atoi(carepartnerIDStr)
+	if err != nil || carepartnerID <= 0 {
+		http.Error(w, "invalid carepartner_id", http.StatusBadRequest)
+		return
+	}
+
+	// Build video metadata
 	uri := "users/" + userID + "/" + handler.Filename
-	extension := "." + handler.Filename[strings.LastIndex(handler.Filename, ".")+1:]
 
-	// Upload to storage
+	extension := ""
+	if idx := strings.LastIndex(handler.Filename, "."); idx != -1 {
+		extension = handler.Filename[idx:]
+	}
+
+	displayedName := r.FormValue("displayed_name")
+	if displayedName == "" {
+		displayedName = handler.Filename
+	}
+
+	// Upload file to MinIO
 	if err := c.Services.CreateVideoFile(file, handler, uri); err != nil {
-		http.Error(w, "failed to save video file: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to upload video file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Create DB record
 	video := &media.VideoMedia{
 		URI:           uri,
 		Filename:      handler.Filename,
-		Extension:     extension,
 		DisplayedName: displayedName,
+		Extension:     extension,
 	}
 
 	if err := c.Services.CreateVideo(video); err != nil {
-		http.Error(w, "failed to save video metadata: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to save video: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -129,6 +156,7 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -151,6 +179,10 @@ func (c *VideoController) GetVideosByCarepartnerAndCaregiverHandler(w http.Respo
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if videos == nil {
+		videos = []media.VideoMedia{}
 	}
 
 	json.NewEncoder(w).Encode(videos)

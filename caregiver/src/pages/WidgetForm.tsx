@@ -194,50 +194,58 @@ export default function WidgetForm() {
     }, [moduleId]);
 
     async function handleUpload() {
-        var data;
+        let data;
         if (widgetType === "weather") {
-            data = {
-                ZIPCODE: zipCode,
-            };
+            data = { ZIPCODE: zipCode };
         } else if (widgetType === "sports") {
-            data = {
-                CATEGORY: "",
-                COUNTRY: sportsType,
-                LANGUAGE: sportsTeam?.abbr || "",
-            };
+            data = { CATEGORY: "", COUNTRY: sportsType, LANGUAGE: sportsTeam?.abbr || "" };
         } else {
-            data = {
-                CATEGORY: "",
-                COUNTRY: "",
-                LANGUAGE: "",
-            };
+            data = { CATEGORY: "", COUNTRY: "", LANGUAGE: "" };
         }
 
-        var endpoint =
+        const endpoint =
             widgetType === "weather"
                 ? "/weather/upload"
                 : widgetType === "sports"
                 ? "/sports-news/upload"
                 : "/news/upload";
-        
+
         try {
-        var response = await fetch(`${API_URL}${endpoint}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(data),
-        });
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
 
-        if (!response.ok) {
+            if (!response.ok) {
+                const text = await response.text();
+                setUploadStatus(`Error: ${text}`);
+                return;
+            }
+
+            // Safely parse JSON if any
             const text = await response.text();
-            setUploadStatus(`Error: ${text}`);
-            return;
-        }
+            let widgetMetadata: any = {};
+            if (text) {
+                try {
+                    widgetMetadata = JSON.parse(text);
+                } catch {
+                    console.warn("Response not valid JSON, using empty object");
+                }
+            }
 
-        setUploadStatus("Saved!");
+            const metadataId = widgetMetadata.id;
+            if (metadataId) {
+                setUploadStatus(`Saved! Metadata ID: ${metadataId}`);
+            } else {
+                setUploadStatus("Saved!");
+            }
+
+            // Reset form if needed
+            setSportsTeam(null);
+            setZipCode("10001");
         } catch (err: any) {
-        setUploadStatus("Upload failed: " + err.message);
+            setUploadStatus("Upload failed: " + err.message);
         }
     }
 

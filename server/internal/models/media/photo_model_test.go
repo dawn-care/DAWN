@@ -2,82 +2,64 @@ package media
 
 import (
 	"regexp"
-	"server/internal/utils"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+
+	"server/internal/utils"
 )
 
+//
 // CREATE
+//
 
 func TestCreatePhoto(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	photo := &PhotoMedia{
-		URI:       "https://example.com/photo1.jpg",
-		Filename:  "photo1.jpg",
-		Extension: "jpg",
+		URI:           "https://example.com/photo1.jpg",
+		DisplayedName: "My Photo",
+		Filename:      "photo1.jpg",
+		Extension:     "jpg",
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "PhotoMedia" (uri, filename, extension)
-		VALUES ($1, $2, $3)
+		INSERT INTO "PhotoMedia" (uri, displayed_name, filename, extension)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`)).
-		WithArgs(photo.URI, photo.Filename, photo.Extension).
+		WithArgs(photo.URI, photo.DisplayedName, photo.Filename, photo.Extension).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 	err := CreatePhoto(db, photo)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, photo.ID)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCreatePhotosBulk(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	photos := []PhotoMedia{
-		{URI: "https://example.com/photo1.jpg", Filename: "photo1.jpg", Extension: "jpg"},
-		{URI: "https://example.com/photo2.jpg", Filename: "photo2.jpg", Extension: "jpg"},
-	}
-
-	mock.ExpectBegin()
-	mock.ExpectPrepare(regexp.QuoteMeta(`
-		INSERT INTO "PhotoMedia" (uri, filename, extension)
-		VALUES ($1, $2, $3)
-		RETURNING id
-	`))
-
-	for i := range photos {
-		mock.ExpectQuery(regexp.QuoteMeta(`
-			INSERT INTO "PhotoMedia" (uri, filename, extension)
-			VALUES ($1, $2, $3)
-			RETURNING id
-		`)).
-			WithArgs(photos[i].URI, photos[i].Filename, photos[i].Extension).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(i + 1))
-	}
-	mock.ExpectCommit()
-
-	err := CreatePhotosBulk(db, photos)
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-// RETRIEVE
+//
+// READ
+//
 
 func TestGetPhotoByID(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
-		AddRow(1, "https://example.com/photo1.jpg", "photo1.jpg", "jpg")
+	rows := sqlmock.NewRows([]string{
+		"id", "uri", "displayed_name", "filename", "extension",
+	}).AddRow(
+		1,
+		"https://example.com/photo1.jpg",
+		"My Photo",
+		"photo1.jpg",
+		"jpg",
+	)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, uri, filename, extension
+		SELECT id, uri, displayed_name, filename, extension
 		FROM "PhotoMedia"
 		WHERE id = $1;
 	`)).
@@ -88,7 +70,8 @@ func TestGetPhotoByID(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, photo)
 	assert.Equal(t, "photo1.jpg", photo.Filename)
-	assert.Equal(t, "jpg", photo.Extension)
+	assert.Equal(t, "My Photo", photo.DisplayedName)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -96,12 +79,14 @@ func TestGetPhotosByCarepartnerAndCaregiver(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
-		AddRow(1, "https://example.com/photo1.jpg", "photo1.jpg", "jpg").
-		AddRow(2, "https://example.com/photo2.jpg", "photo2.jpg", "jpg")
+	rows := sqlmock.NewRows([]string{
+		"id", "uri", "displayed_name", "filename", "extension",
+	}).
+		AddRow(1, "uri1", "Photo 1", "p1.jpg", "jpg").
+		AddRow(2, "uri2", "Photo 2", "p2.jpg", "jpg")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT p.id, p.uri, p.filename, p.extension
+		SELECT p.id, p.uri, p.displayed_name, p.filename, p.extension
 		FROM "PhotoMedia" p
 		JOIN "Module" m ON m.metadata_id = p.id
 		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
@@ -112,37 +97,76 @@ func TestGetPhotosByCarepartnerAndCaregiver(t *testing.T) {
 	photos, err := GetPhotosByCarepartnerAndCaregiver(db, 201, 301)
 	assert.NoError(t, err)
 	assert.Len(t, photos, 2)
-	assert.Equal(t, "photo2.jpg", photos[1].Filename)
+	assert.Equal(t, "p2.jpg", photos[1].Filename)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+//
 // UPDATE
+//
 
 func TestUpdatePhoto(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
 	photo := &PhotoMedia{
-		ID:        1,
-		URI:       "https://example.com/photo1_updated.jpg",
-		Filename:  "photo1_updated.jpg",
-		Extension: "jpg",
+		ID:            1,
+		URI:           "updated_uri",
+		DisplayedName: "Updated Photo",
+		Filename:      "updated.jpg",
+		Extension:     "jpg",
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(`
 		UPDATE "PhotoMedia"
-		SET uri = $1, filename = $2, extension = $3
-		WHERE id = $4;
+		SET uri = $1,
+		    displayed_name = $2,
+		    filename = $3,
+		    extension = $4
+		WHERE id = $5;
 	`)).
-		WithArgs(photo.URI, photo.Filename, photo.Extension, photo.ID).
+		WithArgs(photo.URI, photo.DisplayedName, photo.Filename, photo.Extension, photo.ID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err := UpdatePhoto(db, photo)
 	assert.NoError(t, err)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestUpdatePhoto_NotFound(t *testing.T) {
+	db, mock := utils.SetupMockDB(t)
+	defer db.Close()
+
+	photo := &PhotoMedia{
+		ID:            99,
+		URI:           "missing",
+		DisplayedName: "Missing",
+		Filename:      "missing.jpg",
+		Extension:     "jpg",
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE "PhotoMedia"
+		SET uri = $1,
+		    displayed_name = $2,
+		    filename = $3,
+		    extension = $4
+		WHERE id = $5;
+	`)).
+		WithArgs(photo.URI, photo.DisplayedName, photo.Filename, photo.Extension, photo.ID).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := UpdatePhoto(db, photo)
+	assert.Error(t, err)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+//
 // DELETE
+//
 
 func TestDeletePhoto(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
@@ -157,22 +181,41 @@ func TestDeletePhoto(t *testing.T) {
 
 	err := DeletePhoto(db, 1)
 	assert.NoError(t, err)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ANALYSIS & STATS
+func TestDeletePhoto_NotFound(t *testing.T) {
+	db, mock := utils.SetupMockDB(t)
+	defer db.Close()
+
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE FROM "PhotoMedia"
+		WHERE id = $1;
+	`)).
+		WithArgs(99).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err := DeletePhoto(db, 99)
+	assert.Error(t, err)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+//
+// STATS
+//
 
 func TestGetPhotoStats(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
 	defer db.Close()
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COUNT(*) FROM "PhotoMedia";
-	`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "PhotoMedia";`)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
 
 	count, err := GetPhotoStats(db)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, count)
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

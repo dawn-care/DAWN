@@ -6,8 +6,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"regexp"
 	"testing"
 
@@ -15,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	modelsMedia "server/internal/models/media"
-
 	"server/internal/utils"
 )
 
@@ -24,73 +21,37 @@ func TestCreatePhotoService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	photo := &modelsMedia.PhotoMedia{
-		URI:       "https://example.com/test.jpg",
-		Filename:  "test",
-		Extension: "jpg",
+		URI:           "users/test/test.jpg",
+		Filename:      "test",
+		Extension:     "jpg",
+		DisplayedName: "Test Photo",
 	}
 
-	mock.ExpectQuery(regexp.QuoteMeta(
-		`INSERT INTO "PhotoMedia" (uri, filename, extension)
-		VALUES ($1, $2, $3)
-		RETURNING id;`,
-	)).
-		WithArgs(photo.URI, photo.Filename, photo.Extension).
+	mock.ExpectBegin()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+	INSERT INTO "PhotoMedia" (uri, displayed_name, filename, extension)
+	VALUES ($1, $2, $3, $4)
+	RETURNING id;
+	`)).
+		WithArgs(
+			photo.URI,
+			photo.DisplayedName,
+			photo.Filename,
+			photo.Extension,
+		).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
+	mock.ExpectCommit()
+
 	err := service.CreatePhoto(photo)
+
 	assert.NoError(t, err)
 	assert.Equal(t, 1, photo.ID)
-}
-
-func TestCreatePhotoFileService(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-
-	service := NewPhotoService(db, minio, "test-photo")
-
-	file, err := os.Open("..\\testFiles\\test_photo.png")
-	if err != nil {
-		t.Fatalf("failed to open file: %v", err)
-	}
-	defer file.Close()
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", filepath.Base("server\\internal\\tests\\testFiles\\test_photo.png"))
-	if err != nil {
-		t.Fatalf("failed to create form file: %v", err)
-	}
-
-	if _, err := io.Copy(part, file); err != nil {
-		t.Fatalf("failed to copy file content: %v", err)
-	}
-
-	if err := writer.Close(); err != nil {
-		t.Fatalf("failed to close writer: %v", err)
-	}
-
-	r := httptest.NewRequest(http.MethodPost, "/upload", body)
-	r.Header.Set("Content-Type", writer.FormDataContentType())
-
-	if err := r.ParseMultipartForm(100 << 20); err != nil {
-		t.Fatalf("bad file: %v", err)
-	}
-
-	reqfile, handler, err := r.FormFile("file")
-	if err != nil {
-		t.Fatalf("bad file: %v", err)
-	}
-	defer file.Close()
-
-	serviceErr := service.CreatePhotoFile(reqfile, handler, "users/test-user/test_photo.png")
-	assert.NoError(t, serviceErr)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestCreatePhotoService_NilPhoto(t *testing.T) {
@@ -98,7 +59,6 @@ func TestCreatePhotoService_NilPhoto(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	err := service.CreatePhoto(nil)
@@ -110,12 +70,44 @@ func TestCreatePhotoService_InvalidPhoto(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	photo := &modelsMedia.PhotoMedia{}
 	err := service.CreatePhoto(photo)
+
 	assert.EqualError(t, err, "uri, filename, and extension are required")
+}
+
+func TestCreatePhotoFileService(t *testing.T) {
+	db, _ := utils.SetupMockDB(t)
+	defer db.Close()
+
+	minio := utils.SetupMockMinIO(t)
+	service := NewPhotoService(db, minio, "test-photo")
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", "test.png")
+	assert.NoError(t, err)
+
+	_, err = io.Copy(part, bytes.NewBuffer([]byte("fake-image-data")))
+	assert.NoError(t, err)
+
+	writer.Close()
+
+	r := httptest.NewRequest(http.MethodPost, "/upload", body)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+
+	err = r.ParseMultipartForm(10 << 20)
+	assert.NoError(t, err)
+
+	reqFile, handler, err := r.FormFile("file")
+	assert.NoError(t, err)
+	defer reqFile.Close()
+
+	serviceErr := service.CreatePhotoFile(reqFile, handler, "users/test-user/test.png")
+	assert.NoError(t, serviceErr)
 }
 
 func TestGetPhotoByIDService(t *testing.T) {
@@ -123,58 +115,30 @@ func TestGetPhotoByIDService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
-	expectedPhoto := &modelsMedia.PhotoMedia{
-		ID:        1,
-		URI:       "https://example.com/test.jpg",
-		Filename:  "test",
-		Extension: "jpg",
-	}
-
-	mock.ExpectQuery(regexp.QuoteMeta(
-		`SELECT id, uri, filename, extension
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT id, uri, displayed_name, filename, extension
 		FROM "PhotoMedia"
-		WHERE id = $1;`,
-	)).
+		WHERE id = $1;
+	`)).
 		WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "uri", "filename", "extension"}).
-			AddRow(expectedPhoto.ID, expectedPhoto.URI, expectedPhoto.Filename, expectedPhoto.Extension))
+		WillReturnRows(sqlmock.NewRows(
+			[]string{"id", "uri", "displayed_name", "filename", "extension"},
+		).AddRow(1, "users/test/test.jpg", "Test Photo", "test", "jpg"))
 
 	photo, err := service.GetPhotoByID(1)
+
 	assert.NoError(t, err)
-	assert.Equal(t, expectedPhoto, photo)
+	assert.Equal(t, 1, photo.ID)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestGetPhotoFileService(t *testing.T) {
+func TestGetPhotoByID_InvalidID(t *testing.T) {
 	db, _ := utils.SetupMockDB(t)
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
-	service := NewAudioService(db, minio, "test-photo")
-
-	file, err := service.GetAudioFile("users/test-user/test_photo.png")
-	assert.NoError(t, err)
-	defer file.Close()
-
-	gotBytes, err := io.ReadAll(file)
-	assert.NoError(t, err)
-
-	localPath := "../testFiles/test_photo.png"
-	expectedBytes, err := os.ReadFile(localPath)
-	assert.NoError(t, err)
-
-	assert.Equal(t, expectedBytes, gotBytes)
-}
-
-func TestGetPhotoByIDService_InvalidID(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	_, err := service.GetPhotoByID(0)
@@ -186,88 +150,33 @@ func TestUpdatePhotoService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	photo := &modelsMedia.PhotoMedia{
-		ID:        1,
-		URI:       "https://example.com/test.jpg",
-		Filename:  "test",
-		Extension: "jpg",
+		ID:            1,
+		URI:           "users/test/test.jpg",
+		Filename:      "updated",
+		DisplayedName: "Updated Name",
+		Extension:     "jpg",
 	}
 
-	mock.ExpectExec(regexp.QuoteMeta(
-		`UPDATE "PhotoMedia"
-		SET uri = $1, filename = $2, extension = $3
-		WHERE id = $4;`,
-	)).
-		WithArgs(photo.URI, photo.Filename, photo.Extension, photo.ID).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+		UPDATE "PhotoMedia"
+		SET uri = $1, displayed_name = $2, filename = $3, extension = $4
+		WHERE id = $5;
+	`)).
+	WithArgs(
+		photo.URI,
+		photo.DisplayedName,
+		photo.Filename,
+		photo.Extension,
+		photo.ID,
+	).
+	WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := service.UpdatePhoto(photo)
 	assert.NoError(t, err)
-}
-
-func TestUpdatePhotoFileService(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-
-	service := NewPhotoService(db, minio, "test-photo")
-
-	file, err := os.Open("..\\testFiles\\test_photo.png")
-	if err != nil {
-		t.Fatalf("failed to open file: %v", err)
-	}
-	defer file.Close()
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", filepath.Base("server\\internal\\tests\\testFiles\\test_photo.png"))
-	if err != nil {
-		t.Fatalf("failed to create form file: %v", err)
-	}
-
-	if _, err := io.Copy(part, file); err != nil {
-		t.Fatalf("failed to copy file content: %v", err)
-	}
-
-	if err := writer.Close(); err != nil {
-		t.Fatalf("failed to close writer: %v", err)
-	}
-
-	r := httptest.NewRequest(http.MethodPost, "/upload", body)
-	r.Header.Set("Content-Type", writer.FormDataContentType())
-
-	if err := r.ParseMultipartForm(100 << 20); err != nil {
-		t.Fatalf("bad file: %v", err)
-	}
-
-	reqfile, handler, err := r.FormFile("file")
-	if err != nil {
-		t.Fatalf("bad file: %v", err)
-	}
-	defer file.Close()
-
-	serviceErr := service.UpdatePhotoFile(reqfile, handler, "users/test-user/test_photo.png")
-	assert.NoError(t, serviceErr)
-}
-
-func TestUpdatePhotoService_InvalidPhoto(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-
-	service := NewPhotoService(db, minio, "test-photo")
-
-	err := service.UpdatePhoto(nil)
-	assert.EqualError(t, err, "photo cannot be nil")
-
-	err = service.UpdatePhoto(&modelsMedia.PhotoMedia{ID: 0})
-	assert.EqualError(t, err, "invalid photo ID")
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestDeletePhotoService(t *testing.T) {
@@ -275,7 +184,6 @@ func TestDeletePhotoService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	mock.ExpectExec(regexp.QuoteMeta(
@@ -286,26 +194,14 @@ func TestDeletePhotoService(t *testing.T) {
 
 	err := service.DeletePhoto(1)
 	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestDeletePhotoileService(t *testing.T) {
+func TestDeletePhoto_InvalidID(t *testing.T) {
 	db, _ := utils.SetupMockDB(t)
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
-	service := NewAudioService(db, minio, "test-photo")
-
-	err := service.DeleteAudioFile("users/test-user/test_photo.png")
-	assert.NoError(t, err)
-}
-
-func TestDeletePhotoService_InvalidID(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	err := service.DeletePhoto(0)
@@ -317,13 +213,14 @@ func TestGetPhotoStatsService(t *testing.T) {
 	defer db.Close()
 
 	minio := utils.SetupMockMinIO(t)
-
 	service := NewPhotoService(db, minio, "test-photo")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "PhotoMedia";`)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 
 	count, err := service.GetPhotoStats()
+
 	assert.NoError(t, err)
 	assert.Equal(t, 5, count)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

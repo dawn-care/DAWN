@@ -28,14 +28,30 @@ func NewAudioService(db *sql.DB, blob *minio.Client, bucket string) *AudioServic
 // CREATE
 // ─────────────────────────────────────────────
 
-func (s *AudioService) CreateAudio(audio *media.AudioMedia) error {
+// Create a single audio
+func (s *AudioService) CreateAudio(
+	audio *media.AudioMedia,
+) error {
 	if audio == nil {
 		return errors.New("audio cannot be nil")
 	}
-	if audio.URI == "" || audio.Filename == "" || audio.Extension == "" || audio.DisplayedName == "" {
-		return errors.New("uri, displayed_name, filename, and extension are required")
+	if audio.URI == "" || audio.Filename == "" || audio.Extension == "" {
+		return errors.New("uri, filename, and extension are required")
 	}
-	return media.CreateAudio(s.DB, audio)
+
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create audio metadata
+	if err := media.CreateAudioTx(tx, audio); err != nil {
+		return err
+	}
+
+	// Commit
+	return tx.Commit()
 }
 
 func (s *AudioService) CreateAudioFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
