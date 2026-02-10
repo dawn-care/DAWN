@@ -20,7 +20,7 @@ type CaregiverServiceInterface interface {
 	CreateCaregiver(cg *caregiver.Caregiver) error
 	GetCaregiverByID(id int) (*caregiver.Caregiver, error)
 	GetAllCaregivers() ([]caregiver.Caregiver, error)
-	GetCaregiverByCarereceiverID(id int) (*caregiver.Caregiver, error)
+	GetCaregiverByCarepartnerID(id int) (*caregiver.Caregiver, error)
 	SearchCaregivers(query string) ([]caregiver.Caregiver, error)
 	UpdateCaregiver(cg *caregiver.Caregiver) error
 	DeleteCaregiver(id int) error
@@ -138,26 +138,26 @@ func (cc *CaregiverController) GetAllCaregivers(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusOK, list)
 }
 
-// GetCaregiverByCarereceiverID godoc
-// @Summary Get a caregiver by carereceiver ID
-// @Description Retrieves a caregiver associated with a specific carereceiver
+// GetCaregiverByCarepartnerID godoc
+// @Summary Get a caregiver by Carepartner ID
+// @Description Retrieves a caregiver associated with a specific Carepartner
 // @Tags caregiver
 // @Accept json
 // @Produce json
-// @Param carereceiverId path int true "Carereceiver ID"
+// @Param CarepartnerId path int true "Carepartner ID"
 // @Success 200 {object} caregiver.Caregiver
-// @Failure 400 {object} map[string]string "invalid carereceiver ID"
+// @Failure 400 {object} map[string]string "invalid Carepartner ID"
 // @Failure 404 {object} map[string]string "caregiver not found"
 // @Failure 500 {object} map[string]string "internal server error"
-// @Router /caregivers/carereceiver/{carereceiverId} [get]
-func (cc *CaregiverController) GetCaregiverByCarereceiverID(w http.ResponseWriter, r *http.Request) {
-	id, err := extractIDFromParam(r, "carereceiverId")
+// @Router /caregivers/carepartner/{CarepartnerId} [get]
+func (cc *CaregiverController) GetCaregiverByCarepartnerID(w http.ResponseWriter, r *http.Request) {
+	id, err := extractIDFromParam(r, "CarepartnerId")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid carereceiver ID")
+		writeError(w, http.StatusBadRequest, "invalid Carepartner ID")
 		return
 	}
 
-	cg, err := cc.Service.GetCaregiverByCarereceiverID(id)
+	cg, err := cc.Service.GetCaregiverByCarepartnerID(id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
