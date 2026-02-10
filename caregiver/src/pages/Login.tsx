@@ -24,6 +24,10 @@ const Login = () => {
       }
       // here should receive data and be able to say what the persons name etc is
       setName("");
+      // this is here to leave the name variable and stop golang from tweaking while it's unimplemented
+      if (name) {
+        console.log(name);
+      }
       setStatus("success");
     } catch (err) {
       console.error(err);
