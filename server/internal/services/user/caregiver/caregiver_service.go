@@ -23,11 +23,11 @@ func NewCaregiverService(db *sql.DB) *CaregiverService {
 // ─────────────────────────────────────────────
 
 func (s *CaregiverService) CreateCaregiver(c *caregiver.Caregiver) error {
-	if c.Username == "" {
-		return errors.New("username cannot be empty")
+	if c.Name == "" {
+		return errors.New("name cannot be empty")
 	}
-	if c.CarereceiverID == 0 {
-		return errors.New("carereceiver_id must match caregiver ID or be set")
+	if c.CarepartnerID == 0 {
+		return errors.New("carepartner_id must match caregiver ID or be set")
 	}
 
 	return caregiver.CreateCaregiver(s.DB, c)
@@ -39,8 +39,8 @@ func (s *CaregiverService) CreateCaregiversBulk(list []caregiver.Caregiver) erro
 	}
 
 	for _, c := range list {
-		if c.Username == "" {
-			return errors.New("username cannot be empty in caregiver list")
+		if c.Name == "" {
+			return errors.New("name cannot be empty in caregiver list")
 		}
 	}
 
@@ -58,11 +58,11 @@ func (s *CaregiverService) GetCaregiverByID(id int) (*caregiver.Caregiver, error
 	return caregiver.GetCaregiverByID(s.DB, id)
 }
 
-func (s *CaregiverService) GetCaregiverByCarereceiverID(crID int) (*caregiver.Caregiver, error) {
+func (s *CaregiverService) GetCaregiverByCarepartnerID(crID int) (*caregiver.Caregiver, error) {
 	if crID <= 0 {
-		return nil, errors.New("invalid carereceiver ID")
+		return nil, errors.New("invalid carepartner ID")
 	}
-	return caregiver.GetCaregiverByCarereceiver(s.DB, crID)
+	return caregiver.GetCaregiverByCarepartner(s.DB, crID)
 }
 
 func (s *CaregiverService) GetAllCaregivers() ([]caregiver.Caregiver, error) {
@@ -73,7 +73,7 @@ func (s *CaregiverService) SearchCaregivers(keyword string) ([]caregiver.Caregiv
 	if len(keyword) < 2 {
 		return nil, errors.New("search keyword too short")
 	}
-	return caregiver.SearchCaregiversByUsername(s.DB, keyword)
+	return caregiver.SearchCaregiversByName(s.DB, keyword)
 }
 
 // ─────────────────────────────────────────────
@@ -84,8 +84,8 @@ func (s *CaregiverService) UpdateCaregiver(c *caregiver.Caregiver) error {
 	if c.ID <= 0 {
 		return errors.New("invalid caregiver ID")
 	}
-	if c.Username == "" {
-		return errors.New("username cannot be empty")
+	if c.Name == "" {
+		return errors.New("name cannot be empty")
 	}
 	return caregiver.UpdateCaregiver(s.DB, c)
 }
@@ -136,10 +136,10 @@ func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (
 
 	// if not found -> create new caregiver
 	c := &caregiver.Caregiver{
-		Username:       googleUser.Name,
-		Role:           "caregiver",
-		CarereceiverID: 0, // set later (?)
-		GoogleID:       &googleUser.ID,
+		Name:          googleUser.Name,
+		Role:          "caregiver",
+		CarepartnerID: 0, // set later (?)
+		GoogleID:      &googleUser.ID,
 	}
 
 	if err := caregiver.CreateCaregiver(s.DB, c); err != nil {
