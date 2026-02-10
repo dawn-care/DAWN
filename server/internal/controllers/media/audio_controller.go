@@ -119,12 +119,6 @@ func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Required form values
-	userID := r.FormValue("user_id")
-	if userID == "" {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
-		return
-	}
-
 	caregiverIDStr := r.FormValue("caregiver_id")
 	carepartnerIDStr := r.FormValue("carepartner_id")
 
@@ -141,7 +135,7 @@ func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Build audio metadata
-	uri := "users/" + userID + "/" + handler.Filename
+	uri := "users/" + caregiverIDStr + "/" + handler.Filename
 
 	extension := ""
 	if idx := strings.LastIndex(handler.Filename, "."); idx != -1 {
@@ -195,16 +189,24 @@ func (c *AudioController) CreateAudioFileHandler(w http.ResponseWriter, r *http.
 // @Failure 500 {string} string "internal server error"
 // @Router /audio [get]
 func (c *AudioController) GetAudioByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
-	id, _ := strconv.Atoi(idStr)
+    idStr := r.URL.Query().Get("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil || id <= 0 {
+        http.Error(w, "invalid audio ID", http.StatusBadRequest)
+        return
+    }
 
-	audio, err := c.Services.GetAudioByID(id)
-	if err != nil {
-		http.Error(w, "Audio not found", http.StatusNotFound)
-		return
-	}
+    audio, err := c.Services.GetAudioByID(id)
+    if err != nil {
+        http.Error(w, "Audio not found", http.StatusNotFound)
+        return
+    }
 
-	fmt.Fprintf(w, "%+v", audio)
+    w.Header().Set("Content-Type", "application/json")
+    if err := json.NewEncoder(w).Encode(audio); err != nil {
+        http.Error(w, fmt.Sprintf("failed to encode audio JSON: %v", err), http.StatusInternalServerError)
+        return
+    }
 }
 
 // GetAudioFileByIDHandler godoc

@@ -59,6 +59,10 @@ func (m *mockModuleService) DeleteModule(id int) error {
     return nil
 }
 
+func (m *mockModuleService) GetModulesByCaregiverAndCarepartner(caregiverID, carepartnerID int) ([]*modules.Module, error) {
+	return nil, nil
+}
+
 // --- Tests ---
 
 func TestCreateModuleHandler_Success(t *testing.T) {

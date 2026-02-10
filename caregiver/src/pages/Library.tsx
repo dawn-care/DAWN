@@ -2,37 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-type ModuleType =
-  | "photo"
-  | "video"
-  | "audio"
-  | "weather"
-  | "news"
-  | "message_prompt"
-  | "caregiver_location_prompt"
-  | "carepartner_location_prompt";
+type MediaType = "video" | "photo" | "audio";
 
-interface ModuleItem {
-  module_id: number;
-  metadata_id: number;
-  type: ModuleType;
-
-  // Media fields
-  displayed_name?: string;
-  filename?: string;
-  uri?: string;
-  extension?: string;
-
-  // Widget fields
-  zipcode?: string;
-  category?: string;
-  language?: string;
-  country?: string;
-
-  // Prompt fields
-  message?: string;
-  location?: string;
-  image_uri?: string;
+interface MediaItem {
+  id: number;
+  moduleId: number;
+  name: string;
+  filename: string;
+  type: MediaType;
+  uri: string;
 }
 
 type Filter = {
@@ -45,76 +23,121 @@ const FILTERS: Filter[] = [
   { key: "pictures", label: "Pictures", value: "photo" },
   { key: "videos", label: "Videos", value: "video" },
   { key: "music", label: "Music", value: "audio" },
-  { key: "widgets", label: "Widgets", value: "widget" },
-  { key: "prompts", label: "Prompts", value: "prompt" },
+  { key: "png", label: ".png", value: ".png" },
+  { key: "jpg", label: ".jpg", value: ".jpg" },
+  { key: "mov", label: ".mov", value: ".mov" },
+  { key: "wav", label: ".wav", value: ".wav" },
+  { key: "mp3", label: ".mp3", value: ".mp3" },
+  { key: "ogg", label: ".ogg", value: ".ogg" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function Library() {
-  const [modules, setModules] = useState<ModuleItem[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const caregiverID = 1; // temporary
-  const carepartnerID = 1; // temporary
-
-  // Fetch all metadata on mount
   useEffect(() => {
-    async function fetchMetadata() {
+    async function fetchMedia() {
       try {
-        const url = new URL(`${API_URL}/modules/metadata/all`);
-        url.searchParams.append("caregiver_id", caregiverID.toString());
-        url.searchParams.append("carepartner_id", carepartnerID.toString());
+        // Get modules
+        const modulesRes = await fetch(
+          `${API_URL}/modules?caregiver_id=1&carepartner_id=1`
+        );
 
-        const res = await fetch(url.toString());
-        if (!res.ok) {
-          console.error("Failed to fetch metadata");
-          return;
+        if (!modulesRes.ok) {
+          throw new Error("Failed to fetch modules");
         }
 
-        const data: ModuleItem[] = await res.json();
-        setModules(data);
+        const text = await modulesRes.text();
+        console.log("RAW MODULE RESPONSE:", text);
+
+        const modules = JSON.parse(text);
+
+        // **TEMP**
+        const mediaModules = modules.filter(
+          (m: any) =>
+            ["photo", "video", "audio"].includes(m.module_type)
+        );
+
+        // Fetch metadata for each module
+        const mediaResults = await Promise.all(
+          mediaModules.map(async (m: any) => {
+            const type = m.module_type as MediaType;
+
+            const res = await fetch(`${API_URL}/${type}?id=${m.metadata_id}`);
+            if (!res.ok) return null;
+
+            const data = await res.json();
+
+            return {
+              id: data.id,
+              moduleId: m.id,
+              name: data.displayed_name || data.filename,
+              filename: data.filename,
+              type,
+              uri: `${API_URL}/${type}/file?id=${data.id}`,
+            } as MediaItem;
+          })
+        );
+
+        setMedia(mediaResults.filter(Boolean));
       } catch (err) {
-        console.error("Error fetching metadata:", err);
+        console.error("Failed to fetch media:", err);
       }
     }
 
-    fetchMetadata();
+    fetchMedia();
   }, []);
 
-  const handleDelete = async (moduleId: number) => {
-    if (!confirm("Are you sure you want to delete?")) return;
+  const handleDelete = async (
+    // metadataId: number,
+    moduleId: number,
+    // type: MediaType
+  ) => {
+    if (!confirm("Are you sure you want to delete this item?")) return;
 
     try {
-      // const res = await fetch(`${API_URL}/module?id=${moduleId}`, {
+      // // Delete module first
+      // await fetch(`${API_URL}/modules/${moduleId}`, {
       //   method: "DELETE",
       // });
 
-      setModules((prev) => prev.filter((m) => m.module_id !== moduleId));
+      // // Delete actual media metadata/file
+      // await fetch(`${API_URL}/${type}?id=${metadataId}`, {
+      //   method: "DELETE",
+      // });
 
-      // if (!res.ok) throw new Error("Failed to delete module");
+      setMedia((prev) =>
+        prev.filter((m) => m.moduleId !== moduleId)
+      );
     } catch (err) {
-      console.error("Failed to delete module:", err);
+      console.error("Delete failed:", err);
     }
   };
 
-  const handleRename = async (moduleId: number, newName: string) => {
+  const handleRename = async (
+    metadataId: number,
+    // type: MediaType,
+    newName: string
+  ) => {
     try {
-      const res = await fetch(`${API_URL}/module/rename`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ module_id: moduleId, name: newName }),
-      });
+      // const res = await fetch(`${API_URL}/${type}`, {
+      //   method: "PUT",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     id: metadataId,
+      //     displayed_name: newName,
+      //   }),
+      // });
 
-      if (!res.ok) throw new Error("Rename failed");
+      // if (!res.ok) throw new Error("Rename failed");
 
-      setModules((prev) =>
+      setMedia((prev) =>
         prev.map((m) =>
-          m.module_id === moduleId
-            ? { ...m, displayed_name: newName }
-            : m
+          m.id === metadataId ? { ...m, name: newName } : m
         )
       );
     } catch (err) {
@@ -122,31 +145,21 @@ export default function Library() {
     }
   };
 
-  const filteredModules = useMemo(() => {
-    return modules.filter((item) => {
-      const name =
-        item.displayed_name || item.filename || item.message || "";
+  const filteredMedia = useMemo(() => {
+    return media.filter((item) => {
+      const matchesSearch =
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.filename.toLowerCase().includes(search.toLowerCase());
 
-      const matchesSearch = name
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matchesFilter = !activeFilter
+        ? true
+        : activeFilter.startsWith(".")
+        ? item.filename.toLowerCase().endsWith(activeFilter)
+        : item.type === activeFilter;
 
-      if (!activeFilter) return matchesSearch;
-
-      if (activeFilter === "widget") {
-        return (
-          (item.type === "weather" || item.type === "news") &&
-          matchesSearch
-        );
-      }
-
-      if (activeFilter === "prompt") {
-        return item.type.includes("prompt") && matchesSearch;
-      }
-
-      return item.type === activeFilter && matchesSearch;
+      return matchesSearch && matchesFilter;
     });
-  }, [modules, search, activeFilter]);
+  }, [media, search, activeFilter]);
 
   return (
     <div className="relative w-full px-8 py-10">
@@ -173,12 +186,11 @@ export default function Library() {
                 activeFilter === filter.value ? null : filter.value
               )
             }
-            className={`px-4 py-1 rounded-full border text-sm transition
-              ${
-                activeFilter === filter.value
-                  ? "bg-teal-200 border-teal-300"
-                  : "bg-white hover:bg-gray-100"
-              }`}
+            className={`px-4 py-1 rounded-full border text-sm transition ${
+              activeFilter === filter.value
+                ? "bg-teal-200 border-teal-300"
+                : "bg-white hover:bg-gray-100"
+            }`}
           >
             {filter.label}
           </button>
@@ -186,9 +198,9 @@ export default function Library() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
-        {filteredModules.map((item) => (
-          <ModuleCard
-            key={item.module_id}
+        {filteredMedia.map((item) => (
+          <MediaCard
+            key={item.moduleId}
             item={item}
             onDelete={handleDelete}
             onRename={handleRename}
@@ -198,7 +210,7 @@ export default function Library() {
 
       <button
         onClick={() => navigate("/upload")}
-        className="fixed bottom-6 right-6 bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-full shadow-lg"
+        className="fixed bottom-6 right-6 bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-full shadow-lg flex items-center justify-center"
       >
         <Plus className="h-6 w-6" />
       </button>
@@ -206,92 +218,59 @@ export default function Library() {
   );
 }
 
-function ModuleCard({
+function MediaCard({
   item,
   onDelete,
   onRename,
 }: {
-  item: ModuleItem;
-  onDelete: (moduleId: number) => void;
-  onRename: (moduleId: number, newName: string) => void;
-}) {
+  item: MediaItem;
+  onDelete: (metadataId: number, moduleId: number, type: MediaType) => void;
+  onRename: (id: number, type: MediaType, newName: string) => void;
+}){
   const [isEditing, setIsEditing] = useState(false);
-  const [tempName, setTempName] = useState(
-    item.displayed_name || item.filename || item.message || ""
-  );
+  const [tempName, setTempName] = useState(item.name);
 
-  const handleSave = async () => {
-    if (tempName.trim()) {
-      await onRename(item.module_id, tempName.trim());
+  const handleBlurOrEnter = async () => {
+    if (tempName.trim() && tempName !== item.name) {
+      await onRename(item.id, item.type, tempName.trim());
     }
     setIsEditing(false);
   };
 
-  const renderContent = () => {
-    switch (item.type) {
-      case "photo":
-        return (
-          <img
-            src={item.uri}
-            alt={item.displayed_name}
-            className="w-full aspect-video object-cover rounded mb-4"
-          />
-        );
-
-      case "video":
-        return (
-          <video
-            controls
-            className="w-full aspect-video rounded mb-4"
-            src={item.uri}
-          />
-        );
-
-      case "audio":
-        return (
-          <audio controls className="w-full mb-4">
-            <source src={item.uri} />
-          </audio>
-        );
-
-      case "weather":
-        return (
-          <div className="w-full aspect-video bg-blue-100 rounded mb-4 flex items-center justify-center">
-            Weather Widget ({item.zipcode})
-          </div>
-        );
-
-      case "news":
-        return (
-          <div className="w-full aspect-video bg-yellow-100 rounded mb-4 flex items-center justify-center">
-            News ({item.category})
-          </div>
-        );
-
-      default:
-        return (
-          <div className="w-full aspect-video bg-gray-200 rounded mb-4 flex items-center justify-center text-center px-4">
-            {item.message}
-          </div>
-        );
-    }
-  };
-
   return (
     <div className="relative flex flex-col items-center text-center">
-      {renderContent()}
+      {item.type === "photo" ? (
+        <img
+          src={item.uri}
+          alt={item.name}
+          className="w-full aspect-video object-cover rounded mb-4"
+        />
+      ) : item.type === "video" ? (
+        <div className="w-full aspect-video bg-gray-300 rounded mb-4 flex items-center justify-center">
+          <span className="text-gray-700 font-medium">VIDEO</span>
+        </div>
+      ) : (
+        <div className="w-full aspect-video bg-gray-200 rounded mb-4 flex items-center justify-center">
+          <audio controls className="w-full px-4">
+            <source src={item.uri} type="audio/mpeg" />
+            Your browser does not support the audio element.
+          </audio>
+        </div>
+      )}
 
+      {/* Editable Name */}
       {isEditing ? (
         <div className="flex items-center gap-1">
           <input
+            type="text"
             value={tempName}
             autoFocus
             onChange={(e) => setTempName(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={(e) => e.key === "Enter" && handleSave()}
+            onBlur={handleBlurOrEnter}
+            onKeyDown={(e) => e.key === "Enter" && handleBlurOrEnter()}
             className="border-b border-teal-500 focus:outline-none text-lg font-medium text-center"
           />
-          <button onClick={handleSave}>
+          <button onClick={handleBlurOrEnter}>
             <Check className="h-4 w-4 text-teal-500" />
           </button>
         </div>
@@ -300,13 +279,17 @@ function ModuleCard({
           className="text-lg font-medium cursor-pointer hover:text-teal-500"
           onClick={() => setIsEditing(true)}
         >
-          {tempName}
+          {item.name}
         </h3>
       )}
 
+      <p className="text-sm text-gray-500">{item.filename}</p>
+
+      {/* Delete Button */}
       <button
-        onClick={() => onDelete(item.module_id)}
+        onClick={() => onDelete(item.id, item.moduleId, item.type)}
         className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+        title="Delete"
       >
         <Trash2 className="h-4 w-4" />
       </button>

@@ -13,14 +13,14 @@ func RegisterModulesRoutes(r chi.Router, controller *moduleCtrl.ModuleController
 		// CREATE
 		r.Post("/", controller.CreateModuleHandler)
 
-		// READ
-		r.Get("/{id}", controller.GetModuleByIDHandler)
-
 		// GET
+		r.Get("/", controller.GetMetadataHandler)
+		r.Get("/{id}", controller.GetModuleByIDHandler)
 		r.Get("/metadata/search", controller.GetMetadataHandler)
 		r.Get("/metadata/all", controller.GetAllMetadataHandler)
+		r.Get("/", controller.GetModulesByCaregiverAndCarepartnerHandler)
 
 		// DELETE
-		r.Delete("/", controller.DeleteModuleHandler)
+		// r.Delete("/", controller.DeleteModuleHandler)
 	})
 }

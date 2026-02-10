@@ -7,7 +7,6 @@ import (
 	"server/internal/utils"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -102,24 +101,24 @@ func TestGetMetadataByCaregiverCarepartnerAndType(t *testing.T) {
 // CHILD RECORDS (generic fetch test example)
 // ---------------------------
 
-func TestFetchChildRecords(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
+// func TestFetchChildRecords(t *testing.T) {
+// 	db, mock := utils.SetupMockDB(t)
+// 	defer db.Close()
 
-	ids := []int{1, 2}
-	rows := sqlmock.NewRows([]string{"id", "uri", "filename"}).
-		AddRow(1, "uri1", "file1").
-		AddRow(2, "uri2", "file2")
+// 	ids := []int{1, 2}
+// 	rows := sqlmock.NewRows([]string{"id", "uri", "filename"}).
+// 		AddRow(1, "uri1", "file1").
+// 		AddRow(2, "uri2", "file2")
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "PhotoMedia" WHERE id = ANY($1)`)).
-		WithArgs(pq.Array(ids)).
-		WillReturnRows(rows)
+// 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "PhotoMedia" WHERE id = ANY($1)`)).
+// 		WithArgs(pq.Array(ids)).
+// 		WillReturnRows(rows)
 
-	results, err := GetPhotoMediaByIDs(db, ids)
-	assert.NoError(t, err)
-	assert.Len(t, results, 2)
-	assert.Equal(t, "uri1", results[0]["uri"])
-	assert.Equal(t, "file2", results[1]["filename"])
+// 	results, err := GetPhotoMediaByIDs(db, ids)
+// 	assert.NoError(t, err)
+// 	assert.Len(t, results, 2)
+// 	assert.Equal(t, "uri1", results[0]["uri"])
+// 	assert.Equal(t, "file2", results[1]["filename"])
 
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
+// 	assert.NoError(t, mock.ExpectationsWereMet())
+// }

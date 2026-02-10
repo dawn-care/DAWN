@@ -77,7 +77,7 @@ export default function UploadMedia() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          module_type: "media",
+          module_type: mediaType,
           caregiver_id: 1,
           carepartner_id: 1,
           metadata_id: metadataId,

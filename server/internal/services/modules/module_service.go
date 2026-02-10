@@ -52,6 +52,28 @@ func (s *ModuleService) GetModuleByID(id int) (*modules.Module, error) {
 	return mod, nil
 }
 
+// Returns all modules for a given caregiver and carepartner
+func (s *ModuleService) GetModulesByCaregiverAndCarepartner(caregiverID, carepartnerID int) ([]*modules.Module, error) {
+	if caregiverID <= 0 || carepartnerID <= 0 {
+		return nil, errors.New("invalid caregiver or carepartner ID")
+	}
+
+	modulesList, err := modules.GetModulesByCaregiverAndCarepartner(s.DB, caregiverID, carepartnerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get modules: %w", err)
+	}
+	if modulesList == nil {
+		return nil, fmt.Errorf("modules with caregiver id %d and carepartner id %d not found", caregiverID, carepartnerID)
+	}
+
+	modulePtrs := make([]*modules.Module, len(modulesList))
+	for i := range modulesList {
+		modulePtrs[i] = &modulesList[i]
+	}
+
+	return modulePtrs, nil
+}
+
 // Get all metadata IDs for a given caregiver, carepartner, and module type
 func (s *ModuleService) GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID int, moduleType string) ([]int, error) {
 	if caregiverID <= 0 || carepartnerID <= 0 {
@@ -65,6 +87,7 @@ func (s *ModuleService) GetMetadataByCaregiverCarepartnerAndType(caregiverID, ca
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metadata: %w", err)
 	}
+
 	return metadataIDs, nil
 }
 
@@ -74,31 +97,15 @@ func (s *ModuleService) GetAllMetadataByCaregiverCarepartner(caregiverID, carepa
 		return nil, errors.New("invalid caregiver or carepartner ID")
 	}
 
-	query := `
-		SELECT metadata_id
-		FROM "Module"
-		WHERE caregiver_id = $1 AND carepartner_id = $2;
-	`
-
-	rows, err := s.DB.Query(query, caregiverID, carepartnerID)
+	metadataIDs, err := modules.GetAllMetadataByCaregiverCarepartner(s.DB, caregiverID, carepartnerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query all metadata: %w", err)
-	}
-	defer rows.Close()
-
-	var metadataIDs []int
-	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		metadataIDs = append(metadataIDs, id)
+		return nil, fmt.Errorf("failed to get metadata: %w", err)
 	}
 
 	return metadataIDs, nil
 }
 
 // DeleteModule deletes a module by its ID
-func (s *ModuleService) DeleteModule(id int) error {
-	return modules.DeleteModule(s.DB, id)
-}
+// func (s *ModuleService) DeleteModule(id int) error {
+// 	return modules.DeleteModule(s.DB, id)
+// }

@@ -16,7 +16,8 @@ type ModuleServiceInterface interface {
 	GetModuleByID(id int) (*modules.Module, error)
 	GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID int, moduleType string) ([]int, error)
 	GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID int) ([]int, error)
-	DeleteModule(id int) error
+	GetModulesByCaregiverAndCarepartner(caregiverID, carepartnerID int) ([]*modules.Module, error)
+	// DeleteModule(id int) error
 }
 
 // ---- Controller ----
@@ -74,6 +75,26 @@ func (c *ModuleController) CreateModuleHandler(w http.ResponseWriter, r *http.Re
 // ---------------------------
 // READ
 // ---------------------------
+func (c *ModuleController) GetModulesByCaregiverAndCarepartnerHandler(w http.ResponseWriter, r *http.Request) {
+
+	caregiverID, err := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
+	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+
+	if err != nil || caregiverID <= 0 || carepartnerID <= 0{
+		http.Error(w, "Missing query parameters", http.StatusBadRequest)
+		return
+	}
+
+	modules, err := c.Service.GetModulesByCaregiverAndCarepartner(caregiverID, carepartnerID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(modules)
+}
+
 func (c *ModuleController) GetModuleByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -126,19 +147,19 @@ func (c *ModuleController) GetAllMetadataHandler(w http.ResponseWriter, r *http.
 // ---------------------------
 
 // DeleteModuleHandler deletes a module by ID
-func (c *ModuleController) DeleteModuleHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
-		http.Error(w, "invalid module ID", http.StatusBadRequest)
-		return
-	}
+// func (c *ModuleController) DeleteModuleHandler(w http.ResponseWriter, r *http.Request) {
+// 	idStr := r.URL.Query().Get("id")
+// 	id, err := strconv.Atoi(idStr)
+// 	if err != nil || id <= 0 {
+// 		http.Error(w, "invalid module ID", http.StatusBadRequest)
+// 		return
+// 	}
 
-	if err := c.Service.DeleteModule(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+// 	if err := c.Service.DeleteModule(id); err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("module deleted"))
-}
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte("module deleted"))
+// }

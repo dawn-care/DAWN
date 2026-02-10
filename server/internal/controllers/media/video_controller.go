@@ -95,12 +95,6 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Required form values
-	userID := r.FormValue("user_id")
-	if userID == "" {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
-		return
-	}
-
 	caregiverIDStr := r.FormValue("caregiver_id")
 	carepartnerIDStr := r.FormValue("carepartner_id")
 
@@ -117,7 +111,7 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Build video metadata
-	uri := "users/" + userID + "/" + handler.Filename
+	uri := "users/" + caregiverIDStr + "/" + handler.Filename
 
 	extension := ""
 	if idx := strings.LastIndex(handler.Filename, "."); idx != -1 {
