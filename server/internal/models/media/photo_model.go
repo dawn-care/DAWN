@@ -178,15 +178,3 @@ func DeletePhoto(db *sql.DB, id int) error {
 	}
 	return nil
 }
-
-// ─────────────────────────────────────────────
-// STATS
-// ─────────────────────────────────────────────
-
-// Get total photo count
-func GetPhotoStats(db *sql.DB) (int, error) {
-	query := `SELECT COUNT(*) FROM "PhotoMedia";`
-	var count int
-	err := db.QueryRow(query).Scan(&count)
-	return count, err
-}

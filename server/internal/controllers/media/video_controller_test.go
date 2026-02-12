@@ -24,7 +24,6 @@ type mockVideoService struct {
 	UpdateVideoFileFn                    func(multipart.File, *multipart.FileHeader, string) error
 	DeleteVideoFn                        func(int) error
 	DeleteVideoFileFn                    func(string) error
-	GetVideoStatsFn                      func() (int, error)
 }
 
 func (m *mockVideoService) CreateVideo(v *models.VideoMedia) error {
@@ -61,10 +60,6 @@ func (m *mockVideoService) DeleteVideo(id int) error {
 
 func (m *mockVideoService) DeleteVideoFile(u string) error {
 	return m.DeleteVideoFileFn(u)
-}
-
-func (m *mockVideoService) GetVideoStats() (int, error) {
-	return m.GetVideoStatsFn()
 }
 
 // ---- Tests ----
@@ -163,22 +158,6 @@ func TestDeleteVideoHandler(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("expected status 204, got %d", rec.Code)
-	}
-}
-
-func TestGetVideoStatsHandler(t *testing.T) {
-	mockSvc := &mockVideoService{
-		GetVideoStatsFn: func() (int, error) { return 42, nil },
-	}
-
-	controller := NewVideoController(mockSvc)
-	req := httptest.NewRequest(http.MethodGet, "/videos/stats", nil)
-	rec := httptest.NewRecorder()
-
-	controller.GetVideoStatsHandler(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 }
 

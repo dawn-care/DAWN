@@ -85,55 +85,6 @@ func TestGetAudiosByCarepartnerAndCaregiver(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestSearchAudios(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	rows := sqlmock.NewRows([]string{
-		"id", "uri", "filename", "extension", "displayed_name",
-	}).AddRow(1, "uri", "love.mp3", "mp3", "Love Song")
-
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, uri, filename, extension, displayed_name
-		FROM "AudioMedia"
-		WHERE filename ILIKE $1
-		   OR displayed_name ILIKE $1;
-	`)).
-		WithArgs("%love%").
-		WillReturnRows(rows)
-
-	results, err := SearchAudios(db, "love")
-	assert.NoError(t, err)
-	assert.Len(t, results, 1)
-	assert.Equal(t, "love.mp3", results[0].Filename)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestGetMediaStats(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	rows := sqlmock.NewRows([]string{
-		"audio_count", "video_count", "photo_count",
-	}).AddRow(3, 5, 7)
-
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT
-			(SELECT COUNT(*) FROM "AudioMedia") AS audio_count,
-			(SELECT COUNT(*) FROM "VideoMedia") AS video_count,
-			(SELECT COUNT(*) FROM "PhotoMedia") AS photo_count;
-	`)).
-		WillReturnRows(rows)
-
-	stats, err := GetMediaStats(db)
-	assert.NoError(t, err)
-	assert.Equal(t, 3, stats.AudioCount)
-	assert.Equal(t, 5, stats.VideoCount)
-	assert.Equal(t, 7, stats.PhotoCount)
-	assert.Equal(t, 15, stats.Total)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
 func TestDeleteAudio_NotFound(t *testing.T) {
 	db, mock := utils.SetupMockDB(t)
 	defer db.Close()

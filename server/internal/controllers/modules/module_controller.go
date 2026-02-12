@@ -17,7 +17,7 @@ type ModuleServiceInterface interface {
 	GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID int, moduleType string) ([]int, error)
 	GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID int) ([]int, error)
 	GetModulesByCaregiverAndCarepartner(caregiverID, carepartnerID int) ([]*modules.Module, error)
-	// DeleteModule(id int) error
+	DeleteModule(id int) error
 }
 
 // ---- Controller ----
@@ -147,19 +147,19 @@ func (c *ModuleController) GetAllMetadataHandler(w http.ResponseWriter, r *http.
 // ---------------------------
 
 // DeleteModuleHandler deletes a module by ID
-// func (c *ModuleController) DeleteModuleHandler(w http.ResponseWriter, r *http.Request) {
-// 	idStr := r.URL.Query().Get("id")
-// 	id, err := strconv.Atoi(idStr)
-// 	if err != nil || id <= 0 {
-// 		http.Error(w, "invalid module ID", http.StatusBadRequest)
-// 		return
-// 	}
+func (c *ModuleController) DeleteModuleHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid module ID", http.StatusBadRequest)
+		return
+	}
 
-// 	if err := c.Service.DeleteModule(id); err != nil {
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
+	if err := c.Service.DeleteModule(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write([]byte("module deleted"))
-// }
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("module deleted"))
+}

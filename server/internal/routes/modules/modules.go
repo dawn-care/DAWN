@@ -21,6 +21,6 @@ func RegisterModulesRoutes(r chi.Router, controller *moduleCtrl.ModuleController
 		r.Get("/", controller.GetModulesByCaregiverAndCarepartnerHandler)
 
 		// DELETE
-		// r.Delete("/", controller.DeleteModuleHandler)
+		r.Delete("/", controller.DeleteModuleHandler)
 	})
 }

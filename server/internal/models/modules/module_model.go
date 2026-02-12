@@ -131,106 +131,35 @@ func GetMetadataByCaregiverCarepartnerAndType(db *sql.DB, caregiverID int, carep
 	return metadataIDs, nil
 }
 
-// -------------------------------------------------------------
-// IGNORE - was testing
-// -------------------------------------------------------------
+// DELETE
+// Delete a module by ID (DB)
+func DeleteModule(db *sql.DB, id int) error {
+	return DeleteModuleTx(db, id)
+}
 
-// func GetPhotoMediaByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "PhotoMedia", ids)
-// }
+// Delete a module by ID (Tx)
+func DeleteModuleTx(exec interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}, id int) error {
 
-// func GetVideoMediaByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "VideoMedia", ids)
-// }
+	query := `
+		DELETE FROM "Module"
+		WHERE id = $1;
+	`
 
-// func GetAudioMediaByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "AudioMedia", ids)
-// }
+	result, err := exec.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete module: %w", err)
+	}
 
-// func GetWeatherWidgetsByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "WeatherWidget", ids)
-// }
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
 
-// func GetNewsWidgetsByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "NewsWidget", ids)
-// }
+	if rowsAffected == 0 {
+		return fmt.Errorf("module with id %d not found", id)
+	}
 
-// func GetCarepartnerLocationPromptsByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "CarepartnerLocationPrompt", ids)
-// }
-
-// func GetCaregiverLocationPromptsByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "CaregiverLocationPrompt", ids)
-// }
-
-// func GetMessagePromptsByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "MessagePrompt", ids)
-// }
-
-// func GetEventPromptsByIDs(db *sql.DB, ids []int) ([]map[string]interface{}, error) {
-// 	return fetchChildRecords(db, "EventPrompt", ids)
-// }
-
-// // -------------------------------------------------------------
-// // Generic function to fetch child records from any table by IDs
-// // -------------------------------------------------------------
-// func fetchChildRecords(db *sql.DB, table string, ids []int) ([]map[string]interface{}, error) {
-// 	if len(ids) == 0 {
-// 		return nil, nil
-// 	}
-
-// 	query := fmt.Sprintf(`SELECT * FROM "%s" WHERE id = ANY($1)`, table)
-
-// 	rows, err := db.Query(query, pq.Array(ids))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-
-// 	cols, err := rows.Columns()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var results []map[string]interface{}
-// 	for rows.Next() {
-// 		columns := make([]interface{}, len(cols))
-// 		columnPointers := make([]interface{}, len(cols))
-// 		for i := range columns {
-// 			columnPointers[i] = &columns[i]
-// 		}
-
-// 		if err := rows.Scan(columnPointers...); err != nil {
-// 			return nil, err
-// 		}
-
-// 		m := make(map[string]interface{})
-// 		for i, colName := range cols {
-// 			m[colName] = columns[i]
-// 		}
-// 		results = append(results, m)
-// 	}
-
-// 	return results, nil
-// }
-
-// // DeleteModule deletes a module by its ID
-// func DeleteModule(db *sql.DB, id int) error {
-// 	if id <= 0 {
-// 		return fmt.Errorf("invalid module ID: %d", id)
-// 	}
-
-// 	res, err := db.Exec(`DELETE FROM "Module" WHERE id=$1`, id)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to delete module: %w", err)
-// 	}
-
-// 	rows, err := res.RowsAffected()
-// 	if err != nil {
-// 		return fmt.Errorf("failed to check affected rows: %w", err)
-// 	}
-// 	if rows == 0 {
-// 		return fmt.Errorf("module with ID %d not found", id)
-// 	}
-// 	return nil
-// }
+	return nil
+}

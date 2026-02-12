@@ -215,8 +215,3 @@ func (s *PhotoService) DeletePhotoFile(uri string) error {
 
 	return nil
 }
-
-// Get total photo count
-func (s *PhotoService) GetPhotoStats() (int, error) {
-	return media.GetPhotoStats(s.DB)
-}

@@ -31,7 +31,6 @@ type VideoServiceInterface interface {
 	UpdateVideoFile(file multipart.File, handler *multipart.FileHeader, uri string) error
 	DeleteVideo(id int) error
 	DeleteVideoFile(uri string) error
-	GetVideoStats() (int, error)
 }
 
 // ---- Controller ----
@@ -322,15 +321,4 @@ func (c *VideoController) DeleteVideoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// GetVideoStatsHandler godoc
-func (c *VideoController) GetVideoStatsHandler(w http.ResponseWriter, r *http.Request) {
-	count, err := c.Services.GetVideoStats()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]int{"total_videos": count})
 }

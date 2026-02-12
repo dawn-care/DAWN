@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
-import UploadMedia from "./pages/UploadMedia";
+import MediaFormCreate from "./pages/MediaFormCreate";
+import MediaFormUpdate from "./pages/MediaFormUpdate";
+import MediaFormDelete from "./pages/MediaFormDelete"
 import Header from "./components/Header";
 import AgendaView from "./pages/AgendaView";
 import Library from "./pages/Library";
@@ -15,11 +17,19 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/upload" element={<UploadMedia />} />
+        <Route path="/library" element={<Library />} />
+
         <Route path="/agenda" element={<CalendarView />} />
         <Route path="/agenda/:date" element={<AgendaView />} />
-        <Route path="/library" element={<Library />} />
+
+        <Route path="/media" element={<MediaFormCreate />} />
+        <Route path="/media/update" element={<MediaFormUpdate />} />
+        <Route path = "/media/delete" element={<MediaFormDelete />} />
+
         <Route path="/prompt" element={<PromptForm />} />
+        <Route path="/prompt/:promptId" element={<PromptForm />} />
+
+
         <Route path="/prompt/:moduleId" element={<PromptForm />} />
         <Route path="/widget" element={<WidgetForm />} />
         <Route path="/widget/:moduleId" element={<WidgetForm />} />

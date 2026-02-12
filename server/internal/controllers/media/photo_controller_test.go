@@ -3,7 +3,6 @@ package media
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -18,11 +17,9 @@ type mockPhotoService struct {
 	getErr      error
 	updateErr   error
 	deleteErr   error
-	statsErr    error
 	photoResult *media.PhotoMedia
 	photoFile   multipart.File
 	photoList   []media.PhotoMedia
-	statsResult int
 }
 
 // ---- Interface methods ----
@@ -61,10 +58,6 @@ func (m *mockPhotoService) DeletePhoto(id int) error {
 
 func (m *mockPhotoService) DeletePhotoFile(uri string) error {
 	return m.deleteErr
-}
-
-func (m *mockPhotoService) GetPhotoStats() (int, error) {
-	return m.statsResult, m.statsErr
 }
 
 //
@@ -163,34 +156,6 @@ func TestGetPhotosByCarepartnerAndCaregiverHandler_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	controller.GetPhotosByCarepartnerAndCaregiverHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestGetPhotoStatsHandler_Error(t *testing.T) {
-	mockSvc := &mockPhotoService{statsErr: errors.New("db error")}
-	controller := NewPhotoController(mockSvc)
-
-	req := httptest.NewRequest(http.MethodGet, "/photo/stats", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetPhotoStatsHandler(w, req)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", w.Code)
-	}
-}
-
-func TestGetPhotoStatsHandler_Success(t *testing.T) {
-	mockSvc := &mockPhotoService{statsResult: 5}
-	controller := NewPhotoController(mockSvc)
-
-	req := httptest.NewRequest(http.MethodGet, "/photo/stats", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetPhotoStatsHandler(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
