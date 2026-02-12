@@ -20,6 +20,7 @@ function App() {
         <Route path="/agenda/:date" element={<AgendaView />} />
         <Route path="/library" element={<Library />} />
         <Route path="/prompt" element={<PromptForm />} />
+        <Route path="/prompt/:moduleId" element={<PromptForm />} />
         <Route path="/widget" element={<WidgetForm />} />
         <Route path="/widget/:moduleId" element={<WidgetForm />} />
       </Routes>

@@ -23,16 +23,24 @@ export default function PromptForm() {
   useEffect(() => {
     if (!moduleId) return;
 
-    fetch(`${API_URL}/messages/${moduleId}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Failed to load message");
-        return res.json();
-      })
-      .then(data => {
-        setPromptMessage(data.message);
-        setExistingImageUri(data.image_uri ?? null);
-      })
-      .catch(err => setUploadStatus(err.message));
+    async function loadPrompt() {
+      var res = await fetch(`${API_URL}/modules/${moduleId}`);
+      const module = await res.json();
+      console.log("Loaded module for editing:", module);
+
+      fetch(`${API_URL}/messages?id=${module.metadata_id}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to load message");
+          return res.json();
+        })
+        .then(data => {
+          setPromptMessage(data.message);
+          setExistingImageUri(data.image_uri ?? null);
+        })
+        .catch(err => setUploadStatus(err.message));
+    }
+
+    loadPrompt();
   }, [moduleId]);
 
   /*******************************************
@@ -66,6 +74,8 @@ export default function PromptForm() {
       if (file) {
         const formData = new FormData();
         formData.append("file", file, file.name);
+        formData.append("caregiver_id", "1"); // temp caregiver ID
+        formData.append("carepartner_id", "1"); // temp carepartner ID
 
         const imageResponse = await fetch(`${API_URL}/photo/upload`, {
           method: "POST",
@@ -111,7 +121,7 @@ export default function PromptForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          module_type: "prompt",
+          module_type: "messages",
           caregiver_id: 1,     // temp caregiver ID
           carepartner_id: 1,   // temp carepartner ID
           metadata_id: metadataId,
