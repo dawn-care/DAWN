@@ -210,8 +210,3 @@ func (s *VideoService) DeleteVideoFile(uri string) error {
 	}
 	return nil
 }
-
-// Get total video count
-func (s *VideoService) GetVideoStats() (int, error) {
-	return media.GetVideoStats(s.DB)
-}

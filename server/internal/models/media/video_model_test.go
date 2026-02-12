@@ -204,21 +204,3 @@ func TestDeleteVideo_NotFound(t *testing.T) {
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
-
-//
-// STATS
-//
-
-func TestGetVideoStats(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "VideoMedia";`)).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
-
-	count, err := GetVideoStats(db)
-	assert.NoError(t, err)
-	assert.Equal(t, 5, count)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
-}

@@ -23,8 +23,6 @@ type AudioServiceInterface interface {
 	UpdateAudioFile(f multipart.File, h *multipart.FileHeader, uri string) error
 	DeleteAudio(id int) error
 	DeleteAudioFile(uri string) error
-	SearchAudios(keyword string) ([]models.AudioMedia, error)
-	GetMediaStats() (*models.MediaStats, error)
 }
 
 // ---- Controller ----
@@ -371,44 +369,4 @@ func (c *AudioController) DeleteAudioFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	fmt.Fprint(w, "Audio file deleted")
-}
-
-// SearchAudiosHandler godoc
-// @Summary Search audio entries by keyword
-// @Description Performs keyword search on audio metadata
-// @Tags audio
-// @Produce json
-// @Param keyword query string true "Search keyword"
-// @Success 200 {array} media.AudioMedia
-// @Failure 400 {string} string "keyword is required"
-// @Failure 500 {string} string "internal server error"
-// @Router /audio/search [get]
-func (c *AudioController) SearchAudiosHandler(w http.ResponseWriter, r *http.Request) {
-	keyword := r.URL.Query().Get("keyword")
-
-	audios, err := c.Services.SearchAudios(keyword)
-	if err != nil {
-		http.Error(w, "search failed", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Fprintf(w, "%+v", audios)
-}
-
-// GetMediaStatsHandler godoc
-// @Summary Get media statistics
-// @Description Returns statistics for media entries
-// @Tags audio
-// @Produce json
-// @Success 200 {object} media.MediaStats
-// @Failure 500 {string} string "internal server error"
-// @Router /audio/stats [get]
-func (c *AudioController) GetMediaStatsHandler(w http.ResponseWriter, r *http.Request) {
-	stats, err := c.Services.GetMediaStats()
-	if err != nil {
-		http.Error(w, "failed to get stats", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Fprintf(w, "%+v", stats)
 }

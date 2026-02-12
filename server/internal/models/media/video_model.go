@@ -178,15 +178,3 @@ func DeleteVideo(db *sql.DB, id int) error {
 	}
 	return nil
 }
-
-// ─────────────────────────────────────────────
-// STATS
-// ─────────────────────────────────────────────
-
-// Get total video count
-func GetVideoStats(db *sql.DB) (int, error) {
-	query := `SELECT COUNT(*) FROM "VideoMedia";`
-	var count int
-	err := db.QueryRow(query).Scan(&count)
-	return count, err
-}

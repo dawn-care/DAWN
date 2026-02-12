@@ -31,7 +31,6 @@ type PhotoServiceInterface interface {
 	UpdatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error
 	DeletePhoto(id int) error
 	DeletePhotoFile(uri string) error
-	GetPhotoStats() (int, error)
 }
 
 // ---- Controller ----
@@ -404,23 +403,4 @@ func (c *PhotoController) DeletePhotoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// GetPhotoStatsHandler godoc
-// @Summary Get photo statistics
-// @Description Returns the total number of uploaded photos
-// @Tags photo
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]int "total_photos"
-// @Failure 500 {string} string "internal server error"
-// @Router /photo/stats [get]
-func (c *PhotoController) GetPhotoStatsHandler(w http.ResponseWriter, r *http.Request) {
-	count, err := c.Services.GetPhotoStats()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]int{"total_photos": count})
 }

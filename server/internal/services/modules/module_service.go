@@ -106,6 +106,12 @@ func (s *ModuleService) GetAllMetadataByCaregiverCarepartner(caregiverID, carepa
 }
 
 // DeleteModule deletes a module by its ID
-// func (s *ModuleService) DeleteModule(id int) error {
-// 	return modules.DeleteModule(s.DB, id)
-// }
+func (s *ModuleService) DeleteModule(id int) error {
+	if id <= 0 {
+		return errors.New("invalid module ID")
+	}
+
+	deleted := modules.DeleteModule(s.DB, id)
+
+	return deleted
+}

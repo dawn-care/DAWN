@@ -24,8 +24,6 @@ type mockAudioService struct {
 	UpdateAudioFileFunc                    func(multipart.File, *multipart.FileHeader, string) error
 	DeleteAudioFunc                        func(int) error
 	DeleteAudioFileFunc                    func(string) error
-	SearchAudiosFunc                       func(string) ([]models.AudioMedia, error)
-	GetMediaStatsFunc                      func() (*models.MediaStats, error)
 }
 
 func (m *mockAudioService) CreateAudio(a *models.AudioMedia) error {
@@ -89,20 +87,6 @@ func (m *mockAudioService) DeleteAudioFile(uri string) error {
 		return m.DeleteAudioFileFunc(uri)
 	}
 	return nil
-}
-
-func (m *mockAudioService) SearchAudios(keyword string) ([]models.AudioMedia, error) {
-	if m.SearchAudiosFunc != nil {
-		return m.SearchAudiosFunc(keyword)
-	}
-	return nil, nil
-}
-
-func (m *mockAudioService) GetMediaStats() (*models.MediaStats, error) {
-	if m.GetMediaStatsFunc != nil {
-		return m.GetMediaStatsFunc()
-	}
-	return nil, nil
 }
 
 // ---- Tests ----

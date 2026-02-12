@@ -201,21 +201,3 @@ func TestDeletePhoto_NotFound(t *testing.T) {
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
-
-//
-// STATS
-//
-
-func TestGetPhotoStats(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "PhotoMedia";`)).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
-
-	count, err := GetPhotoStats(db)
-	assert.NoError(t, err)
-	assert.Equal(t, 10, count)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
-}

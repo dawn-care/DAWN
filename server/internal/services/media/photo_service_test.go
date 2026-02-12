@@ -207,20 +207,3 @@ func TestDeletePhoto_InvalidID(t *testing.T) {
 	err := service.DeletePhoto(0)
 	assert.EqualError(t, err, "invalid photo ID")
 }
-
-func TestGetPhotoStatsService(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-	service := NewPhotoService(db, minio, "test-photo")
-
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "PhotoMedia";`)).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
-
-	count, err := service.GetPhotoStats()
-
-	assert.NoError(t, err)
-	assert.Equal(t, 5, count)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}

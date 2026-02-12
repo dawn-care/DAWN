@@ -291,30 +291,3 @@ func (s *AudioService) DeleteAudioFile(uri string) error {
 	}
 	return nil
 }
-
-// ─────────────────────────────────────────────
-// ANALYTICS / STATS
-// ─────────────────────────────────────────────
-
-func (s *AudioService) GetMediaStats() (*media.MediaStats, error) {
-	stats, err := media.GetMediaStats(s.DB)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get media stats: %w", err)
-	}
-	return stats, nil
-}
-
-// ─────────────────────────────────────────────
-// SEARCH
-// ─────────────────────────────────────────────
-
-func (s *AudioService) SearchAudios(keyword string) ([]media.AudioMedia, error) {
-	if keyword == "" {
-		return nil, errors.New("keyword cannot be empty")
-	}
-	results, err := media.SearchAudios(s.DB, keyword)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search audios: %w", err)
-	}
-	return results, nil
-}

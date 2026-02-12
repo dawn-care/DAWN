@@ -217,22 +217,3 @@ func TestDeleteVideoFileService(t *testing.T) {
 	err := service.DeleteVideoFile("users/test-user/test_video.mp4")
 	assert.NoError(t, err)
 }
-
-func TestGetVideoStats(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-
-	minio := utils.SetupMockMinIO(t)
-	service := NewVideoService(db, minio, "test-video")
-
-	rows := sqlmock.NewRows([]string{"count"}).AddRow(5)
-
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM "VideoMedia";`)).
-		WillReturnRows(rows)
-
-	count, err := service.GetVideoStats()
-	assert.NoError(t, err)
-	assert.Equal(t, 5, count)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
