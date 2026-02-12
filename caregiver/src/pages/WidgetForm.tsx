@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from 'react-router-dom';
 
 type WidgetType = "weather" | "sports" | "good";
 type SportsType = "nfl" | "nba" | "mlb" | "nhl";
@@ -8,6 +8,10 @@ type Team = {
   name: string;
   abbr: string;
 };
+
+interface WidgetFormProps {
+  moduleId?: number;
+}
 
 const SPORTS_TEAMS: Record<SportsType, Team[]> = {
   nfl: [
@@ -149,10 +153,13 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function WidgetForm() {
+export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) {
     //For Edit Mode
     const { moduleId } = useParams<{ moduleId: string }>();
-    const isEditMode = Boolean(moduleId);
+
+    // Use either the prop for library call or the URL param for link access
+    const actualModuleId = propModuleId ?? moduleId;
+    const isEditMode = Boolean(actualModuleId);
 
     const [widgetType, setWidgetType] = useState<WidgetType>("weather");
     const [widgetId, setWidgetId] = useState<number | null>(null);
@@ -162,29 +169,37 @@ export default function WidgetForm() {
     const [uploadStatus, setUploadStatus] = useState("");
 
     useEffect(() => {
-        if (!moduleId) return;
+        if (!actualModuleId) return;
 
         async function loadWidget() {
-            var res = await fetch(`${API_URL}/modules/${moduleId}`);
+            var res = await fetch(`${API_URL}/modules/${actualModuleId}`);
             const module = await res.json();
+            console.log("Loaded module for editing:", module);
 
             setWidgetType(module.module_type);
             setWidgetId(module.metadata_id);
 
             if (module.module_type === "weather") {
-                res = await fetch(`${API_URL}/weather/${module.metadata_id}`);
+                res = await fetch(`${API_URL}/weather?id=${module.metadata_id}`);
                 const widget = await res.json();
+                console.log("Loaded weather widget metadata:", widget);
                 setZipCode(widget.zipcode);
             }
 
             if (module.module_type === "sports") {
-                res = await fetch(`${API_URL}/sports-news/${module.metadata_id}`);
+                res = await fetch(`${API_URL}/sports?id=${module.metadata_id}`);
                 const widget = await res.json();
-                const teamAbbr = widget.language;
+                console.log("Loaded sports widget metadata:", widget);
+                const teamStr = widget.language;
+                const match = teamStr.match(/\(([^)]+)\)$/);
+                const teamAbbr = match ? match[1] : teamStr;
+
                 const country = widget.country as SportsType;
+
                 const foundTeam = SPORTS_TEAMS[country].find(
-                                (team) => team.abbr.toUpperCase() === teamAbbr.toUpperCase()
-                            );
+                (team) => team.abbr.toUpperCase() === teamAbbr.toUpperCase()
+                );
+
                 setSportsType(country);
                 setSportsTeam(foundTeam || null);
             }
@@ -198,7 +213,7 @@ export default function WidgetForm() {
         if (widgetType === "weather") {
             data = { ZIPCODE: zipCode };
         } else if (widgetType === "sports") {
-            data = { CATEGORY: "", COUNTRY: sportsType, LANGUAGE: sportsTeam?.abbr || "" };
+            data = { CATEGORY: "", COUNTRY: sportsType, LANGUAGE: `${sportsTeam?.name} (${sportsTeam?.abbr})` || "" };
         } else {
             data = { CATEGORY: "", COUNTRY: "", LANGUAGE: "" };
         }
@@ -207,7 +222,7 @@ export default function WidgetForm() {
             widgetType === "weather"
                 ? "/weather/upload"
                 : widgetType === "sports"
-                ? "/sports-news/upload"
+                ? "/sports/upload"
                 : "/news/upload";
 
         try {
@@ -259,7 +274,7 @@ export default function WidgetForm() {
             data = {
                 CATEGORY: "",
                 COUNTRY: sportsType,
-                LANGUAGE: sportsTeam?.abbr || "",
+                LANGUAGE: `${sportsTeam?.name} (${sportsTeam?.abbr})` || "",
             };
         } else {
             data = {
@@ -273,7 +288,7 @@ export default function WidgetForm() {
             widgetType === "weather"
                 ? "/weather/update"
                 : widgetType === "sports"
-                ? "/sports-news/update"
+                ? "/sports/update"
                 : "/news/update";
         
         try {
@@ -302,10 +317,10 @@ export default function WidgetForm() {
 
         const endpoint =
             widgetType === "weather"
-                ? `/weather/delete/${widgetId}`
+                ? `/weather/delete?id=${widgetId}`
                 : widgetType === "sports"
-                ? `/sports-news/delete/${widgetId}`
-                : `/news/delete/${widgetId}`;
+                ? `/sports/delete?id=${widgetId}`
+                : `/news/delete?id=${widgetId}`;
         try{
             const response = await fetch(`${API_URL}${endpoint}`, {
                 method: "DELETE",

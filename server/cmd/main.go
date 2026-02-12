@@ -34,10 +34,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -63,8 +63,8 @@ func main() {
 			"http://localhost:3001",
 			"http://localhost:5173",
 		},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -125,6 +125,7 @@ func main() {
 
 	caregiverService := caregiverSvc.NewCaregiverService(db)
 	newsService := newsSvc.NewNewsWidgetService(db, "api key")
+	sportsService := newsSvc.NewSportsNewsWidgetService(db)
 	weatherService := weatherSvc.NewWeatherService(db, "api key")
 	modulesService := modulesSvc.NewModuleService(db)
 
@@ -140,6 +141,7 @@ func main() {
 
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
+	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 
@@ -155,6 +157,7 @@ func main() {
 
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
+	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)

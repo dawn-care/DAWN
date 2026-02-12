@@ -1,17 +1,46 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import WidgetForm from "./WidgetForm";
+// import type { Module } from "../components/AgendaList";
 
+type ModuleType = "photo" | "video" | "audio" | "weather" | "sports" | "news" | "messages";
 type MediaType = "video" | "photo" | "audio";
 
-interface MediaItem {
+interface ModuleItem {
   id: number;
-  moduleId: number;
+  caregiver_id: number;
+  carepartner_id: number;
+  module_type: ModuleType;
+  metadata_id: number;
+}
+
+interface MediaItem extends ModuleItem {
   name: string;
   filename: string;
   type: MediaType;
   uri: string;
 }
+
+interface WeatherItem extends ModuleItem {
+  module_type: "weather";
+  zipcode: string;
+}
+
+interface NewsItem extends ModuleItem {
+  module_type: "news" | "sports";
+  category: string;
+  language: string;
+  country: string;
+}
+
+interface PromptItem extends ModuleItem {
+  type: "messages";
+  message: string;
+  image_uri?: string;
+}
+
+type WidgetItem = WeatherItem | NewsItem;
 
 type Filter = {
   key: string;
@@ -34,13 +63,13 @@ const FILTERS: Filter[] = [
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function Library() {
-  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [modules, setModules] = useState<ModuleItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function fetchMedia() {
+    async function fetchModules() {
       try {
         // Get modules
         const modulesRes = await fetch(
@@ -56,40 +85,71 @@ export default function Library() {
 
         const modules = JSON.parse(text);
 
-        // **TEMP**
-        const mediaModules = modules.filter(
-          (m: any) =>
-            ["photo", "video", "audio"].includes(m.module_type)
-        );
-
         // Fetch metadata for each module
-        const mediaResults = await Promise.all(
-          mediaModules.map(async (m: any) => {
-            const type = m.module_type as MediaType;
+        const moduleResults = await Promise.all(
+          modules.map(async (m: any) => {
+            const type = m.module_type as ModuleType;
 
             const res = await fetch(`${API_URL}/${type}?id=${m.metadata_id}`);
             if (!res.ok) return null;
 
             const data = await res.json();
-
-            return {
-              id: data.id,
-              moduleId: m.id,
-              name: data.displayed_name || data.filename,
-              filename: data.filename,
-              type,
-              uri: `${API_URL}/${type}/file?id=${data.id}`,
-            } as MediaItem;
+            if (type === "video" || type === "photo" || type === "audio") {
+              return {
+                id: m.id,
+                caregiver_id: 1,
+                carepartner_id: 1,
+                metadata_id: m.metadata_id,
+                module_type: type,
+                name: data.displayed_name || data.filename,
+                filename: data.filename,
+                type: type,
+                uri: `${API_URL}/${type}/file?id=${data.id}`,
+              } as MediaItem;
+            } else if (type === "weather") {
+              return {
+                id: m.id,
+                caregiver_id: 1,
+                carepartner_id: 1,
+                metadata_id: m.metadata_id,
+                module_type: "weather",
+                type: "weather",
+                zipcode: data.zipcode,
+              } as WeatherItem;
+            } else if (type === "news" || type === "sports") {
+              return {
+                id: m.id,
+                caregiver_id: 1,
+                carepartner_id: 1,
+                metadata_id: m.metadata_id,
+                module_type: type,
+                type: type,
+                category: data.category,
+                language: data.language,
+                country: data.country,
+              } as NewsItem;
+            } else {
+              return {
+                id: m.id,
+                caregiver_id: 1,
+                carepartner_id: 1,
+                metadata_id: m.metadata_id,
+                module_type: "messages",
+                type: "messages",
+                message: data.message,
+                image_uri: data.image_uri,
+              } as PromptItem;
+            }
           })
         );
 
-        setMedia(mediaResults.filter(Boolean));
+        setModules(moduleResults.filter(Boolean));
       } catch (err) {
-        console.error("Failed to fetch media:", err);
+        console.error("Failed to fetch modules:", err);
       }
     }
 
-    fetchMedia();
+    fetchModules();
   }, []);
 
   const handleDelete = async (
@@ -110,8 +170,8 @@ export default function Library() {
       //   method: "DELETE",
       // });
 
-      setMedia((prev) =>
-        prev.filter((m) => m.moduleId !== moduleId)
+      setModules((prev) =>
+        prev.filter((m) => m.id !== moduleId)
       );
     } catch (err) {
       console.error("Delete failed:", err);
@@ -135,9 +195,9 @@ export default function Library() {
 
       // if (!res.ok) throw new Error("Rename failed");
 
-      setMedia((prev) =>
+      setModules((prev) =>
         prev.map((m) =>
-          m.id === metadataId ? { ...m, name: newName } : m
+          m.metadata_id === metadataId ? { ...m, name: newName } : m
         )
       );
     } catch (err) {
@@ -145,21 +205,30 @@ export default function Library() {
     }
   };
 
-  const filteredMedia = useMemo(() => {
-    return media.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.filename.toLowerCase().includes(search.toLowerCase());
+  const filteredModules = useMemo(() => {
+    return modules.filter((item) => {
+      if (item.module_type === "video" || item.module_type === "photo" || item.module_type === "audio") {
+        var mediaItem = item as MediaItem;
+        var matchesSearch =
+          mediaItem.name.toLowerCase().includes(search.toLowerCase()) ||
+          mediaItem.filename.toLowerCase().includes(search.toLowerCase());
 
-      const matchesFilter = !activeFilter
-        ? true
-        : activeFilter.startsWith(".")
-        ? item.filename.toLowerCase().endsWith(activeFilter)
-        : item.type === activeFilter;
+        var matchesFilter = !activeFilter
+          ? true
+          : activeFilter.startsWith(".")
+          ? mediaItem.filename.toLowerCase().endsWith(activeFilter)
+          : item.module_type === activeFilter;
 
-      return matchesSearch && matchesFilter;
+        return matchesSearch && matchesFilter;
+      } else {
+        const matchesFilter = !activeFilter
+          ? true
+          : item.module_type === activeFilter;
+
+        return matchesFilter;
+      }
     });
-  }, [media, search, activeFilter]);
+  }, [modules, search, activeFilter]);
 
   return (
     <div className="relative w-full px-8 py-10">
@@ -198,14 +267,24 @@ export default function Library() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
-        {filteredMedia.map((item) => (
-          <MediaCard
-            key={item.moduleId}
-            item={item}
-            onDelete={handleDelete}
-            onRename={handleRename}
-          />
-        ))}
+        {filteredModules.map((item) =>
+          item.module_type === "video" ||
+          item.module_type === "photo" ||
+          item.module_type === "audio" ? (
+            <MediaCard
+              key={item.id}
+              item={item as MediaItem}
+              onDelete={handleDelete}
+              onRename={handleRename}
+            />
+          ) : item.module_type === "weather" ||
+            item.module_type === "sports" ||
+            item.module_type === "news" ? (
+            <WidgetCard key={item.id} item={item as WidgetItem} />
+          ) : item.module_type === "messages" ? (
+            <PromptCard key={item.id} item={item as PromptItem} />
+          ) : null
+        )}
       </div>
 
       <button
@@ -238,19 +317,22 @@ function MediaCard({
   };
 
   return (
-    <div className="relative flex flex-col items-center text-center">
+    <div className="relative flex flex-col items-center text-center 
+      border border-gray-200 rounded-xl 
+      shadow-sm hover:shadow-md 
+      p-6 w-full h-64 bg-white">
       {item.type === "photo" ? (
         <img
           src={item.uri}
           alt={item.name}
-          className="w-full aspect-video object-cover rounded mb-4"
+          className="w-full h-40 object-cover rounded mb-4"
         />
       ) : item.type === "video" ? (
-        <div className="w-full aspect-video bg-gray-300 rounded mb-4 flex items-center justify-center">
+        <div className="w-full h-40 object-cover rounded mb-4 bg-gray-200 flex items-center justify-center">
           <span className="text-gray-700 font-medium">VIDEO</span>
         </div>
       ) : (
-        <div className="w-full aspect-video bg-gray-200 rounded mb-4 flex items-center justify-center">
+        <div className="w-full h-40 object-cover rounded mb-4 bg-gray-200 flex items-center justify-center">
           <audio controls className="w-full px-4">
             <source src={item.uri} type="audio/mpeg" />
             Your browser does not support the audio element.
@@ -287,12 +369,113 @@ function MediaCard({
 
       {/* Delete Button */}
       <button
-        onClick={() => onDelete(item.id, item.moduleId, item.type)}
+        onClick={() => onDelete(item.metadata_id, item.id, item.type)}
         className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
         title="Delete"
       >
         <Trash2 className="h-4 w-4" />
       </button>
     </div>
+  );
+}
+
+function WidgetCard({ item }: { item: WidgetItem }) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  return (
+    <>
+      {isEditing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setIsEditing(false)}
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+            >
+              ✕
+            </button>
+            <div className="p-8">
+              <WidgetForm moduleId={item.id}/>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative flex flex-col items-center justify-center text-center 
+          border border-gray-200 rounded-xl 
+          shadow-sm hover:shadow-md 
+          p-6 w-full h-64 bg-white">
+        {item.module_type === "weather" ? (
+          <>
+            <h3
+              className="text-3xl font-semibold cursor-pointer hover:text-teal-500"
+              onClick={() => setIsEditing(true)}
+            >
+              Weather
+            </h3>
+            <p className="text-lg text-gray-500 mt-2">
+              Zipcode: {item.zipcode}
+            </p>
+          </>
+        ) : item.module_type === "sports" ? (
+          <>
+            <h3
+              className="text-3xl font-semibold cursor-pointer hover:text-teal-500"
+              onClick={() => setIsEditing(true)}
+            >
+              {item.country.toUpperCase()} News
+            </h3>
+            <p className="text-lg text-gray-500 mt-2">
+              Team: {item.language}
+            </p>
+          </>
+        ) : (
+          <h3
+            className="text-3xl font-semibold cursor-pointer hover:text-teal-500"
+            onClick={() => setIsEditing(true)}
+          >
+            Good News
+          </h3>
+        )}
+      </div>
+    </>
+  );
+}
+
+function PromptCard({ item }: { item: PromptItem }) {
+  return (
+    <>
+      <div className="relative flex flex-col items-center justify-center text-center 
+          border border-gray-200 rounded-xl 
+          shadow-sm hover:shadow-md 
+          p-6 w-full h-64 bg-white">
+          {item.image_uri ? (
+            <>
+              <img
+                src={item.image_uri}
+                alt={"Prompt Image"}
+                className="w-full h-40 object-cover rounded mb-4"
+              />
+              <p className="text-sm text-gray-500">
+                {item.message.length > 30
+                  ? item.message.slice(0, 30) + "..."
+                  : item.message}
+              </p>
+            </>
+          ) : (
+            <>
+              <h3
+                className="text-3xl font-semibold cursor-pointer hover:text-teal-500"
+              >
+                Message
+              </h3>
+              <p className="text-lg text-gray-500 mt-2">
+                {item.message.length > 40
+                  ? item.message.slice(0, 40) + "..."
+                  : item.message}
+              </p>
+            </>
+          )}
+      </div>
+    </>
   );
 }

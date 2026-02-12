@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	models "server/internal/models/widgets/news"
@@ -156,10 +157,16 @@ func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWid
 		return "", errors.New("league and team cannot be empty")
 	}
 	sport := SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY]
+	re := regexp.MustCompile(`\(([^)]+)\)$`)
+	match := re.FindStringSubmatch(sports_news_widget.LANGUAGE)
+	teamAbbr := ""
+	if len(match) > 1 {
+		teamAbbr = match[1]
+	}
 
 	url := fmt.Sprintf(
 		"http://site.api.espn.com/apis/site/v2/sports/%s/%s/teams/%s/schedule",
-		sport, sports_news_widget.COUNTRY, sports_news_widget.LANGUAGE,
+		sport, sports_news_widget.COUNTRY, teamAbbr,
 	)
 	resp, err := s.client.Get(url)
 	if err != nil {

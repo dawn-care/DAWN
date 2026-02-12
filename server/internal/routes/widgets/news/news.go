@@ -11,11 +11,11 @@ func RegisterNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.NewsWidgetCont
 	r.Route("/news", func(r chi.Router) {
 
 		// CRUD operations
-		r.Post("/upload", controller.CreateNewsWidgetHandler)        // Create single news widget
-		r.Post("/bulk", controller.CreateNewsWidgetHandler)          // TODO: add bulk handler?
-		r.Get("/{id}", controller.GetNewsWidgetByIDHandler)          // Get by ID (query param ?id=)
-		r.Put("/update", controller.UpdateNewsWidgetHandler)         // Update widget
-		r.Delete("/delete/{id}", controller.DeleteNewsWidgetHandler) // Delete by ID (query param ?id=)
+		r.Post("/upload", controller.CreateNewsWidgetHandler)   // Create single news widget
+		r.Post("/bulk", controller.CreateNewsWidgetHandler)     // TODO: add bulk handler?
+		r.Get("/", controller.GetNewsWidgetByIDHandler)         // Get by ID (query param ?id=)
+		r.Put("/update", controller.UpdateNewsWidgetHandler)    // Update widget
+		r.Delete("/delete", controller.DeleteNewsWidgetHandler) // Delete by ID (query param ?id=)
 
 		// Stats
 		r.Get("/stats", controller.GetNewsWidgetStatsHandler)

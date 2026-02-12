@@ -13,9 +13,9 @@ func RegisterWeatherWidgetRoutes(r chi.Router, controller *weatherCtrlr.WeatherW
 		// CRUD operations
 		r.Post("/upload", controller.CreateWeatherWidgetHandler) // Create single weather widget
 		// r.Post("/bulk", weatherCtrlr.CreateWeatherWidgetsBulkHandler) // TODO: Also missing bulk handler?
-		r.Get("/{id}", controller.GetWeatherWidgetByIDHandler)          // Get by ID
-		r.Put("/update", controller.UpdateWeatherWidgetHandler)         // Update
-		r.Delete("/delete/{id}", controller.DeleteWeatherWidgetHandler) // Delete by ID
+		r.Get("/", controller.GetWeatherWidgetByIDHandler)         // Get by ID (?id=)
+		r.Put("/update", controller.UpdateWeatherWidgetHandler)    // Update
+		r.Delete("/delete", controller.DeleteWeatherWidgetHandler) // Delete by ID
 
 		// Stats
 		r.Get("/stats", controller.GetWeatherWidgetStatsHandler)
