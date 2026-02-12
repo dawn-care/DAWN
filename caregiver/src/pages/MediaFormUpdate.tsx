@@ -24,7 +24,7 @@ const allowedExtensions: Record<MediaType, string[]> = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function UpdateMedia() {
+export default function MediaFormUpdate() {
   const navigate = useNavigate();
 
   const [mediaList, setMediaList] = useState<MediaOption[]>([]);
@@ -186,7 +186,7 @@ export default function UpdateMedia() {
         {/* New Name */}
         <div className="mb-6">
           <label className="text-lg font-medium">New Media Name:</label>
-
+            <label>optional</label>
           <input
             type="text"
             value={mediaName}
@@ -199,9 +199,9 @@ export default function UpdateMedia() {
         {selected && (
           <div className="mb-6">
             <label className="text-lg font-medium">
-              Replace File (Same type: {selected.type.toUpperCase()})
+              Replace File
             </label>
-
+            <label>optional</label>
             <div
               className="mt-2 p-6 border-2 border-dashed border-gray-400 rounded cursor-pointer bg-purple-50 text-center"
               onClick={() =>

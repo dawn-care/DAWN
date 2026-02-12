@@ -10,7 +10,7 @@ const allowedExtensions = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function UploadMedia() {
+export default function MediaFormCreate() {
   const [mediaName, setMediaName] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("video");
   const [file, setFile] = useState<File | null>(null);
