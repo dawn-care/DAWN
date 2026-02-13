@@ -2,9 +2,22 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".heic"];
+
+// Create a prop interface so that Library can pass parameters to the form for editing existing prompts without relying on URL params
+interface PromptFormProps {
+  moduleId?: number;
+  onDeleteSuccess?: () => void;
+  onUpdateSuccess?: () => void;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function PromptForm() {
+export default function PromptForm({
+        moduleId: propModuleId,
+        onDeleteSuccess,
+        onUpdateSuccess
+    }: PromptFormProps
+  ) {
   // Creating Variables
   const [promptMessage, setPromptMessage] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -12,7 +25,9 @@ export default function PromptForm() {
   const [uploadStatus, setUploadStatus] = useState("");
   // Editing Variables
   const { moduleId } = useParams<{ moduleId: string }>();
-  const isEditMode = Boolean(moduleId);
+  const actualModuleId = propModuleId ?? moduleId;
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const isEditMode = Boolean(actualModuleId);
   const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
   // Deleting Variables
   const navigate = useNavigate();
@@ -21,12 +36,13 @@ export default function PromptForm() {
    * If form is in edit mode, load message
    *******************************************/
   useEffect(() => {
-    if (!moduleId) return;
+    if (!actualModuleId) return;
 
     async function loadPrompt() {
-      var res = await fetch(`${API_URL}/modules/${moduleId}`);
+      var res = await fetch(`${API_URL}/modules/${actualModuleId}`);
       const module = await res.json();
       console.log("Loaded module for editing:", module);
+      setPromptId(module.metadata_id);
 
       fetch(`${API_URL}/messages?id=${module.metadata_id}`)
         .then(res => {
@@ -41,7 +57,7 @@ export default function PromptForm() {
     }
 
     loadPrompt();
-  }, [moduleId]);
+  }, [actualModuleId]);
 
   /*******************************************
    * Check if the uploaded file is a picture
@@ -88,7 +104,8 @@ export default function PromptForm() {
         }
 
         const imageData = await imageResponse.json();
-        imageUri = imageData.uri;
+        var uri = `/photo/file?id=${imageData.id}`;
+        imageUri = uri;
         metadataId = imageData.id; // assuming the image upload returns a metadata id
       }
 
@@ -167,7 +184,7 @@ export default function PromptForm() {
         imageUri = (await res.json()).uri;
       }
 
-      const res = await fetch(`${API_URL}/messages/update/${moduleId}`, {
+      const res = await fetch(`${API_URL}/messages/update/${promptId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -179,6 +196,9 @@ export default function PromptForm() {
       if (!res.ok) throw new Error("Update failed");
 
       setUploadStatus("Updated");
+      if (onUpdateSuccess) {
+          onUpdateSuccess();
+      }
     } catch (err: any) {
       setUploadStatus(err.message);
     }
@@ -191,13 +211,24 @@ export default function PromptForm() {
     if (!confirm("Are you sure you want to delete this message?")) return;
 
     try {
-      const res = await fetch(`${API_URL}/messages/delete/${moduleId}`, {
+      const moduleRes = await fetch(`${API_URL}/modules/delete?id=${actualModuleId}`, {
         method: "DELETE",
       });
 
-      if (!res.ok) throw new Error("Delete failed");
+      if (!moduleRes.ok) throw new Error("Delete failed");
 
-      navigate("/library");
+      const promptRes = await fetch(`${API_URL}/messages/delete/${promptId}`, {
+        method: "DELETE",
+      });
+
+      if (!promptRes.ok) throw new Error("Delete failed");
+
+      setUploadStatus("Deleted");
+      if (onDeleteSuccess) {
+          onDeleteSuccess();
+      } else {
+          navigate("/library");
+      }
     } catch (err: any) {
       setUploadStatus(err.message);
     }

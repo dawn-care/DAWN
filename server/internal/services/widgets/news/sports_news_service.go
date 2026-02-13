@@ -129,7 +129,7 @@ func (s *SportsNewsWidgetService) UpdateSportsNewsWidget(sports_news_widget *mod
 	if sports_news_widget.ID <= 0 {
 		return errors.New("invalid NewsWidget ID")
 	}
-	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" || sports_news_widget.CATEGORY == "" {
+	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
 		return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
 	}
 	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {

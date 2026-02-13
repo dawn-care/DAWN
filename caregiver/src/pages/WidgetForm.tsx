@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 type WidgetType = "weather" | "sports" | "good";
 type SportsType = "nfl" | "nba" | "mlb" | "nhl";
@@ -9,8 +9,11 @@ type Team = {
   abbr: string;
 };
 
+// Create a prop interface so that Library can pass parameters to the form for editing existing widgets without relying on URL params
 interface WidgetFormProps {
   moduleId?: number;
+  onDeleteSuccess?: () => void;
+  onUpdateSuccess?: () => void;
 }
 
 const SPORTS_TEAMS: Record<SportsType, Team[]> = {
@@ -153,7 +156,11 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) {
+export default function WidgetForm({ 
+        moduleId: propModuleId,
+        onDeleteSuccess,
+        onUpdateSuccess
+    }: WidgetFormProps) {
     //For Edit Mode
     const { moduleId } = useParams<{ moduleId: string }>();
 
@@ -167,6 +174,7 @@ export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) 
     const [sportsTeam, setSportsTeam] = useState<Team | null>(null);
     const [zipCode, setZipCode] = useState<string>("10001");
     const [uploadStatus, setUploadStatus] = useState("");
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (!actualModuleId) return;
@@ -268,16 +276,19 @@ export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) 
         var data;
         if (widgetType === "weather") {
             data = {
+                ID: widgetId,
                 ZIPCODE: zipCode,
             };
         } else if (widgetType === "sports") {
             data = {
+                ID: widgetId,
                 CATEGORY: "",
                 COUNTRY: sportsType,
                 LANGUAGE: `${sportsTeam?.name} (${sportsTeam?.abbr})` || "",
             };
         } else {
             data = {
+                ID: widgetId,
                 CATEGORY: "",
                 COUNTRY: "",
                 LANGUAGE: "",
@@ -292,38 +303,12 @@ export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) 
                 : "/news/update";
         
         try {
-        const response = await fetch(`${API_URL}${endpoint}`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(data),
-        });
-
-        if (!response.ok) {
-            const text = await response.text();
-            setUploadStatus(`Error: ${text}`);
-            return;
-        }
-
-        setUploadStatus("Updated Successfully!");
-        } catch (err: any) {
-        setUploadStatus("Update failed: " + err.message);
-        }
-    }
-
-    async function handleDelete() {
-        if (!moduleId) return;
-
-        const endpoint =
-            widgetType === "weather"
-                ? `/weather/delete?id=${widgetId}`
-                : widgetType === "sports"
-                ? `/sports/delete?id=${widgetId}`
-                : `/news/delete?id=${widgetId}`;
-        try{
             const response = await fetch(`${API_URL}${endpoint}`, {
-                method: "DELETE",
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(data),
             });
 
             if (!response.ok) {
@@ -332,7 +317,54 @@ export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) 
                 return;
             }
 
+            setUploadStatus("Updated Successfully!");
+            if (onUpdateSuccess) {
+                onUpdateSuccess();
+            }
+        } catch (err: any) {
+            setUploadStatus("Update failed: " + err.message);
+        }
+    }
+
+    async function handleDelete() {
+        if (!confirm("Are you sure you want to delete this widget?")) return;
+        if (!actualModuleId) return;
+
+        const moduleEndpoint = `/modules/delete?id=${actualModuleId}`;
+
+        const widgetEndpoint =
+            widgetType === "weather"
+                ? `/weather/delete?id=${widgetId}`
+                : widgetType === "sports"
+                ? `/sports/delete?id=${widgetId}`
+                : `/news/delete?id=${widgetId}`;
+        try{
+            const moduleResponse = await fetch(`${API_URL}${moduleEndpoint}`, {
+                method: "DELETE",
+            });
+
+            if (!moduleResponse.ok) {
+                const text = await moduleResponse.text();
+                setUploadStatus(`Error: ${text}`);
+                return;
+            }
+
+            const widgetResponse = await fetch(`${API_URL}${widgetEndpoint}`, {
+                method: "DELETE",
+            });
+
+            if (!widgetResponse.ok) {
+                const text = await widgetResponse.text();
+                setUploadStatus(`Error: ${text}`);
+                return;
+            }
+
             setUploadStatus("Deleted!");
+            if (onDeleteSuccess) {
+                onDeleteSuccess();
+            } else {
+                navigate("/library");
+            }
         } catch (err: any) {
             setUploadStatus("Delete failed: " + err.message);
         }
@@ -347,15 +379,25 @@ export default function WidgetForm({ moduleId: propModuleId }: WidgetFormProps) 
                 {/* Widget Type */}
                 <div className="mb-6">
                     <label className="text-lg font-medium">Widget Type:</label>
-                    <select
+                    {isEditMode ? (
+                        <div className="w-full mt-2 p-3 border rounded bg-gray-100 text-gray-700">
+                        {widgetType === "weather"
+                            ? "Weather News"
+                            : widgetType === "sports"
+                            ? "Sports News"
+                            : "Good News"}
+                        </div>
+                    ) : (
+                        <select
                         value={widgetType}
                         onChange={(e) => setWidgetType(e.target.value as WidgetType)}
                         className="w-full mt-2 p-3 border rounded bg-purple-50"
-                    >
+                        >
                         <option value="weather">Weather News</option>
                         <option value="sports">Sports News</option>
                         <option value="good">Good News</option>
-                    </select>
+                        </select>
+                    )}
                 </div>
 
                 {/* Conditional Widget Type Inputs */}

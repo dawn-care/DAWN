@@ -27,10 +27,8 @@ function App() {
         <Route path = "/media/delete" element={<MediaFormDelete />} />
 
         <Route path="/prompt" element={<PromptForm />} />
-        <Route path="/prompt/:promptId" element={<PromptForm />} />
-
-
         <Route path="/prompt/:moduleId" element={<PromptForm />} />
+        
         <Route path="/widget" element={<WidgetForm />} />
         <Route path="/widget/:moduleId" element={<WidgetForm />} />
       </Routes>
