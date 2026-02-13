@@ -206,3 +206,67 @@ BEGIN
     END LOOP;
 END;
 $$;
+
+-- Test User Setup: Mock Data for Schema
+
+WITH carepartner_insert AS (
+  INSERT INTO "Carepartner" (name) 
+  VALUES ('John Doe')
+  RETURNING id AS carepartner_id
+),
+caregiver_insert AS (
+  INSERT INTO "Caregiver" (carepartner_id, name, role, google_id) 
+  SELECT carepartner_id, 'Jane Smith', 'ADMIN', 'test.caregiver@example.com'
+  FROM carepartner_insert
+  RETURNING id AS caregiver_id, carepartner_id
+),
+photo_insert AS (
+  INSERT INTO "PhotoMedia" (uri, displayed_name, filename, extension) 
+  VALUES 
+    ('storage/photos/sunset.jpg', 'Sunset', 'sunset', '.jpg')
+  RETURNING id AS photo_id
+),
+video_insert AS (
+  INSERT INTO "VideoMedia" (uri, displayed_name, filename, extension) 
+  VALUES 
+    ('storage/videos/birthday_celebration.mp4', 'Birthday Celebration', 'birthday_celebration', '.mp4')
+  RETURNING id AS video_id
+),
+audio_insert AS (
+  INSERT INTO "AudioMedia" (uri, displayed_name, filename, extension) 
+  VALUES ('storage/audio/favorite_songs.mp3', 'Favorite Songs', 'favorite_songs', '.mp3')
+  RETURNING id AS audio_id
+),
+weather_widget_insert AS (
+  INSERT INTO "WeatherWidget" (zipcode) 
+  VALUES ('10001')
+  RETURNING id AS weather_id
+),
+news_widget_insert AS (
+  INSERT INTO "NewsWidget" (category, language, country) 
+  VALUES ('health', 'en', 'US')
+  RETURNING id AS news_id
+),
+message_prompt_insert AS (
+  INSERT INTO "MessagePrompt" (message, image_uri) 
+  VALUES ('Time for your medication! Remember to take your vitamins.', 'storage/prompts/med_reminder.jpg')
+  RETURNING id AS message_id
+),
+modules_insert AS (
+  INSERT INTO "Module" (module_type, caregiver_id, carepartner_id, metadata_id) 
+  SELECT 'PhotoMedia', caregiver_id, carepartner_id, photo_id FROM caregiver_insert, photo_insert
+  UNION ALL
+  SELECT 'VideoMedia', caregiver_id, carepartner_id, video_id FROM caregiver_insert, video_insert
+  UNION ALL
+  SELECT 'AudioMedia', caregiver_id, carepartner_id, audio_id FROM caregiver_insert, audio_insert
+  UNION ALL
+  SELECT 'WeatherWidget', caregiver_id, carepartner_id, weather_id FROM caregiver_insert, weather_widget_insert
+  UNION ALL
+  SELECT 'NewsWidget', caregiver_id, carepartner_id, news_id FROM caregiver_insert, news_widget_insert
+  UNION ALL
+  SELECT 'MessagePrompt', caregiver_id, carepartner_id, message_id FROM caregiver_insert, message_prompt_insert
+  RETURNING id AS module_id, carepartner_id
+)
+INSERT INTO "Configuration" (carepartner_id, module_id, occurence_type, occurence_definition, position, duration) 
+SELECT carepartner_id, module_id, 'daily', ARRAY[]::integer[], ROW_NUMBER() OVER (ORDER BY module_id), 30
+FROM modules_insert;
