@@ -8,6 +8,7 @@ import (
 	"os"
 
 	authCtrlr "server/internal/controllers/auth"
+	configurationCtrlr "server/internal/controllers/configurations"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
@@ -15,6 +16,7 @@ import (
 	newsCtrlr "server/internal/controllers/widgets/news"
 	weatherCtrlr "server/internal/controllers/widgets/weather"
 
+	configurationRts "server/internal/routes/configurations"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
@@ -23,6 +25,7 @@ import (
 	weatherRts "server/internal/routes/widgets/weather"
 
 	authSvc "server/internal/services/auth"
+	configurationSvc "server/internal/services/configurations"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
@@ -95,6 +98,7 @@ func main() {
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "photo-bucket")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
 	caregiverService := caregiverSvc.NewCaregiverService(db) // ONLY ONE
+	configurationService := configurationSvc.NewConfigurationService(db)
 	newsService := newsSvc.NewNewsWidgetService(db, os.Getenv("NEWS_API_KEY"))
 	weatherService := weatherSvc.NewWeatherService(db, os.Getenv("OPENWEATHER_API_KEY"))
 	sportsNewsService := newsSvc.NewSportsNewsWidgetService(db)
@@ -124,6 +128,7 @@ func main() {
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
+	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
 	sportsNewsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsNewsService)
@@ -138,6 +143,7 @@ func main() {
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
+	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsNewsCtrl)
