@@ -3,94 +3,95 @@ import videoCameraIcon from '../assets/module_symbols/video-camera-svgrepo-com.s
 import widgetIcon from '../assets/module_symbols/widget-svgrepo-com.svg';
 import promptIcon from '../assets/module_symbols/prompt-edit-svgrepo-com.svg';
 
-export type ModuleMetadata =
-    | { type: 'photo'; id: number; uri: string; displayed_name: string; filename: string; extension: string }
-    | { type: 'video'; id: number; uri: string; displayed_name: string; filename: string; extension: string }
-    | { type: 'audio'; id: number; uri: string; displayed_name: string; filename: string; extension: string }
-    | { type: 'weather'; id: number; zipcode: string }
-    | { type: 'news'; id: number; category: string; language: string; country: string }
-    | { type: 'carepartner_location'; id: number; location: string; message: string; image_uri: string }
-    | { type: 'caregiver_location'; id: number; location: string; message: string; image_uri: string }
-    | { type: 'message'; id: number; message: string; image_uri: string }
-    | { type: 'event'; id: number; list_id: number; time: string; text: string };
+// Metadata shapes returned inline by the backend
+export type PhotoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
+export type VideoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
+export type AudioMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
+export type WeatherMetadata = { id: number; zipcode: string };
+export type NewsMetadata = { id: number; category: string; language: string; country: string };
+export type MessageMetadata = { id: number; message: string; image_uri: string };
+export type EventMetadata = { id: number; list_id: number; time: string; text: string };
+export type CarepartnerLocationMetadata = { id: number; location: string; message: string; image_uri: string };
+export type CaregiverLocationMetadata = { id: number; location: string; message: string; image_uri: string };
 
-export type Module = {
+// Matches the ConfigurationWithMetadata Go struct returned by GetConfigurationsByDayAndCarepartner
+export type ConfigurationWithMetadata = {
     id: number;
-    module_type: 'media' | 'widget' | 'prompt';
-    caregiver_id?: number | null;
-    carepartner_id?: number | null;
-    metadata_id: number;
-};
-
-export type ModuleWithMetadata = Module & {
-    metadata: ModuleMetadata;
-};
-
-export type ConfigurationItem = {
-    id?: number;
+    caregiver_id: number;
     carepartner_id: number;
     module_id: number;
     occurence_type: string;
     occurence_definition: string[];
     position: number;
     duration: number;
-}
+    module_type: string;
+    metadata_id: number;
+    metadata: PhotoMetadata | VideoMetadata | AudioMetadata | WeatherMetadata
+        | NewsMetadata | MessageMetadata | EventMetadata
+        | CarepartnerLocationMetadata | CaregiverLocationMetadata | null;
+};
 
 interface AgendaListProps {
-    items: ConfigurationItem[];
-    setItems: (items: ConfigurationItem[]) => void;
-    modules: Module[];
-    setModules: (modules: Module[]) => void;
-    metadata: Record<number, ModuleMetadata>;
-    setMetadata: (metadata: Record<number, ModuleMetadata>) => void;
+    items: ConfigurationWithMetadata[];
+    setItems: (items: ConfigurationWithMetadata[]) => void;
 }
 
-export default function AgendaList({ items, setItems, modules, setModules: _setModules, metadata, setMetadata: _setMetadata }: AgendaListProps) {
+export default function AgendaList({ items, setItems }: AgendaListProps) {
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
 
-    const getModuleMetadata = (moduleId: number): ModuleMetadata | null => {
-        const module = modules.find(m => m.id === moduleId);
-        if (!module) return null;
-        return metadata[module.metadata_id] || null;
-    };
+    const getModuleTitle = (item: ConfigurationWithMetadata): string => {
+        const meta = item.metadata;
+        if (!meta) return `Module ${item.module_id}`;
 
-    const getModuleTitle = (moduleId: number): string => {
-        const metadata = getModuleMetadata(moduleId);
-        if (!metadata) return `Module ${moduleId}`;
-        switch (metadata.type) {
+        switch (item.module_type) {
             case 'video':
-                return metadata.displayed_name;
+                return "Video  - " + ((meta as VideoMetadata).displayed_name ?? `Module ${item.module_id}`);
             case 'photo':
-                return metadata.displayed_name;
+                return "Photo  - " + ((meta as PhotoMetadata).displayed_name ?? `Module ${item.module_id}`);
             case 'audio':
-                return metadata.displayed_name;
+                return "Audio  - " + ((meta as AudioMetadata).displayed_name ?? `Module ${item.module_id}`);
             case 'weather':
-                return `Weather - Zip Code: ${metadata.zipcode}`;
+                return `Weather - Zip Code: ${(meta as WeatherMetadata).zipcode}`;
             case 'news':
-                return `News - Category: ${metadata.category}`;
+            case 'sports':
+                return `News - Category: ${(meta as NewsMetadata).category}`;
             case 'message':
                 return 'Message';
             case 'event':
-                return `Event - ${metadata.text}`;
+                return `Event - ${(meta as EventMetadata).text}`;
             case 'carepartner_location':
-                return `Location - ${metadata.location}`;
+                return `Location - ${(meta as CarepartnerLocationMetadata).location}`;
             case 'caregiver_location':
-                return `Location - ${metadata.location}`;
+                return `Location - ${(meta as CaregiverLocationMetadata).location}`;
             default:
-                return `Module ${moduleId}`;
+                return `Module ${item.module_id}`;
         }
     };
 
-    const getModuleIcon = (moduleId: number): string => {
-        const module = modules.find(m => m.id === moduleId);
-        if (!module) return "";
-
-        switch (module.module_type) {
-            case 'media':
+    const getModuleIcon = (moduleType: string): string => {
+        // Map detailed module_type values to icon categories
+        switch (moduleType) {
+            case 'photo':
+            case 'PhotoMedia':
+            case 'video':
+            case 'VideoMedia':
+            case 'audio':
+            case 'AudioMedia':
                 return videoCameraIcon;
-            case 'widget':
+            case 'weather':
+            case 'WeatherWidget':
+            case 'news':
+            case 'NewsWidget':
+            case 'sports':
                 return widgetIcon;
-            case 'prompt':
+            case 'message':
+            case 'MessagePrompt':
+            case 'event':
+            case 'EventPrompt':
+            case 'carepartner_location':
+            case 'CarepartnerLocationPrompt':
+            case 'caregiver_location':
+            case 'CaregiverLocationPrompt':
                 return promptIcon;
             default:
                 return widgetIcon;
@@ -197,9 +198,9 @@ export default function AgendaList({ items, setItems, modules, setModules: _setM
                         </div>
                     </div>
                     <button className="flex-1 flex items-center gap-4 bg-slate-100 p-2 rounded-lg">
-                        <img src={getModuleIcon(item.module_id)} alt="module icon" className="w-12 h-12 rounded" />
+                        <img src={getModuleIcon(item.module_type)} alt="module icon" className="w-12 h-12 rounded" />
                         <div className="flex-1 flex">
-                            <div className="text-gray-800 font-medium text-2xl">{getModuleTitle(item.module_id)}</div>
+                            <div className="text-gray-800 font-medium text-2xl">{getModuleTitle(item)}</div>
                         </div>
                         <span className="text-gray-700 text-2xl">&gt;</span>
                     </button>

@@ -1,15 +1,13 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import AgendaList, { type ConfigurationItem, type Module, type ModuleMetadata }  from '../components/AgendaList';
+import AgendaList, { type ConfigurationWithMetadata } from '../components/AgendaList';
 import Library from './Library';
 
 export default function AgendaView() {
     const { date } = useParams();
     const navigate = useNavigate();
-    const [items, setItems] = useState<ConfigurationItem[]>([]);
+    const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
     const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
-    const [modules, setModules] = useState<Module[]>([]);
-    const [metadata, setMetadata] = useState<Record<number, ModuleMetadata>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -19,43 +17,20 @@ export default function AgendaView() {
                 setLoading(true);
                 setError(null);
 
-                // Fetch configurations
                 const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
-                const configRes = await fetch(`http://localhost:8080/configurations?carepartner_id=1&day=${dayOfMonth}&month=${month}&dayOfWeek=${dayOfWeek}`);
-                if (!configRes.ok) throw new Error('Failed to fetch configurations');
-                const configData = await configRes.json();
-                setItems(configData || []);
+                if (dayOfMonth === 0) return;
 
-                // Fetch modules
-                const modulesRes = await fetch('http://localhost:8080/api/modules?carepartner_id=1');
-                if (!modulesRes.ok) throw new Error('Failed to fetch modules');
-                const modulesData = await modulesRes.json();
-                setModules(modulesData || []);
+                const params = new URLSearchParams({
+                    carepartner_id: '1',
+                    day: String(dayOfMonth),
+                    month: String(month),
+                    day_of_week: String(dayOfWeek),
+                });
 
-                // Fetch metadata for each module
-                const metadataMap: Record<number, ModuleMetadata> = {};
-                
-                for (const module of modulesData || []) {
-                    try {
-                        let metaRes;
-                        if (module.module_type === 'media') {
-                            metaRes = await fetch(`http://localhost:8080/api/media/${module.metadata_id}`);
-                        } else if (module.module_type === 'widget') {
-                            metaRes = await fetch(`http://localhost:8080/api/widgets/${module.metadata_id}`);
-                        } else if (module.module_type === 'prompt') {
-                            metaRes = await fetch(`http://localhost:8080/api/prompts/${module.metadata_id}`);
-                        }
-                        
-                        if (metaRes && metaRes.ok) {
-                            const metaData = await metaRes.json();
-                            metadataMap[module.metadata_id] = metaData;
-                        }
-                    } catch (err) {
-                        console.warn(`Failed to fetch metadata for module ${module.metadata_id}:`, err);
-                    }
-                }
-                
-                setMetadata(metadataMap);
+                const res = await fetch(`http://localhost:8080/configurations/day?${params}`);
+                if (!res.ok) throw new Error('Failed to fetch configurations');
+                const data: ConfigurationWithMetadata[] = await res.json();
+                setItems(data || []);
             } catch (err) {
                 const errorMessage = err instanceof Error ? err.message : 'An error occurred';
                 setError(errorMessage);
@@ -66,7 +41,7 @@ export default function AgendaView() {
         };
 
         fetchData();
-    }, []);
+    }, [date]);
 
     const currentDateToComponents = () => {
         if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
@@ -135,7 +110,7 @@ export default function AgendaView() {
                     </div>
                 </div>
 
-                <AgendaList items={items} setItems={setItems} modules={modules} setModules={setModules} metadata={metadata} setMetadata={setMetadata} />
+                <AgendaList items={items} setItems={setItems} />
 
                 <div className="flex items-center justify-between mt-12">
                     <button className="text-3xl text-gray-600 hover:text-gray-800">⚙</button>

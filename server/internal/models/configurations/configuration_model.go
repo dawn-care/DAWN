@@ -148,24 +148,15 @@ func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, m
 				m.module_type, m.metadata_id,
 				CASE m.module_type
 					WHEN 'photo' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "PhotoMedia" WHERE id = m.metadata_id) t)
-					WHEN 'PhotoMedia' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "PhotoMedia" WHERE id = m.metadata_id) t)
 					WHEN 'video' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "VideoMedia" WHERE id = m.metadata_id) t)
-					WHEN 'VideoMedia' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "VideoMedia" WHERE id = m.metadata_id) t)
 					WHEN 'audio' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "AudioMedia" WHERE id = m.metadata_id) t)
-					WHEN 'AudioMedia' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "AudioMedia" WHERE id = m.metadata_id) t)
 					WHEN 'weather' THEN (SELECT row_to_json(t) FROM (SELECT id, zipcode FROM "WeatherWidget" WHERE id = m.metadata_id) t)
-					WHEN 'WeatherWidget' THEN (SELECT row_to_json(t) FROM (SELECT id, zipcode FROM "WeatherWidget" WHERE id = m.metadata_id) t)
 					WHEN 'news' THEN (SELECT row_to_json(t) FROM (SELECT id, category, language, country FROM "NewsWidget" WHERE id = m.metadata_id) t)
-					WHEN 'NewsWidget' THEN (SELECT row_to_json(t) FROM (SELECT id, category, language, country FROM "NewsWidget" WHERE id = m.metadata_id) t)
 					WHEN 'sports' THEN (SELECT row_to_json(t) FROM (SELECT id, category, language, country FROM "NewsWidget" WHERE id = m.metadata_id) t)
 					WHEN 'message' THEN (SELECT row_to_json(t) FROM (SELECT id, message, image_uri FROM "MessagePrompt" WHERE id = m.metadata_id) t)
-					WHEN 'MessagePrompt' THEN (SELECT row_to_json(t) FROM (SELECT id, message, image_uri FROM "MessagePrompt" WHERE id = m.metadata_id) t)
 					WHEN 'event' THEN (SELECT row_to_json(t) FROM (SELECT id, list_id, time, text FROM "EventPrompt" WHERE id = m.metadata_id) t)
-					WHEN 'EventPrompt' THEN (SELECT row_to_json(t) FROM (SELECT id, list_id, time, text FROM "EventPrompt" WHERE id = m.metadata_id) t)
 					WHEN 'carepartner_location' THEN (SELECT row_to_json(t) FROM (SELECT id, location, message, image_uri FROM "CarepartnerLocationPrompt" WHERE id = m.metadata_id) t)
-					WHEN 'CarepartnerLocationPrompt' THEN (SELECT row_to_json(t) FROM (SELECT id, location, message, image_uri FROM "CarepartnerLocationPrompt" WHERE id = m.metadata_id) t)
 					WHEN 'caregiver_location' THEN (SELECT row_to_json(t) FROM (SELECT id, location, message, image_uri FROM "CaregiverLocationPrompt" WHERE id = m.metadata_id) t)
-					WHEN 'CaregiverLocationPrompt' THEN (SELECT row_to_json(t) FROM (SELECT id, location, message, image_uri FROM "CaregiverLocationPrompt" WHERE id = m.metadata_id) t)
 					ELSE NULL
 				END AS metadata
 			FROM "Configuration" c
