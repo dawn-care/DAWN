@@ -72,26 +72,17 @@ export default function AgendaList({ items, setItems }: AgendaListProps) {
         // Map detailed module_type values to icon categories
         switch (moduleType) {
             case 'photo':
-            case 'PhotoMedia':
             case 'video':
-            case 'VideoMedia':
             case 'audio':
-            case 'AudioMedia':
                 return videoCameraIcon;
             case 'weather':
-            case 'WeatherWidget':
             case 'news':
-            case 'NewsWidget':
             case 'sports':
                 return widgetIcon;
             case 'message':
-            case 'MessagePrompt':
             case 'event':
-            case 'EventPrompt':
             case 'carepartner_location':
-            case 'CarepartnerLocationPrompt':
             case 'caregiver_location':
-            case 'CaregiverLocationPrompt':
                 return promptIcon;
             default:
                 return widgetIcon;
