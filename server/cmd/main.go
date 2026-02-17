@@ -89,6 +89,8 @@ func main() {
 	}
 
 	// MinIO setup
+	minioHost := getEnvOrDefault("MINIO_HOST", "localhost")
+	minioPort := getEnvOrDefault("MINIO_PORT", "9000")
 	minioAccess := getEnvOrDefault("MINIO_ACCESS_KEY", "localuser")
 	minioSecret := getEnvOrDefault("MINIO_SECRET_KEY", "localpass123")
 
@@ -128,6 +130,7 @@ func main() {
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
 	weatherService := weatherSvc.NewWeatherService(db, "api key")
 	modulesService := modulesSvc.NewModuleService(db)
+	configurationService := configurationSvc.NewConfigurationService(db)
 
 	eventsService := promptsSvc.NewEventService(db)
 	messageService := promptsSvc.NewMessageService(db)
