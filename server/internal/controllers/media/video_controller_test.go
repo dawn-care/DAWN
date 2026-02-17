@@ -12,7 +12,8 @@ import (
 	models "server/internal/models/media"
 )
 
-// Mock service implementing VideoServiceInterface
+// ---- Mock Service ----
+
 type mockVideoService struct {
 	CreateVideoFn                        func(*models.VideoMedia) error
 	CreateVideoFileFn                    func(multipart.File, *multipart.FileHeader, string) error
@@ -23,7 +24,6 @@ type mockVideoService struct {
 	UpdateVideoFileFn                    func(multipart.File, *multipart.FileHeader, string) error
 	DeleteVideoFn                        func(int) error
 	DeleteVideoFileFn                    func(string) error
-	GetVideoStatsFn                      func() (int, error)
 }
 
 func (m *mockVideoService) CreateVideo(v *models.VideoMedia) error {
@@ -62,20 +62,23 @@ func (m *mockVideoService) DeleteVideoFile(u string) error {
 	return m.DeleteVideoFileFn(u)
 }
 
-func (m *mockVideoService) GetVideoStats() (int, error) {
-	return m.GetVideoStatsFn()
-}
-
 // ---- Tests ----
 
 func TestCreateVideoHandler(t *testing.T) {
 	mockSvc := &mockVideoService{
-		CreateVideoFn: func(v *models.VideoMedia) error { return nil },
+		CreateVideoFn: func(v *models.VideoMedia) error {
+			return nil
+		},
 	}
 
 	controller := NewVideoController(mockSvc)
 
-	video := models.VideoMedia{URI: "test.com/video.mp4", Filename: "video.mp4", Extension: "mp4"}
+	video := models.VideoMedia{
+		URI:       "test.com/video.mp4",
+		Filename:  "video.mp4",
+		Extension: ".mp4",
+	}
+
 	body, _ := json.Marshal(video)
 	req := httptest.NewRequest(http.MethodPost, "/videos", bytes.NewBuffer(body))
 	rec := httptest.NewRecorder()
@@ -155,22 +158,6 @@ func TestDeleteVideoHandler(t *testing.T) {
 
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("expected status 204, got %d", rec.Code)
-	}
-}
-
-func TestGetVideoStatsHandler(t *testing.T) {
-	mockSvc := &mockVideoService{
-		GetVideoStatsFn: func() (int, error) { return 42, nil },
-	}
-
-	controller := NewVideoController(mockSvc)
-	req := httptest.NewRequest(http.MethodGet, "/videos/stats", nil)
-	rec := httptest.NewRecorder()
-
-	controller.GetVideoStatsHandler(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 }
 

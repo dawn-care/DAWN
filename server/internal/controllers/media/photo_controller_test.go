@@ -3,13 +3,12 @@ package media
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	models "server/internal/models/media"
+	"server/internal/models/media"
 )
 
 // Mock service implementing PhotoServiceInterface
@@ -18,45 +17,71 @@ type mockPhotoService struct {
 	getErr      error
 	updateErr   error
 	deleteErr   error
-	statsErr    error
-	photoResult *models.PhotoMedia
+	photoResult *media.PhotoMedia
 	photoFile   multipart.File
-	photoList   []models.PhotoMedia
-	statsResult int
+	photoList   []media.PhotoMedia
 }
 
-func (m *mockPhotoService) CreatePhoto(p *models.PhotoMedia) error { return m.createErr }
+// ---- Interface methods ----
+
+func (m *mockPhotoService) CreatePhoto(p *media.PhotoMedia) error {
+	return m.createErr
+}
+
 func (m *mockPhotoService) CreatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
 	return m.createErr
 }
-func (m *mockPhotoService) GetPhotoByID(id int) (*models.PhotoMedia, error) {
+
+func (m *mockPhotoService) GetPhotoByID(id int) (*media.PhotoMedia, error) {
 	return m.photoResult, m.getErr
 }
+
 func (m *mockPhotoService) GetPhotoFile(uri string) (multipart.File, error) {
 	return m.photoFile, m.getErr
 }
-func (m *mockPhotoService) GetPhotosByCarepartnerAndCaregiver(c, g int) ([]models.PhotoMedia, error) {
+
+func (m *mockPhotoService) GetPhotosByCarepartnerAndCaregiver(c, g int) ([]media.PhotoMedia, error) {
 	return m.photoList, m.getErr
 }
-func (m *mockPhotoService) UpdatePhoto(p *models.PhotoMedia) error { return m.updateErr }
+
+func (m *mockPhotoService) UpdatePhoto(p *media.PhotoMedia) error {
+	return m.updateErr
+}
+
 func (m *mockPhotoService) UpdatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
 	return m.updateErr
 }
-func (m *mockPhotoService) DeletePhoto(id int) error         { return m.deleteErr }
-func (m *mockPhotoService) DeletePhotoFile(uri string) error { return m.deleteErr }
-func (m *mockPhotoService) GetPhotoStats() (int, error)      { return m.statsResult, m.statsErr }
 
-// --- Tests ---
+func (m *mockPhotoService) DeletePhoto(id int) error {
+	return m.deleteErr
+}
+
+func (m *mockPhotoService) DeletePhotoFile(uri string) error {
+	return m.deleteErr
+}
+
+//
+// ---------------- TESTS ----------------
+//
 
 func TestCreatePhotoHandler_Success(t *testing.T) {
 	mockSvc := &mockPhotoService{}
 	controller := NewPhotoController(mockSvc)
 
-	photo := models.PhotoMedia{ID: 1, Filename: "pic.jpg", URI: "/photos/pic.jpg"}
-	body, _ := json.Marshal(photo)
-	req := httptest.NewRequest(http.MethodPost, "/photo", bytes.NewBuffer(body))
-	w := httptest.NewRecorder()
+	payload := map[string]interface{}{
+		"uri":            "/photos/pic.jpg",
+		"filename":       "pic.jpg",
+		"displayed_name": "pic.jpg",
+		"extension":      ".jpg",
+		"caregiver_id":   1,
+		"carepartner_id": 1,
+	}
 
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/photo", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
 	controller.CreatePhotoHandler(w, req)
 
 	if w.Code != http.StatusOK {
@@ -66,7 +91,7 @@ func TestCreatePhotoHandler_Success(t *testing.T) {
 
 func TestGetPhotoByIDHandler_Success(t *testing.T) {
 	mockSvc := &mockPhotoService{
-		photoResult: &models.PhotoMedia{ID: 1, Filename: "image.jpg"},
+		photoResult: &media.PhotoMedia{ID: 1, Filename: "image.jpg"},
 	}
 	controller := NewPhotoController(mockSvc)
 
@@ -106,7 +131,7 @@ func TestDeletePhotoHandler_Success(t *testing.T) {
 
 func TestUpdatePhotoHandler_Success(t *testing.T) {
 	controller := NewPhotoController(&mockPhotoService{})
-	photo := models.PhotoMedia{ID: 2, Filename: "update.jpg"}
+	photo := media.PhotoMedia{ID: 2, Filename: "update.jpg"}
 	body, _ := json.Marshal(photo)
 	req := httptest.NewRequest(http.MethodPut, "/photo", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
@@ -120,44 +145,17 @@ func TestUpdatePhotoHandler_Success(t *testing.T) {
 
 func TestGetPhotosByCarepartnerAndCaregiverHandler_Success(t *testing.T) {
 	mockSvc := &mockPhotoService{
-		photoList: []models.PhotoMedia{
+		photoList: []media.PhotoMedia{
 			{ID: 1, Filename: "p1.jpg"},
 			{ID: 2, Filename: "p2.jpg"},
 		},
 	}
 	controller := NewPhotoController(mockSvc)
-	req := httptest.NewRequest(http.MethodGet, "/photos?carepartner_id=1&caregiver_id=1", nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/photo/list?carepartner_id=1&caregiver_id=1", nil)
 	w := httptest.NewRecorder()
 
 	controller.GetPhotosByCarepartnerAndCaregiverHandler(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestGetPhotoStatsHandler_Error(t *testing.T) {
-	mockSvc := &mockPhotoService{statsErr: errors.New("db error")}
-	controller := NewPhotoController(mockSvc)
-
-	req := httptest.NewRequest(http.MethodGet, "/stats", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetPhotoStatsHandler(w, req)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", w.Code)
-	}
-}
-
-func TestGetPhotoStatsHandler_Success(t *testing.T) {
-	mockSvc := &mockPhotoService{statsResult: 5}
-	controller := NewPhotoController(mockSvc)
-
-	req := httptest.NewRequest(http.MethodGet, "/stats", nil)
-	w := httptest.NewRecorder()
-
-	controller.GetPhotoStatsHandler(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)

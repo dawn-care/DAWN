@@ -6,8 +6,6 @@ import (
 	widgets "server/internal/models/widgets/news"
 	"server/internal/services/widgets/news"
 	"strconv"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // Service Interface
@@ -71,7 +69,7 @@ func (c *NewsWidgetController) CreateNewsWidgetHandler(w http.ResponseWriter, r 
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /news-widgets/{id} [get]
 func (c *NewsWidgetController) GetNewsWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "Invalid NewsWidget ID", http.StatusBadRequest)

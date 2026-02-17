@@ -29,17 +29,32 @@ func NewPhotoService(db *sql.DB, blob *minio.Client, bucket string) *PhotoServic
 }
 
 // Create a single photo
-func (s *PhotoService) CreatePhoto(photo *media.PhotoMedia) error {
+func (s *PhotoService) CreatePhoto(
+	photo *media.PhotoMedia,
+) error {
 	if photo == nil {
 		return errors.New("photo cannot be nil")
 	}
 	if photo.URI == "" || photo.Filename == "" || photo.Extension == "" {
 		return errors.New("uri, filename, and extension are required")
 	}
-	return media.CreatePhoto(s.DB, photo)
+
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create photo metadata
+	if err := media.CreatePhotoTx(tx, photo); err != nil {
+		return err
+	}
+
+	// Commit
+	return tx.Commit()
 }
 
-// Create a single photo file
+// Create a single photo file (BLOB)
 func (s *PhotoService) CreatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
 	if file == nil {
 		return errors.New("file data cannot be nil")
@@ -60,7 +75,6 @@ func (s *PhotoService) CreatePhotoFile(file multipart.File, handler *multipart.F
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-
 	_, err = s.BLOB.PutObject(
 		context.Background(),
 		s.Bucket,
@@ -200,9 +214,4 @@ func (s *PhotoService) DeletePhotoFile(uri string) error {
 	}
 
 	return nil
-}
-
-// Get total photo count
-func (s *PhotoService) GetPhotoStats() (int, error) {
-	return media.GetPhotoStats(s.DB)
 }

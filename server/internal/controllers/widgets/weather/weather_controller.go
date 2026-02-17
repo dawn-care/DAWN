@@ -5,8 +5,6 @@ import (
 	"net/http"
 	widgets "server/internal/models/widgets/weather"
 	"strconv"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // Service Interface
@@ -69,7 +67,7 @@ func (c *WeatherWidgetController) CreateWeatherWidgetHandler(w http.ResponseWrit
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /weather-widgets/{id} [get]
 func (c *WeatherWidgetController) GetWeatherWidgetByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

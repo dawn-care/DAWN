@@ -8,52 +8,34 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateModuleWithMedia(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to open sqlmock database: %v", err)
-	}
+func TestCreateModule(t *testing.T) {
+	db, mock, _ := sqlmock.New()
 	defer db.Close()
 
 	svc := NewModuleService(db)
 
-	mock.ExpectBegin()
-
-	// Expect media insert (for example, audio)
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "AudioMedia" (uri, filename, extension)
-		VALUES ($1, $2, $3)
-		RETURNING id;
-	`)).
-		WithArgs("uri_test", "song.mp3", "mp3").
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-
-	// Expect module insert
+	rows := sqlmock.NewRows([]string{"id"}).AddRow(1)
 	mock.ExpectQuery(regexp.QuoteMeta(`
 		INSERT INTO "Module" (module_type, caregiver_id, carepartner_id, metadata_id)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`)).
-		WithArgs("audio", 10, 20, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(100))
+		WithArgs("audio", 1, 2, 99).
+		WillReturnRows(rows)
 
-	mock.ExpectCommit()
-
-	mod, err := svc.CreateModuleWithMedia("audio", 10, 20, "uri_test", "song.mp3", "mp3")
+	mod, err := svc.CreateModule("audio", 1, 2, 99)
 	assert.NoError(t, err)
 	assert.NotNil(t, mod)
-	assert.Equal(t, 100, mod.ID)
-	assert.Equal(t, 1, mod.MetadataID)
 	assert.Equal(t, "audio", mod.ModuleType)
+	assert.Equal(t, 1, mod.CaregiverID)
+	assert.Equal(t, 2, mod.CarepartnerID)
+	assert.Equal(t, 99, mod.MetadataID)
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestGetModuleByID(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to open sqlmock database: %v", err)
-	}
+	db, mock, _ := sqlmock.New()
 	defer db.Close()
 
 	svc := NewModuleService(db)
@@ -81,10 +63,7 @@ func TestGetModuleByID(t *testing.T) {
 }
 
 func TestGetMetadataByCaregiverCarepartnerAndType(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to open sqlmock database: %v", err)
-	}
+	db, mock, _ := sqlmock.New()
 	defer db.Close()
 
 	svc := NewModuleService(db)
@@ -103,6 +82,29 @@ func TestGetMetadataByCaregiverCarepartnerAndType(t *testing.T) {
 	metadataIDs, err := svc.GetMetadataByCaregiverCarepartnerAndType(5, 6, "photo")
 	assert.NoError(t, err)
 	assert.Equal(t, []int{101, 102}, metadataIDs)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestGetAllMetadataByCaregiverCarepartner(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer db.Close()
+
+	svc := NewModuleService(db)
+
+	rows := sqlmock.NewRows([]string{"metadata_id"}).AddRow(201).AddRow(202)
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT metadata_id
+		FROM "Module"
+		WHERE caregiver_id = $1 AND carepartner_id = $2;
+	`)).
+		WithArgs(11, 12).
+		WillReturnRows(rows)
+
+	metadataIDs, err := svc.GetAllMetadataByCaregiverCarepartner(11, 12)
+	assert.NoError(t, err)
+	assert.Equal(t, []int{201, 202}, metadataIDs)
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

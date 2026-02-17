@@ -2,9 +2,22 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".heic"];
+
+// Create a prop interface so that Library can pass parameters to the form for editing existing prompts without relying on URL params
+interface PromptFormProps {
+  moduleId?: number;
+  onDeleteSuccess?: () => void;
+  onUpdateSuccess?: () => void;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function PromptForm() {
+export default function PromptForm({
+        moduleId: propModuleId,
+        onDeleteSuccess,
+        onUpdateSuccess
+    }: PromptFormProps
+  ) {
   // Creating Variables
   const [promptMessage, setPromptMessage] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -12,7 +25,9 @@ export default function PromptForm() {
   const [uploadStatus, setUploadStatus] = useState("");
   // Editing Variables
   const { moduleId } = useParams<{ moduleId: string }>();
-  const isEditMode = Boolean(moduleId);
+  const actualModuleId = propModuleId ?? moduleId;
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const isEditMode = Boolean(actualModuleId);
   const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
   // Deleting Variables
   const navigate = useNavigate();
@@ -21,19 +36,28 @@ export default function PromptForm() {
    * If form is in edit mode, load message
    *******************************************/
   useEffect(() => {
-    if (!moduleId) return;
+    if (!actualModuleId) return;
 
-    fetch(`${API_URL}/messages/${moduleId}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Failed to load message");
-        return res.json();
-      })
-      .then(data => {
-        setPromptMessage(data.message);
-        setExistingImageUri(data.image_uri ?? null);
-      })
-      .catch(err => setUploadStatus(err.message));
-  }, [moduleId]);
+    async function loadPrompt() {
+      var res = await fetch(`${API_URL}/modules/${actualModuleId}`);
+      const module = await res.json();
+      console.log("Loaded module for editing:", module);
+      setPromptId(module.metadata_id);
+
+      fetch(`${API_URL}/messages?id=${module.metadata_id}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to load message");
+          return res.json();
+        })
+        .then(data => {
+          setPromptMessage(data.message);
+          setExistingImageUri(data.image_uri ?? null);
+        })
+        .catch(err => setUploadStatus(err.message));
+    }
+
+    loadPrompt();
+  }, [actualModuleId]);
 
   /*******************************************
    * Check if the uploaded file is a picture
@@ -60,40 +84,38 @@ export default function PromptForm() {
 
     try {
       let imageUri: string | null = null;
+      let metadataId: number | null = null;
 
-      // If image is included, upload it to the photo library first
+      // Upload the optional image first, if provided
       if (file) {
         const formData = new FormData();
         formData.append("file", file, file.name);
+        formData.append("caregiver_id", "1"); // temp caregiver ID
+        formData.append("carepartner_id", "1"); // temp carepartner ID
 
         const imageResponse = await fetch(`${API_URL}/photo/upload`, {
-            method: "POST",
-            body: formData,
+          method: "POST",
+          body: formData,
         });
 
         if (!imageResponse.ok) {
-            const text = await imageResponse.text();
-            throw new Error(text || "Image upload failed");
+          const text = await imageResponse.text();
+          throw new Error(text || "Image upload failed");
         }
 
-        // After image is uploaded, get the URI
         const imageData = await imageResponse.json();
-        imageUri = imageData.uri;
+        var uri = `/photo/file?id=${imageData.id}`;
+        imageUri = uri;
+        metadataId = imageData.id; // assuming the image upload returns a metadata id
       }
 
-      // Create the prompt 
+      // Create the message/prompt
       const promptResponse = await fetch(`${API_URL}/messages`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: promptMessage,
           image_uri: imageUri,
-          /*
-          NOTE: This currently works for message prompts. But do we really need different models for caregiver/partner locations?
-                Seems like the locations could be easily included in the message text and a picture of a map can be included without needing a separate model
-          */
         }),
       });
 
@@ -102,8 +124,34 @@ export default function PromptForm() {
         throw new Error(text || "Message creation failed");
       }
 
-      // Success
-      setUploadStatus("Saved");
+      const promptData = await promptResponse.json();
+      // Use the returned id from the prompt creation as the metadata ID
+      if (!metadataId) metadataId = promptData.id;
+
+      if (!metadataId) {
+        setUploadStatus("Saved but could not determine metadata ID.");
+        return;
+      }
+
+      // Create a module pointing to this metadata
+      const moduleResponse = await fetch(`${API_URL}/modules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          module_type: "messages",
+          caregiver_id: 1,     // temp caregiver ID
+          carepartner_id: 1,   // temp carepartner ID
+          metadata_id: metadataId,
+        }),
+      });
+
+      if (!moduleResponse.ok) {
+        const text = await moduleResponse.text();
+        setUploadStatus(`Prompt saved but failed to create module: ${text}`);
+        return;
+      }
+
+      setUploadStatus("Saved!");
       setFile(null);
       setPromptMessage("");
     } catch (err: any) {
@@ -136,7 +184,7 @@ export default function PromptForm() {
         imageUri = (await res.json()).uri;
       }
 
-      const res = await fetch(`${API_URL}/messages/update/${moduleId}`, {
+      const res = await fetch(`${API_URL}/messages/update/${promptId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -148,6 +196,9 @@ export default function PromptForm() {
       if (!res.ok) throw new Error("Update failed");
 
       setUploadStatus("Updated");
+      if (onUpdateSuccess) {
+          onUpdateSuccess();
+      }
     } catch (err: any) {
       setUploadStatus(err.message);
     }
@@ -160,13 +211,24 @@ export default function PromptForm() {
     if (!confirm("Are you sure you want to delete this message?")) return;
 
     try {
-      const res = await fetch(`${API_URL}/messages/delete/${moduleId}`, {
+      const moduleRes = await fetch(`${API_URL}/modules/delete?id=${actualModuleId}`, {
         method: "DELETE",
       });
 
-      if (!res.ok) throw new Error("Delete failed");
+      if (!moduleRes.ok) throw new Error("Delete failed");
 
-      navigate("/library");
+      const promptRes = await fetch(`${API_URL}/messages/delete/${promptId}`, {
+        method: "DELETE",
+      });
+
+      if (!promptRes.ok) throw new Error("Delete failed");
+
+      setUploadStatus("Deleted");
+      if (onDeleteSuccess) {
+          onDeleteSuccess();
+      } else {
+          navigate("/library");
+      }
     } catch (err: any) {
       setUploadStatus(err.message);
     }

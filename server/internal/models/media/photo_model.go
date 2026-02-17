@@ -104,7 +104,7 @@ func GetPhotosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID i
 	query := `
 		SELECT p.id, p.uri, p.displayed_name, p.filename, p.extension
 		FROM "PhotoMedia" p
-		JOIN "Module" m ON m.metadata = p.id
+		JOIN "Module" m ON m.metadata_id = p.id
 		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
 	`
 	rows, err := db.Query(query, carepartnerID, caregiverID)
@@ -177,16 +177,4 @@ func DeletePhoto(db *sql.DB, id int) error {
 		return fmt.Errorf("no photo found with id %d", id)
 	}
 	return nil
-}
-
-// ─────────────────────────────────────────────
-// STATS
-// ─────────────────────────────────────────────
-
-// Get total photo count
-func GetPhotoStats(db *sql.DB) (int, error) {
-	query := `SELECT COUNT(*) FROM "PhotoMedia";`
-	var count int
-	err := db.QueryRow(query).Scan(&count)
-	return count, err
 }

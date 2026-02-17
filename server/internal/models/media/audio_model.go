@@ -75,7 +75,7 @@ func CreateAudiosBulk(db *sql.DB, audios []AudioMedia) error {
 }
 
 // ─────────────────────────────────────────────
-// READ OPERATIONS
+// READ
 // ─────────────────────────────────────────────
 
 // Get one audio record by ID
@@ -171,9 +171,8 @@ func GetAudiosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID i
 	query := `
 		SELECT a.id, a.uri, a.filename, a.extension, a.displayed_name
 		FROM "AudioMedia" a
-		JOIN "Module" m ON m.metadata = a.id
-		WHERE m.carepartner_id = $1
-		  AND m.caregiver_id = $2;
+		JOIN "Module" m ON m.metadata_id = a.id
+		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
 	`
 	rows, err := db.Query(query, carepartnerID, caregiverID)
 	if err != nil {
@@ -244,71 +243,4 @@ func DeleteAudio(db *sql.DB, id int) error {
 		return fmt.Errorf("no audio found with id %d", id)
 	}
 	return nil
-}
-
-// ─────────────────────────────────────────────
-// ANALYTICS / STATS
-// ─────────────────────────────────────────────
-
-type MediaStats struct {
-	AudioCount int `json:"audio_count"`
-	VideoCount int `json:"video_count"`
-	PhotoCount int `json:"photo_count"`
-	Total      int `json:"total"`
-}
-
-func GetMediaStats(db *sql.DB) (*MediaStats, error) {
-	stats := &MediaStats{}
-	query := `
-		SELECT
-			(SELECT COUNT(*) FROM "AudioMedia") AS audio_count,
-			(SELECT COUNT(*) FROM "VideoMedia") AS video_count,
-			(SELECT COUNT(*) FROM "PhotoMedia") AS photo_count;
-	`
-	err := db.QueryRow(query).Scan(
-		&stats.AudioCount,
-		&stats.VideoCount,
-		&stats.PhotoCount,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	stats.Total = stats.AudioCount + stats.VideoCount + stats.PhotoCount
-	return stats, nil
-}
-
-// ─────────────────────────────────────────────
-// SEARCH
-// ─────────────────────────────────────────────
-
-// Search audios by filename OR displayed name
-func SearchAudios(db *sql.DB, keyword string) ([]AudioMedia, error) {
-	query := `
-		SELECT id, uri, filename, extension, displayed_name
-		FROM "AudioMedia"
-		WHERE filename ILIKE $1
-		   OR displayed_name ILIKE $1;
-	`
-	rows, err := db.Query(query, fmt.Sprintf("%%%s%%", keyword))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []AudioMedia
-	for rows.Next() {
-		var a AudioMedia
-		if err := rows.Scan(
-			&a.ID,
-			&a.URI,
-			&a.Filename,
-			&a.Extension,
-			&a.DisplayedName,
-		); err != nil {
-			return nil, err
-		}
-		results = append(results, a)
-	}
-	return results, nil
 }

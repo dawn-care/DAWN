@@ -14,7 +14,7 @@ func RegisterMessageRoutes(r chi.Router, controller *ctrlr.MessageController) {
 		r.Post("/", controller.CreateMessageHandler)
 
 		// Get a message by ID
-		r.Get("/{id}", controller.GetMessageByIDHandler)
+		r.Get("/", controller.GetMessageByIDHandler) // Get by ID (?id=)
 
 		// Update a message
 		r.Put("/update/{id}", controller.UpdateMessageHandler)
