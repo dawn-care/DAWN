@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 type MediaType = "video" | "photo" | "audio";
-type RepeatType = "daily" | "weekly" | "monthly" | "yearly" | "never";
 
 const allowedExtensions = {
   video: [".mp4", ".mov", ".avi"],
@@ -11,13 +10,9 @@ const allowedExtensions = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function UploadMedia() {
+export default function MediaFormCreate() {
   const [mediaName, setMediaName] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("video");
-  const [repeat, setRepeat] = useState<RepeatType>("daily");
-  const [weeklyDay, setWeeklyDay] = useState("Monday");
-  const [monthlyDay, setMonthlyDay] = useState<number>(1);
-  const [yearlyDate, setYearlyDate] = useState("2025-01-01");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
@@ -47,11 +42,8 @@ export default function UploadMedia() {
     const formData = new FormData();
     formData.append("file", file, file.name);
     formData.append("displayed_name", mediaName);
-    formData.append("id", "1"); // temp user ID
-    formData.append("repeat", repeat);
-    if (repeat === "weekly") formData.append("weeklyDay", weeklyDay);
-    if (repeat === "monthly") formData.append("monthlyDay", monthlyDay.toString());
-    if (repeat === "yearly") formData.append("yearlyDate", yearlyDate);
+    formData.append("caregiver_id", "1");   // temp caregiver ID
+    formData.append("carepartner_id", "1"); // temp carepartner ID
 
     const endpoint =
       mediaType === "video"
@@ -61,6 +53,7 @@ export default function UploadMedia() {
         : "/audio/upload";
 
     try {
+      // Upload media metadata
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         body: formData,
@@ -69,6 +62,31 @@ export default function UploadMedia() {
       if (!response.ok) {
         const text = await response.text();
         setUploadStatus(`Error: ${text}`);
+        return;
+      }
+
+      const metadata = await response.json();
+      const metadataId = metadata.id;
+      if (!metadataId) {
+        setUploadStatus("Upload succeeded but metadata ID not returned.");
+        return;
+      }
+
+      // Create a module that references this metadata
+      const moduleResponse = await fetch(`${API_URL}/modules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          module_type: mediaType,
+          caregiver_id: 1,
+          carepartner_id: 1,
+          metadata_id: metadataId,
+        }),
+      });
+
+      if (!moduleResponse.ok) {
+        const text = await moduleResponse.text();
+        setUploadStatus(`Media saved but failed to create module: ${text}`);
         return;
       }
 
@@ -110,65 +128,6 @@ export default function UploadMedia() {
             <option value="audio">Audio</option>
           </select>
         </div>
-
-        {/* Repeat Option */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Repeat:</label>
-          <select
-            value={repeat}
-            onChange={(e) => setRepeat(e.target.value as RepeatType)}
-            className="w-full mt-2 p-3 border rounded bg-purple-50"
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-            <option value="never">Never</option>
-          </select>
-        </div>
-
-        {/* Conditional Repeat Inputs */}
-        {repeat === "weekly" && (
-          <div className="mb-6">
-            <label className="text-lg font-medium">Select Weekday:</label>
-            <select
-              value={weeklyDay}
-              onChange={(e) => setWeeklyDay(e.target.value)}
-              className="w-full mt-2 p-3 border rounded bg-purple-50"
-            >
-              {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(day => (
-                <option key={day} value={day}>{day}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {repeat === "monthly" && (
-          <div className="mb-6">
-            <label className="text-lg font-medium">Select Day:</label>
-            <select
-              value={monthlyDay}
-              onChange={(e) => setMonthlyDay(parseInt(e.target.value))}
-              className="w-full mt-2 p-3 border rounded bg-purple-50"
-            >
-              {Array.from({length:28}, (_,i)=>i+1).map(day => (
-                <option key={day} value={day}>{day}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {repeat === "yearly" && (
-          <div className="mb-6">
-            <label className="text-lg font-medium">Select Date:</label>
-            <input
-              type="date"
-              value={yearlyDate}
-              onChange={(e) => setYearlyDate(e.target.value)}
-              className="w-full mt-2 p-3 border rounded bg-purple-50"
-            />
-          </div>
-        )}
 
         {/* Upload */}
         <div className="mb-6">

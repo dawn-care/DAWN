@@ -63,7 +63,7 @@ func (c *MessageController) CreateMessageHandler(w http.ResponseWriter, r *http.
 // @Failure 500 {string} string "internal server error"
 // @Router /messages/{id} [get]
 func (c *MessageController) GetMessageByIDHandler(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
 		http.Error(w, "invalid message ID", http.StatusBadRequest)

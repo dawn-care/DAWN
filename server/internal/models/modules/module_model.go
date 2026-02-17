@@ -49,6 +49,58 @@ func GetModuleByID(db *sql.DB, id int) (*Module, error) {
 	return mod, nil
 }
 
+// Returns all modules for a given caregiver and carepartner
+func GetModulesByCaregiverAndCarepartner(db *sql.DB, caregiverID, carepartnerID int) ([]Module, error) {
+	query := `
+		SELECT id, module_type, caregiver_id, carepartner_id, metadata_id
+		FROM "Module"
+		WHERE caregiver_id = $1 AND carepartner_id = $2;
+	`
+
+	rows, err := db.Query(query, caregiverID, carepartnerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query modules: %w", err)
+	}
+	defer rows.Close()
+
+	var modulesList []Module
+	for rows.Next() {
+		var m Module
+		if err := rows.Scan(&m.ID, &m.ModuleType, &m.CaregiverID, &m.CarepartnerID, &m.MetadataID); err != nil {
+			return nil, err
+		}
+		modulesList = append(modulesList, m)
+	}
+
+	return modulesList, nil
+}
+
+// Get all metadata IDs for a caregiver and carepartner (any module type)
+func  GetAllMetadataByCaregiverCarepartner(db *sql.DB, caregiverID, carepartnerID int) ([]int, error) {
+	query := `
+		SELECT metadata_id
+		FROM "Module"
+		WHERE caregiver_id = $1 AND carepartner_id = $2;
+	`
+
+	rows, err := db.Query(query, caregiverID, carepartnerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all metadata: %w", err)
+	}
+	defer rows.Close()
+
+	var metadataIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		metadataIDs = append(metadataIDs, id)
+	}
+
+	return metadataIDs, nil
+}
+
 // Get all metadata IDs by caregiver ID, carepartner ID, and module type
 func GetMetadataByCaregiverCarepartnerAndType(db *sql.DB, caregiverID int, carepartnerID int, moduleType string) ([]int, error) {
 	query := `
@@ -77,4 +129,37 @@ func GetMetadataByCaregiverCarepartnerAndType(db *sql.DB, caregiverID int, carep
 	}
 
 	return metadataIDs, nil
+}
+
+// DELETE
+// Delete a module by ID (DB)
+func DeleteModule(db *sql.DB, id int) error {
+	return DeleteModuleTx(db, id)
+}
+
+// Delete a module by ID (Tx)
+func DeleteModuleTx(exec interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}, id int) error {
+
+	query := `
+		DELETE FROM "Module"
+		WHERE id = $1;
+	`
+
+	result, err := exec.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete module: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("module with id %d not found", id)
+	}
+
+	return nil
 }

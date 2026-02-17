@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"path/filepath"
 
 	"github.com/minio/minio-go/v7"
 	"server/internal/models/media"
@@ -29,18 +28,41 @@ func NewVideoService(db *sql.DB, blob *minio.Client, bucket string) *VideoServic
 }
 
 // Create a single video
-func (s *VideoService) CreateVideo(video *media.VideoMedia) error {
+func (s *VideoService) CreateVideo(
+	video *media.VideoMedia,
+) error {
 	if video == nil {
 		return errors.New("video cannot be nil")
 	}
 	if video.URI == "" || video.Filename == "" || video.Extension == "" {
 		return errors.New("uri, filename, and extension are required")
 	}
-	return media.CreateVideo(s.DB, video)
+
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Create video metadata
+	if err := media.CreateVideoTx(tx, video); err != nil {
+		return err
+	}
+
+	// COMMIT transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
-// Create a single video file
-func (s *VideoService) CreateVideoFile(file multipart.File, handler *multipart.FileHeader, uri string) error {
+// Upload a single video file to blob storage
+func (s *VideoService) CreateVideoFile(
+	file multipart.File,
+	handler *multipart.FileHeader,
+	uri string,
+) error {
 	if file == nil {
 		return errors.New("file data cannot be nil")
 	}
@@ -68,20 +90,12 @@ func (s *VideoService) CreateVideoFile(file multipart.File, handler *multipart.F
 		uri,
 		bytes.NewReader(data),
 		int64(len(data)),
-		minio.PutObjectOptions{ContentType: contentType},
+		minio.PutObjectOptions{
+			ContentType: contentType,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("unable to upload video to blob storage: %w", err)
-	}
-
-	// Save metadata in DB
-	video := &media.VideoMedia{
-		URI:       uri,
-		Filename:  handler.Filename,
-		Extension: filepath.Ext(handler.Filename),
-	}
-	if err := s.CreateVideo(video); err != nil {
-		return fmt.Errorf("failed to save video metadata to DB: %w", err)
 	}
 
 	return nil
@@ -195,9 +209,4 @@ func (s *VideoService) DeleteVideoFile(uri string) error {
 		return fmt.Errorf("unable to delete video: %w", err)
 	}
 	return nil
-}
-
-// Get total video count
-func (s *VideoService) GetVideoStats() (int, error) {
-	return media.GetVideoStats(s.DB)
 }

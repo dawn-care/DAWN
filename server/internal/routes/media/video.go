@@ -9,17 +9,20 @@ import (
 // RegisterVideoRoutes wires VideoController handlers to HTTP routes
 func RegisterVideoRoutes(r chi.Router, videoCtrl *media.VideoController) {
 	r.Route("/video", func(r chi.Router) {
+		// CREATE
 		r.Post("/", videoCtrl.CreateVideoHandler)
 		r.Post("/upload", videoCtrl.CreateVideoFileHandler)
 
-		r.Get("/", videoCtrl.GetVideoByIDHandler)                           // e.g., /video?id=1
-		r.Get("/file", videoCtrl.GetVideoFileByIDHandler)                   // e.g., /video/file?id=1
-		r.Get("/list", videoCtrl.GetVideosByCarepartnerAndCaregiverHandler) // e.g., /video/list?carepartner_id=1&caregiver_id=2
-		r.Get("/stats", videoCtrl.GetVideoStatsHandler)
+		// READ
+		r.Get("/", videoCtrl.GetVideoByIDHandler)
+		r.Get("/file", videoCtrl.GetVideoFileByIDHandler)
+		r.Get("/list", videoCtrl.GetVideosByCarepartnerAndCaregiverHandler)
 
+		// UPDATE
 		r.Put("/", videoCtrl.UpdateVideoHandler)
 		r.Put("/file", videoCtrl.UpdateVideoFileHandler)
 
+		// DELETE
 		r.Delete("/", videoCtrl.DeleteVideoHandler)
 		r.Delete("/file", videoCtrl.DeleteVideoFileHandler)
 	})

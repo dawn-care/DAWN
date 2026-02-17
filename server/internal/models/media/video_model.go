@@ -104,7 +104,7 @@ func GetVideosByCarepartnerAndCaregiver(db *sql.DB, carepartnerID, caregiverID i
 	query := `
 		SELECT v.id, v.uri, v.displayed_name, v.filename, v.extension
 		FROM "VideoMedia" v
-		JOIN "Module" m ON m.metadata = v.id
+		JOIN "Module" m ON m.metadata_id = v.id
 		WHERE m.carepartner_id = $1 AND m.caregiver_id = $2;
 	`
 	rows, err := db.Query(query, carepartnerID, caregiverID)
@@ -177,16 +177,4 @@ func DeleteVideo(db *sql.DB, id int) error {
 		return fmt.Errorf("no video found with id %d", id)
 	}
 	return nil
-}
-
-// ─────────────────────────────────────────────
-// STATS
-// ─────────────────────────────────────────────
-
-// Get total video count
-func GetVideoStats(db *sql.DB) (int, error) {
-	query := `SELECT COUNT(*) FROM "VideoMedia";`
-	var count int
-	err := db.QueryRow(query).Scan(&count)
-	return count, err
 }

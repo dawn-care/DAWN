@@ -31,7 +31,6 @@ type PhotoServiceInterface interface {
 	UpdatePhotoFile(file multipart.File, handler *multipart.FileHeader, uri string) error
 	DeletePhoto(id int) error
 	DeletePhotoFile(uri string) error
-	GetPhotoStats() (int, error)
 }
 
 // ---- Controller ----
@@ -56,6 +55,7 @@ func NewPhotoController(Services PhotoServiceInterface) *PhotoController {
 // @Router /photo [post]
 func (c *PhotoController) CreatePhotoHandler(w http.ResponseWriter, r *http.Request) {
 	var photo media.PhotoMedia
+
 	if err := json.NewDecoder(r.Body).Decode(&photo); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -66,6 +66,7 @@ func (c *PhotoController) CreatePhotoHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(photo)
 }
 
@@ -82,6 +83,11 @@ func (c *PhotoController) CreatePhotoHandler(w http.ResponseWriter, r *http.Requ
 // @Failure 500 {string} string "internal server error"
 // @Router /photo/file [post]
 func (c *PhotoController) CreatePhotoFileHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "failed to parse multipart form", http.StatusBadRequest)
+		return
+	}
+
 	file, handler, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "file is required", http.StatusBadRequest)
@@ -89,9 +95,9 @@ func (c *PhotoController) CreatePhotoFileHandler(w http.ResponseWriter, r *http.
 	}
 	defer file.Close()
 
+	// Read first 512 bytes for MIME detection
 	buf := make([]byte, 512)
-	_, err = file.Read(buf)
-	if err != nil {
+	if _, err := file.Read(buf); err != nil {
 		http.Error(w, "unable to read file content", http.StatusBadRequest)
 		return
 	}
@@ -102,44 +108,68 @@ func (c *PhotoController) CreatePhotoFileHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if seeker, ok := file.(io.Seeker); ok {
-		seeker.Seek(0, io.SeekStart)
+	// Reset file pointer
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		http.Error(w, "failed to reset file pointer", http.StatusInternalServerError)
+		return
 	}
 
-	userID := r.FormValue("id")
+	caregiverIDStr := r.FormValue("caregiver_id")
+	carepartnerIDStr := r.FormValue("carepartner_id")
+
+	caregiverID, err := strconv.Atoi(caregiverIDStr)
+	if err != nil || caregiverID <= 0 {
+		http.Error(w, "invalid caregiver_id", http.StatusBadRequest)
+		return
+	}
+
+	carepartnerID, err := strconv.Atoi(carepartnerIDStr)
+	if err != nil || carepartnerID <= 0 {
+		http.Error(w, "invalid carepartner_id", http.StatusBadRequest)
+		return
+	}
+
+	// Build photo metadata
+	uri := "users/" + caregiverIDStr + "/" + handler.Filename
+
+	extension := ""
+	if idx := strings.LastIndex(handler.Filename, "."); idx != -1 {
+		extension = handler.Filename[idx:]
+	}
+
 	displayedName := r.FormValue("displayed_name")
+	if displayedName == "" {
+		displayedName = handler.Filename
+	}
 
-	uri := "users/" + userID + "/" + handler.Filename
-	extension := "." + handler.Filename[strings.LastIndex(handler.Filename, ".")+1:]
-
-	// Upload to MinIO
+	// Upload file to MinIO
 	if err := c.Services.CreatePhotoFile(file, handler, uri); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Create database record
 	photo := &media.PhotoMedia{
 		URI:           uri,
-		DisplayedName: displayedName,
 		Filename:      handler.Filename,
+		DisplayedName: displayedName,
 		Extension:     extension,
 	}
 
 	if err := c.Services.CreatePhoto(photo); err != nil {
-		http.Error(w, "failed to save photo metadata: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to save photo: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]interface{}{
-		"id":            photo.ID,
-		"filename":      photo.Filename,
-		"uri":           photo.URI,
-		"extension":     photo.Extension,
+		"id":             photo.ID,
+		"filename":       photo.Filename,
 		"displayed_name": photo.DisplayedName,
+		"uri":            photo.URI,
+		"extension":      photo.Extension,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -229,7 +259,11 @@ func (c *PhotoController) GetPhotosByCarepartnerAndCaregiverHandler(w http.Respo
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
+	
+	if photos == nil {
+		photos = []media.PhotoMedia{}
+	}
+	
 	json.NewEncoder(w).Encode(photos)
 }
 
@@ -369,23 +403,4 @@ func (c *PhotoController) DeletePhotoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// GetPhotoStatsHandler godoc
-// @Summary Get photo statistics
-// @Description Returns the total number of uploaded photos
-// @Tags photo
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]int "total_photos"
-// @Failure 500 {string} string "internal server error"
-// @Router /photo/stats [get]
-func (c *PhotoController) GetPhotoStatsHandler(w http.ResponseWriter, r *http.Request) {
-	count, err := c.Services.GetPhotoStats()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]int{"total_photos": count})
 }
