@@ -1,89 +1,56 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
-import AgendaList, { type ConfigurationItem, type Module, type ModuleMetadata }  from '../components/AgendaList';
+import { useState, useEffect } from 'react';
+import AgendaList, { type ConfigurationWithMetadata } from '../components/AgendaList';
 import Library from './Library';
 
 export default function AgendaView() {
     const { date } = useParams();
     const navigate = useNavigate();
-    const [items, setItems] = useState<ConfigurationItem[]>([
-        { id: 1, carepartner_id: 1, module_id: 1, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 1, duration: 60 },
-        { id: 2, carepartner_id: 1, module_id: 2, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 7, duration: 300 },
-        { id: 3, carepartner_id: 1, module_id: 3, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 12, duration: 120 },
-        { id: 4, carepartner_id: 1, module_id: 4, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 15, duration: 180 },
-        { id: 5, carepartner_id: 1, module_id: 5, occurence_type: "daily", occurence_definition: ["monday", "tuesday"], position: 27, duration: 90 },
-    ]);
+    const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
     const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const [modules, setModules] = useState<Module[]>([
-        {
-            id: 1,
-            module_type: 'media',
-            carepartner_id: 1,
-            metadata_id: 1
-        },
-        {
-            id: 2,
-            module_type: 'media',
-            carepartner_id: 1,
-            metadata_id: 2
-        },
-        {
-            id: 3,
-            module_type: 'widget',
-            carepartner_id: 1,
-            metadata_id: 3
-        },
-        {
-            id: 4,
-            module_type: 'widget',
-            carepartner_id: 1,
-            metadata_id: 4
-        },
-        {
-            id: 5,
-            module_type: 'prompt',
-            carepartner_id: 1,
-            metadata_id: 5
-        }
-    ]);
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                setError(null);
 
-    const [metadata, setMetadata] = useState<Record<number, ModuleMetadata>>({
-        1: {
-            type: 'video',
-            id: 1,
-            uri: 'https://example.com/videos/family-video.mp4',
-            displayed_name: 'Family Reunion',
-            filename: 'family-video',
-            extension: 'mp4'
-        },
-        2: {
-            type: 'photo',
-            id: 2,
-            uri: 'https://example.com/photos/vacation-2023.jpg',
-            displayed_name: 'Vacation 2023',
-            filename: 'vacation-2023',
-            extension: 'jpg'
-        },
-        3: {
-            type: 'weather',
-            id: 3,
-            zipcode: '90210'
-        },
-        4: {
-            type: 'news',
-            id: 4,
-            category: 'Sports',
-            language: 'en',
-            country: 'US'
-        },
-        5: {
-            type: 'message',
-            id: 5,
-            message: 'Hope you are having a great day!',
-            image_uri: 'https://example.com/greeting.jpg'
-        }
-    });
+                const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
+                if (dayOfMonth === 0) return;
+
+                const params = new URLSearchParams({
+                    carepartner_id: '1',
+                    day: String(dayOfMonth),
+                    month: String(month),
+                    day_of_week: String(dayOfWeek),
+                });
+
+                const res = await fetch(`http://localhost:8080/configurations/day?${params}`);
+                if (!res.ok) throw new Error('Failed to fetch configurations');
+                const data: ConfigurationWithMetadata[] = await res.json();
+                setItems(data || []);
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+                setError(errorMessage);
+                console.error('Error fetching data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [date]);
+
+    const currentDateToComponents = () => {
+        if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
+        const currentDate = new Date(date);
+        const dayOfWeek = currentDate.getDay(); // 0 (Sun) to 6 (Sat)
+        const dayOfMonth = currentDate.getDate(); // 1 to 31
+        const month = currentDate.getMonth() + 1;
+        return { dayOfMonth, month, dayOfWeek };
+    }
 
     const handlePreviousDay = () => {
         if (!date) return;
@@ -103,6 +70,22 @@ export default function AgendaView() {
 
     return (
         <div className="min-h-screen bg-white">
+            {loading && (
+                <div className="flex items-center justify-center min-h-screen">
+                    <p className="text-xl text-gray-600">Loading agenda...</p>
+                </div>
+            )}
+            
+            {error && (
+                <div className="flex items-center justify-center min-h-screen">
+                    <div className="bg-red-50 border-2 border-red-400 rounded-lg p-6">
+                        <p className="text-red-700 font-semibold">Error loading data</p>
+                        <p className="text-red-600 text-sm mt-2">{error}</p>
+                    </div>
+                </div>
+            )}
+            
+            {!loading && !error && (
             <div className="px-8 py-8">
                 <div className="flex items-center justify-between mb-8">
                     <button onClick={handlePreviousDay} className="text-4xl text-gray-800 hover:text-gray-600">&lt;</button>
@@ -127,7 +110,7 @@ export default function AgendaView() {
                     </div>
                 </div>
 
-                <AgendaList items={items} setItems={setItems} modules={modules} setModules={setModules} metadata={metadata} setMetadata={setMetadata} />
+                <AgendaList items={items} setItems={setItems} />
 
                 <div className="flex items-center justify-between mt-12">
                     <button className="text-3xl text-gray-600 hover:text-gray-800">⚙</button>
@@ -140,22 +123,23 @@ export default function AgendaView() {
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {isLibraryModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
-                        <button
-                            onClick={() => setIsLibraryModalOpen(false)}
-                            className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
-                        >
-                            ✕
-                        </button>
-                        <div className="p-8">
-                            <Library />
+                {isLibraryModalOpen && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+                            <button
+                                onClick={() => setIsLibraryModalOpen(false)}
+                                className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+                            >
+                                ✕
+                            </button>
+                            <div className="p-8">
+                                <Library />
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
+            </div>
             )}
         </div>
     );

@@ -9,6 +9,7 @@ import (
 	"os"
 
 	authCtrlr "server/internal/controllers/auth"
+	configurationCtrlr "server/internal/controllers/configurations"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
@@ -16,6 +17,7 @@ import (
 	newsCtrlr "server/internal/controllers/widgets/news"
 	weatherCtrlr "server/internal/controllers/widgets/weather"
 
+	configurationRts "server/internal/routes/configurations"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
@@ -24,6 +26,7 @@ import (
 	weatherRts "server/internal/routes/widgets/weather"
 
 	authSvc "server/internal/services/auth"
+	configurationSvc "server/internal/services/configurations"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
@@ -152,6 +155,7 @@ func main() {
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
+	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
 	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
@@ -168,6 +172,7 @@ func main() {
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
+	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
