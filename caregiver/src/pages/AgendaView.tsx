@@ -1,7 +1,14 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import AgendaList, { type ConfigurationWithMetadata } from '../components/AgendaList';
+import ConfigurationForm from '../components/ConfigurationForm';
 import Library from './Library';
+
+interface SelectedModule {
+    moduleId: number;
+    moduleType: string;
+    label: string;
+}
 
 export default function AgendaView() {
     const { date } = useParams();
@@ -11,43 +18,48 @@ export default function AgendaView() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // For the create flow: library → config form
+    const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
+    // For the edit flow: clicking an existing item
+    const [editingConfig, setEditingConfig] = useState<ConfigurationWithMetadata | null>(null);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
+            if (dayOfMonth === 0) return;
+
+            const params = new URLSearchParams({
+                carepartner_id: '1',
+                day: String(dayOfMonth),
+                month: String(month),
+                day_of_week: String(dayOfWeek),
+            });
+
+            const res = await fetch(`http://localhost:8080/configurations/day?${params}`);
+            if (!res.ok) throw new Error('Failed to fetch configurations');
+            const data: ConfigurationWithMetadata[] = await res.json();
+            setItems(data || []);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+            setError(errorMessage);
+            console.error('Error fetching data:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
-                if (dayOfMonth === 0) return;
-
-                const params = new URLSearchParams({
-                    carepartner_id: '1',
-                    day: String(dayOfMonth),
-                    month: String(month),
-                    day_of_week: String(dayOfWeek),
-                });
-
-                const res = await fetch(`http://localhost:8080/configurations/day?${params}`);
-                if (!res.ok) throw new Error('Failed to fetch configurations');
-                const data: ConfigurationWithMetadata[] = await res.json();
-                setItems(data || []);
-            } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-                setError(errorMessage);
-                console.error('Error fetching data:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchData();
     }, [date]);
 
     const currentDateToComponents = () => {
         if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
         const currentDate = new Date(date);
-        const dayOfWeek = currentDate.getDay(); // 0 (Sun) to 6 (Sat)
-        const dayOfMonth = currentDate.getDate(); // 1 to 31
+        const dayOfWeek = currentDate.getDay();
+        const dayOfMonth = currentDate.getDate();
         const month = currentDate.getMonth() + 1;
         return { dayOfMonth, month, dayOfWeek };
     }
@@ -56,7 +68,7 @@ export default function AgendaView() {
         if (!date) return;
         const currentDate = new Date(date);
         currentDate.setDate(currentDate.getDate() - 1);
-        const newDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        const newDate = currentDate.toISOString().split('T')[0];
         navigate(`/agenda/${newDate}`);
     };
 
@@ -64,8 +76,23 @@ export default function AgendaView() {
         if (!date) return;
         const currentDate = new Date(date);
         currentDate.setDate(currentDate.getDate() + 1);
-        const newDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        const newDate = currentDate.toISOString().split('T')[0];
         navigate(`/agenda/${newDate}`);
+    };
+
+    const handleModuleSelect = (module: SelectedModule) => {
+        setIsLibraryModalOpen(false);
+        setSelectedModule(module);
+    };
+
+    const handleItemClick = (item: ConfigurationWithMetadata) => {
+        setEditingConfig(item);
+    };
+
+    const handleConfigSaved = () => {
+        setSelectedModule(null);
+        setEditingConfig(null);
+        fetchData(); // refresh the agenda list
     };
 
     return (
@@ -110,7 +137,7 @@ export default function AgendaView() {
                     </div>
                 </div>
 
-                <AgendaList items={items} setItems={setItems} />
+                <AgendaList items={items} setItems={setItems} onItemClick={handleItemClick} />
 
                 <div className="flex items-center justify-between mt-12">
                     <button className="text-3xl text-gray-600 hover:text-gray-800">⚙</button>
@@ -124,6 +151,7 @@ export default function AgendaView() {
                     </div>
                 </div>
 
+                {/* Library Picker Modal */}
                 {isLibraryModalOpen && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                         <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
@@ -134,7 +162,53 @@ export default function AgendaView() {
                                 ✕
                             </button>
                             <div className="p-8">
-                                <Library />
+                                <h2 className="text-2xl font-semibold text-center mb-2 text-teal-600">Select a Module to Add</h2>
+                                <p className="text-center text-gray-500 mb-4 text-sm">Click on an item to add it to the agenda</p>
+                                <Library onSelect={handleModuleSelect} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Configuration Form Modal — Create Mode */}
+                {selectedModule && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                            <button
+                                onClick={() => setSelectedModule(null)}
+                                className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+                            >
+                                ✕
+                            </button>
+                            <div className="p-8">
+                                <ConfigurationForm
+                                    selectedModule={selectedModule}
+                                    currentItemCount={items.length}
+                                    onSave={handleConfigSaved}
+                                    onCancel={() => setSelectedModule(null)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Configuration Form Modal — Edit Mode */}
+                {editingConfig && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                            <button
+                                onClick={() => setEditingConfig(null)}
+                                className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+                            >
+                                ✕
+                            </button>
+                            <div className="p-8">
+                                <ConfigurationForm
+                                    existingConfig={editingConfig}
+                                    currentItemCount={items.length}
+                                    onSave={handleConfigSaved}
+                                    onCancel={() => setEditingConfig(null)}
+                                />
                             </div>
                         </div>
                     </div>
