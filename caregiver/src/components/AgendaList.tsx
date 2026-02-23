@@ -177,7 +177,8 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
         setPendingReorder(null);
         setPreReorderItems(null);
         console.log('Reorder confirmed', items);
-        // TODO: Add API call to InsertConfiguration (needs to include all modules in agenda listing) to update positions in backend
+        
+        // TODO: Add API call to InsertConfigurations (needs to include all modules in agenda listing) to update positions in backend
     };
 
     const cancelReorder = () => {
@@ -241,9 +242,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                     <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
                         <h3 className="text-xl font-semibold text-gray-800 mb-3">Confirm Position Change</h3>
                         <p className="text-gray-600 mb-6">
-                            Move <span className="font-medium text-gray-800">"{pendingReorder.movedTitle}"</span> from
-                            position <span className="font-medium">{pendingReorder.fromPos}</span> to
-                            position <span className="font-medium">{pendingReorder.toPos}</span>?
+                            Move <span className="font-medium text-gray-800">"{pendingReorder.movedTitle}"</span>?
                         </p>
                         <div className="flex gap-3 justify-end">
                             <button

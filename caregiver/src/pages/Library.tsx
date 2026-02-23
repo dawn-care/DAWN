@@ -449,13 +449,15 @@ function MediaCard({
       <p className="text-sm text-gray-500">{item.filename}</p>
 
       {/* Delete Button */}
-      <button
-        onClick={() => onDelete(item.metadata_id, item.id, item.type)}
-        className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-        title="Delete"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {onSelect == undefined && (
+        <button
+          onClick={() => onDelete(item.metadata_id, item.id, item.type)}
+          className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -545,13 +547,15 @@ function WidgetCard({
           </h3>
         )}
         {/* Delete Button */}
-        <button
-          onClick={() => onDelete(item.id, item.metadata_id, item.module_type, isEditing)}
-          className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-          title="Delete"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {onSelect == undefined && (
+          <button
+            onClick={() => onDelete(item.id, item.metadata_id, item.module_type, isEditing)}
+            className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </>
   );
@@ -639,13 +643,15 @@ function PromptCard({
             </>
           )}
           {/* Delete Button */}
-          <button
-            onClick={() => onDelete(item.id, item.metadata_id, isEditing)}
-            className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
+          {onSelect == undefined && (
+            <button
+              onClick={() => onDelete(item.id, item.metadata_id, isEditing)}
+              className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
           </button>
+        )}
       </div>
     </>
   );
