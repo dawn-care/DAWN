@@ -1,9 +1,11 @@
 import { GoogleLogin } from "@react-oauth/google";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [name, setName] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSuccess = async (credentialResponse: any) => {
     try {
@@ -35,25 +37,39 @@ const Login = () => {
     }
   };
 
+  useEffect(() => {
+    if (status === 'success') {
+      // Navigate after the state is successfully set
+      navigate('/library');
+    }
+  }, [status, navigate]); // Add status as a dependency to trigger navigation after it changes
+
   const handleError = () => {
-    setStatus("error");
+    setStatus('error');
   };
 
   return (
-    <div>
-      <h1>Login</h1>
+    <div className="w-full flex flex-col items-center mt-8 px-6">
+      <h1 className="text-3xl font-semibold mb-6">
+        Welcome!
+      </h1>
 
-      {status === "idle" && (
-        <GoogleLogin onSuccess={handleSuccess} onError={handleError} />
-      )}
+      <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+        <div className="mb-6 text-center">
+          <label className="text-lg font-medium">Log in or sign up with Google to access your agenda and library.</label>
+        </div>
 
-      {status === "success" && (
-        <p style={{ color: "green" }}>Login Success! Welcome!</p>
-      )}
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={handleSuccess}
+            onError={handleError}
+          />
+        </div>
 
-      {status === "error" && (
-        <p style={{ color: "red" }}> Login Failed. Please try again.</p>
-      )}
+        {status == "error" && (
+          <p style={{ color: "red" }}> Login failed. Please try again.</p>
+        )}
+      </div>
     </div>
   );
 };
