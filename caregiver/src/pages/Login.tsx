@@ -37,12 +37,12 @@ const Login = () => {
     }
   };
 
+  // Navigate after the state is successfully set
   useEffect(() => {
     if (status === 'success') {
-      // Navigate after the state is successfully set
       navigate('/library');
     }
-  }, [status, navigate]); // Add status as a dependency to trigger navigation after it changes
+  }, [status, navigate]); // Automatically trigger when status changes
 
   const handleError = () => {
     setStatus('error');
