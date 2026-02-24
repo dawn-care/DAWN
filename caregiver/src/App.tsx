@@ -10,6 +10,7 @@ import PromptForm from "./pages/PromptForm"
 import CalendarView from "./pages/CalendarView";
 import WidgetForm from "./pages/WidgetForm";
 import Login from "./pages/Login"
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -33,6 +34,8 @@ function App() {
         <Route path="/widget" element={<WidgetForm />} />
         <Route path="/widget/:moduleId" element={<WidgetForm />} />
         <Route path="/login" element={<Login/>} />
+
+        <Route path="/settings" element={<Settings/>} />
       </Routes>
     </>
   );
