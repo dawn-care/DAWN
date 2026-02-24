@@ -1,11 +1,13 @@
 import { GoogleLogin } from "@react-oauth/google";
 import { useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [name, setName] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { setIsAuthenticated } = useAuth();
 
   const handleSuccess = async (credentialResponse: any) => {
     try {
@@ -30,6 +32,8 @@ const Login = () => {
       if (name) {
         console.log(name);
       }
+      // Set the global auth status to true
+      setIsAuthenticated(true);
       setStatus("success");
     } catch (err) {
       console.error(err);
