@@ -27,13 +27,6 @@ func (s *CaregiverService) CreateCaregiver(c *caregiver.Caregiver) error {
 		return errors.New("name cannot be empty")
 	}
 
-	/* TODO - FindOrCreateFromGoogle sets the CarepartnerID to 0 by default, then tries to create caregiver
-	 * Need to either change the default id in that function or remove this check
-	 */
-	//if c.CarepartnerID == 0 {
-	//	return errors.New("carepartner_id must match caregiver ID or be set")
-	//}
-
 	return caregiver.CreateCaregiver(s.DB, c)
 }
 
