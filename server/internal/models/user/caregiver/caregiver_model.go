@@ -68,7 +68,7 @@ func CreateCaregiversBulk(db *sql.DB, caregivers []Caregiver) error {
 // GetCaregiverByID retrieves a caregiver by ID
 func GetCaregiverByID(db *sql.DB, id int) (*Caregiver, error) {
 	query := `
-		SELECT id, carepartner_id, name, role
+		SELECT id, carepartner_id, name, role, google_id
 		FROM "Caregiver"
 		WHERE id = $1;
 	`
@@ -79,6 +79,7 @@ func GetCaregiverByID(db *sql.DB, id int) (*Caregiver, error) {
 		&c.CarepartnerID,
 		&c.Name,
 		&c.Role,
+		&c.GoogleID,
 	)
 
 	if err != nil {

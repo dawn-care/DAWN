@@ -145,11 +145,13 @@ func main() {
 
 	// Auth routes
 	r.Post("/api/auth/google", authController.GoogleLogin)
+	r.Post("/api/auth/logout", authController.Logout)
 
 	// Protected route (test route - update later w protected routes)
 	r.Group(func(r chi.Router) {
 		r.Use(mw.RequireAuth(sessionService))
 		r.Get("/api/me", authController.MeHandler)
+		r.Put("/api/me", authController.UpdateMeHandler)
 	})
 
 	// Controllers

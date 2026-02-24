@@ -1,5 +1,5 @@
 import { GoogleLogin } from "@react-oauth/google";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from "../context/AuthContext";
 
@@ -26,27 +26,43 @@ const Login = () => {
         setStatus("error");
         return;
       }
+
       // here should receive data and be able to say what the persons name etc is
       setName("");
+
       // this is here to leave the name variable and stop golang from tweaking while it's unimplemented
       if (name) {
         console.log(name);
+      }  
+
+      // After login succeeds, fetch user
+      const meRes = await fetch("http://localhost:8080/api/me", {
+        credentials: "include",
+      });
+
+      // If user does not exist, login was not okay
+      if (!meRes.ok) {
+        setStatus("error");
+        return;
       }
-      // Set the global auth status to true
+
+      const user = await meRes.json();
+      console.log("USER FROM BACKEND:", user);
+
+      // Set the global auth status
       setIsAuthenticated(true);
-      setStatus("success");
+
+      // If user does not have a paired carepartner id, take them to setup page
+      if (user.carepartner_id == 0) {
+        navigate("/setup");
+      } else {
+        navigate("/library");
+      }
     } catch (err) {
       console.error(err);
       setStatus("error");
     }
   };
-
-  // Navigate after the state is successfully set
-  useEffect(() => {
-    if (status === 'success') {
-      navigate('/library');
-    }
-  }, [status, navigate]); // Automatically trigger when status changes
 
   const handleError = () => {
     setStatus('error');

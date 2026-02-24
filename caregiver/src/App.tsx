@@ -11,6 +11,7 @@ import CalendarView from "./pages/CalendarView";
 import WidgetForm from "./pages/WidgetForm";
 import Login from "./pages/Login"
 import Settings from "./pages/Settings";
+import AccountSetupPage from "./pages/AccountSetup";
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
         <Route path="/login" element={<Login/>} />
 
         <Route path="/settings" element={<Settings/>} />
+        <Route path="/setup" element={<AccountSetupPage/>} />
       </Routes>
     </>
   );
