@@ -26,9 +26,13 @@ func (s *CaregiverService) CreateCaregiver(c *caregiver.Caregiver) error {
 	if c.Name == "" {
 		return errors.New("name cannot be empty")
 	}
-	if c.CarepartnerID == 0 {
-		return errors.New("carepartner_id must match caregiver ID or be set")
-	}
+
+	/* TODO - FindOrCreateFromGoogle sets the CarepartnerID to 0 by default, then tries to create caregiver
+	 * Need to either change the default id in that function or remove this check
+	 */
+	//if c.CarepartnerID == 0 {
+	//	return errors.New("carepartner_id must match caregiver ID or be set")
+	//}
 
 	return caregiver.CreateCaregiver(s.DB, c)
 }
@@ -124,10 +128,10 @@ func (s *CaregiverService) CountModulesForCaregiver(caregiverID int) (int, error
 }
 
 func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (*caregiver.Caregiver, error) {
-
 	// First try to find existing caregiver by Google ID
 	existing, err := caregiver.GetCaregiverByGoogleID(s.DB, googleUser.ID)
-	if err != nil {
+
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 	if existing != nil {

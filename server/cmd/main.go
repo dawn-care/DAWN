@@ -150,6 +150,7 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(mw.RequireAuth(sessionService))
 		r.Get("/api/me", authController.MeHandler)
+		r.Put("/api/me", authController.UpdateMeHandler)
 	})
 
 	// Controllers

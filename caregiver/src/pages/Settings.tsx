@@ -21,42 +21,40 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCaregiver = async () => {
       try {
-        const res = await fetch("/api/me", {
+        const res = await fetch("http://localhost:8080/api/me", {
           method: "GET",
           credentials: "include",
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          setCaregiver(data);
-        } else {
+        if (!res.ok) {
           console.warn("Failed to fetch caregiver, using defaults");
+          return;
         }
+
+        const data = await res.json();
+        setCaregiver(data);
       } catch (err) {
         console.error("Error fetching caregiver, using defaults:", err);
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchCaregiver();
   }, []);
 
+  // TODO - actually clear session cookie
   const handleLogout = () => {
     setIsAuthenticated(false);
     navigate("/login");
   };
 
+  // TODO - actually ping the backend to update the caregiver record
   const handleUpdate = () => {
     alert(`Update functionality not implemented yet. Name: ${caregiver.name}`);
   };
-
-  if (loading) return <p>Loading...</p>;
 
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
@@ -68,7 +66,9 @@ export default function SettingsPage() {
           <input
             type="text"
             value={caregiver.name}
-            onChange={(e) => setCaregiver({ ...caregiver, name: e.target.value })}
+            onChange={(e) =>
+              setCaregiver({ ...caregiver, name: e.target.value })
+            }
             className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
           />
         </div>
@@ -95,14 +95,14 @@ export default function SettingsPage() {
 
         <div className="flex gap-4 mt-4">
           <button
-            className="flex-1 bg-teal-200 hover:bg-teal-300 text-white font-semibold py-3 rounded"
+            className="mt-4 flex-1 bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
             onClick={handleUpdate}
           >
             Update
           </button>
 
           <button
-            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded"
+            className="mt-4 flex-1 bg-red-500 hover:bg-red-600 text-gray-800 font-semibold py-3 rounded"
             onClick={handleLogout}
           >
             Logout
