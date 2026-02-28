@@ -157,7 +157,37 @@ export default function ConfigurationForm({
         setSaving(true);
         setStatus('');
 
-        //TODO - Do endpoint
+        try {
+            const configEntry = {
+                id: existingConfig.id,
+                module_id: existingConfig.module_id,
+                occurence_type: occurrenceType,
+                occurence_definition: buildOccurrenceDefinition(),
+                position: position,
+                duration: duration,
+            };
+
+            const res = await fetch(`${API_URL}/configurations/insert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carepartner_id: existingConfig.carepartner_id,
+                    json_config: JSON.stringify([configEntry]),
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to update configuration');
+            }
+
+            setStatus('Configuration updated successfully!');
+            onSave();
+        } catch (err: any) {
+            setStatus(`Error: ${err.message}`);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleDelete = async () => {

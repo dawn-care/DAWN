@@ -114,7 +114,6 @@ CREATE OR REPLACE PROCEDURE insert_configurations(
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    to_delete_row RECORD;
     new_row RECORD;
 BEGIN
     CREATE TEMP TABLE tmp_configs AS
@@ -127,15 +126,22 @@ BEGIN
         (conf->>'duration')::INT AS duration
     FROM jsonb_array_elements(p_configs) AS conf;
 
-    FOR to_delete_row IN SELECT * FROM tmp_configs ORDER BY position ASC LOOP
-        IF to_delete_row.id IS NOT NULL THEN
-            DELETE FROM "Configuration" WHERE id = to_delete_row.id;
-            IF FOUND THEN
-                UPDATE "Configuration" SET position = position - 1 WHERE carepartner_id = p_carepartner_id AND position > to_delete_row.position;
-            END IF;
-        END IF;
-    END LOOP;
+    -- Batch-delete all existing configurations being replaced
+    DELETE FROM "Configuration"
+    WHERE id IN (SELECT t.id FROM tmp_configs t WHERE t.id IS NOT NULL);
 
+    -- Compact remaining positions to close gaps left by the deletions
+    WITH ranked AS (
+        SELECT id, ROW_NUMBER() OVER (ORDER BY position) AS new_pos
+        FROM "Configuration"
+        WHERE carepartner_id = p_carepartner_id
+    )
+    UPDATE "Configuration" c
+    SET position = ranked.new_pos
+    FROM ranked
+    WHERE c.id = ranked.id;
+
+    -- Insert all configurations, shifting existing rows as needed
     FOR new_row IN SELECT * FROM tmp_configs ORDER BY position ASC LOOP
         UPDATE "Configuration"
         SET position = "Configuration".position + 1
@@ -147,44 +153,25 @@ BEGIN
             ORDER BY position DESC
         ) desc_positions
         WHERE "Configuration".id = desc_positions.id;
-        IF new_row.id IS NOT NULL THEN
-            INSERT INTO "Configuration" (
-                id,
-                carepartner_id,
-                module_id,
-                occurence_type,
-                occurence_definition,
-                position,
-                duration
-            ) VALUES (
-                new_row.id,
-                p_carepartner_id,
-                new_row.module_id,
-                new_row.occurence_type,
-                new_row.occurence_definition,
-                new_row.position,
-                new_row.duration
-            );
-        ELSE
-            INSERT INTO "Configuration" (
-                carepartner_id,
-                module_id,
-                occurence_type,
-                occurence_definition,
-                position,
-                duration
-            ) VALUES (
-                p_carepartner_id,
-                new_row.module_id,
-                new_row.occurence_type,
-                new_row.occurence_definition,
-                new_row.position,
-                new_row.duration
-            );
-        END IF;
+
+        INSERT INTO "Configuration" (
+            carepartner_id,
+            module_id,
+            occurence_type,
+            occurence_definition,
+            position,
+            duration
+        ) VALUES (
+            p_carepartner_id,
+            new_row.module_id,
+            new_row.occurence_type,
+            new_row.occurence_definition,
+            new_row.position,
+            new_row.duration
+        );
     END LOOP;
 
-    DROP TABLE tmp_configs;
+    DROP TABLE IF EXISTS tmp_configs;
 END;
 $$;
 

@@ -172,17 +172,46 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
         setDraggedIndex(null);
     };
 
-    const confirmReorder = () => {
-        // User confirmed — keep the new order
-        setPendingReorder(null);
-        setPreReorderItems(null);
-        console.log('Reorder confirmed', items);
-        
-        // TODO: Add API call to InsertConfigurations (needs to include all modules in agenda listing) to update positions in backend
+    const confirmReorder = async () => {
+        if (!pendingReorder) return;
+        const reordered = pendingReorder.reordered;
+
+        try {
+            const configEntries = reordered.map((item) => ({
+                id: item.id,
+                module_id: item.module_id,
+                occurence_type: item.occurence_type,
+                occurence_definition: item.occurence_definition ?? [],
+                position: item.position,
+                duration: item.duration,
+            }));
+
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+            const res = await fetch(`${API_URL}/configurations/insert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carepartner_id: 1,
+                    json_config: JSON.stringify(configEntries),
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to update positions');
+            }
+        } catch (err) {
+            console.error('Reorder failed, reverting:', err);
+            if (preReorderItems) {
+                setItems(preReorderItems);
+            }
+        } finally {
+            setPendingReorder(null);
+            setPreReorderItems(null);
+        }
     };
 
     const cancelReorder = () => {
-        // User cancelled — revert to the snapshot
         if (preReorderItems) {
             setItems(preReorderItems);
         }
