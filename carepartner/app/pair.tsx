@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -7,60 +7,113 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
 
-type PairingResult =
+type CodeResult =
+  | { ok: true; pairingCode: string; expiresInSec?: number }
+  | { ok: false; message: string };
+
+type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function pairDeviceWithCode(pairingCode: string): Promise<PairingResult> {
+// ---- STUB BACKEND CALLS (replace later) ----
+async function fetchPairingCodeForThisDevice(): Promise<CodeResult> {
   // TODO: replace with real API call
-  // const res = await fetch("https://your-api/pair", {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ pairingCode }),
-  // });
-  // if (!res.ok) return { ok: false, message: "Invalid pairing code." };
+  // const res = await fetch("https://your-api/device/pairing-code", { method: "POST" });
   // return await res.json();
 
-  // stub behavior:
-  await new Promise((r) => setTimeout(r, 800));
-
-  // accept a specific code for dev testing:
-  if (pairingCode.toUpperCase() === "ABC123") {
-    return { ok: true, deviceId: "device_123" };
-  }
-
-  return { ok: false, message: "Invalid pairing code. Please try again." };
+  await new Promise((r) => setTimeout(r, 700));
+  return { ok: true, pairingCode: "ABC123", expiresInSec: 600 };
 }
 
-function normalizeCode(raw: string) {
-  // uppercase, remove spaces/dashes, keep alphanumeric only
-  return raw
-    .toUpperCase()
-    .replace(/[\s-]/g, "")
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 8); // allow up to 8 just in case your backend uses that later
+async function verifyThisDeviceIsPaired(): Promise<VerifyResult> {
+  // TODO: replace with real API call
+  // const res = await fetch("https://your-api/device/verify-pairing", { method: "POST" });
+  // if (!res.ok) return { ok: false, message: "Not paired yet." };
+  // return await res.json();
+
+  await new Promise((r) => setTimeout(r, 800));
+  // Stub behavior: pretend the caregiver already used the code.
+  return { ok: true, deviceId: "device_123" };
+}
+
+function formatCountdown(totalSeconds: number) {
+  const sec = Math.max(0, Math.floor(totalSeconds));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export default function PairScreen() {
-  const [code, setCode] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [expiresInSec, setExpiresInSec] = useState<number | null>(null);
+
+  const [isLoadingCode, setIsLoadingCode] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
 
-  const cleanedCode = useMemo(() => normalizeCode(code), [code]);
-  const canSubmit = cleanedCode.length >= 6 && !isSubmitting;
+  const canVerify = !!pairingCode && !isLoadingCode && !isVerifying;
 
-  const handleSubmit = async () => {
+  const loadCode = async () => {
     setError(null);
-    setIsSubmitting(true);
+    setIsLoadingCode(true);
+    try {
+      const result = await fetchPairingCodeForThisDevice();
+      if (!result.ok) {
+        setError(result.message);
+        setPairingCode(null);
+        setExpiresInSec(null);
+        return;
+      }
+
+      setPairingCode(result.pairingCode);
+      setExpiresInSec(result.expiresInSec ?? null);
+    } catch {
+      setError("Could not load pairing code. Please check your connection.");
+      setPairingCode(null);
+      setExpiresInSec(null);
+    } finally {
+      setIsLoadingCode(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Simple countdown (optional)
+  useEffect(() => {
+    if (expiresInSec == null) return;
+    if (expiresInSec <= 0) return;
+
+    const id = setInterval(() => {
+      setExpiresInSec((t) => (t == null ? t : Math.max(0, t - 1)));
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [expiresInSec]);
+
+  // If it expires, clear code + show message (optional)
+  useEffect(() => {
+    if (expiresInSec == null) return;
+    if (expiresInSec > 0) return;
+
+    // Expired
+    setPairingCode(null);
+    setError("This code expired. Tap Refresh Code to generate a new one.");
+  }, [expiresInSec]);
+
+  const handleVerify = async () => {
+    setError(null);
+    setIsVerifying(true);
 
     try {
-      const result = await pairDeviceWithCode(cleanedCode);
+      const result = await verifyThisDeviceIsPaired();
       if (!result.ok) {
         setError(result.message);
         return;
@@ -69,12 +122,12 @@ export default function PairScreen() {
       // TODO: store deviceId / auth token returned from backend
       // Example: await SecureStore.setItemAsync("deviceId", result.deviceId)
 
-      // Next step per your manual: Terms & Conditions screen (stub route for now)
+      // Next step: Terms & Conditions screen
       router.push("/terms" as Href);
     } catch {
       setError("Something went wrong. Please check your connection and try again.");
     } finally {
-      setIsSubmitting(false);
+      setIsVerifying(false);
     }
   };
 
@@ -91,51 +144,69 @@ export default function PairScreen() {
             <Text style={styles.title}>Pair Device</Text>
 
             <Text style={styles.subtitle}>
-              Enter the pairing code from your caregiver’s account page to link this device.
+              On the caregiver’s device, open Start-Up and enter this code to link this
+              screen/device. Then tap <Text style={styles.bold}>Verify</Text> here.
             </Text>
 
-            <View style={styles.inputGroup}>
+            {/* Code display */}
+            <View style={styles.codeBlock}>
               <Text style={styles.label}>Pairing Code</Text>
 
-              <TextInput
-                value={code}
-                onChangeText={(t) => setCode(normalizeCode(t))}
-                placeholder="e.g. ABC123"
-                placeholderTextColor="rgba(0,0,0,0.35)"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                keyboardType="default"
-                returnKeyType="done"
-                onSubmitEditing={() => {
-                  if (canSubmit) handleSubmit();
-                }}
-                style={styles.input}
-                maxLength={8}
-              />
+              <View style={styles.codeBox}>
+                {isLoadingCode ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator />
+                    <Text style={styles.codeLoadingText}>Generating…</Text>
+                  </View>
+                ) : pairingCode ? (
+                  <Text style={styles.codeText}>{pairingCode}</Text>
+                ) : (
+                  <Text style={styles.codeMissingText}>—</Text>
+                )}
+              </View>
 
-              <Text style={styles.helper}>
-                Tip: codes are usually 6–8 letters/numbers.
-              </Text>
+              <View style={styles.codeMetaRow}>
+                {expiresInSec != null && pairingCode ? (
+                  <Text style={styles.helper}>
+                    Expires in {formatCountdown(expiresInSec)}
+                  </Text>
+                ) : (
+                  <Text style={styles.helper}>Code updates are handled by backend.</Text>
+                )}
+
+                <Pressable
+                  onPress={loadCode}
+                  disabled={isLoadingCode || isVerifying}
+                  style={({ pressed }) => [
+                    styles.linkButton,
+                    (isLoadingCode || isVerifying) && { opacity: 0.5 },
+                    pressed && !(isLoadingCode || isVerifying) && { opacity: 0.75 },
+                  ]}
+                >
+                  <Text style={styles.linkText}>Refresh Code</Text>
+                </Pressable>
+              </View>
 
               {!!error && <Text style={styles.error}>{error}</Text>}
             </View>
 
+            {/* Verify button */}
             <Pressable
-              onPress={handleSubmit}
-              disabled={!canSubmit}
+              onPress={handleVerify}
+              disabled={!canVerify}
               style={({ pressed }) => [
                 styles.button,
-                !canSubmit && styles.buttonDisabled,
-                pressed && canSubmit && { transform: [{ scale: 0.99 }] },
+                !canVerify && styles.buttonDisabled,
+                pressed && canVerify && { transform: [{ scale: 0.99 }] },
               ]}
             >
-              {isSubmitting ? (
+              {isVerifying ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator />
-                  <Text style={styles.buttonText}>Pairing…</Text>
+                  <Text style={styles.buttonText}>Verifying…</Text>
                 </View>
               ) : (
-                <Text style={styles.buttonText}>Pair Device</Text>
+                <Text style={styles.buttonText}>Verify</Text>
               )}
             </Pressable>
 
@@ -180,29 +251,67 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: "rgba(0,0,0,0.65)",
   },
+  bold: { fontWeight: "800", color: "rgba(0,0,0,0.75)" },
 
-  inputGroup: { gap: 8 },
+  codeBlock: { gap: 8 },
   label: {
     fontSize: 14,
     fontWeight: "700",
     color: "rgba(0,0,0,0.7)",
   },
-  input: {
-    height: 54,
-    borderRadius: 14,
+  codeBox: {
+    height: 64,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.18)",
     paddingHorizontal: 14,
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: 2,
-    color: "rgba(0,0,0,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.95)",
+  },
+  codeText: {
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: 4,
+    color: "rgba(0,0,0,0.85)",
+  },
+  codeMissingText: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "rgba(0,0,0,0.35)",
+  },
+  codeLoadingText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "rgba(0,0,0,0.55)",
+  },
+
+  codeMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
   },
   helper: {
     fontSize: 13,
     color: "rgba(0,0,0,0.55)",
+    flex: 1,
   },
+
+  linkButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+  },
+  linkText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "rgba(0,0,0,0.7)",
+  },
+
   error: {
     fontSize: 14,
     color: "#B00020",
