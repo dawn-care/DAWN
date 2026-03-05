@@ -34,10 +34,19 @@ export type ConfigurationWithMetadata = {
 interface AgendaListProps {
     items: ConfigurationWithMetadata[];
     setItems: (items: ConfigurationWithMetadata[]) => void;
+    onItemClick?: (item: ConfigurationWithMetadata) => void;
 }
 
-export default function AgendaList({ items, setItems }: AgendaListProps) {
+export default function AgendaList({ items, setItems, onItemClick }: AgendaListProps) {
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+    const [pendingReorder, setPendingReorder] = React.useState<{
+        reordered: ConfigurationWithMetadata[];
+        movedTitle: string;
+        fromPos: number;
+        toPos: number;
+    } | null>(null);
+    // Keep a snapshot so we can revert on cancel
+    const [preReorderItems, setPreReorderItems] = React.useState<ConfigurationWithMetadata[] | null>(null);
 
     const getModuleTitle = (item: ConfigurationWithMetadata): string => {
         const meta = item.metadata;
@@ -102,6 +111,7 @@ export default function AgendaList({ items, setItems }: AgendaListProps) {
         if (draggedIndex === null || draggedIndex === dropIndex) return;
 
         const targetItem = items[dropIndex];
+        const draggedItem = items[draggedIndex];
 
         const updatedItems = items.map((item, index) => {
             // Dragging UP
@@ -146,13 +156,67 @@ export default function AgendaList({ items, setItems }: AgendaListProps) {
         const [removed] = reordered.splice(draggedIndex, 1);
         reordered.splice(dropIndex, 0, removed);
 
+        // Save snapshot for potential revert, apply reorder optimistically, and show confirmation
+        setPreReorderItems([...items]);
         setItems(reordered);
+        setPendingReorder({
+            reordered,
+            movedTitle: getModuleTitle(draggedItem),
+            fromPos: draggedItem.position,
+            toPos: targetItem.position,
+        });
         setDraggedIndex(null);
     };
 
     const handleDragEnd = () => {
         setDraggedIndex(null);
-        console.log(items);
+    };
+
+    const confirmReorder = async () => {
+        if (!pendingReorder) return;
+        const reordered = pendingReorder.reordered;
+
+        try {
+            const configEntries = reordered.map((item) => ({
+                id: item.id,
+                module_id: item.module_id,
+                occurence_type: item.occurence_type,
+                occurence_definition: item.occurence_definition ?? [],
+                position: item.position,
+                duration: item.duration,
+            }));
+
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+            const res = await fetch(`${API_URL}/configurations/insert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carepartner_id: 1,
+                    json_config: JSON.stringify(configEntries),
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to update positions');
+            }
+        } catch (err) {
+            console.error('Reorder failed, reverting:', err);
+            if (preReorderItems) {
+                setItems(preReorderItems);
+            }
+        } finally {
+            setPendingReorder(null);
+            setPreReorderItems(null);
+        }
+    };
+
+    const cancelReorder = () => {
+        if (preReorderItems) {
+            setItems(preReorderItems);
+        }
+        setPendingReorder(null);
+        setPreReorderItems(null);
     };
 
     return (
@@ -188,7 +252,10 @@ export default function AgendaList({ items, setItems }: AgendaListProps) {
                             </div>
                         </div>
                     </div>
-                    <button className="flex-1 flex items-center gap-4 bg-slate-100 p-2 rounded-lg">
+                    <button
+                        className="flex-1 flex items-center gap-4 bg-slate-100 p-2 rounded-lg hover:bg-slate-200 transition"
+                        onClick={() => onItemClick?.(item)}
+                    >
                         <img src={getModuleIcon(item.module_type)} alt="module icon" className="w-12 h-12 rounded" />
                         <div className="flex-1 flex">
                             <div className="text-gray-800 font-medium text-2xl">{getModuleTitle(item)}</div>
@@ -197,6 +264,32 @@ export default function AgendaList({ items, setItems }: AgendaListProps) {
                     </button>
                 </div>
             ))}
+
+            {/* Reorder Confirmation Popup */}
+            {pendingReorder && (
+                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-3">Confirm Position Change</h3>
+                        <p className="text-gray-600 mb-6">
+                            Move <span className="font-medium text-gray-800">"{pendingReorder.movedTitle}"</span>?
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={cancelReorder}
+                                className="px-5 py-2 border border-gray-300 text-gray-600 rounded-lg font-medium hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmReorder}
+                                className="px-5 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600"
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

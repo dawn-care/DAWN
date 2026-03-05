@@ -68,7 +68,12 @@ const FILTERS: Filter[] = [
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export default function Library() {
+// Props for Library when it is acting as the agenda selector
+interface LibraryProps {
+  onSelect?: (module: { moduleId: number; moduleType: string; label: string }) => void;
+}
+
+export default function Library({ onSelect }: LibraryProps = {}) {
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -343,13 +348,14 @@ export default function Library() {
               item={item as MediaItem}
               onDelete={handleMediaDelete}
               onRename={handleMediaRename}
+              onSelect={onSelect}
             />
           ) : item.module_type === "weather" ||
             item.module_type === "sports" ||
             item.module_type === "news" ? (
-            <WidgetCard key={item.id} item={item as WidgetItem} onDelete={handleWidgetDelete} onUpdate={handleUpdate} />
+            <WidgetCard key={item.id} item={item as WidgetItem} onDelete={handleWidgetDelete} onUpdate={handleUpdate} onSelect={onSelect} />
           ) : item.module_type === "messages" ? (
-            <PromptCard key={item.id} item={item as PromptItem} onDelete={handlePromptDelete} onUpdate={handleUpdate}/>
+            <PromptCard key={item.id} item={item as PromptItem} onDelete={handlePromptDelete} onUpdate={handleUpdate} onSelect={onSelect}/>
           ) : null
         )}
       </div>
@@ -368,10 +374,12 @@ function MediaCard({
   item,
   onDelete,
   onRename,
+  onSelect,
 }: {
   item: MediaItem;
   onDelete: (metadataId: number, moduleId: number, type: MediaType) => void;
   onRename: (id: number, type: MediaType, newName: string) => void;
+  onSelect?: (module: { moduleId: number; moduleType: string; label: string }) => void;
 }){
   const [isEditing, setIsEditing] = useState(false);
   const [tempName, setTempName] = useState(item.name);
@@ -383,11 +391,17 @@ function MediaCard({
     setIsEditing(false);
   };
 
+  const handleClick = () => {
+    if (onSelect) {
+      onSelect({ moduleId: item.id, moduleType: item.module_type, label: `${item.type.charAt(0).toUpperCase() + item.type.slice(1)} - ${item.name}` });
+    }
+  };
+
   return (
-    <div className="relative flex flex-col items-center text-center 
-      border border-gray-200 rounded-xl 
-      shadow-sm hover:shadow-md 
-      p-6 w-full h-64 bg-white">
+    <div
+      className={`relative flex flex-col items-center text-center border border-gray-200 rounded-xl shadow-sm hover:shadow-md p-6 w-full h-64 bg-white ${onSelect ? 'cursor-pointer ring-2 ring-transparent hover:ring-teal-400' : ''}`}
+      onClick={onSelect ? handleClick : undefined}
+    >
       {item.type === "photo" ? (
         <img
           src={item.uri}
@@ -435,13 +449,15 @@ function MediaCard({
       <p className="text-sm text-gray-500">{item.filename}</p>
 
       {/* Delete Button */}
-      <button
-        onClick={() => onDelete(item.metadata_id, item.id, item.type)}
-        className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-        title="Delete"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {onSelect == undefined && (
+        <button
+          onClick={() => onDelete(item.metadata_id, item.id, item.type)}
+          className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -450,10 +466,12 @@ function WidgetCard({
     item,
     onDelete,
     onUpdate,
+    onSelect,
   }: {
     item: WidgetItem;
     onDelete: (moduleId: number, metadataId: number, moduleType: string, isEditing: boolean) => void;
     onUpdate: () => void;
+    onSelect?: (module: { moduleId: number; moduleType: string; label: string }) => void;
   }) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -487,12 +505,15 @@ function WidgetCard({
       )}
 
     {/* For displaying widgets in the library */}
-      <div className="relative flex flex-col items-center justify-center text-center 
-          border border-gray-200 rounded-xl 
-          shadow-sm hover:shadow-md
-          hover:text-teal-500 
-          p-6 w-full h-64 bg-white"
-          onClick={() => setIsEditing(true)}>
+      <div className={`relative flex flex-col items-center justify-center text-center border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:text-teal-500 p-6 w-full h-64 bg-white ${onSelect ? 'cursor-pointer ring-2 ring-transparent hover:ring-teal-400' : ''}`}
+          onClick={() => {
+            if (onSelect) {
+              const label = item.module_type === 'weather' ? `Weather - Zip: ${item.zipcode}` : item.module_type === 'sports' ? `Sports - ${(item as NewsItem).language}` : 'Good News';
+              onSelect({ moduleId: item.id, moduleType: item.module_type, label });
+            } else {
+              setIsEditing(true);
+            }
+          }}>
         {item.module_type === "weather" ? (
           <>
             <h3
@@ -526,13 +547,15 @@ function WidgetCard({
           </h3>
         )}
         {/* Delete Button */}
-        <button
-          onClick={() => onDelete(item.id, item.metadata_id, item.module_type, isEditing)}
-          className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-          title="Delete"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {onSelect == undefined && (
+          <button
+            onClick={() => onDelete(item.id, item.metadata_id, item.module_type, isEditing)}
+            className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </>
   );
@@ -542,10 +565,12 @@ function PromptCard({
     item,
     onDelete,
     onUpdate,
+    onSelect,
   }: {
     item: PromptItem;
     onDelete: (moduleId: number, metadataId: number, isEditing: boolean) => void;
     onUpdate: () => void;
+    onSelect?: (module: { moduleId: number; moduleType: string; label: string }) => void;
   }){
   const [isEditing, setIsEditing] = useState(false);
 
@@ -579,12 +604,15 @@ function PromptCard({
       )}
 
       {/* For displaying prompts in the library */}
-      <div className="relative flex flex-col items-center justify-center text-center 
-          border border-gray-200 rounded-xl 
-          shadow-sm hover:shadow-md
-          hover:text-teal-500 
-          p-6 w-full h-64 bg-white"
-          onClick={() => setIsEditing(true)}>
+      <div className={`relative flex flex-col items-center justify-center text-center border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:text-teal-500 p-6 w-full h-64 bg-white ${onSelect ? 'cursor-pointer ring-2 ring-transparent hover:ring-teal-400' : ''}`}
+          onClick={() => {
+            if (onSelect) {
+              const label = item.message.length > 40 ? `Message - ${item.message.slice(0, 40)}...` : `Message - ${item.message}`;
+              onSelect({ moduleId: item.id, moduleType: 'message', label });
+            } else {
+              setIsEditing(true);
+            }
+          }}>
           {item.image_uri ? (
             <>
               <img
@@ -615,13 +643,15 @@ function PromptCard({
             </>
           )}
           {/* Delete Button */}
-          <button
-            onClick={() => onDelete(item.id, item.metadata_id, isEditing)}
-            className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
+          {onSelect == undefined && (
+            <button
+              onClick={() => onDelete(item.id, item.metadata_id, isEditing)}
+              className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
           </button>
+        )}
       </div>
     </>
   );

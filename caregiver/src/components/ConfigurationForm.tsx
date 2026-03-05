@@ -1,0 +1,448 @@
+import { useState, useEffect } from 'react';
+import type { ConfigurationWithMetadata } from './AgendaList';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+type OccurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat'] as const;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+interface SelectedModule {
+    moduleId: number;
+    moduleType: string;
+    label: string;
+}
+
+interface ConfigurationFormProps {
+    /** When provided the form runs in edit mode, pre-filled with this config */
+    existingConfig?: ConfigurationWithMetadata;
+    /** When provided the form runs in create mode for this module */
+    selectedModule?: SelectedModule;
+    /** Current number of items in the agenda (used for default position on create) */
+    currentItemCount: number;
+    /** Callback after a successful save / update / delete so they can refresh */
+    onSave: () => void;
+    onCancel: () => void;
+}
+
+export default function ConfigurationForm({
+    existingConfig,
+    selectedModule,
+    currentItemCount,
+    onSave,
+    onCancel,
+}: ConfigurationFormProps) {
+    const isEditMode = Boolean(existingConfig);
+    const [occurrenceType, setOccurrenceType] = useState<OccurrenceType>('daily');
+    const [weeklyDays, setWeeklyDays] = useState<string[]>([]);
+    const [monthlyDays, setMonthlyDays] = useState<string[]>([]);
+    const [yearlyDates, setYearlyDates] = useState<string[]>([]);
+    const [yearlyMonth, setYearlyMonth] = useState<string>('Jan');
+    const [yearlyDay, setYearlyDay] = useState<number>(1);
+    const [duration, setDuration] = useState<number>(30);
+    const [position, setPosition] = useState<number>(currentItemCount + 1);
+    const [status, setStatus] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    // Pre-fill for edit mode
+    useEffect(() => {
+        if (!existingConfig) return;
+        setOccurrenceType(existingConfig.occurence_type as OccurrenceType);
+        setDuration(existingConfig.duration);
+        setPosition(existingConfig.position);
+
+        const def = existingConfig.occurence_definition || [];
+        switch (existingConfig.occurence_type) {
+            case 'weekly':
+                setWeeklyDays(def);
+                break;
+            case 'monthly':
+                setMonthlyDays(def);
+                break;
+            case 'yearly':
+                setYearlyDates(def);
+                break;
+        }
+    }, [existingConfig]);
+
+    // Build occurence_definition from UI state
+    const buildOccurrenceDefinition = (): string[] => {
+        switch (occurrenceType) {
+            case 'daily':
+                return [];
+            case 'weekly':
+                return weeklyDays;
+            case 'monthly':
+                return monthlyDays;
+            case 'yearly':
+                return yearlyDates;
+            default:
+                return [];
+        }
+    };
+
+    // Toggle a day in the weekly selection
+    const toggleWeeklyDay = (day: string) => {
+        setWeeklyDays((prev) =>
+            prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+        );
+    };
+
+    // Toggle a day number in the monthly selection
+    const toggleMonthlyDay = (day: string) => {
+        setMonthlyDays((prev) =>
+            prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+        );
+    };
+
+    // Add a yearly date entry
+    const addYearlyDate = () => {
+        const entry = `${yearlyMonth} ${yearlyDay}`;
+        if (!yearlyDates.includes(entry)) {
+            setYearlyDates((prev) => [...prev, entry]);
+        }
+    };
+
+    // Remove a yearly date entry
+    const removeYearlyDate = (entry: string) => {
+        setYearlyDates((prev) => prev.filter((d) => d !== entry));
+    };
+
+    // Derive the display label
+    const moduleLabel = isEditMode
+        ? getModuleLabel(existingConfig!)
+        : selectedModule?.label || 'Unknown Module';
+
+    const handleCreate = async () => {
+        if (!selectedModule) return;
+        setSaving(true);
+        setStatus('');
+
+        try {
+            const configEntry = {
+                id: null,
+                module_id: selectedModule.moduleId,
+                occurence_type: occurrenceType,
+                occurence_definition: buildOccurrenceDefinition(),
+                position: position,
+                duration: duration,
+            };
+
+            const res = await fetch(`${API_URL}/configurations/insert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carepartner_id: 1, //TODO - need some sort of storage of the current users carepartner_id
+                    json_config: JSON.stringify([configEntry]),
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to create configuration');
+            }
+
+            setStatus('Configuration created successfully!');
+            onSave();
+        } catch (err: any) {
+            setStatus(`Error: ${err.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleUpdate = async () => {
+        if (!existingConfig) return;
+        setSaving(true);
+        setStatus('');
+
+        try {
+            const configEntry = {
+                id: existingConfig.id,
+                module_id: existingConfig.module_id,
+                occurence_type: occurrenceType,
+                occurence_definition: buildOccurrenceDefinition(),
+                position: position,
+                duration: duration,
+            };
+
+            const res = await fetch(`${API_URL}/configurations/insert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carepartner_id: existingConfig.carepartner_id,
+                    json_config: JSON.stringify([configEntry]),
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to update configuration');
+            }
+
+            setStatus('Configuration updated successfully!');
+            onSave();
+        } catch (err: any) {
+            setStatus(`Error: ${err.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!existingConfig) return;
+        if (!confirm('Are you sure you want to remove this item from the agenda?')) return;
+        setSaving(true);
+        setStatus('');
+
+        try {
+            const res = await fetch(`${API_URL}/configurations/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carepartner_id: existingConfig.carepartner_id,
+                    id_list: [existingConfig.id],
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to delete configuration');
+            }
+
+            setStatus('Configuration removed successfully!');
+            onSave();
+        } catch (err: any) {
+            setStatus(`Error: ${err.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="w-full flex flex-col items-center px-6 py-4">
+            <h1 className="text-3xl font-semibold mb-6">
+                {isEditMode ? 'Edit Agenda Item' : 'Add to Agenda'}
+            </h1>
+
+            <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow space-y-6">
+                {/* Module Info (read-only) */}
+                <div>
+                    <label className="text-lg font-medium text-gray-700">Module</label>
+                    <div className="w-full mt-2 p-3 border rounded bg-gray-100 text-gray-700">
+                        {moduleLabel}
+                    </div>
+                </div>
+
+                {/* Occurrence Type */}
+                <div>
+                    <label className="text-lg font-medium text-gray-700">Recurrence</label>
+                    <select
+                        value={occurrenceType}
+                        onChange={(e) => setOccurrenceType(e.target.value as OccurrenceType)}
+                        className="w-full mt-2 p-3 border rounded bg-purple-50"
+                    >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </div>
+
+                {/* Occurrence Definition — varies by type */}
+                {occurrenceType === 'weekly' && (
+                    <div>
+                        <label className="text-lg font-medium text-gray-700">Days of the Week</label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {DAYS_OF_WEEK.map((day) => (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => toggleWeeklyDay(day)}
+                                    className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
+                                        weeklyDays.includes(day)
+                                            ? 'bg-teal-300 border-teal-400 text-gray-800'
+                                            : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {day}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {occurrenceType === 'monthly' && (
+                    <div>
+                        <label className="text-lg font-medium text-gray-700">Days of the Month</label>
+                        <div className="grid grid-cols-7 gap-2 mt-2">
+                            {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((day) => (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => toggleMonthlyDay(day)}
+                                    className={`px-2 py-2 rounded border text-sm font-medium transition ${
+                                        monthlyDays.includes(day)
+                                            ? 'bg-teal-300 border-teal-400 text-gray-800'
+                                            : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {day}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {occurrenceType === 'yearly' && (
+                    <div>
+                        <label className="text-lg font-medium text-gray-700">Dates (Month &amp; Day)</label>
+                        <div className="flex gap-2 mt-2">
+                            <select
+                                value={yearlyMonth}
+                                onChange={(e) => setYearlyMonth(e.target.value)}
+                                className="p-3 border rounded bg-purple-50"
+                            >
+                                {MONTHS.map((m) => (
+                                    <option key={m} value={m}>
+                                        {m}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="number"
+                                min={1}
+                                max={31}
+                                value={yearlyDay}
+                                onChange={(e) => setYearlyDay(Number(e.target.value))}
+                                className="w-20 p-3 border rounded bg-purple-50"
+                            />
+                            <button
+                                type="button"
+                                onClick={addYearlyDate}
+                                className="px-4 py-2 bg-teal-200 hover:bg-teal-300 rounded font-medium"
+                            >
+                                Add
+                            </button>
+                        </div>
+                        {yearlyDates.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                {yearlyDates.map((entry) => (
+                                    <span
+                                        key={entry}
+                                        className="flex items-center gap-1 px-3 py-1 bg-teal-100 border border-teal-300 rounded-full text-sm"
+                                    >
+                                        {entry}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeYearlyDate(entry)}
+                                            className="text-red-500 hover:text-red-700 font-bold"
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Duration */}
+                <div>
+                    <label className="text-lg font-medium text-gray-700">Duration (seconds)</label>
+                    <input
+                        type="number"
+                        min={1}
+                        value={duration}
+                        onChange={(e) => setDuration(Number(e.target.value))}
+                        className="w-full mt-2 p-3 border rounded bg-purple-50"
+                    />
+                </div>
+
+                {/* Action Buttons */}
+                {isEditMode ? (
+                    <div className="flex flex-col gap-3">
+                        <button
+                            disabled={saving}
+                            onClick={handleUpdate}
+                            className="w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded disabled:opacity-50"
+                        >
+                            {saving ? 'Saving…' : 'Update'}
+                        </button>
+                        <button
+                            disabled={saving}
+                            onClick={handleDelete}
+                            className="w-full bg-red-100 hover:bg-red-200 text-red-700 font-semibold py-3 rounded disabled:opacity-50"
+                        >
+                            {saving ? 'Deleting…' : 'Remove from Agenda'}
+                        </button>
+                        <button
+                            disabled={saving}
+                            onClick={onCancel}
+                            className="w-full border border-gray-300 text-gray-600 font-semibold py-3 rounded hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-3">
+                        <button
+                            disabled={saving}
+                            onClick={handleCreate}
+                            className="w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded disabled:opacity-50"
+                        >
+                            {saving ? 'Saving…' : 'Add to Agenda'}
+                        </button>
+                        <button
+                            disabled={saving}
+                            onClick={onCancel}
+                            className="w-full border border-gray-300 text-gray-600 font-semibold py-3 rounded hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
+
+                {status && (
+                    <p
+                        className={`mt-2 text-sm text-center ${
+                            status.startsWith('Error') ? 'text-red-600' : 'text-green-600'
+                        }`}
+                    >
+                        {status}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function getModuleLabel(cfg: ConfigurationWithMetadata): string {
+    const meta = cfg.metadata;
+    if (!meta) return `Module ${cfg.module_id}`;
+
+    switch (cfg.module_type) {
+        case 'video':
+            return `Video - ${(meta as any).displayed_name ?? `Module ${cfg.module_id}`}`;
+        case 'photo':
+            return `Photo - ${(meta as any).displayed_name ?? `Module ${cfg.module_id}`}`;
+        case 'audio':
+            return `Audio - ${(meta as any).displayed_name ?? `Module ${cfg.module_id}`}`;
+        case 'weather':
+            return `Weather - Zip: ${(meta as any).zipcode}`;
+        case 'news':
+        case 'sports':
+            return `News - ${(meta as any).category}`;
+        case 'message':
+            return `Message`;
+        case 'event':
+            return `Event - ${(meta as any).text}`;
+        case 'carepartner_location':
+            return `Care Partner Location - ${(meta as any).location}`;
+        case 'caregiver_location':
+            return `Caregiver Location - ${(meta as any).location}`;
+        default:
+            return `Module ${cfg.module_id}`;
+    }
+}
