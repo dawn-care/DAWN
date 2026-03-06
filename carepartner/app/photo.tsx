@@ -22,6 +22,8 @@ interface PhotoViewerProps {
   configuration: ConfigurationWithMetadata;  
 }
 
+const API_URL = "http://localhost:8080"
+
 // Simple reusable glass container (local to this file for now)
 function GlassCard({
   children,
@@ -51,7 +53,7 @@ export default function PhotoViewerScreen({
 
       return {
         title: metadata.displayed_name,
-        photoUrls: [metadata.uri],
+        photoUrls: [`${API_URL}/photo/file?id=${metadata.id}`],
         startIndex: 0
       };
     } else {

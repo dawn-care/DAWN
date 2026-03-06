@@ -22,6 +22,8 @@ interface GreetingScreenProps {
   configuration: ConfigurationWithMetadata;  
 }
 
+const API_URL = "http://localhost:8080"
+
 function formatTime(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));
   const m = Math.floor(sec / 60);
@@ -56,7 +58,7 @@ export default function GreetingScreen({
   
       return {
         title: metadata.displayed_name,
-        videoUrl: metadata.uri,
+        videoUrl: `${API_URL}/video/file?id=${metadata.id}`,
       };
     };
   
