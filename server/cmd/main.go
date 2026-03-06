@@ -64,6 +64,7 @@ func main() {
 		AllowedOrigins: []string{
 			"http://localhost:3001",
 			"http://localhost:5173",
+			"http://localhost:8081",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
@@ -126,9 +127,9 @@ func main() {
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
 
 	caregiverService := caregiverSvc.NewCaregiverService(db)
-	newsService := newsSvc.NewNewsWidgetService(db, "api key")
+	newsService := newsSvc.NewNewsWidgetService(db, "3bc060a2d2c146bf92e6d9b94341d739")
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
-	weatherService := weatherSvc.NewWeatherService(db, "api key")
+	weatherService := weatherSvc.NewWeatherService(db, "30d992579f0ac7f70e065cf0afaa070d")
 	modulesService := modulesSvc.NewModuleService(db)
 	configurationService := configurationSvc.NewConfigurationService(db)
 

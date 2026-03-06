@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import AgendaView, { type ConfigurationWithMetadata, VideoMetadata } from "./agendaView";
 
 // ---- STUB TYPES (replace later) ----
 type GreetingMediaConfig = {
@@ -17,19 +18,8 @@ type GreetingMediaConfig = {
   videoUrl?: string; // remote URL from backend
 };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function fetchGreetingMedia(): Promise<GreetingMediaConfig> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/greeting");
-  // return await res.json();
-
-  return {
-    title: "Good Morning, Grandma",
-    videoUrl: undefined,
-    // For quick testing you can temporarily set:
-    // videoUrl:
-    //   "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  };
+interface GreetingScreenProps {
+  configuration: ConfigurationWithMetadata;  
 }
 
 function formatTime(totalSeconds: number) {
@@ -50,13 +40,29 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
-export default function GreetingScreen() {
+export default function GreetingScreen({
+  configuration: configuration
+  }: GreetingScreenProps) {
   const videoRef = useRef<Video>(null);
-
-  const [config, setConfig] = useState<GreetingMediaConfig>({
-    title: "Good Morning, Grandma",
-    videoUrl: undefined,
-  });
+  const buildConfig = (configuration: ConfigurationWithMetadata): GreetingMediaConfig => {
+      const metadata = configuration.metadata as VideoMetadata | null;
+  
+      if (!metadata) {
+        return {
+          title: "Video",
+          videoUrl: "",
+        };
+      }
+  
+      return {
+        title: metadata.displayed_name,
+        videoUrl: metadata.uri,
+      };
+    };
+  
+    const [config, setConfig] = useState<GreetingMediaConfig>(
+      buildConfig(configuration)
+    );
 
   const [durationSec, setDurationSec] = useState(0);
   const [positionSec, setPositionSec] = useState(0);
@@ -64,19 +70,9 @@ export default function GreetingScreen() {
   const [barWidth, setBarWidth] = useState(1);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const next = await fetchGreetingMedia();
-        if (mounted) setConfig(next);
-      } catch {
-        // TODO: log/report
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    const next = buildConfig(configuration);
+    setConfig(next);
+  }, [configuration]);
 
   const progress = useMemo(() => {
     if (!durationSec) return 0;

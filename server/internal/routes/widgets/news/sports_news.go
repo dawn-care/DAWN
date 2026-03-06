@@ -25,6 +25,6 @@ func RegisterSportsNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.SportsNe
 		r.Get("/by-day-and-carepartner", controller.GetSportsNewsByDayAndCarepartnerHandler)                    // ?carepartner_id=&day=&month=&year=
 
 		// Team-specific game endpoint
-		r.Get("/team-game", controller.GetTeamGameHandler) // ?league=&team=
+		r.Post("/team-game", controller.GetTeamGameHandler)
 	})
 }

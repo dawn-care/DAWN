@@ -64,7 +64,7 @@ export default function Screensaver() {
   }, [config.backgroundImageUrl]);
 
   const handleEnter = () => {
-    router.push({ pathname: "/greeting" } as any);
+    router.push({ pathname: "/agendaView" } as any);
   };
 
   return (
