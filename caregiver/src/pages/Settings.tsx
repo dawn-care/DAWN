@@ -23,12 +23,13 @@ export default function SettingsPage() {
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
   // Get the caregiver info
   useEffect(() => {
     const fetchCaregiver = async () => {
       try {
-        const res = await fetch("http://localhost:8080/api/me", {
+        const res = await fetch(`${API_URL}/api/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -52,7 +53,7 @@ export default function SettingsPage() {
 const handleLogout = async () => {
   try {
     // Call the backend to clear the cookie
-    const res = await fetch("http://localhost:8080/api/auth/logout", {
+    const res = await fetch(`${API_URL}/api/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
@@ -74,7 +75,7 @@ const handleLogout = async () => {
   // Update caregiver info
   const handleUpdate = async () => {
     try {
-      const res = await fetch("http://localhost:8080/caregivers", {
+      const res = await fetch(`${API_URL}/caregivers`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
