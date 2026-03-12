@@ -50,7 +50,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d/:ro
-    ports:
+    # ports:
      # - "5432:5432"
     networks:
       - app-network
