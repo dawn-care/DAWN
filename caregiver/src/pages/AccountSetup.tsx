@@ -44,7 +44,7 @@ export default function AccountSetupPage() {
     formData.append("consentForm", file);
 
     try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        const API_URL = import.meta.env.VITE_API_URL;
         const res = await fetch(`${API_URL}/api/me`, {
         method: "PUT",
         credentials: "include",

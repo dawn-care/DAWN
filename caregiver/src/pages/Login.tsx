@@ -8,7 +8,7 @@ const Login = () => {
   const [name, setName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { setIsAuthenticated } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleSuccess = async (credentialResponse: any) => {
     try {

@@ -38,7 +38,7 @@ export default function AgendaView() {
                 day_of_week: String(dayOfWeek),
             });
 
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+            const API_URL = import.meta.env.VITE_API_URL;
             const res = await fetch(`${API_URL}/configurations/day?${params}`);
             if (!res.ok) throw new Error('Failed to fetch configurations');
             const data: ConfigurationWithMetadata[] = await res.json();

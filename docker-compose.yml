@@ -31,6 +31,8 @@ services:
     build:
       context: ./caregiver
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://SERVER_IP:8080
     container_name: caregiver
     ports:
       - "3001:80"
