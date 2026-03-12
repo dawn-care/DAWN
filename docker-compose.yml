@@ -32,7 +32,7 @@ services:
       context: ./caregiver
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://SERVER_IP:8080
+        VITE_API_URL: http://129.21.34.143:8080 # TODO: Can write a script that should get the server IP instead of hard coding it
     container_name: caregiver
     ports:
       - "3001:80"
