@@ -8,12 +8,13 @@ const Login = () => {
   const [name, setName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { setIsAuthenticated } = useAuth();
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleSuccess = async (credentialResponse: any) => {
     try {
       const idToken = credentialResponse.credential;
 
-      const res = await fetch("http://localhost:8080/api/auth/google", {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -36,7 +37,7 @@ const Login = () => {
       }  
 
       // After login succeeds, fetch user
-      const meRes = await fetch("http://localhost:8080/api/me", {
+      const meRes = await fetch(`${API_URL}api/me`, {
         credentials: "include",
       });
 

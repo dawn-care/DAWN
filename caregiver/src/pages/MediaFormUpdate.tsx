@@ -22,7 +22,7 @@ const allowedExtensions: Record<MediaType, string[]> = {
   audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function MediaFormUpdate() {
   const navigate = useNavigate();
