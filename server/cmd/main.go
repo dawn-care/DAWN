@@ -14,6 +14,7 @@ import (
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
+	pairingCtrlr "server/internal/controllers/user/device_pairing"
 	newsCtrlr "server/internal/controllers/widgets/news"
 	weatherCtrlr "server/internal/controllers/widgets/weather"
 
@@ -22,6 +23,7 @@ import (
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
 	caregiverRts "server/internal/routes/user"
+	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
 	weatherRts "server/internal/routes/widgets/weather"
 
@@ -31,6 +33,7 @@ import (
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
 	caregiverSvc "server/internal/services/user/caregiver"
+	pairingSvc "server/internal/services/user/device_pairing"
 	newsSvc "server/internal/services/widgets/news"
 	weatherSvc "server/internal/services/widgets/weather"
 
@@ -136,6 +139,7 @@ func main() {
 	messageService := promptsSvc.NewMessageService(db)
 	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
 	carepartnerLocationService := promptsSvc.NewCarepartnerLocationService(db)
+	devicePairingService := pairingSvc.NewDevicePairingService(db)
 
 	// Auth services
 	googleService := authSvc.NewGoogleAuthService()
@@ -170,6 +174,7 @@ func main() {
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
 	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
 	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
+	devicePairingController := pairingCtrlr.NewDevicePairingController(devicePairingService)
 
 	// Routes
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
@@ -187,6 +192,9 @@ func main() {
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
 	promptsRts.RegisterCaregiverLocationRoutes(r, caregiverLocationCtrl)
 	promptsRts.RegisterCarepartnerLocationRoutes(r, carepartnerLocationCtrl)
+	r.Route("/api/users", func(r chi.Router) {
+		pairingRts.RegisterDevicePairingRoutes(r, devicePairingController)
+	})
 
 	r.Mount("/swagger", httpSwagger.WrapHandler)
 

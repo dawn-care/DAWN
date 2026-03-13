@@ -107,6 +107,14 @@ CREATE TABLE "Session" (
     expires_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE "DevicePairing" (
+  "id" SERIAL PRIMARY KEY,
+  "carepartner_id" INTEGER NOT NULL REFERENCES "Carepartner"("id"),
+  "pairing_code" VARCHAR(10) NOT NULL UNIQUE,
+  "expires_at" TIMESTAMP NOT NULL,
+  "paired" BOOLEAN DEFAULT FALSE
+);
+
 CREATE OR REPLACE PROCEDURE insert_configurations(
     p_carepartner_id INT,
     p_configs JSONB
