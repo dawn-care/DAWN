@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 
 type CodeResult =
   | { ok: true; pairingCode: string; expiresInSec?: number }
@@ -19,12 +20,37 @@ type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
-const API_BASE = "http://localhost:8080/api/users/device-pairing";
+const API_BASE = "http://localhost:8080/api/users";
+
+// ---- Local storage helpers with web fallback ----
+async function getStoredCarepartnerID(): Promise<number | null> {
+  if (Platform.OS === "web") {
+    const id = localStorage.getItem("carepartnerID");
+    return id ? parseInt(id, 10) : null;
+  }
+  const id = await SecureStore.getItemAsync("carepartnerID");
+  return id ? parseInt(id, 10) : null;
+}
+
+async function storeCarepartnerID(id: number) {
+  if (Platform.OS === "web") {
+    localStorage.setItem("carepartnerID", id.toString());
+    return;
+  }
+  await SecureStore.setItemAsync("carepartnerID", id.toString());
+}
 
 // ---- API CALLS ----
+async function createNewCarepartner(): Promise<number> {
+  const res = await fetch(`${API_BASE}/carepartner/create-carepartner`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to create carepartner");
+  const data = await res.json();
+  return data.carepartner_id;
+}
+
 async function fetchPairingCodeForThisDevice(carepartnerID: number): Promise<CodeResult> {
   try {
-    const res = await fetch(`${API_BASE}/code`, {
+    const res = await fetch(`${API_BASE}/device-pairing/code`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ carepartner_id: carepartnerID }),
@@ -37,17 +63,17 @@ async function fetchPairingCodeForThisDevice(carepartnerID: number): Promise<Cod
 
     const data = await res.json();
     return { ok: true, pairingCode: data.pairing_code, expiresInSec: data.expires_in_sec };
-  } catch (err) {
+  } catch {
     return { ok: false, message: "Network error while generating code" };
   }
 }
 
-async function verifyThisDeviceIsPaired(): Promise<VerifyResult> {
+async function verifyThisDeviceIsPaired(carepartnerID: number): Promise<VerifyResult> {
   try {
-    const res = await fetch(`${API_BASE}/status`, {
+    const res = await fetch(`${API_BASE}/device-pairing/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ carepartnerID: 1 }), // TODO - Not hardcode!
+      body: JSON.stringify({ carepartner_id: carepartnerID }),
     });
 
     if (!res.ok) {
@@ -56,10 +82,22 @@ async function verifyThisDeviceIsPaired(): Promise<VerifyResult> {
     }
 
     const data = await res.json();
-    // data.paired is a boolean, convert to deviceId if needed
     return { ok: true, deviceId: data.paired ? "device_123" : "" };
-  } catch (err) {
+  } catch {
     return { ok: false, message: "Network error while checking device pairing" };
+  }
+}
+
+async function carepartnerExists(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/carepartner/${id}`);
+
+    if (res.status === 404) return false;
+    if (!res.ok) return false;
+
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -73,67 +111,80 @@ function formatCountdown(totalSeconds: number) {
 export default function PairScreen() {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [expiresInSec, setExpiresInSec] = useState<number | null>(null);
+  const [carepartnerID, setCarepartnerID] = useState<number | null>(null);
 
   const [isLoadingCode, setIsLoadingCode] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
   const canVerify = !!pairingCode && !isLoadingCode && !isVerifying;
 
-  const CAREPARTNER_ID = 1; // Replace with actual logged-in carepartner ID
-
-  // Load pairing code
-  const loadCode = async () => {
-    setError(null);
-    setIsLoadingCode(true);
-    try {
-      const result = await fetchPairingCodeForThisDevice(CAREPARTNER_ID);
-      if (!result.ok) {
-        setError(result.message);
-        setPairingCode(null);
-        setExpiresInSec(null);
-        return;
-      }
-
-      setPairingCode(result.pairingCode);
-      setExpiresInSec(result.expiresInSec ?? null);
-    } catch {
-      setError("Could not load pairing code. Please check your connection.");
-      setPairingCode(null);
-      setExpiresInSec(null);
-    } finally {
-      setIsLoadingCode(false);
-    }
-  };
-
+  // ---- Load or create carepartnerID ----
   useEffect(() => {
-    loadCode();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    async function init() {
+      setIsLoadingCode(true);
+      setError(null);
+
+      try {
+        let id = await getStoredCarepartnerID();
+
+        if (id) {
+          const valid = await carepartnerExists(id);
+          if (!valid) {
+            id = null;
+          }
+        }
+
+        if (!id) {
+          id = await createNewCarepartner();
+          await storeCarepartnerID(id);
+        }
+
+        setCarepartnerID(id);
+
+        const result = await fetchPairingCodeForThisDevice(id);
+        if (!result.ok) {
+          setError(result.message);
+          setPairingCode(null);
+          setExpiresInSec(null);
+          return;
+        }
+
+        setPairingCode(result.pairingCode);
+        setExpiresInSec(result.expiresInSec ?? null);
+
+      } catch (err: any) {
+        setError(err.message || "Failed to initialize carepartner ID");
+      } finally {
+        setIsLoadingCode(false);
+      }
+    }
+
+    init();
   }, []);
 
   // Countdown for expiration
   useEffect(() => {
     if (expiresInSec == null || expiresInSec <= 0) return;
-
     const id = setInterval(() => {
       setExpiresInSec((t) => (t == null ? t : Math.max(0, t - 1)));
     }, 1000);
-
     return () => clearInterval(id);
   }, [expiresInSec]);
 
   // Expired handling
   useEffect(() => {
-    if (expiresInSec == null) return;
-    if (expiresInSec > 0) return;
-
+    if (expiresInSec == null || expiresInSec > 0) return;
     setPairingCode(null);
     setError("This code expired. Tap Refresh Code to generate a new one.");
   }, [expiresInSec]);
 
-  // Verify pairing
   const handleVerify = async () => {
+    if (!carepartnerID) {
+      setError("Carepartner ID not initialized");
+      return;
+    }
+
     setError(null);
     setIsVerifying(true);
 
@@ -143,7 +194,7 @@ export default function PairScreen() {
         return;
       }
 
-      const result = await verifyThisDeviceIsPaired();
+      const result = await verifyThisDeviceIsPaired(carepartnerID);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -157,6 +208,29 @@ export default function PairScreen() {
       setError("Something went wrong. Please check your connection and try again.");
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const loadCode = async () => {
+    if (!carepartnerID) return;
+    setError(null);
+    setIsLoadingCode(true);
+    try {
+      const result = await fetchPairingCodeForThisDevice(carepartnerID);
+      if (!result.ok) {
+        setError(result.message);
+        setPairingCode(null);
+        setExpiresInSec(null);
+        return;
+      }
+      setPairingCode(result.pairingCode);
+      setExpiresInSec(result.expiresInSec ?? null);
+    } catch {
+      setError("Could not load pairing code. Please check your connection.");
+      setPairingCode(null);
+      setExpiresInSec(null);
+    } finally {
+      setIsLoadingCode(false);
     }
   };
 
