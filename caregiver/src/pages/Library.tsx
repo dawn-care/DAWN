@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import WidgetForm from "./WidgetForm";
 import PromptForm from "./PromptForm";
 // import type { Module } from "../components/AgendaList";
+import { useAuth } from "../context/AuthContext";
 
 type ModuleType = "photo" | "video" | "audio" | "weather" | "sports" | "news" | "messages";
 type MediaType = "video" | "photo" | "audio";
@@ -78,16 +79,19 @@ export default function Library({ onSelect }: LibraryProps = {}) {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchModules();
-  }, []);
+    if (user) {
+      fetchModules();
+    }
+  }, [user]);
 
   const fetchModules = async () => {
     try {
       // Get modules
       const modulesRes = await fetch(
-        `${API_URL}/modules?caregiver_id=1&carepartner_id=1`
+        `${API_URL}/modules?caregiver_id=${user?.id}&carepartner_id=${user?.carepartner_id}`
       );
 
       if (!modulesRes.ok) {
@@ -111,8 +115,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           if (type === "video" || type === "photo" || type === "audio") {
             return {
               id: m.id,
-              caregiver_id: 1,
-              carepartner_id: 1,
+              caregiver_id: user!.id,
+              carepartner_id: user!.carepartner_id,
               metadata_id: m.metadata_id,
               module_type: type,
               name: data.displayed_name || data.filename,
@@ -123,8 +127,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           } else if (type === "weather") {
             return {
               id: m.id,
-              caregiver_id: 1,
-              carepartner_id: 1,
+              caregiver_id: user!.id,
+              carepartner_id: user!.carepartner_id,
               metadata_id: m.metadata_id,
               module_type: "weather",
               type: "weather",
@@ -133,8 +137,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           } else if (type === "news" || type === "sports") {
             return {
               id: m.id,
-              caregiver_id: 1,
-              carepartner_id: 1,
+              caregiver_id: user!.id,
+              carepartner_id: user!.carepartner_id,
               metadata_id: m.metadata_id,
               module_type: type,
               type: type,
@@ -145,8 +149,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           } else {
             return {
               id: m.id,
-              caregiver_id: 1,
-              carepartner_id: 1,
+              caregiver_id: user!.id,
+              carepartner_id: user!.carepartner_id,
               metadata_id: m.metadata_id,
               module_type: "messages",
               type: "messages",

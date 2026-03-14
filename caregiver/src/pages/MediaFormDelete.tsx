@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../context/AuthContext';
 
 type MediaType = "video" | "photo" | "audio";
 
@@ -24,13 +25,19 @@ export default function MediaFormDelete() {
   const [mediaList, setMediaList] = useState<MediaOption[]>([]);
   const [selected, setSelected] = useState<MediaOption | null>(null);
   const [status, setStatus] = useState("");
+  const { user } = useAuth();
 
   /* ---------------- LOAD ALL MEDIA ---------------- */
   useEffect(() => {
     async function loadMedia() {
       try {
+        if (!user?.id || !user.carepartner_id) {
+          setStatus("Cannot load media: user information missing.");
+          return;
+        }
+
         const modulesRes = await fetch(
-          `${API_URL}/modules?caregiver_id=1&carepartner_id=1`
+          `${API_URL}/modules?caregiver_id=${user.id}&carepartner_id=${user.carepartner_id}`
         );
         const modules: Module[] = await modulesRes.json();
 

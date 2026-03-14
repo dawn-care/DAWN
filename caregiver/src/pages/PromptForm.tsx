@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".heic"];
 
@@ -31,6 +32,7 @@ export default function PromptForm({
   const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
   // Deleting Variables
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   /*******************************************
    * If form is in edit mode, load message
@@ -88,10 +90,15 @@ export default function PromptForm({
 
       // Upload the optional image first, if provided
       if (file) {
+        if (!user?.id || !user.carepartner_id) {
+          setUploadStatus("Cannot upload: user information missing.");
+          return;
+        }
+
         const formData = new FormData();
         formData.append("file", file, file.name);
-        formData.append("caregiver_id", "1"); // temp caregiver ID
-        formData.append("carepartner_id", "1"); // temp carepartner ID
+        formData.append("caregiver_id", user.id.toString());
+        formData.append("carepartner_id", user.carepartner_id.toString());
 
         const imageResponse = await fetch(`${API_URL}/photo/upload`, {
           method: "POST",
@@ -139,8 +146,8 @@ export default function PromptForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           module_type: "messages",
-          caregiver_id: 1,     // temp caregiver ID
-          carepartner_id: 1,   // temp carepartner ID
+          caregiver_id: user?.id,
+          carepartner_id: user?.carepartner_id,
           metadata_id: metadataId,
         }),
       });
