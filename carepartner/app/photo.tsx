@@ -93,6 +93,7 @@ export default function PhotoViewerScreen({
     : 0;
 
   const currentUrl = hasPhotos ? config.photoUrls![safeIndex] : undefined;
+  console.log("PhotoViewer config:", config, "currentUrl:", currentUrl);
 
   const handlePrev = () => {
     if (!hasPhotos) return;
@@ -119,7 +120,7 @@ export default function PhotoViewerScreen({
         {/* Photo area */}
         <View style={styles.photoWrap}>
           {currentUrl ? (
-            <Image source={{ uri: currentUrl }} style={styles.photo} />
+            <img src={currentUrl} style={styles.photo} onError={(e) => console.log("Image failed:", e.nativeEvent)} />
           ) : (
             <View style={[styles.photo, styles.placeholder]}>
               <Text style={styles.placeholderText}>Photo will load from backend</Text>

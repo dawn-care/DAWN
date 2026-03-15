@@ -45,7 +45,7 @@ function GlassCard({
 export default function GreetingScreen({
   configuration: configuration
   }: GreetingScreenProps) {
-  const videoRef = useRef<Video>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const buildConfig = (configuration: ConfigurationWithMetadata): GreetingMediaConfig => {
       const metadata = configuration.metadata as VideoMetadata | null;
   
@@ -81,11 +81,13 @@ export default function GreetingScreen({
     return Math.min(1, Math.max(0, positionSec / durationSec));
   }, [positionSec, durationSec]);
 
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
+  const onPlaybackStatusUpdate = (
+    event: React.SyntheticEvent<HTMLVideoElement>
+  ) => {
+    const video = event.currentTarget;
 
-    const d = status.durationMillis ? status.durationMillis / 1000 : 0;
-    const p = status.positionMillis ? status.positionMillis / 1000 : 0;
+    const d = video.duration || 0;
+    const p = video.currentTime || 0;
 
     setDurationSec(d);
     setPositionSec(p);
@@ -129,15 +131,15 @@ export default function GreetingScreen({
         {/* Video area */}
         <View style={styles.videoWrap}>
           {config.videoUrl ? (
-            <Video
+            <video
               ref={videoRef}
+              src={config.videoUrl}
               style={styles.video}
-              source={{ uri: config.videoUrl }}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay
-              isLooping={false}
-              onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-              useNativeControls={false}
+              autoPlay
+              loop={false}
+              controls={false}
+              onTimeUpdate={onPlaybackStatusUpdate}
+              onError={(e) => console.error("Video error:", e)}
             />
           ) : (
             <View style={[styles.video, styles.videoPlaceholder]}>
