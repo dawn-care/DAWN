@@ -70,11 +70,11 @@ func main() {
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
-			fmt.Sprintf("http://%s:3001", url),
-			fmt.Sprintf("http://%s:5173", url),
-			fmt.Sprintf("http://%s:8081", url),
-			fmt.Sprintf("http://%s", url),
-			"http://startup-da.gccis.rit.edu",
+			fmt.Sprintf("%s:3001", url),
+			fmt.Sprintf("%s:5173", url),
+			fmt.Sprintf("%s:8081", url),
+			fmt.Sprintf("%s", url),
+			"startup-da.gccis.rit.edu",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
