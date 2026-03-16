@@ -16,6 +16,7 @@ services:
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: localuser
       MINIO_SECRET_KEY: localpass123
+      API_URL: http://129.21.34.143
     depends_on:
       db:
         condition: service_healthy
