@@ -74,7 +74,7 @@ func main() {
 			fmt.Sprintf("%s:5173", url),
 			fmt.Sprintf("%s:8081", url),
 			fmt.Sprintf("%s", url),
-			"startup-da.gccis.rit.edu",
+			"http://startup-da.gccis.rit.edu",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
