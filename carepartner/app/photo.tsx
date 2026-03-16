@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Stack } from "expo-router";
+import AgendaView, { type ConfigurationWithMetadata, PhotoMetadata, MessageMetadata } from "./agendaView";
 
 // ---- STUB TYPES (replace later) ----
 type PhotoViewerConfig = {
@@ -17,23 +18,11 @@ type PhotoViewerConfig = {
   startIndex?: number; // optional
 };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function fetchPhotoViewer(): Promise<PhotoViewerConfig> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/photos");
-  // return await res.json();
-
-  return {
-    title: "Your Grandkids",
-    photoUrls: undefined,
-    startIndex: 0,
-    // For quick testing you can set:
-    // photoUrls: [
-    //   "https://images.unsplash.com/photo-1520975958225-2671f0a1cf2b?auto=format&fit=crop&w=1600&q=80",
-    //   "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
-    // ],
-  };
+interface PhotoViewerProps {
+  configuration: ConfigurationWithMetadata;  
 }
+
+const API_URL = "http://localhost:8080"
 
 // Simple reusable glass container (local to this file for now)
 function GlassCard({
@@ -46,31 +35,56 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
-export default function PhotoViewerScreen() {
-  const [config, setConfig] = useState<PhotoViewerConfig>({
-    title: "Your Grandkids",
-    photoUrls: undefined,
-    startIndex: 0,
-  });
+export default function PhotoViewerScreen({
+  configuration: configuration
+  }: PhotoViewerProps){
+
+  const buildConfig = (configuration: ConfigurationWithMetadata): PhotoViewerConfig => {
+    var metadata;
+    if (configuration.module_type === "photo"){
+      metadata = configuration.metadata as PhotoMetadata | null;
+      if (!metadata) {
+        return {
+          title: "Photos",
+          photoUrls: [],
+          startIndex: 0
+        };
+      }
+
+      return {
+        title: metadata.displayed_name,
+        photoUrls: [`${API_URL}/photo/file?id=${metadata.id}`],
+        startIndex: 0
+      };
+    } else {
+      metadata = configuration.metadata as MessageMetadata | null;
+      if (!metadata) {
+        return {
+          title: "Photos",
+          photoUrls: [],
+          startIndex: 0
+        };
+      }
+
+      return {
+        title: metadata.message,
+        photoUrls: [metadata.image_uri],
+        startIndex: 0
+      };
+    }
+  };
+
+  const [config, setConfig] = useState<PhotoViewerConfig>(
+    buildConfig(configuration)
+  );
 
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const next = await fetchPhotoViewer();
-        if (!mounted) return;
-        setConfig(next);
-        setIndex(next.startIndex ?? 0);
-      } catch {
-        // TODO: log/report
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    const next = buildConfig(configuration);
+    setConfig(next);
+    setIndex(next.startIndex ?? 0);
+  }, [configuration]);
 
   const hasPhotos = !!config.photoUrls?.length;
   const safeIndex = hasPhotos
@@ -79,6 +93,7 @@ export default function PhotoViewerScreen() {
     : 0;
 
   const currentUrl = hasPhotos ? config.photoUrls![safeIndex] : undefined;
+  console.log("PhotoViewer config:", config, "currentUrl:", currentUrl);
 
   const handlePrev = () => {
     if (!hasPhotos) return;
@@ -105,7 +120,7 @@ export default function PhotoViewerScreen() {
         {/* Photo area */}
         <View style={styles.photoWrap}>
           {currentUrl ? (
-            <Image source={{ uri: currentUrl }} style={styles.photo} />
+            <img src={currentUrl} style={styles.photo} onError={(e) => console.log("Image failed:", e.nativeEvent)} />
           ) : (
             <View style={[styles.photo, styles.placeholder]}>
               <Text style={styles.placeholderText}>Photo will load from backend</Text>

@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { Stack } from "expo-router";
+import AgendaView, { type ConfigurationWithMetadata, WeatherMetadata, NewsMetadata, EventMetadata } from "./agendaView";
 
 // ---- STUB TYPES (replace later) ----
 type TextViewerConfig = {
@@ -15,16 +16,88 @@ type TextViewerConfig = {
   content: string; // long text
 };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function fetchTextViewer(): Promise<TextViewerConfig> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/text");
-  // return await res.json();
+interface TextViewerProps {
+  configuration: ConfigurationWithMetadata;
+}
+
+const API_URL = "http://localhost:8080"
+
+async function fetchWeather(metadata: WeatherMetadata): Promise<string> {
+  var response = "";
+  try{
+    const res = await fetch(`${API_URL}/weather/overview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metadata),
+    });
+    response = await res.text();
+  } catch (err: any){
+    console.error("Failed getting weather overview: " + err.message);
+  }
+  return response;
+}
+
+async function fetchSports(metadata: NewsMetadata): Promise<string>{
+  var response = "";
+  try{
+    const res = await fetch(`${API_URL}/sports/team-game`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metadata),
+    });
+    response = await res.text();
+  } catch (err: any){
+    console.error("Failed getting sports overview: " + err.message);
+  }
+  return response;
+}
+
+async function fetchNews(): Promise<string>{
+  var response = "";
+  try{
+    const res = await fetch(`${API_URL}/news/good-news`);
+    response = await res.text();
+  } catch (err: any){
+    console.error("Failed getting sports overview: " + err.message);
+  }
+  return response;
+}
+
+async function buildConfig(
+  configuration: ConfigurationWithMetadata
+): Promise<TextViewerConfig> {
+  let metadata;
+
+  if (configuration.module_type === "weather") {
+    metadata = configuration.metadata as WeatherMetadata | null;
+
+    return {
+      title: "Weather",
+      content: metadata ? await fetchWeather(metadata) : "",
+    };
+  }
+
+  if (configuration.module_type === "sports") {
+    metadata = configuration.metadata as NewsMetadata | null;
+
+    return {
+      title: "Sports News",
+      content: metadata ? await fetchSports(metadata) : "",
+    };
+  }
+
+  if (configuration.module_type === "news") {
+    return {
+      title: "Good News",
+      content: await fetchNews(),
+    };
+  }
+
+  metadata = configuration.metadata as EventMetadata | null;
 
   return {
-    title: "Today's Message",
-    content:
-      "Good morning, Grandma.\n\nWe love you so much. Today is going to be a beautiful day.\n\n• Remember to drink some water\n• Your appointment is at 2:30 PM\n\nLove,\nYour family ❤️",
+    title: metadata?.time ?? "Event",
+    content: metadata?.text ?? "",
   };
 }
 
@@ -39,9 +112,11 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
-export default function TextViewerScreen() {
+export default function TextViewerScreen({
+  configuration: configuration
+  }: TextViewerProps) {
   const [config, setConfig] = useState<TextViewerConfig>({
-    title: "Loading…",
+    title: "",
     content: "",
   });
 
@@ -49,27 +124,25 @@ export default function TextViewerScreen() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const next = await fetchTextViewer();
-        if (!mounted) return;
-        setConfig(next);
-      } catch {
-        // TODO: log/report
-        if (mounted) {
-          setConfig({
-            title: "Unable to load",
-            content: "Please check your connection and try again later.",
-          });
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
+
+    const load = async () => {
+      setLoading(true);
+
+      const next = await buildConfig(configuration);
+
+      if (!mounted) return;
+
+      setConfig(next);
+      setLoading(false);
+    };
+
+    load();
+
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [configuration]);
+
 
   return (
     <>

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import { Audio, AVPlaybackStatus } from "expo-av";
+import AgendaView, { type ConfigurationWithMetadata, AudioMetadata } from "./agendaView";
 
 // ---- STUB TYPES (replace later) ----
 type AudioMediaConfig = {
@@ -18,19 +19,10 @@ type AudioMediaConfig = {
   audioUrl?: string; // remote URL from backend
 };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function fetchAudioMedia(): Promise<AudioMediaConfig> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/audio");
-  // return await res.json();
-
-  return {
-    title: "Fly Me To the Moon",
-    audioUrl: undefined,
-    // For quick testing:
-    // audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  };
+interface AudioScreenProps {
+  configuration: ConfigurationWithMetadata;  
 }
+
 
 function formatTime(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));
@@ -50,13 +42,29 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
-export default function AudioScreen() {
+export default function AudioScreen({
+    configuration: configuration
+  }: AudioScreenProps){
   const soundRef = useRef<Audio.Sound | null>(null);
+  const buildConfig = (configuration: ConfigurationWithMetadata): AudioMediaConfig => {
+    const metadata = configuration.metadata as AudioMetadata | null;
 
-  const [config, setConfig] = useState<AudioMediaConfig>({
-    title: "Fly Me To the Moon",
-    audioUrl: undefined,
-  });
+    if (!metadata) {
+      return {
+        title: "Audio",
+        audioUrl: ""
+      };
+    }
+
+    return {
+      title: metadata.displayed_name,
+      audioUrl: metadata.uri
+    };
+  };
+
+  const [config, setConfig] = useState<AudioMediaConfig>(
+    buildConfig(configuration)
+  );
 
   const [durationSec, setDurationSec] = useState(0);
   const [positionSec, setPositionSec] = useState(0);
@@ -65,19 +73,9 @@ export default function AudioScreen() {
 
   // Fetch config
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const next = await fetchAudioMedia();
-        if (mounted) setConfig(next);
-      } catch {
-        // TODO: log/report
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+     const next = buildConfig(configuration);
+     setConfig(next);
+   }, [configuration]);
 
   // Load/unload audio when audioUrl changes
   useEffect(() => {
