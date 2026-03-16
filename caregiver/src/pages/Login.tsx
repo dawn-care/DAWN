@@ -8,6 +8,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { setUser, setIsAuthenticated } = useAuth();
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleSuccess = async (credentialResponse: any) => {
     setStatus("idle");
@@ -17,7 +18,7 @@ const Login = () => {
       const idToken = credentialResponse.credential;
 
       // Login with Google 
-      const loginRes = await fetch("http://localhost:8080/api/auth/google", {
+      const loginRes = await fetch(`${API_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -31,7 +32,7 @@ const Login = () => {
       }
 
       // Fetch logged-in user 
-      const meRes = await fetch("http://localhost:8080/api/me", {
+      const meRes = await fetch(`${API_URL}/api/me`, {
         credentials: "include",
       });
 

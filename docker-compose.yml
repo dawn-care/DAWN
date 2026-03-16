@@ -16,6 +16,7 @@ services:
       MINIO_PORT: 9000
       MINIO_ACCESS_KEY: localuser
       MINIO_SECRET_KEY: localpass123
+      API_URL: http://129.21.34.143
     depends_on:
       db:
         condition: service_healthy
@@ -31,9 +32,11 @@ services:
     build:
       context: ./caregiver
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://129.21.34.143:8080 # TODO: Can write a script that should get the server IP instead of hard coding it
     container_name: caregiver
     ports:
-      - "3001:80"
+      - "80:80"
     depends_on:
       - server
     networks:
@@ -48,8 +51,8 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d/:ro
-    ports:
-      - "5432:5432"
+    # ports:
+     # - "5432:5432"
     networks:
       - app-network
     healthcheck:

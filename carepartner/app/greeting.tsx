@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Stack, router } from "expo-router";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import AgendaView, { type ConfigurationWithMetadata, VideoMetadata } from "./agendaView";
 
 // ---- STUB TYPES (replace later) ----
 type GreetingMediaConfig = {
@@ -17,20 +18,11 @@ type GreetingMediaConfig = {
   videoUrl?: string; // remote URL from backend
 };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function fetchGreetingMedia(): Promise<GreetingMediaConfig> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/greeting");
-  // return await res.json();
-
-  return {
-    title: "Good Morning, Grandma",
-    videoUrl: undefined,
-    // For quick testing you can temporarily set:
-    // videoUrl:
-    //   "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  };
+interface GreetingScreenProps {
+  configuration: ConfigurationWithMetadata;  
 }
+
+const API_URL = "http://localhost:8080"
 
 function formatTime(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));
@@ -50,13 +42,29 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
-export default function GreetingScreen() {
-  const videoRef = useRef<Video>(null);
-
-  const [config, setConfig] = useState<GreetingMediaConfig>({
-    title: "Good Morning, Grandma",
-    videoUrl: undefined,
-  });
+export default function GreetingScreen({
+  configuration: configuration
+  }: GreetingScreenProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const buildConfig = (configuration: ConfigurationWithMetadata): GreetingMediaConfig => {
+      const metadata = configuration.metadata as VideoMetadata | null;
+  
+      if (!metadata) {
+        return {
+          title: "Video",
+          videoUrl: "",
+        };
+      }
+  
+      return {
+        title: metadata.displayed_name,
+        videoUrl: `${API_URL}/video/file?id=${metadata.id}`,
+      };
+    };
+  
+    const [config, setConfig] = useState<GreetingMediaConfig>(
+      buildConfig(configuration)
+    );
 
   const [durationSec, setDurationSec] = useState(0);
   const [positionSec, setPositionSec] = useState(0);
@@ -64,30 +72,22 @@ export default function GreetingScreen() {
   const [barWidth, setBarWidth] = useState(1);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const next = await fetchGreetingMedia();
-        if (mounted) setConfig(next);
-      } catch {
-        // TODO: log/report
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    const next = buildConfig(configuration);
+    setConfig(next);
+  }, [configuration]);
 
   const progress = useMemo(() => {
     if (!durationSec) return 0;
     return Math.min(1, Math.max(0, positionSec / durationSec));
   }, [positionSec, durationSec]);
 
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
+  const onPlaybackStatusUpdate = (
+    event: React.SyntheticEvent<HTMLVideoElement>
+  ) => {
+    const video = event.currentTarget;
 
-    const d = status.durationMillis ? status.durationMillis / 1000 : 0;
-    const p = status.positionMillis ? status.positionMillis / 1000 : 0;
+    const d = video.duration || 0;
+    const p = video.currentTime || 0;
 
     setDurationSec(d);
     setPositionSec(p);
@@ -131,15 +131,15 @@ export default function GreetingScreen() {
         {/* Video area */}
         <View style={styles.videoWrap}>
           {config.videoUrl ? (
-            <Video
+            <video
               ref={videoRef}
+              src={config.videoUrl}
               style={styles.video}
-              source={{ uri: config.videoUrl }}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay
-              isLooping={false}
-              onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-              useNativeControls={false}
+              autoPlay
+              loop={false}
+              controls={false}
+              onTimeUpdate={onPlaybackStatusUpdate}
+              onError={(e) => console.error("Video error:", e)}
             />
           ) : (
             <View style={[styles.video, styles.videoPlaceholder]}>

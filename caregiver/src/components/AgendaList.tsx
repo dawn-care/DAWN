@@ -186,7 +186,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                 duration: item.duration,
             }));
 
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+            const API_URL = import.meta.env.VITE_API_URL;
             const res = await fetch(`${API_URL}/configurations/insert`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
