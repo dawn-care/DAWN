@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from '../context/AuthContext';
 
 type MediaType = "video" | "photo" | "audio";
 
@@ -16,6 +17,7 @@ export default function MediaFormCreate() {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
+  const { user } = useAuth();
 
   function validateFile(f: File) {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
@@ -39,11 +41,16 @@ export default function MediaFormCreate() {
       return;
     }
 
+    if (!user?.id || !user.carepartner_id) {
+      setUploadStatus("Cannot upload: user information missing.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", file, file.name);
     formData.append("displayed_name", mediaName);
-    formData.append("caregiver_id", "1");   // temp caregiver ID
-    formData.append("carepartner_id", "1"); // temp carepartner ID
+    formData.append("caregiver_id", String(user.id));
+    formData.append("carepartner_id", String(user.carepartner_id));
 
     const endpoint =
       mediaType === "video"
@@ -78,8 +85,8 @@ export default function MediaFormCreate() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           module_type: mediaType,
-          caregiver_id: 1,
-          carepartner_id: 1,
+          caregiver_id: user.id,
+          carepartner_id: user.carepartner_id,
           metadata_id: metadataId,
         }),
       });

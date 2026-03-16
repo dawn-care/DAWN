@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import AgendaList, { type ConfigurationWithMetadata } from '../components/AgendaList';
 import ConfigurationForm from '../components/ConfigurationForm';
 import Library from './Library';
+import { useAuth } from '../context/AuthContext';
 
 interface SelectedModule {
     moduleId: number;
@@ -17,6 +18,7 @@ export default function AgendaView() {
     const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { user } = useAuth();
 
     // For the create flow: library → config form
     const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
@@ -32,7 +34,8 @@ export default function AgendaView() {
             if (dayOfMonth === 0) return;
 
             const params = new URLSearchParams({
-                carepartner_id: '1',
+                caregiver_id: String(user?.id),  // TODO - check if this was okay to add here or if it breaks
+                carepartner_id: String(user?.carepartner_id),
                 day: String(dayOfMonth),
                 month: String(month),
                 day_of_week: String(dayOfWeek),

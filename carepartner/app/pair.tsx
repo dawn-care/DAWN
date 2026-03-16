@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 
 type CodeResult =
   | { ok: true; pairingCode: string; expiresInSec?: number }
@@ -19,25 +20,85 @@ type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
-// ---- STUB BACKEND CALLS (replace later) ----
-async function fetchPairingCodeForThisDevice(): Promise<CodeResult> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/device/pairing-code", { method: "POST" });
-  // return await res.json();
+const API_BASE = "http://localhost:8080/api/users";
 
-  await new Promise((r) => setTimeout(r, 700));
-  return { ok: true, pairingCode: "ABC123", expiresInSec: 600 };
+// ---- Local storage helpers with web fallback ----
+async function getStoredCarepartnerID(): Promise<number | null> {
+  if (Platform.OS === "web") {
+    const id = localStorage.getItem("carepartnerID");
+    return id ? parseInt(id, 10) : null;
+  }
+  const id = await SecureStore.getItemAsync("carepartnerID");
+  return id ? parseInt(id, 10) : null;
 }
 
-async function verifyThisDeviceIsPaired(): Promise<VerifyResult> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/device/verify-pairing", { method: "POST" });
-  // if (!res.ok) return { ok: false, message: "Not paired yet." };
-  // return await res.json();
+async function storeCarepartnerID(id: number) {
+  if (Platform.OS === "web") {
+    localStorage.setItem("carepartnerID", id.toString());
+    return;
+  }
+  await SecureStore.setItemAsync("carepartnerID", id.toString());
+}
 
-  await new Promise((r) => setTimeout(r, 800));
-  // Stub behavior: pretend the caregiver already used the code.
-  return { ok: true, deviceId: "device_123" };
+// ---- API CALLS ----
+async function createNewCarepartner(): Promise<number> {
+  const res = await fetch(`${API_BASE}/carepartner/create-carepartner`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to create carepartner");
+  const data = await res.json();
+  return data.carepartner_id;
+}
+
+async function fetchPairingCodeForThisDevice(carepartnerID: number): Promise<CodeResult> {
+  try {
+    const res = await fetch(`${API_BASE}/device-pairing/code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ carepartner_id: carepartnerID }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      return { ok: false, message: errorData.error || "Failed to generate code" };
+    }
+
+    const data = await res.json();
+    return { ok: true, pairingCode: data.pairing_code, expiresInSec: data.expires_in_sec };
+  } catch {
+    return { ok: false, message: "Network error while generating code" };
+  }
+}
+
+async function verifyThisDeviceIsPaired(carepartnerID: number): Promise<VerifyResult> {
+  try {
+    const res = await fetch(`${API_BASE}/device-pairing/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ carepartner_id: carepartnerID }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      return { ok: false, message: errorData.error || "Failed to check pairing status" };
+    }
+
+    const data = await res.json();
+    return { ok: true, deviceId: data.paired ? "device_123" : "" };
+  } catch {
+    return { ok: false, message: "Network error while checking device pairing" };
+  }
+}
+
+async function carepartnerExists(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/carepartner/${id}`);
+
+    if (res.status === 404) return false;
+    if (!res.ok) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function formatCountdown(totalSeconds: number) {
@@ -50,26 +111,118 @@ function formatCountdown(totalSeconds: number) {
 export default function PairScreen() {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [expiresInSec, setExpiresInSec] = useState<number | null>(null);
+  const [carepartnerID, setCarepartnerID] = useState<number | null>(null);
 
   const [isLoadingCode, setIsLoadingCode] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
   const canVerify = !!pairingCode && !isLoadingCode && !isVerifying;
 
+  // ---- Load or create carepartnerID ----
+  useEffect(() => {
+    async function init() {
+      setIsLoadingCode(true);
+      setError(null);
+
+      try {
+        let id = await getStoredCarepartnerID();
+
+        if (id) {
+          const valid = await carepartnerExists(id);
+          if (!valid) {
+            id = null;
+          }
+        }
+
+        if (!id) {
+          id = await createNewCarepartner();
+          await storeCarepartnerID(id);
+        }
+
+        setCarepartnerID(id);
+
+        const result = await fetchPairingCodeForThisDevice(id);
+        if (!result.ok) {
+          setError(result.message);
+          setPairingCode(null);
+          setExpiresInSec(null);
+          return;
+        }
+
+        setPairingCode(result.pairingCode);
+        setExpiresInSec(result.expiresInSec ?? null);
+
+      } catch (err: any) {
+        setError(err.message || "Failed to initialize carepartner ID");
+      } finally {
+        setIsLoadingCode(false);
+      }
+    }
+
+    init();
+  }, []);
+
+  // Countdown for expiration
+  useEffect(() => {
+    if (expiresInSec == null || expiresInSec <= 0) return;
+    const id = setInterval(() => {
+      setExpiresInSec((t) => (t == null ? t : Math.max(0, t - 1)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [expiresInSec]);
+
+  // Expired handling
+  useEffect(() => {
+    if (expiresInSec == null || expiresInSec > 0) return;
+    setPairingCode(null);
+    setError("This code expired. Tap Refresh Code to generate a new one.");
+  }, [expiresInSec]);
+
+  const handleVerify = async () => {
+    if (!carepartnerID) {
+      setError("Carepartner ID not initialized");
+      return;
+    }
+
+    setError(null);
+    setIsVerifying(true);
+
+    try {
+      if (!pairingCode) {
+        setError("No pairing code available");
+        return;
+      }
+
+      const result = await verifyThisDeviceIsPaired(carepartnerID);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      // TODO: store deviceId if needed
+      // await SecureStore.setItemAsync("deviceId", result.deviceId)
+
+      router.push("/terms" as Href);
+    } catch {
+      setError("Something went wrong. Please check your connection and try again.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const loadCode = async () => {
+    if (!carepartnerID) return;
     setError(null);
     setIsLoadingCode(true);
     try {
-      const result = await fetchPairingCodeForThisDevice();
+      const result = await fetchPairingCodeForThisDevice(carepartnerID);
       if (!result.ok) {
         setError(result.message);
         setPairingCode(null);
         setExpiresInSec(null);
         return;
       }
-
       setPairingCode(result.pairingCode);
       setExpiresInSec(result.expiresInSec ?? null);
     } catch {
@@ -78,56 +231,6 @@ export default function PairScreen() {
       setExpiresInSec(null);
     } finally {
       setIsLoadingCode(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCode();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Simple countdown (optional)
-  useEffect(() => {
-    if (expiresInSec == null) return;
-    if (expiresInSec <= 0) return;
-
-    const id = setInterval(() => {
-      setExpiresInSec((t) => (t == null ? t : Math.max(0, t - 1)));
-    }, 1000);
-
-    return () => clearInterval(id);
-  }, [expiresInSec]);
-
-  // If it expires, clear code + show message (optional)
-  useEffect(() => {
-    if (expiresInSec == null) return;
-    if (expiresInSec > 0) return;
-
-    // Expired
-    setPairingCode(null);
-    setError("This code expired. Tap Refresh Code to generate a new one.");
-  }, [expiresInSec]);
-
-  const handleVerify = async () => {
-    setError(null);
-    setIsVerifying(true);
-
-    try {
-      const result = await verifyThisDeviceIsPaired();
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-
-      // TODO: store deviceId / auth token returned from backend
-      // Example: await SecureStore.setItemAsync("deviceId", result.deviceId)
-
-      // Next step: Terms & Conditions screen
-      router.push("/terms" as Href);
-    } catch {
-      setError("Something went wrong. Please check your connection and try again.");
-    } finally {
-      setIsVerifying(false);
     }
   };
 

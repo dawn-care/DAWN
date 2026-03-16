@@ -1,65 +1,62 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function AccountSetupPage() {
   const navigate = useNavigate();
-
+  const { user, setUser } = useAuth(); // access logged-in user
   const [pairingCode, setPairingCode] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState("");
+  const [consentChecked, setConsentChecked] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  const validateFile = (f: File) => {
-    const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
-
-    if (!allowedTypes.includes(f.type)) {
-      setFileError("Only PDF, PNG, or JPG files are allowed.");
-      return;
-    }
-
-    if (f.size > 5 * 1024 * 1024) {
-      setFileError("File size must be under 5MB.");
-      return;
-    }
-
-    setFileError("");
-    setFile(f);
-  };
-
   const handleSubmit = async () => {
+    // Ensure pairing code is entered
     if (!pairingCode.trim()) {
       setSubmitError("Pairing code is required.");
       return;
     }
 
-    if (!file) {
-      setSubmitError("Written consent document is required.");
+    // Ensure checkbox is clicked
+    if (!consentChecked) {
+      setSubmitError("You must agree to the consent statement to proceed.");
+      return;
+    }
+
+    // Get rid of "user is possibly null" error
+    if (!user?.id) {
+      setSubmitError("User is not logged in. Please log in again.");
       return;
     }
 
     setSubmitError("");
 
-    const formData = new FormData();
-    formData.append("pairingCode", pairingCode);
-    formData.append("consentForm", file);
-
     try {
-        const API_URL = import.meta.env.VITE_API_URL;
-        const res = await fetch(`${API_URL}/api/me`, {
-        method: "PUT",
+      // Verify that the pairing code matches one in the pairing code table
+      const API_URL = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${API_URL}/api/users/device-pairing/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: formData,
-        });
+        body: JSON.stringify({
+          code: pairingCode,
+          caregiver_id: user.id, 
+        }),
+      });
 
       if (!res.ok) {
-        setSubmitError("Failed to complete setup. Please try again.");
+        const errText = await res.text();
+        setSubmitError(errText || "Failed to verify pairing code. Please try again.");
         return;
       }
 
+      // Update user context to have the correct carepartner id after pairing
+      setUser({ ...user, carepartner_id: user.carepartner_id || 1 });
+
+      // Pairing succeeded
       navigate("/library");
     } catch (err) {
       console.error(err);
-      setSubmitError("Something went wrong.");
+      setSubmitError("Something went wrong. Please try again.");
     }
   };
 
@@ -69,7 +66,7 @@ export default function AccountSetupPage() {
         Complete Account Setup
       </h1>
 
-      <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+      <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow">
 
         {/* Pairing Code */}
         <div className="mb-6">
@@ -83,32 +80,31 @@ export default function AccountSetupPage() {
           />
         </div>
 
-        {/* Written Consent Upload */}
+        {/* Consent Statement */}
         <div className="mb-6">
-          <label className="text-lg font-medium">
-            Upload Written Consent (PDF or Image):
-          </label>
-
-          <div
-            className="mt-2 p-6 border-2 border-dashed border-gray-400 rounded cursor-pointer bg-purple-50 text-center"
-            onClick={() => document.getElementById("fileInput")?.click()}
-          >
-            {file ? <span>{file.name}</span> : <span>Drag and drop or click to upload</span>}
+          <label className="text-lg font-medium">Consent Statement:</label>
+          <div className="mt-2 p-4 border rounded bg-gray-50 max-h-48 overflow-y-auto text-sm text-gray-700">
+            <p>
+              By checking this box, you acknowledge that your photos and videos will be
+              stored on the StartUp server. Your data will not be sold to third parties.
+            </p>
+            <p className="mt-2">
+              Please make sure you have discussed this with your care partner before
+              proceeding. You must agree to this statement to complete account setup.
+            </p>
           </div>
 
-          <input
-            id="fileInput"
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) validateFile(f);
-            }}
-          />
-
-          {fileError && (
-            <p className="text-red-500 mt-2 text-sm">{fileError}</p>
-          )}
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="consentCheckbox"
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+            />
+            <label htmlFor="consentCheckbox" className="text-sm text-gray-700">
+              I agree to the consent statement
+            </label>
+          </div>
         </div>
 
         {/* Error Message */}

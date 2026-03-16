@@ -14,6 +14,7 @@ import (
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
+	pairingCtrlr "server/internal/controllers/user/device_pairing"
 	newsCtrlr "server/internal/controllers/widgets/news"
 	weatherCtrlr "server/internal/controllers/widgets/weather"
 
@@ -22,6 +23,7 @@ import (
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
 	caregiverRts "server/internal/routes/user"
+	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
 	weatherRts "server/internal/routes/widgets/weather"
 
@@ -31,10 +33,14 @@ import (
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
 	caregiverSvc "server/internal/services/user/caregiver"
+	pairingSvc "server/internal/services/user/device_pairing"
 	newsSvc "server/internal/services/widgets/news"
 	weatherSvc "server/internal/services/widgets/weather"
 
 	_ "server/cmd/docs"
+	carepartnerCtrlr "server/internal/controllers/user/carepartner"
+	carepartnerRts "server/internal/routes/user"
+	carepartnerSvc "server/internal/services/user/carepartner"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -125,30 +131,75 @@ func main() {
 		}
 	}
 
-	// Services
+	// ------------ SERVICES ------------
+	// User
+	caregiverService := caregiverSvc.NewCaregiverService(db)
+	devicePairingService := pairingSvc.NewDevicePairingService(db)
+	carepartnerService := carepartnerSvc.NewCarepartnerService(db)
+
+	// Auth
+	googleService := authSvc.NewGoogleAuthService()
+	sessionService := authSvc.NewSessionService(db)
+	authService := authSvc.NewAuthService(googleService, caregiverService, sessionService)
+
+	// Agenda
+	modulesService := modulesSvc.NewModuleService(db)
+	configurationService := configurationSvc.NewConfigurationService(db)
+
+	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "audio-bucket")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "photo-bucket")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
 
-	caregiverService := caregiverSvc.NewCaregiverService(db)
-	newsService := newsSvc.NewNewsWidgetService(db, "3bc060a2d2c146bf92e6d9b94341d739")
+	// Widgets
+	newsService := newsSvc.NewNewsWidgetService(db, "api key")
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
-	weatherService := weatherSvc.NewWeatherService(db, "30d992579f0ac7f70e065cf0afaa070d")
-	modulesService := modulesSvc.NewModuleService(db)
-	configurationService := configurationSvc.NewConfigurationService(db)
+	weatherService := weatherSvc.NewWeatherService(db, "api key")
 
-	eventsService := promptsSvc.NewEventService(db)
+	// Prompts
 	messageService := promptsSvc.NewMessageService(db)
+	eventsService := promptsSvc.NewEventService(db)
 	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
 	carepartnerLocationService := promptsSvc.NewCarepartnerLocationService(db)
 
-	// Auth services
-	googleService := authSvc.NewGoogleAuthService()
-	sessionService := authSvc.NewSessionService(db)
-	authService := authSvc.NewAuthService(googleService, caregiverService, sessionService)
+	// ------------ CONTROLLERS ------------
+	// User
+	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
+	devicePairingCtrl := pairingCtrlr.NewDevicePairingController(devicePairingService)
+	carepartnerCtrl := carepartnerCtrlr.NewCarepartnerController(carepartnerService)
+
+	// Auth
 	authController := authCtrlr.AuthController{AuthService: authService}
 
-	// Auth routes
+	// Agenda
+	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
+	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
+
+	// Media
+	audioCtrl := mediaCtrlr.NewAudioController(audioService)
+	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
+	videoCtrl := mediaCtrlr.NewVideoController(videoService)
+
+	// Widgets
+	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
+	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
+	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
+
+	// Prompts
+	messageCtrl := promptsCtrlr.NewMessageController(messageService)
+	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
+	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
+	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
+
+	// ------------ ROUTES ------------
+	// User
+	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
+	r.Route("/api/users", func(r chi.Router) {
+		pairingRts.RegisterDevicePairingRoutes(r, devicePairingCtrl)
+		carepartnerRts.RegisterCarepartnerRoutes(r, carepartnerCtrl)
+	})
+
+	// Auth
 	r.Post("/api/auth/google", authController.GoogleLogin)
 	r.Post("/api/auth/logout", authController.Logout)
 
@@ -159,37 +210,23 @@ func main() {
 		r.Put("/api/me", authController.UpdateMeHandler)
 	})
 
-	// Controllers
-	audioCtrl := mediaCtrlr.NewAudioController(audioService)
-	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
-	videoCtrl := mediaCtrlr.NewVideoController(videoService)
+	// Agenda
+	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
+	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 
-	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
-	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
-	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
-	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
-	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
-	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
-
-	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
-	messageCtrl := promptsCtrlr.NewMessageController(messageService)
-	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
-	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
-
-	// Routes
+	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 
-	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
-	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
+	// Widgets
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
-	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
-	promptsRts.RegisterEventRoutes(r, eventsCtrl)
+	// Prompts
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
+	promptsRts.RegisterEventRoutes(r, eventsCtrl)
 	promptsRts.RegisterCaregiverLocationRoutes(r, caregiverLocationCtrl)
 	promptsRts.RegisterCarepartnerLocationRoutes(r, carepartnerLocationCtrl)
 
