@@ -1,22 +1,53 @@
+# ===============================
+# FRONTEND BUILD STAGE
+# ===============================
+FROM node:24.6-bookworm AS frontend-builder
+
+WORKDIR /frontend
+
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
+COPY caregiver/package*.json ./
+RUN npm install
+
+COPY caregiver/ ./
+RUN npm run build
+
+
+# ===============================
+# BACKEND BUILD STAGE
+# ===============================
 FROM golang:1.25.3-bookworm AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY server/go.mod server/go.sum ./
 RUN go mod download
 
-COPY . .
+COPY server/ ./
 
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN swag init -g ./cmd/main.go -o ./cmd/docs
 
 RUN go build -o main ./cmd
 
+
+# ===============================
+# RUNTIME IMAGE
+# ===============================
 FROM ubuntu:24.04
+
 WORKDIR /app
+
+# Copy Go binary
 COPY --from=builder /app/main .
+
+# Copy built frontend
+COPY --from=frontend-builder /frontend/dist /app/frontend
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 8080
+EXPOSE 80 443
+
 CMD ["./main"]
