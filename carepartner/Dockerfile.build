@@ -16,7 +16,7 @@ RUN npm ci
 COPY . .
 
 # Accept an optional API_URL override at build time (defaults to localhost)
-ARG API_URL=http://129.21.34.143:8080
+ARG API_URL=https://startup-da.gccis.rit.edu/api
 RUN echo "export const API_URL = \"${API_URL}\";" > app/config.ts
 
 # 1. Export the Expo web bundle into dist/

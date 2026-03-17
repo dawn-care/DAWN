@@ -197,6 +197,15 @@ func main() {
 	// User
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
 	r.Route("/api/users", func(r chi.Router) {
+		r.Post("/carepartner/create-carepartner", carepartnerCtrl.CreateCarepartner)
+		r.Get("/carepartner/{id}", carepartnerCtrl.GetCarepartnerByID)
+		r.Get("/carepartner", carepartnerCtrl.GetAllCarepartners)
+		r.Delete("/carepartner/{id}", carepartnerCtrl.DeleteCarepartner)
+
+		r.Post("/device-pairing/code", devicePairingCtrl.GeneratePairingCode)
+		r.Post("/device-pairing/verify", devicePairingCtrl.VerifyPairingCode)
+		r.Post("/device-pairing/status", devicePairingCtrl.IsDevicePaired)
+
 		pairingRts.RegisterDevicePairingRoutes(r, devicePairingCtrl)
 		carepartnerRts.RegisterCarepartnerRoutes(r, carepartnerCtrl)
 	})
@@ -276,7 +285,7 @@ func main() {
 		},
 	}
 
-	go http.ListenAndServe(":80", manager.HTTPHandler(nil))
+	go http.ListenAndServe(":80", manager.HTTPHandler(r))
 
 	log.Println("Starting HTTPS server on 443")
 	log.Fatal(server.ListenAndServeTLS("", ""))

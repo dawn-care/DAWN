@@ -93,7 +93,7 @@ export default function Screensaver() {
       const now = new Date();
       const dateKey = now.toDateString();
       const isAutoStartWindow = now.getHours() === 8 && now.getMinutes() === 0;
-      console.log(now)
+ 
       if (!isAutoStartWindow) {
         return;
       }
