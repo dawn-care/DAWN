@@ -2,24 +2,22 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
   LayoutChangeEvent,
 } from "react-native";
-import { Stack, router } from "expo-router";
-import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
-import AgendaView, { type ConfigurationWithMetadata, VideoMetadata } from "./agendaView";
+import { Stack } from "expo-router";
+import { Video } from "expo-av";
+import { type ConfigurationWithMetadata, type MediaPlaybackProps, VideoMetadata } from "./agendaView";
 
-// ---- STUB TYPES (replace later) ----
 type GreetingMediaConfig = {
-  title: string; // "Good Morning, Grandma"
-  videoUrl?: string; // remote URL from backend
+  videoUrl?: string;
 };
 
 interface GreetingScreenProps {
-  configuration: ConfigurationWithMetadata;  
+  configuration: ConfigurationWithMetadata;
+  onPlaybackComplete: MediaPlaybackProps["onPlaybackComplete"];
 }
 
 const API_URL = "http://localhost:8080"
@@ -43,7 +41,8 @@ function GlassCard({
 }
 
 export default function GreetingScreen({
-  configuration: configuration
+  configuration: configuration,
+  onPlaybackComplete,
   }: GreetingScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const buildConfig = (configuration: ConfigurationWithMetadata): GreetingMediaConfig => {
@@ -51,13 +50,11 @@ export default function GreetingScreen({
   
       if (!metadata) {
         return {
-          title: "Video",
           videoUrl: "",
         };
       }
   
       return {
-        title: metadata.displayed_name,
         videoUrl: `${API_URL}/video/file?id=${metadata.id}`,
       };
     };
@@ -93,12 +90,6 @@ export default function GreetingScreen({
     setPositionSec(p);
   };
 
-  const handleNext = () => {
-    // TODO: route to the actual next screen later
-    // router.push("/someNextScreen");
-    console.log("Next pressed");
-  };
-
   const handleSeek = async (newProgress: number) => {
     if (!videoRef.current || !durationSec) return;
     const targetSeconds = newProgress * durationSec;
@@ -117,18 +108,7 @@ export default function GreetingScreen({
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView style={styles.safe}>
-        {/* Top title strip */}
-        <View style={styles.topBar}>
-          {/* Swap this to your logo asset if desired */}
-          <Image
-            source={require("../assets/images/icon.png")}
-            style={styles.topLogo}
-          />
-          <Text style={styles.topTitle}>{config.title}</Text>
-        </View>
-
-        {/* Video area */}
+      <View style={styles.safe}>
         <View style={styles.videoWrap}>
           {config.videoUrl ? (
             <video
@@ -139,6 +119,7 @@ export default function GreetingScreen({
               loop={false}
               controls={false}
               onTimeUpdate={onPlaybackStatusUpdate}
+              onEnded={onPlaybackComplete}
               onError={(e) => console.error("Video error:", e)}
             />
           ) : (
@@ -149,20 +130,6 @@ export default function GreetingScreen({
               </Text>
             </View>
           )}
-
-          {/* Next arrow (glass) */}
-          <Pressable
-            onPress={handleNext}
-            style={({ pressed }) => [
-              styles.nextWrapper,
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <GlassCard style={styles.nextGlass}>
-              <Text style={styles.nextArrow}>›</Text>
-            </GlassCard>
-          </Pressable>
-
           {/* Progress controls (glass row) */}
           <GlassCard style={styles.progressGlass}>
             <View style={styles.progressRow}>
@@ -190,35 +157,13 @@ export default function GreetingScreen({
             </View>
           </GlassCard>
         </View>
-      </SafeAreaView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#000" },
-
-  // --- top strip ---
-  topBar: {
-    backgroundColor: "#c7f3f6",
-    borderBottomWidth: 2,
-    borderBottomColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  topLogo: {
-    width: 42,
-    height: 42,
-    resizeMode: "contain",
-  },
-  topTitle: {
-    fontSize: 44,
-    fontWeight: "300",
-    color: "rgba(0,0,0,0.85)",
-  },
 
   // --- video ---
   videoWrap: {
@@ -250,28 +195,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.25)",
     backgroundColor: "rgba(255,255,255,0.55)",
-  },
-
-  // --- next button (glass) ---
-  nextWrapper: {
-    position: "absolute",
-    right: 26,
-    top: "45%",
-  },
-  nextGlass: {
-    width: 82,
-    height: 82,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "rgba(0, 255, 240, 0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  nextArrow: {
-    fontSize: 54,
-    color: "rgba(0,0,0,0.75)",
-    lineHeight: 54,
-    marginTop: -2,
   },
 
   // --- progress row (glass container) ---

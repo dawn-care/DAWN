@@ -1,19 +1,16 @@
 // app/text.tsx (or whatever route you want)
 import React, { useEffect, useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { Stack } from "expo-router";
-import AgendaView, { type ConfigurationWithMetadata, WeatherMetadata, NewsMetadata, EventMetadata } from "./agendaView";
+import { type ConfigurationWithMetadata, WeatherMetadata, NewsMetadata, EventMetadata } from "./agendaView";
 
-// ---- STUB TYPES (replace later) ----
 type TextViewerConfig = {
-  title: string; // e.g. "Today's Message"
-  content: string; // long text
+  content: string;
 };
 
 interface TextViewerProps {
@@ -72,7 +69,6 @@ async function buildConfig(
     metadata = configuration.metadata as WeatherMetadata | null;
 
     return {
-      title: "Weather",
       content: metadata ? await fetchWeather(metadata) : "",
     };
   }
@@ -81,14 +77,12 @@ async function buildConfig(
     metadata = configuration.metadata as NewsMetadata | null;
 
     return {
-      title: "Sports News",
       content: metadata ? await fetchSports(metadata) : "",
     };
   }
 
   if (configuration.module_type === "news") {
     return {
-      title: "Good News",
       content: await fetchNews(),
     };
   }
@@ -96,7 +90,6 @@ async function buildConfig(
   metadata = configuration.metadata as EventMetadata | null;
 
   return {
-    title: metadata?.time ?? "Event",
     content: metadata?.text ?? "",
   };
 }
@@ -116,7 +109,6 @@ export default function TextViewerScreen({
   configuration: configuration
   }: TextViewerProps) {
   const [config, setConfig] = useState<TextViewerConfig>({
-    title: "",
     content: "",
   });
 
@@ -148,13 +140,7 @@ export default function TextViewerScreen({
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView style={styles.safe}>
-        {/* Top title strip */}
-        <View style={styles.topBar}>
-          <Text style={styles.topTitle}>{config.title}</Text>
-        </View>
-
-        {/* Content area */}
+      <View style={styles.safe}>
         <View style={styles.body}>
           <GlassCard style={styles.card}>
             <ScrollView
@@ -169,30 +155,13 @@ export default function TextViewerScreen({
             </ScrollView>
           </GlassCard>
         </View>
-      </SafeAreaView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#000" },
-
-  // --- top strip ---
-  topBar: {
-    backgroundColor: "#c7f3f6",
-    borderBottomWidth: 2,
-    borderBottomColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  topTitle: {
-    fontSize: 54,
-    fontWeight: "300",
-    color: "rgba(0,0,0,0.85)",
-    textAlign: "center",
-  },
 
   // --- body ---
   body: {
