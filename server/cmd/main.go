@@ -232,7 +232,8 @@ func main() {
 
 	r.Mount("/swagger", httpSwagger.WrapHandler)
 
-	port := getEnvOrDefault("PORT", "8080")
-	fmt.Printf("Starting server on port %s...\n", port)
-	http.ListenAndServe(":"+port, r)
+	// port := getEnvOrDefault("PORT", "8080")
+	// fmt.Printf("Starting server on port %s...\n", port)
+	// http.ListenAndServe(":"+port, r)
+	http.ListenAndServeTLS(":443", "fullchain.pem", "privkey.pem", r)
 }

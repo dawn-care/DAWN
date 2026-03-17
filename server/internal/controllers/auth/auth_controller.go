@@ -30,7 +30,7 @@ func (c *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false, // set to true in prod
+		Secure:   true, // set to true in prod
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -111,7 +111,7 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1, // tells browser to delete immediately
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 
