@@ -4,7 +4,8 @@ import GreetingScreen from './greeting';
 import TextViewerScreen from './text';
 import PhotoViewerScreen from './photo';
 import React from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
 // Metadata shapes returned inline by the backend
 export type PhotoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
@@ -34,6 +35,15 @@ export type ConfigurationWithMetadata = {
         | CarepartnerLocationMetadata | CaregiverLocationMetadata | null;
 };
 
+async function getStoredCarepartnerID(): Promise<number | null> {
+    if (Platform.OS === 'web') {
+        const id = localStorage.getItem('carepartnerID');
+        return id ? parseInt(id, 10) : null;
+    }
+    const id = await SecureStore.getItemAsync('carepartnerID');
+    return id ? parseInt(id, 10) : null;
+}
+
 export default function AgendaView(){
     const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,10 +54,16 @@ export default function AgendaView(){
         try{
             setLoading(true);
 
+            // const carepartnerId = await getStoredCarepartnerID();
+            // if (!carepartnerId) {
+            //     setError('No carepartner ID found. Please pair this device first.');
+            //     return;
+            // }
+
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
 
             const params = new URLSearchParams({
-                carepartner_id: '1',
+                carepartner_id: "1",
                 day: String(dayOfMonth),
                 month: String(month),
                 day_of_week: String(dayOfWeek),

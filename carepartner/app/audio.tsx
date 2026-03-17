@@ -10,8 +10,9 @@ import {
   View,
 } from "react-native";
 import { Stack } from "expo-router";
-import { Audio, AVPlaybackStatus } from "expo-av";
 import AgendaView, { type ConfigurationWithMetadata, AudioMetadata } from "./agendaView";
+
+const API_URL = "http://localhost:8080";
 
 // ---- STUB TYPES (replace later) ----
 type AudioMediaConfig = {
@@ -45,7 +46,7 @@ function GlassCard({
 export default function AudioScreen({
     configuration: configuration
   }: AudioScreenProps){
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const buildConfig = (configuration: ConfigurationWithMetadata): AudioMediaConfig => {
     const metadata = configuration.metadata as AudioMetadata | null;
 
@@ -58,7 +59,7 @@ export default function AudioScreen({
 
     return {
       title: metadata.displayed_name,
-      audioUrl: metadata.uri
+      audioUrl: `${API_URL}/audio/file?id=${metadata.id}`
     };
   };
 
@@ -77,92 +78,26 @@ export default function AudioScreen({
      setConfig(next);
    }, [configuration]);
 
-  // Load/unload audio when audioUrl changes
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      // Clean up any previous sound
-      if (soundRef.current) {
-        try {
-          soundRef.current.setOnPlaybackStatusUpdate(null);
-          await soundRef.current.unloadAsync();
-        } catch {
-          // ignore
-        }
-        soundRef.current = null;
-      }
-
-      if (!config.audioUrl) {
-        setDurationSec(0);
-        setPositionSec(0);
-        return;
-      }
-
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: true,
-        });
-
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: config.audioUrl },
-          { shouldPlay: true, isLooping: false },
-          (status: AVPlaybackStatus) => {
-            if (!status.isLoaded) return;
-            const d = status.durationMillis ? status.durationMillis / 1000 : 0;
-            const p = status.positionMillis ? status.positionMillis / 1000 : 0;
-            if (!cancelled) {
-              setDurationSec(d);
-              setPositionSec(p);
-            }
-          }
-        );
-
-        if (cancelled) {
-          try {
-            await sound.unloadAsync();
-          } catch {}
-          return;
-        }
-
-        soundRef.current = sound;
-      } catch {
-        // TODO: log/report
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [config.audioUrl]);
-
-  // Final cleanup on unmount
-  useEffect(() => {
-    return () => {
-      (async () => {
-        if (soundRef.current) {
-          try {
-            soundRef.current.setOnPlaybackStatusUpdate(null);
-            await soundRef.current.unloadAsync();
-          } catch {}
-          soundRef.current = null;
-        }
-      })();
-    };
-  }, []);
-
   const progress = useMemo(() => {
     if (!durationSec) return 0;
     return Math.min(1, Math.max(0, positionSec / durationSec));
   }, [positionSec, durationSec]);
 
+  const onPlaybackStatusUpdate = (
+    event: React.SyntheticEvent<HTMLAudioElement>
+  ) => {
+    const audio = event.currentTarget;
+    const d = audio.duration || 0;
+    const p = audio.currentTime || 0;
+    setDurationSec(d);
+    setPositionSec(p);
+  };
+
   const handleSeek = async (newProgress: number) => {
-    if (!soundRef.current || !durationSec) return;
-    const targetMillis = newProgress * durationSec * 1000;
+    if (!audioRef.current || !durationSec) return;
+    const targetSeconds = newProgress * durationSec;
     try {
-      await soundRef.current.setPositionAsync(targetMillis);
+      audioRef.current.currentTime = targetSeconds;
     } catch {
       // ignore
     }
@@ -215,6 +150,23 @@ export default function AudioScreen({
               )}
             </View>
           </View>
+
+          {/* Hidden audio element for playback */}
+          {config.audioUrl ? (
+            <audio
+              ref={audioRef}
+              src={config.audioUrl}
+              autoPlay
+              loop={false}
+              onTimeUpdate={onPlaybackStatusUpdate}
+              onError={(e) => {
+                const audio = e.currentTarget as HTMLAudioElement;
+                const err = audio?.error;
+                console.error("Audio error:", err?.code, err?.message, "src:", config.audioUrl);
+              }}
+              style={{ display: "none" }}
+            />
+          ) : null}
 
           {/* Left arrow */}
           <Pressable
