@@ -99,33 +99,6 @@ services:
     networks:
       - app-network
 
-  nginx:
-    image: nginx:latest
-    container_name: nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/certs:/etc/letsencrypt/live
-      - ./nginx/www:/etc/letsencrypt/www
-    depends_on:
-      - server
-    networks:
-      - app-network
-
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      - ./nginx/certs:/etc/letsencrypt/live
-      - ./nginx/www:/etc/letsencrypt/www
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done'"
-    depends_on:
-      - nginx
-    networks:
-      - app-network
-
 volumes:
   db-data:
   minio-data:
