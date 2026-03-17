@@ -33,7 +33,7 @@ export default function AccountSetupPage() {
     try {
       // Verify that the pairing code matches one in the pairing code table
       const API_URL = import.meta.env.VITE_API_URL;
-        const res = await fetch(`${API_URL}/users/device-pairing/verify`, {
+      const res = await fetch(`${API_URL}/users/device-pairing/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -49,8 +49,17 @@ export default function AccountSetupPage() {
         return;
       }
 
-      // Update user context to have the correct carepartner id after pairing
-      setUser({ ...user, carepartner_id: user.carepartner_id || 1 });
+      const meRes = await fetch(`${API_URL}/me`, {
+        credentials: "include",
+      });
+
+      if (!meRes.ok) {
+        setSubmitError("Pairing succeeded, but failed to refresh account data.");
+        return;
+      }
+
+      const refreshedUser = await meRes.json();
+      setUser(refreshedUser);
 
       // Pairing succeeded
       navigate("/library");
