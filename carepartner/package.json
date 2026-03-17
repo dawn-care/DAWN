@@ -2,6 +2,12 @@
   "name": "carepartner",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "description": "Carepartner companion app for StartUp - Dementia Assistance",
+  "author": {
+    "name": "Ethan - SUDA Team Member",
+    "email": "ea8251@rit.edu.com"
+  },
+  "homepage": "https://ucp4496.github.io/",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",

@@ -20,7 +20,9 @@ type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
-const API_BASE = "http://localhost:8080/api/users";
+import { API_URL } from "./config";
+
+const API_BASE = `${API_URL}/api/users`;
 
 // ---- Local storage helpers with web fallback ----
 async function getStoredCarepartnerID(): Promise<number | null> {
