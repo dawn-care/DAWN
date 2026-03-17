@@ -44,7 +44,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 
 # Copy built frontend
-COPY --from=frontend-builder /frontend/dist /app/frontend
+COPY --from=frontend-builder /app/dist /app/frontend
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
