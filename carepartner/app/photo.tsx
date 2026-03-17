@@ -2,24 +2,19 @@
 import React, { useEffect, useState } from "react";
 import {
   Image,
-  Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { Stack } from "expo-router";
-import AgendaView, { type ConfigurationWithMetadata, PhotoMetadata, MessageMetadata } from "./agendaView";
+import { type ConfigurationWithMetadata, PhotoMetadata, MessageMetadata } from "./agendaView";
 
-// ---- STUB TYPES (replace later) ----
 type PhotoViewerConfig = {
-  title: string; // e.g. "Your Grandkids"
-  photoUrls?: string[]; // remote URLs from backend
-  startIndex?: number; // optional
+  photoUrls?: string[];
 };
 
 interface PhotoViewerProps {
-  configuration: ConfigurationWithMetadata;  
+  configuration: ConfigurationWithMetadata;
 }
 
 const API_URL = "http://localhost:8080"
@@ -36,7 +31,7 @@ function GlassCard({
 }
 
 export default function PhotoViewerScreen({
-  configuration: configuration
+  configuration: configuration,
   }: PhotoViewerProps){
 
   const buildConfig = (configuration: ConfigurationWithMetadata): PhotoViewerConfig => {
@@ -45,31 +40,23 @@ export default function PhotoViewerScreen({
       metadata = configuration.metadata as PhotoMetadata | null;
       if (!metadata) {
         return {
-          title: "Photos",
           photoUrls: [],
-          startIndex: 0
         };
       }
 
       return {
-        title: metadata.displayed_name,
         photoUrls: [`${API_URL}/photo/file?id=${metadata.id}`],
-        startIndex: 0
       };
     } else {
       metadata = configuration.metadata as MessageMetadata | null;
       if (!metadata) {
         return {
-          title: "Photos",
           photoUrls: [],
-          startIndex: 0
         };
       }
 
       return {
-        title: metadata.message,
         photoUrls: [metadata.image_uri],
-        startIndex: 0
       };
     }
   };
@@ -78,46 +65,20 @@ export default function PhotoViewerScreen({
     buildConfig(configuration)
   );
 
-  const [index, setIndex] = useState(0);
-
   useEffect(() => {
     const next = buildConfig(configuration);
     setConfig(next);
-    setIndex(next.startIndex ?? 0);
   }, [configuration]);
 
   const hasPhotos = !!config.photoUrls?.length;
-  const safeIndex = hasPhotos
-    ? ((index % config.photoUrls!.length) + config.photoUrls!.length) %
-      config.photoUrls!.length
-    : 0;
-
-  const currentUrl = hasPhotos ? config.photoUrls![safeIndex] : undefined;
+  const currentUrl = hasPhotos ? config.photoUrls![0] : undefined;
   console.log("PhotoViewer config:", config, "currentUrl:", currentUrl);
-
-  const handlePrev = () => {
-    if (!hasPhotos) return;
-    setIndex((i) => i - 1);
-  };
-
-  const handleNext = () => {
-    if (!hasPhotos) return;
-    setIndex((i) => i + 1);
-  };
-
-  const arrowsDisabled = !hasPhotos || (config.photoUrls?.length ?? 0) <= 1;
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView style={styles.safe}>
-        {/* Top title strip */}
-        <View style={styles.topBar}>
-          <Text style={styles.topTitle}>{config.title}</Text>
-        </View>
-
-        {/* Photo area */}
+      <View style={styles.safe}>
         <View style={styles.photoWrap}>
           {currentUrl ? (
             <img src={currentUrl} style={styles.photo} onError={(e) => console.log("Image failed:", e.nativeEvent)} />
@@ -129,60 +90,14 @@ export default function PhotoViewerScreen({
               </Text>
             </View>
           )}
-
-          {/* Left arrow (glass) */}
-          <Pressable
-            onPress={handlePrev}
-            disabled={arrowsDisabled}
-            style={({ pressed }) => [
-              styles.leftWrapper,
-              pressed && !arrowsDisabled && { transform: [{ scale: 0.98 }] },
-              arrowsDisabled && { opacity: 0.45 },
-            ]}
-          >
-            <GlassCard style={styles.arrowGlass}>
-              <Text style={styles.arrowText}>‹</Text>
-            </GlassCard>
-          </Pressable>
-
-          {/* Right arrow (glass) */}
-          <Pressable
-            onPress={handleNext}
-            disabled={arrowsDisabled}
-            style={({ pressed }) => [
-              styles.rightWrapper,
-              pressed && !arrowsDisabled && { transform: [{ scale: 0.98 }] },
-              arrowsDisabled && { opacity: 0.45 },
-            ]}
-          >
-            <GlassCard style={styles.arrowGlass}>
-              <Text style={styles.arrowText}>›</Text>
-            </GlassCard>
-          </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#000" },
-
-  // --- top strip ---
-  topBar: {
-    backgroundColor: "#c7f3f6",
-    borderBottomWidth: 2,
-    borderBottomColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  topTitle: {
-    fontSize: 54,
-    fontWeight: "300",
-    color: "rgba(0,0,0,0.85)",
-  },
 
   // --- photo ---
   photoWrap: {
@@ -219,34 +134,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.25)",
     backgroundColor: "rgba(255,255,255,0.55)",
-  },
-
-  // --- arrows (glass) ---
-  leftWrapper: {
-    position: "absolute",
-    left: 26,
-    top: "50%",
-    marginTop: -41, // centers the 82px button
-  },
-  rightWrapper: {
-    position: "absolute",
-    right: 26,
-    top: "50%",
-    marginTop: -41,
-  },
-  arrowGlass: {
-    width: 82,
-    height: 82,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "rgba(0, 255, 240, 0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  arrowText: {
-    fontSize: 54,
-    color: "rgba(0,0,0,0.75)",
-    lineHeight: 54,
-    marginTop: -2,
   },
 });

@@ -4,24 +4,22 @@ import {
   Image,
   LayoutChangeEvent,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { Stack } from "expo-router";
-import AgendaView, { type ConfigurationWithMetadata, AudioMetadata } from "./agendaView";
+import { type ConfigurationWithMetadata, type MediaPlaybackProps, AudioMetadata } from "./agendaView";
 
 const API_URL = "http://localhost:8080";
 
-// ---- STUB TYPES (replace later) ----
 type AudioMediaConfig = {
-  title: string; // e.g. "Fly Me To the Moon"
-  audioUrl?: string; // remote URL from backend
+  audioUrl?: string;
 };
 
 interface AudioScreenProps {
-  configuration: ConfigurationWithMetadata;  
+  configuration: ConfigurationWithMetadata;
+  onPlaybackComplete: MediaPlaybackProps["onPlaybackComplete"];
 }
 
 
@@ -44,7 +42,8 @@ function GlassCard({
 }
 
 export default function AudioScreen({
-    configuration: configuration
+  configuration: configuration,
+  onPlaybackComplete,
   }: AudioScreenProps){
   const audioRef = useRef<HTMLAudioElement>(null);
   const buildConfig = (configuration: ConfigurationWithMetadata): AudioMediaConfig => {
@@ -52,13 +51,11 @@ export default function AudioScreen({
 
     if (!metadata) {
       return {
-        title: "Audio",
         audioUrl: ""
       };
     }
 
     return {
-      title: metadata.displayed_name,
       audioUrl: `${API_URL}/audio/file?id=${metadata.id}`
     };
   };
@@ -107,34 +104,15 @@ export default function AudioScreen({
     setBarWidth(e.nativeEvent.layout.width || 1);
   };
 
-  const handlePrev = () => {
-    // TODO: hook to your playlist navigation
-    console.log("Prev pressed");
-  };
-
-  const handleNext = () => {
-    // TODO: hook to your playlist navigation or “continue”
-    console.log("Next pressed");
-  };
-
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView style={styles.safe}>
-        {/* Top title strip */}
-        <View style={styles.topBar}>
-          <Text style={styles.topTitle}>{config.title}</Text>
-        </View>
-
-        {/* Main area */}
+      <View style={styles.safe}>
         <View style={styles.body}>
-          {/* Center “album” / placeholder */}
           <View style={styles.centerWrap}>
             <View style={styles.coverFrame}>
               <Image
-                // Put your default music note image here:
-                // e.g. /assets/images/music-note.png
                 source={require("../assets/images/music-note.jpg")}
                 style={styles.coverImage}
               />
@@ -159,6 +137,7 @@ export default function AudioScreen({
               autoPlay
               loop={false}
               onTimeUpdate={onPlaybackStatusUpdate}
+              onEnded={onPlaybackComplete}
               onError={(e) => {
                 const audio = e.currentTarget as HTMLAudioElement;
                 const err = audio?.error;
@@ -167,32 +146,6 @@ export default function AudioScreen({
               style={{ display: "none" }}
             />
           ) : null}
-
-          {/* Left arrow */}
-          <Pressable
-            onPress={handlePrev}
-            style={({ pressed }) => [
-              styles.leftWrapper,
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <GlassCard style={styles.arrowGlass}>
-              <Text style={styles.arrowText}>‹</Text>
-            </GlassCard>
-          </Pressable>
-
-          {/* Right arrow */}
-          <Pressable
-            onPress={handleNext}
-            style={({ pressed }) => [
-              styles.rightWrapper,
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <GlassCard style={styles.arrowGlass}>
-              <Text style={styles.arrowText}>›</Text>
-            </GlassCard>
-          </Pressable>
 
           {/* Progress controls (glass row) */}
           <GlassCard style={styles.progressGlass}>
@@ -225,29 +178,13 @@ export default function AudioScreen({
             </View>
           </GlassCard>
         </View>
-      </SafeAreaView>
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#d9d9d9" },
-
-  // --- top strip ---
-  topBar: {
-    backgroundColor: "#d7fbff",
-    borderBottomWidth: 2,
-    borderBottomColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  topTitle: {
-    fontSize: 54,
-    fontWeight: "300",
-    color: "rgba(0,0,0,0.85)",
-  },
 
   body: { flex: 1, position: "relative" },
 
