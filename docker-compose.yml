@@ -35,7 +35,7 @@ services:
       context: ./caregiver
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://startup-da.gccis.rit.edu
+        VITE_API_URL: https://startup-da.gccis.rit.edu/api
     container_name: caregiver
     ports:
       - "3000:80"
