@@ -8,7 +8,7 @@ import (
 
 // RegisterSportsNewsWidgetRoutes registers all sports news widget routes
 func RegisterSportsNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.SportsNewsWidgetController) {
-	r.Route("/sports", func(r chi.Router) {
+	r.Route("/api/sports", func(r chi.Router) {
 
 		// CRUD operations
 		r.Post("/upload", controller.CreateSportsNewsWidgetHandler) // Create single sports news widget

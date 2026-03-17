@@ -8,7 +8,7 @@ import (
 
 // RegisterVideoRoutes wires VideoController handlers to HTTP routes
 func RegisterVideoRoutes(r chi.Router, videoCtrl *media.VideoController) {
-	r.Route("/video", func(r chi.Router) {
+	r.Route("/api/video", func(r chi.Router) {
 		// CREATE
 		r.Post("/", videoCtrl.CreateVideoHandler)
 		r.Post("/upload", videoCtrl.CreateVideoFileHandler)
