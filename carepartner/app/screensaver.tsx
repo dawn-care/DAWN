@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import {
   ImageBackground,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Image } from "react-native";
+import { getCarepartnerId } from "./carepartnerId";
 
 // ---- STUB TYPES (replace later with your real backend types) ----
 type ScreensaverConfig = {
@@ -37,6 +38,8 @@ export default function Screensaver() {
     autoStartTimeLabel: "8:00am",
     backgroundImageUrl: undefined,
   });
+  const [hasCarepartnerId, setHasCarepartnerId] = useState<boolean | null>(null);
+  const lastAutoStartDateRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -55,6 +58,21 @@ export default function Screensaver() {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const carepartnerId = await getCarepartnerId();
+      if (mounted) {
+        setHasCarepartnerId(carepartnerId != null);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
 
   const backgroundSource = useMemo(() => {
     if (config.backgroundImageUrl) return { uri: config.backgroundImageUrl };
@@ -62,9 +80,37 @@ export default function Screensaver() {
     return require("../assets/images/defaultBackground.png");
   }, [config.backgroundImageUrl]);
 
-  const handleEnter = () => {
+  const handlePrimaryAction = () => {
     router.push({ pathname: "/agendaView" } as any);
   };
+
+  const handlePairDevice = () => {
+    router.push({ pathname: "/pair" } as any);
+  };
+
+  useEffect(() => {
+    const maybeAutoStart = () => {
+      const now = new Date();
+      const dateKey = now.toDateString();
+      const isAutoStartWindow = now.getHours() === 8 && now.getMinutes() === 0;
+      console.log(now)
+      if (!isAutoStartWindow) {
+        return;
+      }
+
+      if (lastAutoStartDateRef.current === dateKey) {
+        return;
+      }
+
+      lastAutoStartDateRef.current = dateKey;
+      handlePrimaryAction();
+    };
+
+    maybeAutoStart();
+    
+    const intervalId = setInterval(maybeAutoStart, 15000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   return (
     <>
@@ -72,6 +118,17 @@ export default function Screensaver() {
     <View style={styles.root}>
         <ImageBackground source={backgroundSource} style={styles.bg} resizeMode="cover">
         <SafeAreaView style={styles.safe}>
+          <View style={styles.topRightActionRow}>
+            <Pressable
+            onPress={handlePairDevice}
+            style={({ pressed }) => [
+              styles.topRightButton,
+              pressed && { transform: [{ scale: 0.98 }] },
+            ]}
+            >
+            <Text style={styles.topRightButtonText}>Pair Device</Text>
+            </Pressable>
+          </View>
             <View style={styles.content}>
             {/* TOP */}
             <View style={styles.topArea}>
@@ -91,17 +148,17 @@ export default function Screensaver() {
             {/* BOTTOM */}
             <View style={styles.bottomArea}>
                 <Pressable
-                onPress={handleEnter}
+              onPress={handlePrimaryAction}
                 style={({ pressed }) => [
                     styles.arrowButton,
                     pressed && { transform: [{ scale: 0.98 }] },
                 ]}
                 >
-                <Text style={styles.arrowText}>›</Text>
+              <Text style={styles.arrowText}>›</Text>
                 </Pressable>
 
                 <View style={styles.enterPill}>
-                <Text style={styles.enterText}>Enter Start-Up</Text>
+              <Text style={styles.enterText}>Enter Start-Up</Text>
                 </View>
             </View>
             </View>
@@ -116,6 +173,25 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000" },
   bg: { flex: 1 },
   safe: { flex: 1 },
+  topRightActionRow: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    zIndex: 2,
+  },
+  topRightButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(0,0,0,0.25)",
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
+  topRightButtonText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "rgba(0,0,0,0.8)",
+  },
   content: {
     flex: 1,
     alignItems: "center",

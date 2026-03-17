@@ -3,10 +3,10 @@ import AudioScreen from './audio';
 import GreetingScreen from './greeting';
 import TextViewerScreen from './text';
 import PhotoViewerScreen from './photo';
+import { getCarepartnerId } from './carepartnerId';
 import { API_URL } from './config';
 import React from 'react';
-import { Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 // Metadata shapes returned inline by the backend
@@ -82,15 +82,6 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
     return metadata?.time ?? 'Event';
 }
 
-async function getStoredCarepartnerID(): Promise<number | null> {
-    if (Platform.OS === 'web') {
-        const id = localStorage.getItem('carepartnerID');
-        return id ? parseInt(id, 10) : null;
-    }
-    const id = await SecureStore.getItemAsync('carepartnerID');
-    return id ? parseInt(id, 10) : null;
-}
-
 export default function AgendaView(){
     const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -101,16 +92,19 @@ export default function AgendaView(){
         try{
             setLoading(true);
 
-            // const carepartnerId = await getStoredCarepartnerID();
-            // if (!carepartnerId) {
-            //     setError('No carepartner ID found. Please pair this device first.');
-            //     router.replace('/');
-            // }
+            const carepartnerId = await getCarepartnerId();
+            if (!carepartnerId) {
+                setError('No carepartner ID found. Please pair this device first.');
+                const timer = setTimeout(() => {
+                    router.replace('/');
+                }, 5000);
+                return () => clearTimeout(timer);
+            }
 
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
 
             const params = new URLSearchParams({
-                carepartner_id: "1",
+                carepartner_id: String(carepartnerId),
                 day: String(dayOfMonth),
                 month: String(month),
                 day_of_week: String(dayOfWeek),
