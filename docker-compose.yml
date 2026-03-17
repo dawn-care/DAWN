@@ -25,6 +25,7 @@ services:
         condition: service_healthy
     container_name: server
     ports:
+      - "8080:8080"
       - "80:80"
       - "443:443"
     volumes:

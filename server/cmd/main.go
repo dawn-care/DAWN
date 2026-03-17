@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"log"
@@ -49,11 +50,9 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger"
-
-	"crypto/tls"
-	mw "server/internal/middleware"
-
 	"golang.org/x/crypto/acme/autocert"
+
+	mw "server/internal/middleware"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -238,10 +237,13 @@ func main() {
 
 	// Serve static assets (JS, CSS, images)
 	// FRONTEND (STATIC FILE SERVING)
-	// Serve all static files from /app/frontend
-	fs := http.FileServer(http.Dir("/app/frontend"))
-	r.Handle("/assets/*", http.StripPrefix("/assets/", fs))
-	r.Handle("/*", fs) // catch-all serves index.html
+	// Serve everything under /assets/* from /app/frontend/assets
+	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("/app/frontend/assets"))))
+
+	// Catch-all for SPA (any other path serves index.html)
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "/app/frontend/index.html")
+	})
 
 	// port := getEnvOrDefault("PORT", "8080")
 	// fmt.Printf("Starting server on port %s...\n", port)
