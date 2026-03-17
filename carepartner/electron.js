@@ -10,8 +10,12 @@ function createWindow() {
     },
   });
 
-  // Point to Expo web build
-  win.loadURL("http://localhost:8081");
+  // In production, load the static Expo web export; in dev, use the dev server
+  if (app.isPackaged) {
+    win.loadFile(path.join(__dirname, "dist", "index.html"));
+  } else {
+    win.loadURL("http://localhost:8081");
+  }
 }
 
 app.whenReady().then(createWindow);
