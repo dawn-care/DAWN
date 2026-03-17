@@ -50,6 +50,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger"
+	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
 	mw "server/internal/middleware"
@@ -248,11 +249,23 @@ func main() {
 	// port := getEnvOrDefault("PORT", "8080")
 	// fmt.Printf("Starting server on port %s...\n", port)
 	// http.ListenAndServe(":"+port, r)
+
+	// TEMP
 	manager := &autocert.Manager{
 		Cache:      autocert.DirCache("/certs"),
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist("startup-da.gccis.rit.edu"),
+		Client: &acme.Client{
+			DirectoryURL: "https://acme-staging-v02.api.letsencrypt.org/directory",
+		},
 	}
+
+	// ACTUAL
+	// manager := &autocert.Manager{
+	// 	Cache:      autocert.DirCache("/certs"),
+	// 	Prompt:     autocert.AcceptTOS,
+	// 	HostPolicy: autocert.HostWhitelist("startup-da.gccis.rit.edu"),
+	// }
 
 	server := &http.Server{
 		Addr:    ":443",
