@@ -18,7 +18,7 @@ const Login = () => {
       const idToken = credentialResponse.credential;
 
       // Login with Google 
-      const loginRes = await fetch(`${API_URL}/api/auth/google`, {
+      const loginRes = await fetch(`${API_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -32,7 +32,7 @@ const Login = () => {
       }
 
       // Fetch logged-in user 
-      const meRes = await fetch(`${API_URL}/api/me`, {
+      const meRes = await fetch(`${API_URL}/me`, {
         credentials: "include",
       });
 

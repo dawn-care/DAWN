@@ -8,7 +8,7 @@ import (
 
 // RegisterWeatherWidgetRoutes registers all weather widget routes
 func RegisterWeatherWidgetRoutes(r chi.Router, controller *weatherCtrlr.WeatherWidgetController) {
-	r.Route("/weather", func(r chi.Router) {
+	r.Route("/api/weather", func(r chi.Router) {
 
 		// CRUD operations
 		r.Post("/upload", controller.CreateWeatherWidgetHandler) // Create single weather widget

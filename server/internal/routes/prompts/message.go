@@ -8,7 +8,7 @@ import (
 
 // RegisterMessageRoutes registers all routes for messages
 func RegisterMessageRoutes(r chi.Router, controller *ctrlr.MessageController) {
-	r.Route("/messages", func(r chi.Router) {
+	r.Route("/api/messages", func(r chi.Router) {
 
 		// Create a new message
 		r.Post("/", controller.CreateMessageHandler)

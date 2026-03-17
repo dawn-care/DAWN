@@ -21,7 +21,7 @@ type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
-const API_BASE = `${API_URL}/api/users`;
+const API_BASE = `${API_URL}/users`;
 
 // ---- API CALLS ----
 async function createNewCarepartner(): Promise<number> {

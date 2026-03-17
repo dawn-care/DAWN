@@ -29,7 +29,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchCaregiver = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/me`, {
+        const res = await fetch(`${API_URL}/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -53,7 +53,7 @@ export default function SettingsPage() {
 const handleLogout = async () => {
   try {
     // Call the backend to clear the cookie
-    const res = await fetch(`${API_URL}/api/auth/logout`, {
+    const res = await fetch(`${API_URL}/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
