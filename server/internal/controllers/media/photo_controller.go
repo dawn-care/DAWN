@@ -3,6 +3,7 @@ package media
 import (
 	"encoding/json"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -130,7 +131,7 @@ func (c *PhotoController) CreatePhotoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Build photo metadata
-	uri := "users/" + caregiverIDStr + "/" + handler.Filename
+	uri := "users/" + carepartnerIDStr + "/photos/" + handler.Filename
 
 	extension := ""
 	if idx := strings.LastIndex(handler.Filename, "."); idx != -1 {
@@ -233,8 +234,12 @@ func (c *PhotoController) GetPhotoFileByIDHandler(w http.ResponseWriter, r *http
 	}
 	defer file.Close()
 
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+photo.Filename+"\"")
+	contentType := mime.TypeByExtension(photo.Extension)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", "inline; filename=\""+photo.Filename+"\"")
 
 	io.Copy(w, file)
 }
@@ -259,11 +264,11 @@ func (c *PhotoController) GetPhotosByCarepartnerAndCaregiverHandler(w http.Respo
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	if photos == nil {
 		photos = []media.PhotoMedia{}
 	}
-	
+
 	json.NewEncoder(w).Encode(photos)
 }
 
@@ -331,9 +336,9 @@ func (c *PhotoController) UpdatePhotoFileHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	userID := r.FormValue("id")
+	userID := r.FormValue("carepartner_id")
 
-	uri := "users/" + userID + "/" + handler.Filename
+	uri := "users/" + userID + "/photos/" + handler.Filename
 
 	if err := c.Services.UpdatePhotoFile(file, handler, uri); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

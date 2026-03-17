@@ -129,7 +129,7 @@ export default function MediaFormUpdate() {
       /* -------- UPDATE FILE (OPTIONAL) -------- */
       if (file) {
         const formData = new FormData();
-        formData.append("id", selected.metadataId.toString());
+        formData.append("carepartner_id", String(user?.carepartner_id));
         formData.append("file", file);
 
         const fileRes = await fetch(

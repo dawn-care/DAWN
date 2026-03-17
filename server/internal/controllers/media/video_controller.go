@@ -1,9 +1,9 @@
-
 package media
 
 import (
 	"encoding/json"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -110,7 +110,7 @@ func (c *VideoController) CreateVideoFileHandler(w http.ResponseWriter, r *http.
 	}
 
 	// Build video metadata
-	uri := "users/" + caregiverIDStr + "/" + handler.Filename
+	uri := "users/" + carepartnerIDStr + "/videos/" + handler.Filename
 
 	extension := ""
 	if idx := strings.LastIndex(handler.Filename, "."); idx != -1 {
@@ -219,8 +219,12 @@ func (c *VideoController) GetVideoFileByIDHandler(w http.ResponseWriter, r *http
 	}
 	defer file.Close()
 
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+video.Filename+"\"")
+	contentType := mime.TypeByExtension(video.Extension)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", "inline; filename=\""+video.Filename+"\"")
 
 	io.Copy(w, file)
 }
@@ -272,8 +276,8 @@ func (c *VideoController) UpdateVideoFileHandler(w http.ResponseWriter, r *http.
 		seeker.Seek(0, io.SeekStart)
 	}
 
-	userID := r.FormValue("id")
-	uri := "users/" + userID + "/" + handler.Filename
+	userID := r.FormValue("carepartner_id")
+	uri := "users/" + userID + "/videos/" + handler.Filename
 
 	if err := c.Services.UpdateVideoFile(file, handler, uri); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
