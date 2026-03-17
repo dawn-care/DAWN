@@ -67,7 +67,7 @@ const FILTERS: Filter[] = [
   { key: "ogg", label: ".ogg", value: ".ogg" },
 ];
 
-const API_URL = import.meta.env.VITE_API_URL + "/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Props for Library when it is acting as the agenda selector
 interface LibraryProps {

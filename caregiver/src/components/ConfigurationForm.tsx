@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ConfigurationWithMetadata } from './AgendaList';
 
-const API_URL = import.meta.env.VITE_API_URL + "/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 type OccurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly';
 

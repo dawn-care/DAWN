@@ -9,7 +9,7 @@ const allowedExtensions = {
   audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
 
-const API_URL = import.meta.env.VITE_API_URL + "/api";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function MediaFormCreate() {
   const [mediaName, setMediaName] = useState("");
