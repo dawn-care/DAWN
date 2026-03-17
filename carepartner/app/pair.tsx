@@ -10,7 +10,8 @@ import {
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import { API_URL } from "./config";
+import { getCarepartnerId, storeCarepartnerId } from "./carepartnerId";
 
 type CodeResult =
   | { ok: true; pairingCode: string; expiresInSec?: number }
@@ -20,27 +21,7 @@ type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
-import { API_URL } from "./config";
-
 const API_BASE = `${API_URL}/api/users`;
-
-// ---- Local storage helpers with web fallback ----
-async function getStoredCarepartnerID(): Promise<number | null> {
-  if (Platform.OS === "web") {
-    const id = localStorage.getItem("carepartnerID");
-    return id ? parseInt(id, 10) : null;
-  }
-  const id = await SecureStore.getItemAsync("carepartnerID");
-  return id ? parseInt(id, 10) : null;
-}
-
-async function storeCarepartnerID(id: number) {
-  if (Platform.OS === "web") {
-    localStorage.setItem("carepartnerID", id.toString());
-    return;
-  }
-  await SecureStore.setItemAsync("carepartnerID", id.toString());
-}
 
 // ---- API CALLS ----
 async function createNewCarepartner(): Promise<number> {
@@ -128,7 +109,7 @@ export default function PairScreen() {
       setError(null);
 
       try {
-        let id = await getStoredCarepartnerID();
+        let id = await getCarepartnerId();
 
         if (id) {
           const valid = await carepartnerExists(id);
@@ -139,7 +120,7 @@ export default function PairScreen() {
 
         if (!id) {
           id = await createNewCarepartner();
-          await storeCarepartnerID(id);
+          await storeCarepartnerId(id);
         }
 
         setCarepartnerID(id);
@@ -315,6 +296,16 @@ export default function PairScreen() {
               )}
             </Pressable>
 
+            <Pressable
+              onPress={() => router.replace("/" as Href)}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>Return Home</Text>
+            </Pressable>
+
             <Text style={styles.footerNote}>
               Keep the device plugged in and leave the Start-Up app open to ensure it plays
               automatically each morning.
@@ -439,6 +430,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "rgba(0,0,0,0.8)",
+  },
+  secondaryButton: {
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: 1.5,
+    borderColor: "rgba(0,0,0,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "rgba(0,0,0,0.7)",
   },
   loadingRow: {
     flexDirection: "row",
