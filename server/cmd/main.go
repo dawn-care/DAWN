@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
-	"strings"
 
 	authCtrlr "server/internal/controllers/auth"
 	configurationCtrlr "server/internal/controllers/configurations"
@@ -72,14 +69,14 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	apiUrl := getEnvOrDefault("API_URL"+"/api", "localhost")
+	url := getEnvOrDefault("API_URL", "localhost")
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
-			fmt.Sprintf("%s:3001", apiUrl),
-			fmt.Sprintf("%s:5173", apiUrl),
-			fmt.Sprintf("%s:8081", apiUrl),
-			fmt.Sprintf("%s", apiUrl),
+			fmt.Sprintf("%s:3001", url),
+			fmt.Sprintf("%s:5173", url),
+			fmt.Sprintf("%s:8081", url),
+			fmt.Sprintf("%s", url),
 			"http://startup-da.gccis.rit.edu",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -88,7 +85,7 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// ---------------- DB setup ----------------
+	// DB setup
 	dbHost := getEnvOrDefault("DB_HOST", "localhost")
 	dbPort := getEnvOrDefault("DB_PORT", "5432")
 	dbUser := getEnvOrDefault("DB_USER", "myuser")
@@ -105,7 +102,7 @@ func main() {
 		log.Fatal("failed to connect to DB:", err)
 	}
 
-	// ---------------- MinIO setup ----------------
+	// MinIO setup
 	minioHost := getEnvOrDefault("MINIO_HOST", "localhost")
 	minioPort := getEnvOrDefault("MINIO_PORT", "9000")
 	minioAccess := getEnvOrDefault("MINIO_ACCESS_KEY", "localuser")
@@ -135,81 +132,100 @@ func main() {
 		log.Println("bucket exists: media")
 	}
 
-	// ---------------- SERVICES ----------------
+	// ------------ SERVICES ------------
+	// User
 	caregiverService := caregiverSvc.NewCaregiverService(db)
 	devicePairingService := pairingSvc.NewDevicePairingService(db)
 	carepartnerService := carepartnerSvc.NewCarepartnerService(db)
 
+	// Auth
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
 	authService := authSvc.NewAuthService(googleService, caregiverService, sessionService)
 
+	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)
 	configurationService := configurationSvc.NewConfigurationService(db)
 
+	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
 
+	// Widgets
 	newsService := newsSvc.NewNewsWidgetService(db, "api key")
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
 	weatherService := weatherSvc.NewWeatherService(db, "api key")
 
+	// Prompts
 	messageService := promptsSvc.NewMessageService(db)
 	eventsService := promptsSvc.NewEventService(db)
 	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
 	carepartnerLocationService := promptsSvc.NewCarepartnerLocationService(db)
 
-	// ---------------- CONTROLLERS ----------------
+	// ------------ CONTROLLERS ------------
+	// User
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
 	devicePairingCtrl := pairingCtrlr.NewDevicePairingController(devicePairingService)
 	carepartnerCtrl := carepartnerCtrlr.NewCarepartnerController(carepartnerService)
 
+	// Auth
 	authController := authCtrlr.AuthController{AuthService: authService}
 
+	// Agenda
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 
+	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 
+	// Widgets
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
 	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
 	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
 
+	// Prompts
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
 	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
 	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
 	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
 
-	// ---------------- ROUTES ----------------
+	// ------------ ROUTES ------------
+	// User
 	caregiverRts.RegisterCaregiverRoutes(r, caregiverCtrl)
 	r.Route("/api/users", func(r chi.Router) {
 		pairingRts.RegisterDevicePairingRoutes(r, devicePairingCtrl)
 		carepartnerRts.RegisterCarepartnerRoutes(r, carepartnerCtrl)
 	})
 
+	// Auth
 	r.Post("/api/auth/google", authController.GoogleLogin)
 	r.Post("/api/auth/logout", authController.Logout)
 
+	// Protected route (test route - update later w protected routes)
 	r.Group(func(r chi.Router) {
 		r.Use(mw.RequireAuth(sessionService))
 		r.Get("/api/me", authController.MeHandler)
 		r.Put("/api/me", authController.UpdateMeHandler)
 	})
 
+	// Agenda
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 
+	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 
+	// Widgets
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
+	// Prompts
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
 	promptsRts.RegisterEventRoutes(r, eventsCtrl)
 	promptsRts.RegisterCaregiverLocationRoutes(r, caregiverLocationCtrl)
@@ -217,23 +233,9 @@ func main() {
 
 	r.Mount("/swagger", httpSwagger.WrapHandler)
 
-	// ---------------- React Frontend Proxy ----------------
-	frontendURL, _ := url.Parse("http://caregiver:80") // React container
-	proxy := httputil.NewSingleHostReverseProxy(frontendURL)
-
-	// Route all requests except /api and /swagger to the React frontend
-	r.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		path := req.URL.Path
-		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/swagger") {
-			http.NotFound(w, req)
-			return
-		}
-		// SPA rewrite for React routing
-		req.URL.Path = "/"
-		proxy.ServeHTTP(w, req)
-	}))
-
-	// ---------------- HTTPS setup ----------------
+	// port := getEnvOrDefault("PORT", "8080")
+	// fmt.Printf("Starting server on port %s...\n", port)
+	// http.ListenAndServe(":"+port, r)
 	manager := &autocert.Manager{
 		Cache:      autocert.DirCache("/certs"),
 		Prompt:     autocert.AcceptTOS,
@@ -248,7 +250,6 @@ func main() {
 		},
 	}
 
-	// redirect HTTP to HTTPS
 	go http.ListenAndServe(":80", manager.HTTPHandler(nil))
 
 	log.Println("Starting HTTPS server on 443")
