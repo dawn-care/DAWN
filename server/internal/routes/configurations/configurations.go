@@ -8,7 +8,7 @@ import (
 
 // RegisterConfigurationsRoutes registers all configuration-related routes
 func RegisterConfigurationsRoutes(r chi.Router, controller *configurationCtrl.ConfigurationController) {
-	r.Route("/api/configurations", func(r chi.Router) {
+	r.Route("/configurations", func(r chi.Router) {
 
 		// CREATE
 		r.Post("/", controller.CreateConfigurationHandler)

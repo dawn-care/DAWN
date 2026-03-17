@@ -8,7 +8,7 @@ import (
 
 // RegisterCarepartnerLocationRoutes sets up all routes for carepartner location prompts.
 func RegisterCarepartnerLocationRoutes(r chi.Router, controller *prompts.CarepartnerLocationController) {
-	r.Route("/api/carepartner-location", func(r chi.Router) {
+	r.Route("/carepartner-location", func(r chi.Router) {
 
 		// Create a new carepartner location
 		r.Post("/", controller.CreateCarepartnerLocationHandler)

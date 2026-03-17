@@ -8,7 +8,7 @@ import (
 
 // RegisterDevicePairingRoutes registers device pairing endpoints
 func RegisterDevicePairingRoutes(r chi.Router, controller *dpController.DevicePairingController) {
-	r.Route("/api/device-pairing", func(r chi.Router) {
+	r.Route("/device-pairing", func(r chi.Router) {
 		// Generate pairing code for a carepartner device
 		r.Post("/code", controller.GeneratePairingCode) // POST /users/device-pairing/code
 

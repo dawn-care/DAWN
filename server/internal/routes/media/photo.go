@@ -8,7 +8,7 @@ import (
 
 // RegisterPhotoRoutes wires PhotoController handlers to HTTP routes
 func RegisterPhotoRoutes(r chi.Router, photoCtrl *media.PhotoController) {
-	r.Route("/api/photo", func(r chi.Router) {
+	r.Route("/photo", func(r chi.Router) {
 		// CREATE
 		r.Post("/", photoCtrl.CreatePhotoHandler)
 		r.Post("/upload", photoCtrl.CreatePhotoFileHandler)

@@ -8,7 +8,7 @@ import (
 
 // RegisterCaregiverLocationRoutes sets up all routes for caregiver location prompts.
 func RegisterCaregiverLocationRoutes(r chi.Router, controller *prompts.CaregiverLocationController) {
-	r.Route("/api/caregiver-location", func(r chi.Router) {
+	r.Route("/caregiver-location", func(r chi.Router) {
 
 		// Create a new caregiver location
 		r.Post("/", controller.CreateCaregiverLocationHandler)

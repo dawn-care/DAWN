@@ -8,7 +8,7 @@ import (
 
 // RegisterNewsWidgetRoutes registers all news widget routes
 func RegisterNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.NewsWidgetController) {
-	r.Route("/api/news", func(r chi.Router) {
+	r.Route("/news", func(r chi.Router) {
 
 		// CRUD operations
 		r.Post("/upload", controller.CreateNewsWidgetHandler)   // Create single news widget

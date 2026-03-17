@@ -8,7 +8,7 @@ import (
 
 // RegisterEventRoutes registers all routes for event prompts
 func RegisterEventRoutes(r chi.Router, controller *ctrlr.EventController) {
-	r.Route("/api/events", func(r chi.Router) {
+	r.Route("/events", func(r chi.Router) {
 
 		// Create a new list of events
 		r.Post("/", controller.CreateEventListHandler)

@@ -8,7 +8,7 @@ import (
 
 // RegisterCaregiverRoutes registers all caregiver-related routes
 func RegisterCaregiverRoutes(r chi.Router, controller *cgController.CaregiverController) {
-	r.Route("/api/caregivers", func(r chi.Router) {
+	r.Route("/caregivers", func(r chi.Router) {
 
 		r.Post("/", controller.CreateCaregiver)                                       // POST /users/caregivers
 		r.Get("/", controller.GetAllCaregivers)                                       // GET /users/caregivers

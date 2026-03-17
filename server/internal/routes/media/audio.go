@@ -8,7 +8,7 @@ import (
 
 // RegisterAudioRoutes wires AudioController handlers to HTTP routes
 func RegisterAudioRoutes(r chi.Router, audioCtrl *media.AudioController) {
-	r.Route("/api/audio", func(r chi.Router) {
+	r.Route("/audio", func(r chi.Router) {
 		// CREATE
 		r.Post("/", audioCtrl.CreateAudioHandler)
 		r.Post("/upload", audioCtrl.CreateAudioFileHandler)

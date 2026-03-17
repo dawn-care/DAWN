@@ -8,7 +8,7 @@ import (
 
 // RegisterModulesRoutes registers all module-related routes
 func RegisterModulesRoutes(r chi.Router, controller *moduleCtrl.ModuleController) {
-	r.Route("/api/modules", func(r chi.Router) {
+	r.Route("/modules", func(r chi.Router) {
 
 		// CREATE
 		r.Post("/", controller.CreateModuleHandler)
