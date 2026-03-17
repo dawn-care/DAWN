@@ -10,6 +10,7 @@ import {
 import { Stack } from "expo-router";
 import { Video } from "expo-av";
 import { type ConfigurationWithMetadata, type MediaPlaybackProps, VideoMetadata } from "./agendaView";
+import { API_URL } from "./config";
 
 type GreetingMediaConfig = {
   videoUrl?: string;
@@ -19,8 +20,6 @@ interface GreetingScreenProps {
   configuration: ConfigurationWithMetadata;
   onPlaybackComplete: MediaPlaybackProps["onPlaybackComplete"];
 }
-
-const API_URL = "http://localhost:8080"
 
 function formatTime(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));

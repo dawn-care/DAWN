@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import { type ConfigurationWithMetadata, WeatherMetadata, NewsMetadata, EventMetadata } from "./agendaView";
+import { API_URL } from "./config";
 
 type TextViewerConfig = {
   content: string;
@@ -16,8 +17,6 @@ type TextViewerConfig = {
 interface TextViewerProps {
   configuration: ConfigurationWithMetadata;
 }
-
-const API_URL = "http://localhost:8080"
 
 async function fetchWeather(metadata: WeatherMetadata): Promise<string> {
   var response = "";

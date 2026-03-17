@@ -1,0 +1,30 @@
+FROM node:20-bookworm
+
+# electron-builder needs these to produce .deb packages (cross-arch)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        dpkg fakeroot rpm ruby-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy package manifests first for layer caching
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy the rest of the source
+COPY . .
+
+# Accept an optional API_URL override at build time (defaults to localhost)
+ARG API_URL=http://129.21.34.143:8080
+RUN echo "export const API_URL = \"${API_URL}\";" > app/config.ts
+
+# 1. Export the Expo web bundle into dist/
+RUN npx expo export --platform web
+
+# 2. Build the Electron .deb for arm64 (Raspberry Pi 4/5, Debian 12 64-bit)
+RUN npx electron-builder --linux deb --arm64
+
+# The output lives in electron-dist/. Copy it to a well-known path so we can
+# extract it from the container.
+RUN mkdir -p /out && cp electron-dist/*.deb /out/

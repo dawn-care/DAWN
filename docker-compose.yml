@@ -99,6 +99,21 @@ services:
     networks:
       - app-network
 
+  carepartner-build:
+    build:
+      context: ./carepartner
+      dockerfile: Dockerfile.build
+      args:
+        API_URL: ${CAREPARTNER_API_URL:-http://localhost:8080}
+    container_name: carepartner-build
+    # Copy the .deb out of the container into ./carepartner/electron-dist/
+    volumes:
+      - ./carepartner/electron-dist:/host-out
+    entrypoint: >
+      /bin/sh -c "cp /out/*.deb /host-out/ && echo 'Build complete! .deb is in carepartner/electron-dist/'"
+    profiles:
+      - build-rpi
+
 volumes:
   db-data:
   minio-data:
