@@ -23,7 +23,7 @@ export default function SettingsPage() {
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.VITE_API_URL + "/api";
 
   // Get the caregiver info
   useEffect(() => {

@@ -154,7 +154,7 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
   ]
 };
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL + "/api";
 
 export default function WidgetForm({ 
         moduleId: propModuleId,

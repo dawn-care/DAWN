@@ -8,7 +8,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { setUser, setIsAuthenticated } = useAuth();
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.VITE_API_URL + "/api";
 
   const handleSuccess = async (credentialResponse: any) => {
     setStatus("idle");

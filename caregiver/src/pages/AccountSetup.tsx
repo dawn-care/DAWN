@@ -32,7 +32,7 @@ export default function AccountSetupPage() {
 
     try {
       // Verify that the pairing code matches one in the pairing code table
-      const API_URL = import.meta.env.VITE_API_URL;
+      const API_URL = import.meta.env.VITE_API_URL + "/api";
         const res = await fetch(`${API_URL}/api/users/device-pairing/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

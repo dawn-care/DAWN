@@ -72,7 +72,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	apiUrl := getEnvOrDefault("API_URL", "localhost")
+	apiUrl := getEnvOrDefault("API_URL"+"/api", "localhost")
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
