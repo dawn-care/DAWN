@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import { type ConfigurationWithMetadata, PhotoMetadata, MessageMetadata } from "./agendaView";
+import { API_URL } from "./config";
 
 type PhotoViewerConfig = {
   photoUrls?: string[];
@@ -16,8 +17,6 @@ type PhotoViewerConfig = {
 interface PhotoViewerProps {
   configuration: ConfigurationWithMetadata;
 }
-
-const API_URL = "http://localhost:8080"
 
 // Simple reusable glass container (local to this file for now)
 function GlassCard({

@@ -3,6 +3,7 @@ import AudioScreen from './audio';
 import GreetingScreen from './greeting';
 import TextViewerScreen from './text';
 import PhotoViewerScreen from './photo';
+import { API_URL } from './config';
 import React from 'react';
 import { Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
@@ -103,7 +104,7 @@ export default function AgendaView(){
             // const carepartnerId = await getStoredCarepartnerID();
             // if (!carepartnerId) {
             //     setError('No carepartner ID found. Please pair this device first.');
-            //     return;
+            //     router.replace('/');
             // }
 
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
@@ -115,7 +116,7 @@ export default function AgendaView(){
                 day_of_week: String(dayOfWeek),
             })
 
-            const res = await fetch(`http://localhost:8080/configurations/day?${params}`);
+            const res = await fetch(`${API_URL}/configurations/day?${params}`);
             if (!res.ok) throw new Error('Failed to fetch configurations');
             const data: ConfigurationWithMetadata[] = await res.json();
             console.log('Fetched configurations:', data);
@@ -132,7 +133,16 @@ export default function AgendaView(){
     useEffect(() => {
         fetchData();
     }, [])
-    
+
+    // When an error occurs, redirect to home after 5 seconds
+    useEffect(() => {
+        if (!error) return;
+        const timer = setTimeout(() => {
+            router.replace('/');
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [error]);
+
     useEffect(() => {
         if (!items.length) return;
 
@@ -182,6 +192,18 @@ export default function AgendaView(){
 
     if (loading) {
         return <View />;
+    }
+
+    if (error) {
+        return (
+            <SafeAreaView style={styles.safe}>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorTitle}>Unable to load agenda</Text>
+                    <Text style={styles.errorMessage}>{error}</Text>
+                    <Text style={styles.errorSubtext}>Returning to home screen…</Text>
+                </View>
+            </SafeAreaView>
+        );
     }
 
     if (!currentItem) {
@@ -318,5 +340,29 @@ const styles = StyleSheet.create({
     },
     arrowDisabled: {
         opacity: 0.45,
+    },
+    errorContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 32,
+    },
+    errorTitle: {
+        fontSize: 36,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    errorMessage: {
+        fontSize: 20,
+        color: 'rgba(255,255,255,0.7)',
+        marginBottom: 24,
+        textAlign: 'center',
+    },
+    errorSubtext: {
+        fontSize: 18,
+        color: 'rgba(255,255,255,0.45)',
+        textAlign: 'center',
     },
 });

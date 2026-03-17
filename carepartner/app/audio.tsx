@@ -10,8 +10,7 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import { type ConfigurationWithMetadata, type MediaPlaybackProps, AudioMetadata } from "./agendaView";
-
-const API_URL = "http://localhost:8080";
+import { API_URL } from "./config";
 
 type AudioMediaConfig = {
   audioUrl?: string;

@@ -8,7 +8,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Image } from "react-native";
 
@@ -98,7 +97,7 @@ export default function Screensaver() {
                     pressed && { transform: [{ scale: 0.98 }] },
                 ]}
                 >
-                <Ionicons name="chevron-forward" size={54} color="rgba(0,0,0,0.85)" />
+                <Text style={styles.arrowText}>›</Text>
                 </Pressable>
 
                 <View style={styles.enterPill}>
@@ -190,6 +189,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 255, 240, 0.9)",
     borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.25)",
+  },
+  arrowText: {
+    fontSize: 64,
+    lineHeight: 70,
+    color: "rgba(0,0,0,0.85)",
+    fontWeight: "700",
   },
   enterPill: {
     paddingVertical: 8,
