@@ -50,7 +50,10 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger"
 
+	"crypto/tls"
 	mw "server/internal/middleware"
+
+	"golang.org/x/crypto/acme/autocert"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -233,5 +236,22 @@ func main() {
 	// port := getEnvOrDefault("PORT", "8080")
 	// fmt.Printf("Starting server on port %s...\n", port)
 	// http.ListenAndServe(":"+port, r)
-	http.ListenAndServeTLS(":443", "fullchain.pem", "privkey.pem", r)
+	manager := &autocert.Manager{
+		Cache:      autocert.DirCache("/certs"),
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("startup-da.gccis.rit.edu"),
+	}
+
+	server := &http.Server{
+		Addr:    ":443",
+		Handler: r,
+		TLSConfig: &tls.Config{
+			GetCertificate: manager.GetCertificate,
+		},
+	}
+
+	go http.ListenAndServe(":80", manager.HTTPHandler(nil))
+
+	log.Println("Starting HTTPS server on 443")
+	log.Fatal(server.ListenAndServeTLS("", ""))
 }
