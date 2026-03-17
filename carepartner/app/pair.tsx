@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
@@ -92,6 +92,7 @@ function formatCountdown(totalSeconds: number) {
 }
 
 export default function PairScreen() {
+  const { height, width } = useWindowDimensions();
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [expiresInSec, setExpiresInSec] = useState<number | null>(null);
   const [carepartnerID, setCarepartnerID] = useState<number | null>(null);
@@ -101,6 +102,8 @@ export default function PairScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const canVerify = !!pairingCode && !isLoadingCode && !isVerifying;
+  const isCompactScreen = height < 760 || width < 520;
+  const isShortScreen = height < 640;
 
   // ---- Load or create carepartnerID ----
   useEffect(() => {
@@ -222,30 +225,33 @@ export default function PairScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView
-          style={styles.container}
-          behavior={Platform.select({ ios: "padding", android: undefined })}
+        <ScrollView
+          contentContainerStyle={[
+            styles.container,
+            isCompactScreen && styles.containerCompact,
+          ]}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.card}>
-            <Text style={styles.title}>Pair Device</Text>
+          <View style={[styles.card, isCompactScreen && styles.cardCompact]}>
+            <Text style={[styles.title, isCompactScreen && styles.titleCompact]}>Pair Device</Text>
 
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, isCompactScreen && styles.subtitleCompact]}>
               On the caregiver’s device, open Start-Up and enter this code to link this
               screen/device. Then tap <Text style={styles.bold}>Verify</Text> here.
             </Text>
 
             {/* Code display */}
-            <View style={styles.codeBlock}>
+            <View style={[styles.codeBlock, isCompactScreen && styles.codeBlockCompact]}>
               <Text style={styles.label}>Pairing Code</Text>
 
-              <View style={styles.codeBox}>
+              <View style={[styles.codeBox, isCompactScreen && styles.codeBoxCompact]}>
                 {isLoadingCode ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator />
                     <Text style={styles.codeLoadingText}>Generating…</Text>
                   </View>
                 ) : pairingCode ? (
-                  <Text style={styles.codeText}>{pairingCode}</Text>
+                  <Text style={[styles.codeText, isCompactScreen && styles.codeTextCompact]}>{pairingCode}</Text>
                 ) : (
                   <Text style={styles.codeMissingText}>—</Text>
                 )}
@@ -276,12 +282,23 @@ export default function PairScreen() {
               {!!error && <Text style={styles.error}>{error}</Text>}
             </View>
 
+            <View style={[styles.infoBlock, isCompactScreen && styles.infoBlockCompact]}>
+              <Text style={styles.infoLabel}>Carepartner ID</Text>
+              <Text style={[styles.infoValue, isCompactScreen && styles.infoValueCompact]}>
+                {carepartnerID != null ? String(carepartnerID) : "Loading..."}
+              </Text>
+              <Text style={styles.infoHelper}>
+                Temporary debug display for caregiver pairing.
+              </Text>
+            </View>
+
             {/* Verify button */}
             <Pressable
               onPress={handleVerify}
               disabled={!canVerify}
               style={({ pressed }) => [
                 styles.button,
+                isCompactScreen && styles.buttonCompact,
                 !canVerify && styles.buttonDisabled,
                 pressed && canVerify && { transform: [{ scale: 0.99 }] },
               ]}
@@ -289,10 +306,10 @@ export default function PairScreen() {
               {isVerifying ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator />
-                  <Text style={styles.buttonText}>Verifying…</Text>
+                  <Text style={[styles.buttonText, isCompactScreen && styles.buttonTextCompact]}>Verifying…</Text>
                 </View>
               ) : (
-                <Text style={styles.buttonText}>Verify</Text>
+                <Text style={[styles.buttonText, isCompactScreen && styles.buttonTextCompact]}>Verify</Text>
               )}
             </Pressable>
 
@@ -300,18 +317,19 @@ export default function PairScreen() {
               onPress={() => router.replace("/" as Href)}
               style={({ pressed }) => [
                 styles.secondaryButton,
+                isCompactScreen && styles.secondaryButtonCompact,
                 pressed && { opacity: 0.8 },
               ]}
             >
-              <Text style={styles.secondaryButtonText}>Return Home</Text>
+              <Text style={[styles.secondaryButtonText, isCompactScreen && styles.secondaryButtonTextCompact]}>Return Home</Text>
             </Pressable>
 
-            <Text style={styles.footerNote}>
+            <Text style={[styles.footerNote, isShortScreen && styles.footerNoteCompact]}>
               Keep the device plugged in and leave the Start-Up app open to ensure it plays
               automatically each morning.
             </Text>
           </View>
-        </KeyboardAvoidingView>
+        </ScrollView>
       </SafeAreaView>
     </>
   );
@@ -320,10 +338,16 @@ export default function PairScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
   container: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 18,
+    paddingVertical: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  containerCompact: {
+    justifyContent: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
 
   card: {
@@ -336,20 +360,34 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 14,
   },
+  cardCompact: {
+    maxWidth: 460,
+    padding: 10,
+    gap: 4,
+    borderRadius: 14,
+  },
 
   title: {
     fontSize: 34,
     fontWeight: "800",
     color: "rgba(0,0,0,0.85)",
   },
+  titleCompact: {
+    fontSize: 22,
+  },
   subtitle: {
     fontSize: 16,
     lineHeight: 22,
     color: "rgba(0,0,0,0.65)",
   },
+  subtitleCompact: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   bold: { fontWeight: "800", color: "rgba(0,0,0,0.75)" },
 
   codeBlock: { gap: 8 },
+  codeBlockCompact: { gap: 3 },
   label: {
     fontSize: 14,
     fontWeight: "700",
@@ -365,11 +403,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.95)",
   },
+  codeBoxCompact: {
+    height: 44,
+    borderRadius: 12,
+  },
   codeText: {
     fontSize: 34,
     fontWeight: "900",
     letterSpacing: 4,
     color: "rgba(0,0,0,0.85)",
+  },
+  codeTextCompact: {
+    fontSize: 22,
+    letterSpacing: 2,
   },
   codeMissingText: {
     fontSize: 26,
@@ -414,6 +460,37 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  infoBlock: {
+    gap: 4,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.12)",
+    backgroundColor: "rgba(0,0,0,0.03)",
+  },
+  infoBlockCompact: {
+    gap: 2,
+    padding: 8,
+    borderRadius: 10,
+  },
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(0,0,0,0.6)",
+  },
+  infoValue: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "rgba(0,0,0,0.85)",
+  },
+  infoValueCompact: {
+    fontSize: 15,
+  },
+  infoHelper: {
+    fontSize: 12,
+    color: "rgba(0,0,0,0.5)",
+  },
+
   button: {
     height: 54,
     borderRadius: 16,
@@ -423,6 +500,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  buttonCompact: {
+    height: 40,
+    borderRadius: 12,
+  },
   buttonDisabled: {
     backgroundColor: "rgba(0,0,0,0.08)",
   },
@@ -430,6 +511,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "rgba(0,0,0,0.8)",
+  },
+  buttonTextCompact: {
+    fontSize: 15,
   },
   secondaryButton: {
     height: 50,
@@ -440,15 +524,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  secondaryButtonCompact: {
+    height: 38,
+    borderRadius: 12,
+  },
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: "800",
     color: "rgba(0,0,0,0.7)",
   },
+  secondaryButtonTextCompact: {
+    fontSize: 13,
+  },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 6,
   },
 
   footerNote: {
@@ -456,5 +547,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: "rgba(0,0,0,0.55)",
+  },
+  footerNoteCompact: {
+    marginTop: 0,
+    fontSize: 11,
+    lineHeight: 14,
   },
 });

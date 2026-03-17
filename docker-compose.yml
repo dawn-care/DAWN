@@ -88,6 +88,24 @@ services:
     networks:
       - app-network
 
+  carepartner-build:
+    profiles:
+      - build-rpi
+    build:
+      context: ./carepartner
+      dockerfile: Dockerfile.build
+      args:
+        API_URL: http://startup-da.gccis.rit.edu/api
+    container_name: carepartner-build
+    volumes:
+      - ./carepartner/electron-dist:/artifacts
+    command: >
+      /bin/sh -c "
+      mkdir -p /artifacts;
+      cp -f /out/*.deb /artifacts/;
+      ls -l /artifacts;
+      "
+
 volumes:
   db-data:
   minio-data:
