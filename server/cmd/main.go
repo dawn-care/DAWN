@@ -69,16 +69,17 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	url := getEnvOrDefault("API_URL", "localhost")
+	// url := getEnvOrDefault("API_URL", "localhost")
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			fmt.Sprintf("%s:3001", url),
-			fmt.Sprintf("%s:5173", url),
-			fmt.Sprintf("%s:8081", url),
-			fmt.Sprintf("%s", url),
-			"http://startup-da.gccis.rit.edu",
-		},
+		// AllowedOrigins: []string{
+		// 	fmt.Sprintf("%s:3001", url),
+		// 	fmt.Sprintf("%s:5173", url),
+		// 	fmt.Sprintf("%s:8081", url),
+		// 	fmt.Sprintf("%s", url),
+		// 	"http://startup-da.gccis.rit.edu",
+		// }
+		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: false,
