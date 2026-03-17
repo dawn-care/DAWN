@@ -237,12 +237,11 @@ func main() {
 	// ===============================
 
 	// Serve static assets (JS, CSS, images)
-	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("/app/frontend/assets"))))
-
-	// Catch-all: serve index.html (for SPA routing like React/Vite)
-	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "/app/frontend/index.html")
-	})
+	// FRONTEND (STATIC FILE SERVING)
+	// Serve all static files from /app/frontend
+	fs := http.FileServer(http.Dir("/app/frontend"))
+	r.Handle("/assets/*", http.StripPrefix("/assets/", fs))
+	r.Handle("/*", fs) // catch-all serves index.html
 
 	// port := getEnvOrDefault("PORT", "8080")
 	// fmt.Printf("Starting server on port %s...\n", port)
