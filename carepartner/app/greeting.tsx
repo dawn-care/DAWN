@@ -101,9 +101,9 @@ export default function GreetingScreen({
 
   const handleSeek = async (newProgress: number) => {
     if (!videoRef.current || !durationSec) return;
-    const targetMillis = newProgress * durationSec * 1000;
+    const targetSeconds = newProgress * durationSec;
     try {
-      await videoRef.current.setPositionAsync(targetMillis);
+      videoRef.current.currentTime = targetSeconds;
     } catch {
       // ignore for now
     }

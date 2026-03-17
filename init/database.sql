@@ -229,7 +229,7 @@ video_insert AS (
 ),
 audio_insert AS (
   INSERT INTO "AudioMedia" (uri, displayed_name, filename, extension) 
-  VALUES ('users/1/audio/favorite_songs.mp3', 'Favorite Songs', 'favorite_songs', '.mp3')
+  VALUES ('users/1/audio/favorite_song.mp3', 'Favorite Songs', 'favorite_song', '.mp3')
   RETURNING id AS audio_id
 ),
 weather_widget_insert AS (

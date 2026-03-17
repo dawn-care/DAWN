@@ -78,7 +78,7 @@ func main() {
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           300,
 	}))
 
@@ -113,22 +113,20 @@ func main() {
 		log.Fatal("failed to connect to MinIO:", err)
 	}
 
-	// --- Ensure buckets exist ---
+	// --- Ensure bucket exists ---
 	ctx := context.Background()
-	for _, bucket := range []string{"audio-bucket", "photo-bucket", "video-bucket"} {
-		exists, err := minioClient.BucketExists(ctx, bucket)
+	exists, err := minioClient.BucketExists(ctx, "media")
+	if err != nil {
+		log.Fatalf("failed to check bucket media: %v", err)
+	}
+	if !exists {
+		err := minioClient.MakeBucket(ctx, "media", minio.MakeBucketOptions{})
 		if err != nil {
-			log.Fatalf("failed to check bucket %s: %v", bucket, err)
+			log.Fatalf("failed to create bucket media: %v", err)
 		}
-		if !exists {
-			err := minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{})
-			if err != nil {
-				log.Fatalf("failed to create bucket %s: %v", bucket, err)
-			}
-			log.Println("created bucket:", bucket)
-		} else {
-			log.Println("bucket exists:", bucket)
-		}
+		log.Println("created bucket: media")
+	} else {
+		log.Println("bucket exists: media")
 	}
 
 	// ------------ SERVICES ------------
@@ -147,9 +145,9 @@ func main() {
 	configurationService := configurationSvc.NewConfigurationService(db)
 
 	// Media
-	audioService := mediaSvc.NewAudioService(db, minioClient, "audio-bucket")
-	photoService := mediaSvc.NewPhotoService(db, minioClient, "photo-bucket")
-	videoService := mediaSvc.NewVideoService(db, minioClient, "video-bucket")
+	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
+	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
+	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
 
 	// Widgets
 	newsService := newsSvc.NewNewsWidgetService(db, "api key")
