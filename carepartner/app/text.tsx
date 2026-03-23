@@ -183,6 +183,9 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   scrollContent: {
+    flexGrow: 1,              // KEY: lets content take full height
+    justifyContent: "center", // vertical centering
+    alignItems: "center",     // horizontal centering
     paddingBottom: 20,
   },
   contentText: {
@@ -190,5 +193,6 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     color: "rgba(0,0,0,0.82)",
     fontWeight: "500",
+    textAlign: "center", // centers multiline text
   },
 });
