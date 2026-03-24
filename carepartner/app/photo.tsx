@@ -101,14 +101,14 @@ const styles = StyleSheet.create({
   // --- photo ---
   photoWrap: {
     flex: 1,
-    position: "relative",
     backgroundColor: "#000",
+    justifyContent: "center", 
+    alignItems: "center",
   },
   photo: {
     flex: 1,
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
 
   placeholder: {
