@@ -17,7 +17,7 @@ const DEFAULT_CAREGIVER: Caregiver = {
 };
 
 export default function SettingsPage() {
-  const { setIsAuthenticated } = useAuth();
+  const { setIsAuthenticated, setUser } = useAuth();
   const navigate = useNavigate();
 
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
@@ -89,6 +89,12 @@ const handleLogout = async () => {
       }
 
       const result = await res.json();
+      setUser({
+        id: caregiver.id,
+        carepartner_id: caregiver.carepartner_id,
+        name: caregiver.name,
+        role: caregiver.role,
+      });
       setUpdateStatus(result.message || "Settings updated!");
     } catch (err: any) {
       setUpdateStatus("Update failed: " + err.message);
@@ -117,10 +123,12 @@ const handleLogout = async () => {
         <div className="mb-6">
           <label className="text-lg font-medium">Care Partner ID:</label>
           <input
-            type="text"
+            type="number"
             value={caregiver.carepartner_id}
-            className="w-full mt-2 p-3 border rounded bg-gray-200 text-gray-700"
-            readOnly
+            onChange={(e) =>
+              setCaregiver({ ...caregiver, carepartner_id: parseInt(e.target.value, 10) || 0 })
+            }
+            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
           />
         </div>
 

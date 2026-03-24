@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ConfigurationWithMetadata } from './AgendaList';
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -33,6 +34,7 @@ export default function ConfigurationForm({
     onSave,
     onCancel,
 }: ConfigurationFormProps) {
+    const { user } = useAuth();
     const isEditMode = Boolean(existingConfig);
     const [occurrenceType, setOccurrenceType] = useState<OccurrenceType>('daily');
     const [weeklyDays, setWeeklyDays] = useState<string[]>([]);
@@ -116,6 +118,10 @@ export default function ConfigurationForm({
 
     const handleCreate = async () => {
         if (!selectedModule) return;
+        if (!user?.carepartner_id) {
+            setStatus('Error: no carepartner is linked to this caregiver account.');
+            return;
+        }
         setSaving(true);
         setStatus('');
 
@@ -133,7 +139,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: 1, //TODO - need some sort of storage of the current users carepartner_id
+                    carepartner_id: user.carepartner_id,
                     json_config: JSON.stringify([configEntry]),
                 }),
             });

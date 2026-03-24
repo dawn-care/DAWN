@@ -113,6 +113,9 @@ export default function AgendaView(){
             const res = await fetch(`${API_URL}/configurations/day?${params}`);
             if (!res.ok) throw new Error('Failed to fetch configurations');
             const data: ConfigurationWithMetadata[] = await res.json();
+            if (!data || !Array.isArray(data)) {
+                throw new Error('Invalid data format received from server');
+            }
             console.log('Fetched configurations:', data);
             setItems(data || []);
         } catch (err) {

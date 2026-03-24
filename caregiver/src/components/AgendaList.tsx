@@ -2,6 +2,7 @@ import React from 'react';
 import videoCameraIcon from '../assets/module_symbols/video-camera-svgrepo-com.svg';
 import widgetIcon from '../assets/module_symbols/widget-svgrepo-com.svg';
 import promptIcon from '../assets/module_symbols/prompt-edit-svgrepo-com.svg';
+import { useAuth } from '../context/AuthContext';
 
 // Metadata shapes returned inline by the backend
 export type PhotoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
@@ -38,6 +39,7 @@ interface AgendaListProps {
 }
 
 export default function AgendaList({ items, setItems, onItemClick }: AgendaListProps) {
+    const { user } = useAuth();
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
     const [pendingReorder, setPendingReorder] = React.useState<{
         reordered: ConfigurationWithMetadata[];
@@ -174,6 +176,15 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
 
     const confirmReorder = async () => {
         if (!pendingReorder) return;
+        if (!user?.carepartner_id) {
+            console.error('Reorder failed: no carepartner linked to caregiver');
+            if (preReorderItems) {
+                setItems(preReorderItems);
+            }
+            setPendingReorder(null);
+            setPreReorderItems(null);
+            return;
+        }
         const reordered = pendingReorder.reordered;
 
         try {
@@ -191,7 +202,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: 1,
+                    carepartner_id: user.carepartner_id,
                     json_config: JSON.stringify(configEntries),
                 }),
             });

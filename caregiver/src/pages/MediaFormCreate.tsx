@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from '../context/AuthContext';
 
 type MediaType = "video" | "photo" | "audio";
@@ -17,6 +17,10 @@ export default function MediaFormCreate() {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const { user } = useAuth();
 
   function validateFile(f: File) {
@@ -24,9 +28,33 @@ export default function MediaFormCreate() {
     if (!allowedExtensions[mediaType].includes(ext)) {
       setFileError(`Invalid file type for ${mediaType.toUpperCase()}.`);
       setFile(null);
+
+      // Reset input so same file can be reselected
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } else {
       setFileError("");
       setFile(f);
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave() {
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      validateFile(droppedFile);
     }
   }
 
@@ -60,7 +88,6 @@ export default function MediaFormCreate() {
         : "/audio/upload";
 
     try {
-      // Upload media metadata
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         body: formData,
@@ -79,7 +106,6 @@ export default function MediaFormCreate() {
         return;
       }
 
-      // Create a module that references this metadata
       const moduleResponse = await fetch(`${API_URL}/modules`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,6 +126,12 @@ export default function MediaFormCreate() {
       setUploadStatus("Saved!");
       setFile(null);
       setMediaName("");
+
+      // Reset input after success
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
     } catch (err: any) {
       setUploadStatus("Upload failed: " + err.message);
     }
@@ -127,7 +159,11 @@ export default function MediaFormCreate() {
           <label className="text-lg font-medium">Media Type:</label>
           <select
             value={mediaType}
-            onChange={(e) => setMediaType(e.target.value as MediaType)}
+            onChange={(e) => {
+              setMediaType(e.target.value as MediaType);
+              setFile(null);
+              setFileError("");
+            }}
             className="w-full mt-2 p-3 border rounded bg-purple-50"
           >
             <option value="video">Video</option>
@@ -140,19 +176,32 @@ export default function MediaFormCreate() {
         <div className="mb-6">
           <label className="text-lg font-medium">Upload Media:</label>
           <div
-            className="mt-2 p-6 border-2 border-dashed border-gray-400 rounded cursor-pointer bg-purple-50 text-center"
-            onClick={() => document.getElementById("fileInput")?.click()}
+            className={`mt-2 p-6 border-2 border-dashed rounded cursor-pointer text-center transition
+              ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-400 bg-purple-50"}
+            `}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
-            {file ? <span>{file.name}</span> : <span>Drag and drop or click to upload</span>}
+            {file ? (
+              <span>{file.name}</span>
+            ) : (
+              <span>Drag and drop or click to upload</span>
+            )}
           </div>
 
           <input
+            ref={fileInputRef}
             id="fileInput"
             type="file"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              f && validateFile(f);
+              if (f) validateFile(f);
+
+              // allow selecting same file again
+              e.target.value = "";
             }}
           />
 
