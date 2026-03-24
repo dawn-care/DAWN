@@ -8,7 +8,8 @@ CREATE TABLE "Caregiver" (
 
 CREATE TABLE "Carepartner" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "name" text
+  "name" text,
+  "auto_start" time DEFAULT '08:00:00'
 );
 
 CREATE TABLE "Module" (

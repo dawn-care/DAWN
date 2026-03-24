@@ -200,6 +200,7 @@ func main() {
 		r.Post("/carepartner/create-carepartner", carepartnerCtrl.CreateCarepartner)
 		r.Get("/carepartner/{id}", carepartnerCtrl.GetCarepartnerByID)
 		r.Get("/carepartner", carepartnerCtrl.GetAllCarepartners)
+		r.Put("/carepartner/update", carepartnerCtrl.UpdateCarepartner)
 		r.Delete("/carepartner/{id}", carepartnerCtrl.DeleteCarepartner)
 
 		r.Post("/device-pairing/code", devicePairingCtrl.GeneratePairingCode)
