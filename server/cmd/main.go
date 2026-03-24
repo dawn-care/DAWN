@@ -255,9 +255,9 @@ func main() {
 		http.ServeFile(w, r, "/app/frontend/index.html")
 	})
 
-	port := getEnvOrDefault("PORT", "8080")
-	fmt.Printf("Starting server on port %s...\n", port)
-	http.ListenAndServe(":"+port, r)
+	// port := getEnvOrDefault("PORT", "8080")
+	// fmt.Printf("Starting server on port %s...\n", port)
+	// http.ListenAndServe(":"+port, r)
 
 	// TEMP
 	// manager := &autocert.Manager{
