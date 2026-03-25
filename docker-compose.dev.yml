@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: myuser
+      DB_PASSWORD: mypassword
+      DB_NAME: mydb
+      MINIO_HOST: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: localuser
+      MINIO_SECRET_KEY: localpass123
+      API_URL: http://localhost:8080
+      RUN_MODE: dev
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes: []
+
+  carepartner-build:
+    profiles:
+      - build-rpi
+    build:
+      context: ./carepartner
+      dockerfile: Dockerfile.build
+      args:
+        API_URL: http://localhost:8080/api

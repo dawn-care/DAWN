@@ -36,6 +36,8 @@ func TestCreateConfiguration(t *testing.T) {
 		OCCURENCE_DEFINITION: occ,
 		POSITION:             1,
 		DURATION:             60,
+		TIMED:                false,
+		TIME:                 nil,
 	}
 
 	jsonConfig := fmt.Sprintf(`[
@@ -85,12 +87,14 @@ func TestGetConfigurationByID(t *testing.T) {
 		"occurence_definition",
 		"position",
 		"duration",
+		"timed",
+		"time",
 	}).AddRow(
-		1, 1000, 10, "Weekly", pq.Array([]string{"Mon"}), 1, 60,
+		1, 1000, 10, "Weekly", pq.Array([]string{"Mon"}), 1, 60, false, nil,
 	)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position, duration
+		SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position, duration, timed, "time"
 		FROM "Configuration"
 		WHERE id = $1;
 	`)).
@@ -110,15 +114,15 @@ func TestGetConfigurationsByDayAndCarepartner(t *testing.T) {
 	defer db.Close()
 
 	rows := sqlmock.NewRows([]string{
-		"id", "carepartner_id", "module_id", "occurence_type", "occurence_definition", "position", "duration",
+		"id", "carepartner_id", "module_id", "occurence_type", "occurence_definition", "position", "duration", "timed", "time",
 	}).
-		AddRow(1, 1000, 10, "Daily", pq.Array([]string{""}), 1, 60).
-		AddRow(2, 1000, 11, "Weekly", pq.Array([]string{"mon"}), 2, 120).
-		AddRow(3, 1000, 12, "Monthly", pq.Array([]string{"17"}), 3, 300).
-		AddRow(4, 1000, 13, "Yearly", pq.Array([]string{"Nov 17"}), 4, 600)
+		AddRow(1, 1000, 10, "Daily", pq.Array([]string{""}), 1, 60, false, nil).
+		AddRow(2, 1000, 11, "Weekly", pq.Array([]string{"mon"}), 2, 120, false, nil).
+		AddRow(3, 1000, 12, "Monthly", pq.Array([]string{"17"}), 3, 300, false, nil).
+		AddRow(4, 1000, 13, "Yearly", pq.Array([]string{"Nov 17"}), 4, 600, false, nil)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-	SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position, duration
+	SELECT id, carepartner_id, module_id, occurence_type, occurence_definition, position, duration, timed, "time"
 	FROM "Configuration"
 	WHERE carepartner_id = $1
 	  AND (
@@ -160,8 +164,8 @@ func TestUpdateConfiguration(t *testing.T) {
 		OCCURENCE_TYPE:       "Weekly",
 		OCCURENCE_DEFINITION: []string{"mon"},
 		POSITION:             1,
-		DURATION:             60,
-	}
+		DURATION:             60, TIMED: false,
+		TIME: nil}
 
 	mock.ExpectExec(regexp.QuoteMeta(`
 		CALL delete_configurations($1, $2);

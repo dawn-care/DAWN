@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import AgendaList, { type ConfigurationWithMetadata } from '../components/AgendaList';
 import ConfigurationForm from '../components/ConfigurationForm';
 import Library from './Library';
@@ -99,6 +99,19 @@ export default function AgendaView() {
         fetchData(); // refresh the agenda list
     };
 
+    const regularItems = useMemo(() => items.filter(i => !i.timed), [items]);
+    const timedItems = useMemo(
+        () => items.filter(i => i.timed).sort((a, b) => (a.time ?? '').localeCompare(b.time ?? '')),
+        [items],
+    );
+
+    const setRegularItems = (newRegular: ConfigurationWithMetadata[]) => {
+        setItems([...timedItems, ...newRegular]);
+    };
+    const setTimedItems = (newTimed: ConfigurationWithMetadata[]) => {
+        setItems([...regularItems, ...newTimed]);
+    };
+
     return (
         <div className="min-h-screen bg-white">
             {loading && (
@@ -141,7 +154,19 @@ export default function AgendaView() {
                         </div>
                     </div>
 
-                    <AgendaList items={items} setItems={setItems} onItemClick={handleItemClick} />
+                    {/* Regular (Non-Timed) Items */}
+                    <div className="mb-8">
+                        <h3 className="text-2xl font-semibold text-gray-700 mb-4">Agenda Items</h3>
+                        <AgendaList items={regularItems} setItems={setRegularItems} onItemClick={handleItemClick} />
+                    </div>
+
+                    {/* Scheduled (Timed) Items */}
+                    {timedItems.length > 0 && (
+                        <div>
+                            <h3 className="text-2xl font-semibold text-teal-700 mb-4">Scheduled Items</h3>
+                            <AgendaList items={timedItems} setItems={setTimedItems} onItemClick={handleItemClick} />
+                        </div>
+                    )}
 
                     <div className="flex items-center justify-between mt-12">
                         <button className="text-3xl text-gray-600 hover:text-gray-800">⚙</button>

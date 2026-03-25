@@ -16,6 +16,8 @@ type Configuration struct {
 	OCCURENCE_DEFINITION []string `json:"occurence_definition"`
 	POSITION             int      `json:"position"`
 	DURATION             int      `json:"duration"`
+	TIMED                bool     `json:"timed"`
+	TIME                 *string  `json:"time"`
 }
 
 // ConfigurationWithMetadata includes configuration details joined with module and metadata info
@@ -28,6 +30,8 @@ type ConfigurationWithMetadata struct {
 	OCCURENCE_DEFINITION []string        `json:"occurence_definition"`
 	POSITION             int             `json:"position"`
 	DURATION             int             `json:"duration"`
+	TIMED                bool            `json:"timed"`
+	TIME                 *string         `json:"time"`
 	MODULE_TYPE          string          `json:"module_type"`
 	METADATA_ID          int             `json:"metadata_id"`
 	Metadata             json.RawMessage `json:"metadata"`
@@ -44,6 +48,8 @@ type configJSON struct {
 	OccurenceDefinition []string `json:"occurence_definition"`
 	Position            int      `json:"position"`
 	Duration            int      `json:"duration"`
+	Timed               bool     `json:"timed"`
+	Time                *string  `json:"time"`
 }
 
 // configsToJSON safely marshals configurations into the JSON format expected by insert_configurations.
@@ -57,6 +63,8 @@ func configsToJSON(configs ...Configuration) (string, error) {
 			OccurenceDefinition: c.OCCURENCE_DEFINITION,
 			Position:            c.POSITION,
 			Duration:            c.DURATION,
+			Timed:               c.TIMED,
+			Time:                c.TIME,
 		}
 	}
 	data, err := json.Marshal(entries)
@@ -116,7 +124,9 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 					occurence_type,
 					occurence_definition,
 					position,
-					duration
+					duration,
+					timed,
+					"time"
 			FROM "Configuration"
 			WHERE id = $1;
 	`
@@ -126,7 +136,9 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 		&configuration.OCCURENCE_TYPE,
 		pq.Array(&configuration.OCCURENCE_DEFINITION),
 		&configuration.POSITION,
-		&configuration.DURATION)
+		&configuration.DURATION,
+		&configuration.TIMED,
+		&configuration.TIME)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -145,6 +157,7 @@ func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, m
 	query := `
 			SELECT
 				c.id, m.caregiver_id, c.carepartner_id, c.module_id, c.occurence_type, c.occurence_definition, c.position, c.duration,
+				c.timed, c."time",
 				m.module_type, m.metadata_id,
 				CASE m.module_type
 					WHEN 'photo' THEN (SELECT row_to_json(t) FROM (SELECT id, uri, displayed_name, filename, extension FROM "PhotoMedia" WHERE id = m.metadata_id) t)
@@ -183,6 +196,7 @@ func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, m
 			&cfg.ID, &cfg.CAREGIVER_ID, &cfg.CAREPARTNER_ID, &cfg.MODULE_ID,
 			&cfg.OCCURENCE_TYPE, pq.Array(&cfg.OCCURENCE_DEFINITION),
 			&cfg.POSITION, &cfg.DURATION,
+			&cfg.TIMED, &cfg.TIME,
 			&cfg.MODULE_TYPE, &cfg.METADATA_ID,
 			&metadata,
 		)
@@ -211,7 +225,9 @@ func GetCarePartnerConfigurations(db *sql.DB, carepartner_id int) ([]Configurati
 					occurence_type,
 					occurence_definition,
 					position,
-					duration
+					duration,
+					timed,
+					"time"
 			FROM "Configuration"
 			WHERE carepartner_id = $1;
 	`
@@ -229,7 +245,9 @@ func GetCarePartnerConfigurations(db *sql.DB, carepartner_id int) ([]Configurati
 			&configuration.OCCURENCE_TYPE,
 			pq.Array(&configuration.OCCURENCE_DEFINITION),
 			&configuration.POSITION,
-			&configuration.DURATION)
+			&configuration.DURATION,
+			&configuration.TIMED,
+			&configuration.TIME)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning: %v", err)
 		}
