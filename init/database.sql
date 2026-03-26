@@ -28,6 +28,8 @@ CREATE TABLE "Configuration" (
   "occurence_definition" text[],
   "position" integer,
   "duration" integer,
+  "timed" boolean DEFAULT FALSE,
+  "time" text,
   PRIMARY KEY ("carepartner_id", "position")
 );
 
@@ -132,7 +134,9 @@ BEGIN
         conf->>'occurence_type' AS occurence_type,
         ARRAY(SELECT jsonb_array_elements_text(conf->'occurence_definition')) AS occurence_definition,
         (conf->>'position')::INT AS position,
-        (conf->>'duration')::INT AS duration
+        (conf->>'duration')::INT AS duration,
+        COALESCE((conf->>'timed')::BOOLEAN, FALSE) AS timed,
+        conf->>'time' AS "time"
     FROM jsonb_array_elements(p_configs) AS conf;
 
     -- Batch-delete all existing configurations being replaced
@@ -169,14 +173,18 @@ BEGIN
             occurence_type,
             occurence_definition,
             position,
-            duration
+            duration,
+            timed,
+            "time"
         ) VALUES (
             p_carepartner_id,
             new_row.module_id,
             new_row.occurence_type,
             new_row.occurence_definition,
             new_row.position,
-            new_row.duration
+            new_row.duration,
+            new_row.timed,
+            new_row."time"
         );
     END LOOP;
 
@@ -263,6 +271,6 @@ modules_insert AS (
   SELECT 'message', caregiver_id, carepartner_id, message_id FROM caregiver_insert, message_prompt_insert
   RETURNING id AS module_id, carepartner_id
 )
-INSERT INTO "Configuration" (carepartner_id, module_id, occurence_type, occurence_definition, position, duration) 
-SELECT carepartner_id, module_id, 'daily', ARRAY[]::integer[], ROW_NUMBER() OVER (ORDER BY module_id), 30
+INSERT INTO "Configuration" (carepartner_id, module_id, occurence_type, occurence_definition, position, duration, timed, "time") 
+SELECT carepartner_id, module_id, 'daily', ARRAY[]::integer[], ROW_NUMBER() OVER (ORDER BY module_id), 30, FALSE, NULL
 FROM modules_insert;

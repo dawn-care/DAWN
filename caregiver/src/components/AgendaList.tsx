@@ -25,6 +25,8 @@ export type ConfigurationWithMetadata = {
     occurence_definition: string[];
     position: number;
     duration: number;
+    timed: boolean;
+    time: string | null;
     module_type: string;
     metadata_id: number;
     metadata: PhotoMetadata | VideoMetadata | AudioMetadata | WeatherMetadata
@@ -195,6 +197,8 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                 occurence_definition: item.occurence_definition ?? [],
                 position: item.position,
                 duration: item.duration,
+                timed: item.timed ?? false,
+                time: item.time ?? null,
             }));
 
             const API_URL = import.meta.env.VITE_API_URL;
@@ -268,7 +272,12 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                         onClick={() => onItemClick?.(item)}
                     >
                         <img src={getModuleIcon(item.module_type)} alt="module icon" className="w-12 h-12 rounded" />
-                        <div className="flex-1 flex">
+                        <div className="flex-1 flex items-center gap-3">
+                            {item.timed && item.time && (
+                                <span className="text-teal-700 font-semibold text-lg whitespace-nowrap">
+                                    {item.time.slice(0, 5)}
+                                </span>
+                            )}
                             <div className="text-gray-800 font-medium text-2xl">{getModuleTitle(item)}</div>
                         </div>
                         <span className="text-gray-700 text-2xl">&gt;</span>

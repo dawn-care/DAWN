@@ -68,20 +68,15 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// url := getEnvOrDefault("API_URL", "localhost")
-
 	r.Use(cors.Handler(cors.Options{
-		// AllowedOrigins: []string{
-		// 	fmt.Sprintf("%s:3001", url),
-		// 	fmt.Sprintf("%s:5173", url),
-		// 	fmt.Sprintf("%s:8081", url),
-		// 	fmt.Sprintf("%s", url),
-		// 	"http://startup-da.gccis.rit.edu",
-		// }
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins: []string{
+			"http://localhost:5173",
+			"http://localhost:8081",
+			"http://startup-da.gccis.rit.edu",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
@@ -256,37 +251,33 @@ func main() {
 		http.ServeFile(w, r, "/app/frontend/index.html")
 	})
 
-	// port := getEnvOrDefault("PORT", "8080")
-	// fmt.Printf("Starting server on port %s...\n", port)
-	// http.ListenAndServe(":"+port, r)
+	// ===============================
+	// SERVER STARTUP
+	// ===============================
+	runMode := getEnvOrDefault("RUN_MODE", "production")
 
-	// TEMP
-	// manager := &autocert.Manager{
-	// 	Cache:      autocert.DirCache("/certs"),
-	// 	Prompt:     autocert.AcceptTOS,
-	// 	HostPolicy: autocert.HostWhitelist("startup-da.gccis.rit.edu"),
-	// 	Client: &acme.Client{
-	// 		DirectoryURL: "https://acme-staging-v02.api.letsencrypt.org/directory",
-	// 	},
-	// }
+	if runMode == "dev" {
+		port := getEnvOrDefault("PORT", "8080")
+		log.Printf("Starting HTTP dev server on :%s...\n", port)
+		log.Fatal(http.ListenAndServe(":"+port, r))
+	} else {
+		manager := &autocert.Manager{
+			Cache:      autocert.DirCache("/certs"),
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("startup-da.gccis.rit.edu"),
+		}
 
-	// ACTUAL
-	manager := &autocert.Manager{
-		Cache:      autocert.DirCache("/certs"),
-		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist("startup-da.gccis.rit.edu"),
+		server := &http.Server{
+			Addr:    ":443",
+			Handler: r,
+			TLSConfig: &tls.Config{
+				GetCertificate: manager.GetCertificate,
+			},
+		}
+
+		go http.ListenAndServe(":80", manager.HTTPHandler(r))
+
+		log.Println("Starting HTTPS server on 443")
+		log.Fatal(server.ListenAndServeTLS("", ""))
 	}
-
-	server := &http.Server{
-		Addr:    ":443",
-		Handler: r,
-		TLSConfig: &tls.Config{
-			GetCertificate: manager.GetCertificate,
-		},
-	}
-
-	go http.ListenAndServe(":80", manager.HTTPHandler(r))
-
-	log.Println("Starting HTTPS server on 443")
-	log.Fatal(server.ListenAndServeTLS("", ""))
 }
