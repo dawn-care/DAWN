@@ -111,7 +111,7 @@ const handleLogout = async () => {
     if (!caregiver.carepartner_id) return;
 
     try {
-      const res = await fetch(`${API_URL}/carepartner/update`, {
+      const res = await fetch(`${API_URL}/users/carepartner/update`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
