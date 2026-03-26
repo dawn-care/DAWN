@@ -11,6 +11,7 @@ import {
 import { router } from "expo-router";
 import { Image } from "react-native";
 import { getCarepartnerId } from "./carepartnerId";
+import { API_URL } from "./config";
 
 // ---- STUB TYPES (replace later with your real backend types) ----
 type ScreensaverConfig = {
@@ -19,17 +20,21 @@ type ScreensaverConfig = {
   backgroundImageUrl?: string; // remote URL from backend
 };
 
-// ---- STUB BACKEND CALL (replace later) ----
-async function fetchScreensaverConfig(): Promise<ScreensaverConfig> {
-  // TODO: replace with real API call
-  // const res = await fetch("https://your-api/screensaver-config");
-  // return await res.json();
+type Carepartner = {
+  ID: number;
+  Name: string;
+  AutoStart: string; // "HH:MM:SS"
+};
 
-  return {
-    title: "Start-Up",
-    autoStartTimeLabel: "8:00am",
-    backgroundImageUrl: undefined, // stub: set to a real URL later
-  };
+function formatTime(timeString: string) {
+  const [hourStr, minuteStr] = timeString.split(':');
+  let hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12; // convert 0 -> 12
+
+  return `${hour}:${minute.toString().padStart(2, '0')} ${ampm}`;
 }
 
 export default function Screensaver() {
@@ -38,8 +43,23 @@ export default function Screensaver() {
     autoStartTimeLabel: "8:00am",
     backgroundImageUrl: undefined,
   });
+  const [carepartner, setCarepartner] = useState<Carepartner | null>(null);
   const [hasCarepartnerId, setHasCarepartnerId] = useState<boolean | null>(null);
   const lastAutoStartDateRef = useRef<string | null>(null);
+
+  async function fetchScreensaverConfig(): Promise<ScreensaverConfig> {
+    const res = await fetch(`${API_URL}/api/carepartner/${await getCarepartnerId()}`);
+    if (!res.ok) throw new Error('Failed to fetch configurations');
+
+    const data: Carepartner = await res.json();
+    setCarepartner(data);
+    const autoStartTimeLabel = formatTime(data.AutoStart);
+    return {
+      title: "Start-Up",
+      autoStartTimeLabel: autoStartTimeLabel,
+      backgroundImageUrl: undefined, // stub: set to a real URL later
+    };
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -92,7 +112,10 @@ export default function Screensaver() {
     const maybeAutoStart = () => {
       const now = new Date();
       const dateKey = now.toDateString();
-      const isAutoStartWindow = now.getHours() === 8 && now.getMinutes() === 0;
+      const [hourStr, minuteStr] = carepartner?.AutoStart.split(':') || ['0', '0'];
+      let hour = parseInt(hourStr, 10);
+      const minute = parseInt(minuteStr, 10);
+      const isAutoStartWindow = now.getHours() === hour && now.getMinutes() === minute;
  
       if (!isAutoStartWindow) {
         return;

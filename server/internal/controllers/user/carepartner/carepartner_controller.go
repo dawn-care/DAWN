@@ -5,19 +5,38 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	model "server/internal/models/user/carepartner"
-	service "server/internal/services/user/carepartner"
 
 	"github.com/go-chi/chi/v5"
 )
 
-type CarepartnerController struct {
-	Service *service.CarepartnerService
+type CarepartnerServiceInterface interface {
+	CreateCarepartner(c *model.Carepartner) error
+	GetCarepartnerByID(id int) (*model.Carepartner, error)
+	GetAllCarepartners() ([]model.Carepartner, error)
+	UpdateCarepartner(c *model.Carepartner) error
+	DeleteCarepartner(id int) error
 }
 
-func NewCarepartnerController(service *service.CarepartnerService) *CarepartnerController {
+type CarepartnerController struct {
+	Service CarepartnerServiceInterface
+}
+
+func NewCarepartnerController(service CarepartnerServiceInterface) *CarepartnerController {
 	return &CarepartnerController{Service: service}
+}
+
+type CarepartnerResponse struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	AutoStart string `json:"auto_start"`
+}
+
+type CreateCarepartnerRequest struct {
+	Name      string `json:"name"`
+	AutoStart string `json:"auto_start"` // "HH:MM:SS"
 }
 
 // ─────────────────────────────────────────────
@@ -50,18 +69,89 @@ func extractIDFromParam(r *http.Request, name string) (int, error) {
 func (cc *CarepartnerController) CreateCarepartner(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	// For now just have a default name
-	c := &model.Carepartner{
-		Name: "Placeholder Name",
+	var req CreateCarepartnerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
 	}
 
-	err := cc.Service.CreateCarepartner(c)
+	// Default name if missing
+	if req.Name == "" {
+		req.Name = "Placeholder Name"
+	}
+
+	// Parse time (HH:MM:SS)
+	var autoStart time.Time
+	var err error
+
+	if req.AutoStart == "" {
+		// default to 08:00:00
+		autoStart, _ = time.Parse("15:04:05", "08:00:00")
+	} else {
+		autoStart, err = time.Parse("15:04:05", req.AutoStart)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid auto_start format (use HH:MM:SS)")
+			return
+		}
+	}
+
+	c := &model.Carepartner{
+		Name:      req.Name,
+		AutoStart: autoStart,
+	}
+
+	err = cc.Service.CreateCarepartner(c)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]int{"carepartner_id": c.ID})
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"carepartner_id": c.ID,
+		"auto_start":     c.AutoStart.Format("15:04:05"),
+	})
+}
+
+func (cc *CarepartnerController) UpdateCarepartner(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var req struct {
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		AutoStart string `json:"auto_start"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	if req.ID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid carepartner ID")
+		return
+	}
+
+	// Parse time
+	autoStart, err := time.Parse("15:04:05", req.AutoStart)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid auto_start format")
+		return
+	}
+
+	c := &model.Carepartner{
+		ID:        req.ID,
+		Name:      req.Name,
+		AutoStart: autoStart,
+	}
+
+	if err := cc.Service.UpdateCarepartner(c); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "carepartner updated successfully",
+	})
 }
 
 // ─────────────────────────────────────────────
@@ -86,7 +176,13 @@ func (cc *CarepartnerController) GetCarepartnerByID(w http.ResponseWriter, r *ht
 		return
 	}
 
-	writeJSON(w, http.StatusOK, c)
+	resp := CarepartnerResponse{
+		ID:        c.ID,
+		Name:      c.Name,
+		AutoStart: c.AutoStart.Format("15:04:05"),
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (cc *CarepartnerController) GetAllCarepartners(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +191,17 @@ func (cc *CarepartnerController) GetAllCarepartners(w http.ResponseWriter, r *ht
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, list)
+
+	var resp []CarepartnerResponse
+	for _, c := range list {
+		resp = append(resp, CarepartnerResponse{
+			ID:        c.ID,
+			Name:      c.Name,
+			AutoStart: c.AutoStart.Format("15:04:05"),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // ─────────────────────────────────────────────

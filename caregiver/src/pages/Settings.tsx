@@ -21,32 +21,41 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
+  const [autoStart, setAutoStart] = useState<string>("08:00"); // default
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const API_URL = import.meta.env.VITE_API_URL;
 
   // Get the caregiver info
   useEffect(() => {
-    const fetchCaregiver = async () => {
+    const fetchCaregiverAndCarepartner = async () => {
       try {
-        const res = await fetch(`${API_URL}/me`, {
+        // Fetch caregiver info
+        const resCg = await fetch(`${API_URL}/me`, { method: "GET", credentials: "include" });
+        if (!resCg.ok) return;
+
+        const cgData = await resCg.json();
+        setCaregiver(cgData);
+
+        // Fetch associated carepartner
+        const resCp = await fetch(`${API_URL}/carepartner/${cgData.carepartner_id}`, {
           method: "GET",
           credentials: "include",
         });
+        if (!resCp.ok) return;
 
-        if (!res.ok) {
-          console.warn("Failed to fetch caregiver, using defaults");
-          return;
+        const cpData = await resCp.json();
+
+        if (cpData.auto_start) {
+          const [hour, minute] = cpData.auto_start.split(":");
+          setAutoStart(`${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`);
         }
-
-        const data = await res.json();
-        setCaregiver(data);
       } catch (err) {
-        console.error("Error fetching caregiver, using defaults:", err);
+        console.error("Error fetching data:", err);
       }
     };
 
-    fetchCaregiver();
+    fetchCaregiverAndCarepartner();
   }, []);
 
   // Logout
@@ -79,7 +88,9 @@ const handleLogout = async () => {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(caregiver),
+        body: JSON.stringify({
+          ...caregiver,
+        }),
       });
 
       if (!res.ok) {
@@ -89,13 +100,35 @@ const handleLogout = async () => {
       }
 
       const result = await res.json();
-      setUser({
-        id: caregiver.id,
-        carepartner_id: caregiver.carepartner_id,
-        name: caregiver.name,
-        role: caregiver.role,
-      });
+      setUser({ ...caregiver });
       setUpdateStatus(result.message || "Settings updated!");
+    } catch (err: any) {
+      setUpdateStatus("Update failed: " + err.message);
+    }
+  };
+
+  const handleUpdateAutoStart = async () => {
+    if (!caregiver.carepartner_id) return;
+
+    try {
+      const res = await fetch(`${API_URL}/carepartner/update`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: caregiver.carepartner_id,
+          auto_start: autoStart + ":00", // backend expects HH:MM:SS
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        setUpdateStatus("Update failed: " + text);
+        return;
+      }
+
+      const result = await res.json();
+      setUpdateStatus(result.message || "Carepartner settings updated!");
     } catch (err: any) {
       setUpdateStatus("Update failed: " + err.message);
     }
@@ -143,11 +176,25 @@ const handleLogout = async () => {
           />
         </div>
 
+        {/* Auto Start Time */}
+        <div className="mb-6">
+          <label className="text-lg font-medium">Auto Start Time:</label>
+          <input
+            type="time"
+            value={autoStart}
+            onChange={(e) => setAutoStart(e.target.value)}
+            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
+          />
+        </div>
+
         {/* Update & Logout */}
         <div className="flex gap-4 mt-4">
           <button
             className="mt-4 flex-1 bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
-            onClick={handleUpdate}
+            onClick={async () => {
+              await handleUpdate();          // Caregiver update
+              await handleUpdateAutoStart(); // Carepartner auto start update
+            }}
           >
             Save
           </button>

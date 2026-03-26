@@ -44,6 +44,8 @@ export default function ConfigurationForm({
     const [yearlyDay, setYearlyDay] = useState<number>(1);
     const [duration, setDuration] = useState<number>(30);
     const [position, setPosition] = useState<number>(currentItemCount + 1);
+    const [timed, setTimed] = useState<boolean>(false);
+    const [time, setTime] = useState<string>('');
     const [status, setStatus] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -53,6 +55,8 @@ export default function ConfigurationForm({
         setOccurrenceType(existingConfig.occurence_type as OccurrenceType);
         setDuration(existingConfig.duration);
         setPosition(existingConfig.position);
+        setTimed(existingConfig.timed ?? false);
+        setTime(existingConfig.time ?? '');
 
         const def = existingConfig.occurence_definition || [];
         switch (existingConfig.occurence_type) {
@@ -133,6 +137,8 @@ export default function ConfigurationForm({
                 occurence_definition: buildOccurrenceDefinition(),
                 position: position,
                 duration: duration,
+                timed: timed,
+                time: timed && time ? time + ':00' : null,
             };
 
             const res = await fetch(`${API_URL}/configurations/insert`, {
@@ -171,6 +177,8 @@ export default function ConfigurationForm({
                 occurence_definition: buildOccurrenceDefinition(),
                 position: position,
                 duration: duration,
+                timed: timed,
+                time: timed && time ? time + ':00' : null,
             };
 
             const res = await fetch(`${API_URL}/configurations/insert`, {
@@ -353,6 +361,36 @@ export default function ConfigurationForm({
                         )}
                     </div>
                 )}
+
+                {/* Timed Toggle */}
+                <div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-lg font-medium text-gray-700">Scheduled Time</span>
+                        <div
+                            onClick={() => {
+                                setTimed(!timed);
+                                if (timed) setTime('');
+                            }}
+                            className={`relative w-12 h-6 rounded-full transition-colors ${
+                                timed ? 'bg-teal-400' : 'bg-gray-300'
+                            }`}
+                        >
+                            <div
+                                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                    timed ? 'translate-x-6' : ''
+                                }`}
+                            />
+                        </div>
+                    </label>
+                    {timed && (
+                        <input
+                            type="time"
+                            value={time}
+                            onChange={(e) => setTime(e.target.value)}
+                            className="w-full mt-2 p-3 border rounded bg-purple-50"
+                        />
+                    )}
+                </div>
 
                 {/* Duration */}
                 <div>
