@@ -25,7 +25,11 @@ const API_BASE = `${API_URL}/users`;
 
 // ---- API CALLS ----
 async function createNewCarepartner(): Promise<number> {
-  const res = await fetch(`${API_BASE}/carepartner/create-carepartner`, { method: "POST" });
+  const res = await fetch(`${API_BASE}/carepartner/create-carepartner`, { 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({Name: "PlaceHolder Name", AutoStart: "08:00:00"}), 
+  });
   if (!res.ok) throw new Error("Failed to create carepartner");
   const data = await res.json();
   return data.carepartner_id;

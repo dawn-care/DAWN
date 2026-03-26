@@ -1,1 +1,1 @@
-export const API_URL = "http://startup-da.gccis.rit.edu/api";
+export const API_URL = "http://localhost:8080/api";
