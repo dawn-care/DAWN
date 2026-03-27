@@ -114,6 +114,14 @@ export default function ConfigurationForm({
 
     // Add a yearly date entry
     const addYearlyDate = () => {
+        // Validate day against the selected month
+        const monthIndex = MONTHS.indexOf(yearlyMonth as typeof MONTHS[number]);
+        // Use a non-leap year (e.g. 2023) to get max days; Feb max = 29 to allow leap-year dates
+        const maxDay = monthIndex === 1 ? 29 : new Date(2023, monthIndex + 1, 0).getDate();
+        if (yearlyDay < 1 || yearlyDay > maxDay) {
+            setStatus(`Error: ${yearlyMonth} does not have day ${yearlyDay}.`);
+            return;
+        }
         const entry = `${yearlyMonth} ${yearlyDay}`;
         if (!yearlyDates.includes(entry)) {
             setYearlyDates((prev) => [...prev, entry]);
@@ -136,6 +144,25 @@ export default function ConfigurationForm({
             setStatus('Error: no carepartner is linked to this caregiver account.');
             return;
         }
+
+        // Validate occurrence definitions are non-empty for types that require them
+        if (occurrenceType === 'weekly' && weeklyDays.length === 0) {
+            setStatus('Error: please select at least one day of the week.');
+            return;
+        }
+        if (occurrenceType === 'monthly' && monthlyDays.length === 0) {
+            setStatus('Error: please select at least one day of the month.');
+            return;
+        }
+        if (occurrenceType === 'yearly' && yearlyDates.length === 0) {
+            setStatus('Error: please add at least one yearly date.');
+            return;
+        }
+        if (occurrenceType === 'single' && !singleDate) {
+            setStatus('Error: please select a date.');
+            return;
+        }
+
         setSaving(true);
         setStatus('');
 
@@ -176,6 +203,25 @@ export default function ConfigurationForm({
 
     const handleUpdate = async () => {
         if (!existingConfig) return;
+
+        // Validate occurrence definitions are non-empty for types that require them
+        if (occurrenceType === 'weekly' && weeklyDays.length === 0) {
+            setStatus('Error: please select at least one day of the week.');
+            return;
+        }
+        if (occurrenceType === 'monthly' && monthlyDays.length === 0) {
+            setStatus('Error: please select at least one day of the month.');
+            return;
+        }
+        if (occurrenceType === 'yearly' && yearlyDates.length === 0) {
+            setStatus('Error: please add at least one yearly date.');
+            return;
+        }
+        if (occurrenceType === 'single' && !singleDate) {
+            setStatus('Error: please select a date.');
+            return;
+        }
+
         setSaving(true);
         setStatus('');
 

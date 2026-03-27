@@ -7,7 +7,7 @@ const Login = () => {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { setUser, setIsAuthenticated } = useAuth();
+  const { setUser, setIsAuthenticated, setActiveCarePartnerId } = useAuth();
   const API_URL = import.meta.env.VITE_API_URL;
 
   const handleSuccess = async (credentialResponse: any) => {
@@ -48,11 +48,12 @@ const Login = () => {
       setUser(user);
       setIsAuthenticated(true);
 
-      // Redirect to pairing if carepartner id has not been setup, or library if it has
-      if (!user.carepartner_id || user.carepartner_id === 0) {
+      // Redirect to pairing if no carepartners linked, or library if they have some
+      if (!user.carepartners || user.carepartners.length === 0) {
         navigate("/setup");
       } else {
-        navigate("/select-carepartner");
+        setActiveCarePartnerId(user.carepartners[0].id);
+        navigate("/library");
       }
 
       setStatus("success");

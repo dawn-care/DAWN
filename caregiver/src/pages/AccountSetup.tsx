@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function AccountSetupPage() {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth(); // access logged-in user
+  const { user, setUser, setActiveCarePartnerId } = useAuth(); // access logged-in user
   const [pairingCode, setPairingCode] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -57,6 +57,11 @@ export default function AccountSetupPage() {
         setSubmitError(errText || "Failed to verify pairing code. Please try again.");
         return;
       }
+
+      const verifyData = await res.json();
+
+      // Set the active carepartner from the pairing response
+      setActiveCarePartnerId(verifyData.carepartner_id);
 
       const meRes = await fetch(`${API_URL}/me`, {
         credentials: "include",

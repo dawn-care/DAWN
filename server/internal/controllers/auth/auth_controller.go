@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	mw "server/internal/middleware"
 	"server/internal/services/auth"
 	"strconv"
@@ -30,7 +31,7 @@ func (c *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true, // set to true in prod
+		Secure:   os.Getenv("RUN_MODE") != "dev",
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -53,7 +54,28 @@ func (c *AuthController) MeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(user)
+	carepartners, err := c.AuthService.Caregivers.GetCarepartnersByCaregiverID(userID)
+	if err != nil {
+		http.Error(w, "Failed to fetch carepartners", http.StatusInternalServerError)
+		return
+	}
+
+	type cpEntry struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	cpList := make([]cpEntry, len(carepartners))
+	for i, cp := range carepartners {
+		cpList[i] = cpEntry{ID: cp.ID, Name: cp.Name}
+	}
+
+	resp := map[string]interface{}{
+		"id":           user.ID,
+		"name":         user.Name,
+		"role":         user.Role,
+		"carepartners": cpList,
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (c *AuthController) UpdateMeHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +133,7 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1, // tells browser to delete immediately
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   os.Getenv("RUN_MODE") != "dev",
 		SameSite: http.SameSiteLaxMode,
 	})
 

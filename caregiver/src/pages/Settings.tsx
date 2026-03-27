@@ -4,20 +4,18 @@ import { useNavigate } from "react-router-dom";
 
 interface Caregiver {
   id: number;
-  carepartner_id: number;
   name: string;
   role: string;
 }
 
 const DEFAULT_CAREGIVER: Caregiver = {
   id: 0,
-  carepartner_id: 0,
   name: "Your Name",
   role: "Primary Caregiver",
 };
 
 export default function SettingsPage() {
-  const { setIsAuthenticated, setUser } = useAuth();
+  const { setIsAuthenticated, setUser, activeCarePartnerId, setActiveCarePartnerId } = useAuth();
   const navigate = useNavigate();
 
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
@@ -38,7 +36,8 @@ export default function SettingsPage() {
         setCaregiver(cgData);
 
         // Fetch associated carepartner
-        const resCp = await fetch(`${API_URL}/users/carepartner/${cgData.carepartner_id}`, {
+        if (!activeCarePartnerId) return;
+        const resCp = await fetch(`${API_URL}/users/carepartner/${activeCarePartnerId}`, {
           method: "GET",
           credentials: "include",
         });
@@ -56,7 +55,7 @@ export default function SettingsPage() {
     };
 
     fetchCaregiverAndCarepartner();
-  }, []);
+  }, [activeCarePartnerId]);
 
   // Logout
 const handleLogout = async () => {
@@ -73,6 +72,8 @@ const handleLogout = async () => {
 
     // Update global auth state
     setIsAuthenticated(false);
+    setUser(null);
+    setActiveCarePartnerId(null);
 
     // Redirect to login
     navigate("/login");
@@ -108,7 +109,7 @@ const handleLogout = async () => {
   };
 
   const handleUpdateAutoStart = async () => {
-    if (!caregiver.carepartner_id) return;
+    if (!activeCarePartnerId) return;
 
     try {
       const res = await fetch(`${API_URL}/users/carepartner/update`, {
@@ -116,7 +117,7 @@ const handleLogout = async () => {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: caregiver.carepartner_id,
+          id: activeCarePartnerId,
           auto_start: autoStart + ":00", // backend expects HH:MM:SS
         }),
       });
@@ -157,11 +158,9 @@ const handleLogout = async () => {
           <label className="text-lg font-medium">Care Partner ID:</label>
           <input
             type="number"
-            value={caregiver.carepartner_id}
-            onChange={(e) =>
-              setCaregiver({ ...caregiver, carepartner_id: parseInt(e.target.value, 10) || 0 })
-            }
-            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
+            value={activeCarePartnerId ?? 0}
+            className="w-full mt-2 p-3 border rounded bg-gray-200 text-gray-700"
+            readOnly
           />
         </div>
 

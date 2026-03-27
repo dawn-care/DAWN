@@ -39,8 +39,14 @@ export default function AgendaView() {
             }
 
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
-            if (dayOfMonth === 0) return;
-            if (!user?.id || !user?.carepartner_id) return;
+            if (dayOfMonth === 0) {
+                setLoading(false);
+                return;
+            }
+            if (!user?.id || !user?.carepartners) {
+                setLoading(false);
+                return;
+            }
 
             const params = new URLSearchParams({
                 caregiver_id: String(user?.id),  // TODO - check if this was okay to add here or if it breaks
@@ -67,7 +73,7 @@ export default function AgendaView() {
 
    useEffect(() => {
         fetchData();
-    }, [date, activeCarePartnerId]);
+    }, [date, activeCarePartnerId, user]);
 
     useEffect(() => {
         const fetchCarepartners = async () => {
@@ -90,7 +96,7 @@ export default function AgendaView() {
 
     const currentDateToComponents = () => {
         if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
-        const currentDate = new Date(date);
+        const currentDate = new Date(date + 'T00:00:00');
         const dayOfWeek = currentDate.getDay();
         const dayOfMonth = currentDate.getDate();
         const month = currentDate.getMonth() + 1;
@@ -99,17 +105,23 @@ export default function AgendaView() {
 
     const handlePreviousDay = () => {
         if (!date) return;
-        const currentDate = new Date(date);
+        const currentDate = new Date(date + 'T00:00:00');
         currentDate.setDate(currentDate.getDate() - 1);
-        const newDate = currentDate.toISOString().split('T')[0];
+        const y = currentDate.getFullYear();
+        const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentDate.getDate()).padStart(2, '0');
+        const newDate = `${y}-${m}-${d}`;
         navigate(`/agenda/${newDate}`);
     };
 
     const handleNextDay = () => {
         if (!date) return;
-        const currentDate = new Date(date);
+        const currentDate = new Date(date + 'T00:00:00');
         currentDate.setDate(currentDate.getDate() + 1);
-        const newDate = currentDate.toISOString().split('T')[0];
+        const y = currentDate.getFullYear();
+        const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentDate.getDate()).padStart(2, '0');
+        const newDate = `${y}-${m}-${d}`;
         navigate(`/agenda/${newDate}`);
     };
 
@@ -135,10 +147,10 @@ export default function AgendaView() {
     );
 
     const setRegularItems = (newRegular: ConfigurationWithMetadata[]) => {
-        setItems([...timedItems, ...newRegular]);
+        setItems(prev => [...prev.filter(i => i.timed), ...newRegular]);
     };
     const setTimedItems = (newTimed: ConfigurationWithMetadata[]) => {
-        setItems([...regularItems, ...newTimed]);
+        setItems(prev => [...prev.filter(i => !i.timed), ...newTimed]);
     };
 
     return (
@@ -162,18 +174,18 @@ export default function AgendaView() {
                 <div className="px-8 py-8">
                     <div className="flex items-center justify-between mb-8">
                         <button onClick={handlePreviousDay} className="text-4xl text-gray-800 hover:text-gray-600">&lt;</button>
-                        <h2 className="text-4xl font-light text-gray-800">{date} Videos for Dad</h2>
+                        <h2 className="text-4xl font-light text-gray-800">{date} Agenda for {activeCarePartnerId ? carepartners.find(cp => cp.id === activeCarePartnerId)?.name : "..."}</h2>
                         <button onClick={handleNextDay} className="text-4xl text-gray-800 hover:text-gray-600">&gt;</button>
                     </div>
 
                     <div className="flex gap-8 mb-8">
-                        <div className="flex items-center gap-4">
+                        {/* <div className="flex items-center gap-4">
                             <label className="text-gray-700 font-medium">View:</label>
                             <button className="px-6 py-2 bg-gray-200 border-b-2 border-gray-400 rounded text-gray-800 flex items-center gap-2 hover:bg-gray-300">
                                 Daily
                                 <span>∨</span>
                             </button>
-                        </div>
+                        </div> */}
 
                         <div className="flex items-center gap-4">
                             <label className="text-gray-700 font-medium">Care Partner:</label>

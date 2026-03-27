@@ -148,49 +148,70 @@ func (s *DevicePairingService) GeneratePairingCode(carepartnerID int) (*device_p
 // Verify pairing code
 //
 
-func (s *DevicePairingService) VerifyPairingCode(code string, caregiverID int) error {
+func (s *DevicePairingService) VerifyPairingCode(code string, caregiverID int, carepartnerName string) (int, error) {
 
 	if code == "" {
-		return errors.New("pairing code cannot be empty")
+		return 0, errors.New("pairing code cannot be empty")
 	}
 
 	if caregiverID <= 0 {
-		return errors.New("invalid caregiver ID")
+		return 0, errors.New("invalid caregiver ID")
 	}
 
-	pairing, err := device_pairing.GetDevicePairingByCode(s.DB, code)
+	tx, err := s.DB.Begin()
 	if err != nil {
-		return err
+		return 0, errors.New("failed to begin transaction")
 	}
+	defer tx.Rollback()
 
-	if pairing == nil {
-		return errors.New("pairing code not found")
+	// Lock the row to prevent concurrent pairing attempts (TOCTOU)
+	var pairing device_pairing.DevicePairing
+	err = tx.QueryRow(
+		`SELECT id, carepartner_id, pairing_code, paired, expires_at
+		 FROM "DevicePairing" WHERE pairing_code = $1 FOR UPDATE`,
+		code,
+	).Scan(&pairing.ID, &pairing.CarepartnerID, &pairing.PairingCode, &pairing.Paired, &pairing.ExpiresAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, errors.New("pairing code not found")
+		}
+		return 0, err
 	}
 
 	if pairing.Paired {
-		return errors.New("pairing code already used")
+		return 0, errors.New("pairing code already used")
 	}
 
 	if time.Now().After(pairing.ExpiresAt) {
-		return errors.New("pairing code expired")
+		return 0, errors.New("pairing code expired")
 	}
 
-	// Link caregiver to carepartner
-	query := `
-		UPDATE "Caregiver"
-		SET carepartner_id = $1
-		WHERE id = $2;
-	`
-
-	_, err = s.DB.Exec(query, pairing.CarepartnerID, caregiverID)
+	// Link caregiver to carepartner and update name if provided
+	_, err = tx.Exec(
+		`UPDATE "Carepartner"
+		 SET caregiver_id = $1,
+		     name = CASE WHEN $3 <> '' THEN $3 ELSE name END
+		 WHERE id = $2`,
+		caregiverID, pairing.CarepartnerID, carepartnerName,
+	)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Mark pairing as used
-	pairing.Paired = true
+	_, err = tx.Exec(
+		`UPDATE "DevicePairing" SET paired = true WHERE id = $1`,
+		pairing.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
 
-	return device_pairing.UpdateDevicePairing(s.DB, pairing)
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+
+	return pairing.CarepartnerID, nil
 }
 
 //

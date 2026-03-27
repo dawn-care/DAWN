@@ -3,15 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function SelectCarePartnerPage() {
-  const { user } = useAuth();
+  const { user, setActiveCarePartnerId } = useAuth();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState("");
 
   const handleContinue = () => {
     if (!selectedId) return;
 
-    // store selection
-    localStorage.setItem("activeCarePartnerId", selectedId);
+    // store selection via context (which syncs to localStorage)
+    setActiveCarePartnerId(Number(selectedId));
 
     navigate("/library");
   };

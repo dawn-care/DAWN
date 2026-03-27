@@ -78,10 +78,14 @@ func (c *ModuleController) CreateModuleHandler(w http.ResponseWriter, r *http.Re
 func (c *ModuleController) GetModulesByCaregiverAndCarepartnerHandler(w http.ResponseWriter, r *http.Request) {
 
 	caregiverID, err := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
-	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	if err != nil || caregiverID <= 0 {
+		http.Error(w, "invalid or missing caregiver_id", http.StatusBadRequest)
+		return
+	}
 
-	if err != nil || caregiverID <= 0 || carepartnerID <= 0{
-		http.Error(w, "Missing query parameters", http.StatusBadRequest)
+	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	if err != nil || carepartnerID <= 0 {
+		http.Error(w, "invalid or missing carepartner_id", http.StatusBadRequest)
 		return
 	}
 
@@ -114,8 +118,18 @@ func (c *ModuleController) GetModuleByIDHandler(w http.ResponseWriter, r *http.R
 }
 
 func (c *ModuleController) GetMetadataHandler(w http.ResponseWriter, r *http.Request) {
-	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
-	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	caregiverID, err := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
+	if err != nil || caregiverID <= 0 {
+		http.Error(w, "invalid or missing caregiver_id", http.StatusBadRequest)
+		return
+	}
+
+	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	if err != nil || carepartnerID <= 0 {
+		http.Error(w, "invalid or missing carepartner_id", http.StatusBadRequest)
+		return
+	}
+
 	moduleType := r.URL.Query().Get("module_type")
 
 	metadataIDs, err := c.Service.GetMetadataByCaregiverCarepartnerAndType(caregiverID, carepartnerID, moduleType)
@@ -129,8 +143,17 @@ func (c *ModuleController) GetMetadataHandler(w http.ResponseWriter, r *http.Req
 }
 
 func (c *ModuleController) GetAllMetadataHandler(w http.ResponseWriter, r *http.Request) {
-	caregiverID, _ := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
-	carepartnerID, _ := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	caregiverID, err := strconv.Atoi(r.URL.Query().Get("caregiver_id"))
+	if err != nil || caregiverID <= 0 {
+		http.Error(w, "invalid or missing caregiver_id", http.StatusBadRequest)
+		return
+	}
+
+	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	if err != nil || carepartnerID <= 0 {
+		http.Error(w, "invalid or missing carepartner_id", http.StatusBadRequest)
+		return
+	}
 
 	metadataIDs, err := c.Service.GetAllMetadataByCaregiverCarepartner(caregiverID, carepartnerID)
 	if err != nil {
@@ -160,6 +183,5 @@ func (c *ModuleController) DeleteModuleHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("module deleted"))
+	w.WriteHeader(http.StatusNoContent)
 }

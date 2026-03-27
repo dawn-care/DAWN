@@ -85,7 +85,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     if (user) {
       fetchModules();
     }
-  }, [user]);
+  }, [user, activeCarePartnerId]);
 
   const fetchModules = async () => {
     try {
@@ -193,7 +193,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           if (!widgetResponse.ok) throw new Error("Delete failed");
       }
       catch (err: any) {
-            return
+            console.error("Widget delete failed:", err);
+            alert("Failed to delete widget. Please try again.");
+            return;
       }
     }
     setModules((prev) => prev.filter((m) => m.id !== moduleId));
@@ -218,7 +220,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           if (!promptRes.ok) throw new Error("Delete failed");
       }
       catch (err: any) {
-            return
+            console.error("Prompt delete failed:", err);
+            alert("Failed to delete message. Please try again.");
+            return;
       }
     }
     setModules((prev) => prev.filter((m) => m.id !== moduleId));

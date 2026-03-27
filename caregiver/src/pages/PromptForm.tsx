@@ -42,6 +42,10 @@ export default function PromptForm({
 
     async function loadPrompt() {
       var res = await fetch(`${API_URL}/modules/${actualModuleId}`);
+      if (!res.ok) {
+        setUploadStatus("Failed to load module");
+        return;
+      }
       const module = await res.json();
       console.log("Loaded module for editing:", module);
       setPromptId(module.metadata_id);
@@ -179,8 +183,15 @@ export default function PromptForm({
       let imageUri = existingImageUri;
 
       if (file) {
+        if (!user?.id || !activeCarePartnerId) {
+          setUploadStatus("Cannot upload: user information missing.");
+          return;
+        }
+
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("caregiver_id", user.id.toString());
+        formData.append("carepartner_id", activeCarePartnerId.toString());
 
         const res = await fetch(`${API_URL}/photo/upload`, {
           method: "POST",

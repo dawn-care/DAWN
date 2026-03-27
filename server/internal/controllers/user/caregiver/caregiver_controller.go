@@ -133,15 +133,15 @@ func (cc *CaregiverController) GetCaregiverByID(w http.ResponseWriter, r *http.R
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /caregivers/carepartners [get]
 func (cc *CaregiverController) GetCarepartnersByCaregiverID(w http.ResponseWriter, r *http.Request) {
-	caregiverIDStr := r.URL.Query().Get("caregiver_id")
+	caregiverIDStr := chi.URLParam(r, "id")
 	if caregiverIDStr == "" {
-		writeError(w, http.StatusBadRequest, "missing caregiver_id")
+		writeError(w, http.StatusBadRequest, "missing caregiver id")
 		return
 	}
 
 	caregiverID, err := strconv.Atoi(caregiverIDStr)
 	if err != nil || caregiverID <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid caregiver_id")
+		writeError(w, http.StatusBadRequest, "invalid caregiver id")
 		return
 	}
 

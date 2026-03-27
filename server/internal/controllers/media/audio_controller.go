@@ -306,14 +306,18 @@ func (c *AudioController) GetAudiosByCarepartnerAndCaregiverHandler(w http.Respo
 func (c *AudioController) UpdateAudioHandler(w http.ResponseWriter, r *http.Request) {
 	var audio models.AudioMedia
 
-	id, _ := strconv.Atoi(r.FormValue("id"))
+	id, err := strconv.Atoi(r.FormValue("id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid audio ID", http.StatusBadRequest)
+		return
+	}
 	audio.ID = id
 	audio.URI = r.FormValue("uri")
 	audio.DisplayedName = r.FormValue("displayed_name")
 	audio.Filename = r.FormValue("filename")
 	audio.Extension = r.FormValue("extension")
 
-	err := c.Services.UpdateAudio(&audio)
+	err = c.Services.UpdateAudio(&audio)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to update audio: %v", err), http.StatusInternalServerError)
 		return
@@ -369,15 +373,19 @@ func (c *AudioController) UpdateAudioFileHandler(w http.ResponseWriter, r *http.
 // @Failure 500 {string} string "internal server error"
 // @Router /audio [delete]
 func (c *AudioController) DeleteAudioHandler(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.Atoi(r.URL.Query().Get("id"))
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid audio ID", http.StatusBadRequest)
+		return
+	}
 
-	err := c.Services.DeleteAudio(id)
+	err = c.Services.DeleteAudio(id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to delete: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Fprint(w, "Audio deleted")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // DeleteAudioFileHandler godoc

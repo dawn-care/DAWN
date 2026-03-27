@@ -36,7 +36,10 @@ export default function CalendarView() {
 
   const handleDateClick = (day: number) => {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const formattedDate = `${y}-${m}-${d}`; // YYYY-MM-DD format without UTC shift
     navigate(`/agenda/${formattedDate}`);
   };
 

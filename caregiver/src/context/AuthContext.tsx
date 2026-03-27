@@ -47,6 +47,8 @@ export const AuthProvider = ({ children }: { children: JSX.Element | JSX.Element
   useEffect(() => {
     if (activeCarePartnerId !== null) {
       localStorage.setItem("activeCarePartnerId", activeCarePartnerId.toString());
+    } else {
+      localStorage.removeItem("activeCarePartnerId");
     }
   }, [activeCarePartnerId]);
 

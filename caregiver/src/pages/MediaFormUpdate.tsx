@@ -147,7 +147,15 @@ export default function MediaFormUpdate() {
       setFile(null);
       setMediaName("");
 
-      setTimeout(() => window.location.reload(), 800);
+      // Update the media list in state instead of reloading the page
+      if (selected) {
+        setMediaList((prev) =>
+          prev.map((m) =>
+            m.metadataId === selected.metadataId ? { ...m, name: mediaName } : m
+          )
+        );
+        setSelected(null);
+      }
 
     } catch (err: any) {
       setStatus("Update failed: " + err.message);
