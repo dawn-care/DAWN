@@ -55,6 +55,14 @@ func (s *CaregiverService) GetCaregiverByID(id int) (*caregiver.Caregiver, error
 	return caregiver.GetCaregiverByID(s.DB, id)
 }
 
+func (s *CaregiverService) GetCarepartnersByCaregiverID(caregiverID int) ([]caregiver.Caregiver, error) {
+	if caregiverID <= 0 {
+		return nil, errors.New("invalid caregiver ID")
+	}
+
+	return caregiver.GetCarepartnersByCaregiverID(s.DB, caregiverID)
+}
+
 // func (s *CaregiverService) GetCaregiverByCarepartnerID(crID int) (*caregiver.Caregiver, error) {
 // 	if crID <= 0 {
 // 		return nil, errors.New("invalid carepartner ID")

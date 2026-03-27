@@ -19,6 +19,7 @@ import (
 type CaregiverServiceInterface interface {
 	CreateCaregiver(cg *caregiver.Caregiver) error
 	GetCaregiverByID(id int) (*caregiver.Caregiver, error)
+	GetCarepartnersByCaregiverID(id int) ([]caregiver.Caregiver, error)
 	GetAllCaregivers() ([]caregiver.Caregiver, error)
 	// GetCaregiverByCarepartnerID(id int) (*caregiver.Caregiver, error)
 	SearchCaregivers(query string) ([]caregiver.Caregiver, error)
@@ -118,6 +119,39 @@ func (cc *CaregiverController) GetCaregiverByID(w http.ResponseWriter, r *http.R
 	}
 
 	writeJSON(w, http.StatusOK, cg)
+}
+
+// GetCarepartnersByCaregiverID godoc
+// @Summary Get carepartners for a caregiver
+// @Description Retrieves all carepartners associated with a caregiver
+// @Tags caregiver
+// @Accept json
+// @Produce json
+// @Param caregiver_id query int true "Caregiver ID"
+// @Success 200 {array} map[string]interface{}
+// @Failure 400 {object} map[string]string "invalid caregiver_id"
+// @Failure 500 {object} map[string]string "internal server error"
+// @Router /caregivers/carepartners [get]
+func (cc *CaregiverController) GetCarepartnersByCaregiverID(w http.ResponseWriter, r *http.Request) {
+	caregiverIDStr := r.URL.Query().Get("caregiver_id")
+	if caregiverIDStr == "" {
+		writeError(w, http.StatusBadRequest, "missing caregiver_id")
+		return
+	}
+
+	caregiverID, err := strconv.Atoi(caregiverIDStr)
+	if err != nil || caregiverID <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid caregiver_id")
+		return
+	}
+
+	carepartners, err := cc.Service.GetCarepartnersByCaregiverID(caregiverID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, carepartners)
 }
 
 // GetAllCaregivers godoc

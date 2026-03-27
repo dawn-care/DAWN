@@ -73,7 +73,7 @@ export default function AgendaView() {
 
             try {
                 const API_URL = import.meta.env.VITE_API_URL;
-                const res = await fetch(`${API_URL}/carepartners?caregiver_id=${user.id}`);
+                const res = await fetch(`${API_URL}/caregivers/${user.id}/carepartners`);
                 if (!res.ok) throw new Error("Failed to fetch carepartners");
 
                 const data = await res.json();

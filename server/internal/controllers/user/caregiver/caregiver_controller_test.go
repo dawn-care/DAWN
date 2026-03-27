@@ -18,13 +18,14 @@ import (
 ----------------------------------------------------- */
 
 type mockCaregiverService struct {
-	CreateCaregiverFunc             func(cg *caregiverModel.Caregiver) error
-	GetCaregiverByIDFunc            func(id int) (*caregiverModel.Caregiver, error)
-	GetAllCaregiversFunc            func() ([]caregiverModel.Caregiver, error)
+	CreateCaregiverFunc              func(cg *caregiverModel.Caregiver) error
+	GetCaregiverByIDFunc             func(id int) (*caregiverModel.Caregiver, error)
+	GetCarepartnersByCaregiverIDFunc func(caregiverID int) ([]caregiverModel.Caregiver, error)
+	GetAllCaregiversFunc             func() ([]caregiverModel.Caregiver, error)
 	// GetCaregiverByCarepartnerIDFunc func(id int) (*caregiverModel.Caregiver, error)
-	SearchCaregiversFunc            func(query string) ([]caregiverModel.Caregiver, error)
-	UpdateCaregiverFunc             func(cg *caregiverModel.Caregiver) error
-	DeleteCaregiverFunc             func(id int) error
+	SearchCaregiversFunc             func(query string) ([]caregiverModel.Caregiver, error)
+	UpdateCaregiverFunc              func(cg *caregiverModel.Caregiver) error
+	DeleteCaregiverFunc              func(id int) error
 }
 
 func (m *mockCaregiverService) CreateCaregiver(cg *caregiverModel.Caregiver) error {
@@ -32,6 +33,9 @@ func (m *mockCaregiverService) CreateCaregiver(cg *caregiverModel.Caregiver) err
 }
 func (m *mockCaregiverService) GetCaregiverByID(id int) (*caregiverModel.Caregiver, error) {
 	return m.GetCaregiverByIDFunc(id)
+}
+func (m *mockCaregiverService) GetCarepartnersByCaregiverID(caregiverID int) ([]caregiverModel.Caregiver, error) {
+	return m.GetCarepartnersByCaregiverIDFunc(caregiverID)
 }
 func (m *mockCaregiverService) GetAllCaregivers() ([]caregiverModel.Caregiver, error) {
 	return m.GetAllCaregiversFunc()

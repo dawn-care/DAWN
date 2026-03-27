@@ -89,6 +89,33 @@ func GetCaregiverByID(db *sql.DB, id int) (*Caregiver, error) {
 	return c, nil
 }
 
+// GetCarepartnersByCaregiverID retrieves all carepartners for a given caregiver
+func GetCarepartnersByCaregiverID(db *sql.DB, caregiverID int) ([]Caregiver, error) {
+	query := `
+		SELECT id, name
+		FROM "Carepartner"
+		WHERE caregiver_id = $1;
+	`
+
+	rows, err := db.Query(query, caregiverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var carepartners []Caregiver
+
+	for rows.Next() {
+		var cp Caregiver
+		if err := rows.Scan(&cp.ID, &cp.Name); err != nil {
+			return nil, err
+		}
+		carepartners = append(carepartners, cp)
+	}
+
+	return carepartners, nil
+}
+
 // GetCaregiverByCarepartner returns the caregiver sharing the same ID
 // func GetCaregiverByCarepartner(db *sql.DB, crID int) (*Caregiver, error) {
 // 	query := `
