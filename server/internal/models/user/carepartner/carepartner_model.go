@@ -8,9 +8,10 @@ import (
 
 // Carepartner represents a carepartner record
 type Carepartner struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	AutoStart time.Time `json:"auto_start"`
+	ID       	int       `json:"id"`
+	Name      	string    `json:"name"`
+	CaregiverID int	  	  `json:"caregiver_id"`
+	AutoStart 	time.Time `json:"auto_start"`
 }
 
 // ─────────────────────────────────────────────
@@ -19,11 +20,11 @@ type Carepartner struct {
 
 func CreateCarepartner(db *sql.DB, c *Carepartner) error {
 	query := `
-		INSERT INTO "Carepartner" (name, auto_start)
-		VALUES ($1, $2)
+		INSERT INTO "Carepartner" (name, auto_start, caregiver_id)
+		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
-	return db.QueryRow(query, c.Name, c.AutoStart).Scan(&c.ID)
+	return db.QueryRow(query, c.Name, c.AutoStart, c.CaregiverID).Scan(&c.ID)
 }
 
 // ─────────────────────────────────────────────
@@ -32,13 +33,13 @@ func CreateCarepartner(db *sql.DB, c *Carepartner) error {
 
 func GetCarepartnerByID(db *sql.DB, id int) (*Carepartner, error) {
 	query := `
-		SELECT id, name, auto_start
+		SELECT id, name, auto_start, caregiver_id
 		FROM "Carepartner"
 		WHERE id = $1;
 	`
 
 	c := &Carepartner{}
-	err := db.QueryRow(query, id).Scan(&c.ID, &c.Name, &c.AutoStart)
+	err := db.QueryRow(query, id).Scan(&c.ID, &c.Name, &c.AutoStart, &c.CaregiverID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -51,7 +52,7 @@ func GetCarepartnerByID(db *sql.DB, id int) (*Carepartner, error) {
 
 func GetAllCarepartners(db *sql.DB) ([]Carepartner, error) {
 	query := `
-		SELECT id, name, auto_start
+		SELECT id, name, auto_start, caregiver_id
 		FROM "Carepartner";
 	`
 
@@ -64,7 +65,7 @@ func GetAllCarepartners(db *sql.DB) ([]Carepartner, error) {
 	var list []Carepartner
 	for rows.Next() {
 		var c Carepartner
-		if err := rows.Scan(&c.ID, &c.Name, &c.AutoStart); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.AutoStart, &c.CaregiverID); err != nil {
 			return nil, err
 		}
 		list = append(list, c)
@@ -80,11 +81,11 @@ func GetAllCarepartners(db *sql.DB) ([]Carepartner, error) {
 func UpdateCarepartner(db *sql.DB, c *Carepartner) error {
 	query := `
 		UPDATE "Carepartner"
-		SET name = $1, auto_start = $2
-		WHERE id = $3;
+		SET name = $1, auto_start = $2, caregiver_id = $3
+		WHERE id = $4;
 	`
 
-	res, err := db.Exec(query, c.Name, c.AutoStart, c.ID)
+	res, err := db.Exec(query, c.Name, c.AutoStart, c.CaregiverID, c.ID)
 	if err != nil {
 		return err
 	}

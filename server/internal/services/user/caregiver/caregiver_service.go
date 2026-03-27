@@ -133,10 +133,9 @@ func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (
 
 	// if not found -> create new caregiver
 	c := &caregiver.Caregiver{
-		Name:          googleUser.Name,
-		Role:          "caregiver",
-		CarepartnerID: 0, // set later (?)
-		GoogleID:      &googleUser.ID,
+		Name:     googleUser.Name,
+		Role:     "caregiver",
+		GoogleID: &googleUser.ID,
 	}
 
 	if err := caregiver.CreateCaregiver(s.DB, c); err != nil {
