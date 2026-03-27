@@ -23,7 +23,7 @@ type ScreensaverConfig = {
 type Carepartner = {
   ID: number;
   Name: string;
-  AutoStart: string; // "HH:MM:SS"
+  auto_start: string; // "HH:MM:SS"
 };
 
 function formatTime(timeString: string) {
@@ -40,7 +40,7 @@ function formatTime(timeString: string) {
 export default function Screensaver() {
   const [config, setConfig] = useState<ScreensaverConfig>({
     title: "StartUp",
-    autoStartTimeLabel: "8:00am",
+    autoStartTimeLabel: "",
     backgroundImageUrl: undefined,
   });
   const [carepartner, setCarepartner] = useState<Carepartner | null>(null);
@@ -48,12 +48,14 @@ export default function Screensaver() {
   const lastAutoStartDateRef = useRef<string | null>(null);
 
   async function fetchScreensaverConfig(): Promise<ScreensaverConfig> {
-    const res = await fetch(`${API_URL}/api/carepartner/${await getCarepartnerId()}`);
+    const res = await fetch(`${API_URL}/users/carepartner/${await getCarepartnerId()}`);
     if (!res.ok) throw new Error('Failed to fetch configurations');
 
     const data: Carepartner = await res.json();
+    console.log(data);
+    console.log(data.auto_start);
     setCarepartner(data);
-    const autoStartTimeLabel = formatTime(data.AutoStart);
+    const autoStartTimeLabel = formatTime(data.auto_start);
     return {
       title: "Start-Up",
       autoStartTimeLabel: autoStartTimeLabel,
@@ -68,8 +70,8 @@ export default function Screensaver() {
       try {
         const next = await fetchScreensaverConfig();
         if (mounted) setConfig(next);
-      } catch {
-        // TODO: optionally log/report
+      } catch (err) {
+        console.error("Failed to load config:", err);
       }
     })();
 
@@ -112,7 +114,7 @@ export default function Screensaver() {
     const maybeAutoStart = () => {
       const now = new Date();
       const dateKey = now.toDateString();
-      const [hourStr, minuteStr] = carepartner?.AutoStart.split(':') || ['0', '0'];
+      const [hourStr, minuteStr] = carepartner?.auto_start.split(':') || ['0', '0'];
       let hour = parseInt(hourStr, 10);
       const minute = parseInt(minuteStr, 10);
       const isAutoStartWindow = now.getHours() === hour && now.getMinutes() === minute;
@@ -163,7 +165,7 @@ export default function Screensaver() {
                 <View style={styles.autoGlass}>
                 <Text style={styles.autoText}>
                     Auto-Starts at{" "}
-                    <Text style={styles.autoTimeText}>{config.autoStartTimeLabel}</Text>
+                    <Text style={styles.autoTimeText}>{config.autoStartTimeLabel || "Loading..."}</Text>
                 </Text>
                 </View>
             </View>
