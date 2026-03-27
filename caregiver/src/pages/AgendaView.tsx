@@ -32,6 +32,7 @@ export default function AgendaView() {
 
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
             if (dayOfMonth === 0) return;
+            if (!user?.id || !user?.carepartner_id) return;
 
             const params = new URLSearchParams({
                 caregiver_id: String(user?.id),  // TODO - check if this was okay to add here or if it breaks
@@ -39,6 +40,7 @@ export default function AgendaView() {
                 day: String(dayOfMonth),
                 month: String(month),
                 day_of_week: String(dayOfWeek),
+                date: date!,
             });
 
             const API_URL = import.meta.env.VITE_API_URL;
@@ -215,6 +217,7 @@ export default function AgendaView() {
                                         currentItemCount={items.length}
                                         onSave={handleConfigSaved}
                                         onCancel={() => setSelectedModule(null)}
+                                        currentDate={date}
                                     />
                                 </div>
                             </div>
@@ -237,6 +240,7 @@ export default function AgendaView() {
                                         currentItemCount={items.length}
                                         onSave={handleConfigSaved}
                                         onCancel={() => setEditingConfig(null)}
+                                        currentDate={date}
                                     />
                                 </div>
                             </div>

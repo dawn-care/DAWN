@@ -38,7 +38,7 @@ export default function SettingsPage() {
         setCaregiver(cgData);
 
         // Fetch associated carepartner
-        const resCp = await fetch(`${API_URL}/carepartner/${cgData.carepartner_id}`, {
+        const resCp = await fetch(`${API_URL}/users/carepartner/${cgData.carepartner_id}`, {
           method: "GET",
           credentials: "include",
         });
@@ -111,7 +111,7 @@ const handleLogout = async () => {
     if (!caregiver.carepartner_id) return;
 
     try {
-      const res = await fetch(`${API_URL}/carepartner/update`, {
+      const res = await fetch(`${API_URL}/users/carepartner/update`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

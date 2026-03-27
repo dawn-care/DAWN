@@ -97,7 +97,7 @@ func (s *ConfigurationService) GetConfigurationByID(id int) (*configurations.Con
 }
 
 // GetConfigurationsByDayAndCarepartner retrieves configurations for a specific day and carepartner, joined with module and metadata
-func (s *ConfigurationService) GetConfigurationsByDayAndCarepartner(carepartnerID int, day, month, dayOfWeek int) ([]configurations.ConfigurationWithMetadata, error) {
+func (s *ConfigurationService) GetConfigurationsByDayAndCarepartner(carepartnerID int, day, month, dayOfWeek int, fullDate string) ([]configurations.ConfigurationWithMetadata, error) {
 	if carepartnerID <= 0 {
 		return nil, errors.New("invalid carepartner ID")
 	}
@@ -111,7 +111,7 @@ func (s *ConfigurationService) GetConfigurationsByDayAndCarepartner(carepartnerI
 		return nil, errors.New("day of week must be between 0 and 6")
 	}
 
-	cfgs, err := configurations.GetConfigurationsByDayAndCarepartner(s.DB, carepartnerID, day, month, dayOfWeek)
+	cfgs, err := configurations.GetConfigurationsByDayAndCarepartner(s.DB, carepartnerID, day, month, dayOfWeek, fullDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get configurations: %w", err)
 	}

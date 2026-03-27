@@ -141,7 +141,7 @@ func TestGetConfigurationsByDayAndCarepartner(t *testing.T) {
 		).
 		WillReturnRows(rows)
 
-	cfgs, err := GetConfigurationsByDayAndCarepartner(db, 1000, 17, 11, 1)
+	cfgs, err := GetConfigurationsByDayAndCarepartner(db, 1000, 17, 11, 1, "2026-11-17")
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 4)
 
