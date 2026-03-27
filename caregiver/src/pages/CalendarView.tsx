@@ -54,7 +54,7 @@ export default function CalendarView() {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-8 py-12">
-        <h1 className="text-4xl font-light text-gray-800 mb-8">Calendar</h1>
+        <h1 className="text-4xl font-light text-gray-800 mb-8 text-center">Calendar</h1>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
           {/* Month/Year Header */}

@@ -99,12 +99,23 @@ export default function AgendaView(){
         refresh();
     }, []);
 
-    // Build queue from non-timed items only
+    // Build queue: due timed items first, then regular (non-timed) items
     useEffect(() => {
         if (!todaysItems.length) return;
+
+        const currentTime = (() => {
+            const now = new Date();
+            return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        })();
+
+        const dueTimed = todaysItems
+            .filter(i => i.timed && (i.time ?? '').slice(0, 5) <= currentTime)
+            .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+
         const regular = todaysItems.filter(i => !i.timed);
+
         setCurrentIndex(0);
-        setPlayQueue(regular);
+        setPlayQueue([...dueTimed, ...regular]);
     }, [todaysItems]);
 
     // When an error occurs, redirect to home after 5 seconds
