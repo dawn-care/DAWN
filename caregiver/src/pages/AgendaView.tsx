@@ -18,12 +18,14 @@ export default function AgendaView() {
     const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { user, activeCarePartnerId } = useAuth();
+    const { user, activeCarePartnerId, setActiveCarePartnerId } = useAuth();
 
     // For the create flow: library → config form
     const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
     // For the edit flow: clicking an existing item
     const [editingConfig, setEditingConfig] = useState<ConfigurationWithMetadata | null>(null);
+    // Careapartners associated with logged in caregiver
+    const [carepartners, setCarepartners] = useState<{ id: number; name: string }[]>([]);
 
     const fetchData = async () => {
         try {
@@ -61,9 +63,28 @@ export default function AgendaView() {
         }
     };
 
-    useEffect(() => {
+   useEffect(() => {
         fetchData();
-    }, [date]);
+    }, [date, activeCarePartnerId]);
+
+    useEffect(() => {
+        const fetchCarepartners = async () => {
+            if (!user?.id) return;
+
+            try {
+                const API_URL = import.meta.env.VITE_API_URL;
+                const res = await fetch(`${API_URL}/carepartners?caregiver_id=${user.id}`);
+                if (!res.ok) throw new Error("Failed to fetch carepartners");
+
+                const data = await res.json();
+                setCarepartners(data);
+            } catch (err) {
+                console.error("Failed to fetch carepartners:", err);
+            }
+        };
+
+        fetchCarepartners();
+    }, [user]);
 
     const currentDateToComponents = () => {
         if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
@@ -151,12 +172,21 @@ export default function AgendaView() {
                                 <span>∨</span>
                             </button>
                         </div>
+
                         <div className="flex items-center gap-4">
                             <label className="text-gray-700 font-medium">Care Partner:</label>
-                            <button className="px-6 py-2 bg-gray-200 border-b-2 border-gray-400 rounded text-gray-800 flex items-center gap-2 hover:bg-gray-300">
-                                Dad
-                                <span>∨</span>
-                            </button>
+
+                            <select
+                                value={activeCarePartnerId ?? ""}
+                                onChange={(e) => setActiveCarePartnerId(Number(e.target.value))}
+                                className="px-6 py-2 bg-gray-200 border-b-2 border-gray-400 rounded text-gray-800 hover:bg-gray-300"
+                            >
+                                {carepartners.map((cp) => (
+                                    <option key={cp.id} value={cp.id}>
+                                        {cp.name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
