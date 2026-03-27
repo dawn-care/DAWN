@@ -52,7 +52,7 @@ const Login = () => {
       if (!user.carepartner_id || user.carepartner_id === 0) {
         navigate("/setup");
       } else {
-        navigate("/library");
+        navigate("/select-carepartner");
       }
 
       setStatus("success");

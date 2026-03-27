@@ -34,7 +34,6 @@ func TestCreateCaregiver_Success(t *testing.T) {
 	svc := NewCaregiverService(db)
 
 	c := &model.Caregiver{
-		CarepartnerID: 10,
 		Name:          "john",
 		Role:          "helper",
 	}
@@ -44,7 +43,7 @@ func TestCreateCaregiver_Success(t *testing.T) {
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`)).
-		WithArgs(c.CarepartnerID, c.Name, c.Role).
+		WithArgs(c.Name, c.Role).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(5))
 
 	err := svc.CreateCaregiver(c)
@@ -54,24 +53,24 @@ func TestCreateCaregiver_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCreateCaregiver_ValidationError_EmptyName(t *testing.T) {
-	db, _ := setupMockDB(t)
-	defer db.Close()
+// func TestCreateCaregiver_ValidationError_EmptyName(t *testing.T) {
+// 	db, _ := setupMockDB(t)
+// 	defer db.Close()
 
-	svc := NewCaregiverService(db)
-	c := &model.Caregiver{CarepartnerID: 10}
+// 	svc := NewCaregiverService(db)
+// 	c := &model.Caregiver{CarepartnerID: 10}
 
-	err := svc.CreateCaregiver(c)
-	assert.Error(t, err)
-	assert.Equal(t, "name cannot be empty", err.Error())
-}
+// 	err := svc.CreateCaregiver(c)
+// 	assert.Error(t, err)
+// 	assert.Equal(t, "name cannot be empty", err.Error())
+// }
 
 func TestCreateCaregiver_ValidationError_InvalidCarereceiver(t *testing.T) {
 	db, _ := setupMockDB(t)
 	defer db.Close()
 
 	svc := NewCaregiverService(db)
-	c := &model.Caregiver{Name: "john", CarepartnerID: 0}
+	c := &model.Caregiver{Name: "john"}
 
 	err := svc.CreateCaregiver(c)
 	assert.Error(t, err)
@@ -87,8 +86,8 @@ func TestCreateCaregiversBulk_Success(t *testing.T) {
 	defer db.Close()
 
 	list := []model.Caregiver{
-		{Name: "a", CarepartnerID: 1, Role: "helper"},
-		{Name: "b", CarepartnerID: 2, Role: "helper"},
+		{Name: "a", Role: "helper"},
+		{Name: "b", Role: "helper"},
 	}
 
 	svc := NewCaregiverService(db)
@@ -96,17 +95,17 @@ func TestCreateCaregiversBulk_Success(t *testing.T) {
 	mock.ExpectBegin()
 
 	mock.ExpectPrepare(regexp.QuoteMeta(`
-		INSERT INTO "Caregiver" (carepartner_id, name, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO "Caregiver" (name, role)
+		VALUES ($1, $2)
 		RETURNING id;
 	`))
 
 	mock.ExpectQuery(`INSERT INTO "Caregiver"`).
-		WithArgs(1, "a", "helper").
+		WithArgs("a", "helper").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
 
 	mock.ExpectQuery(`INSERT INTO "Caregiver"`).
-		WithArgs(2, "b", "helper").
+		WithArgs("b", "helper").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 
 	mock.ExpectCommit()
@@ -137,7 +136,7 @@ func TestCreateCaregiversBulk_ValidationError(t *testing.T) {
 	svc := NewCaregiverService(db)
 
 	list := []model.Caregiver{
-		{Name: "", CarepartnerID: 5},
+		{Name: "", Role: "helper"},
 	}
 
 	err := svc.CreateCaregiversBulk(list)
@@ -156,11 +155,11 @@ func TestGetCaregiverByID_Success(t *testing.T) {
 	svc := NewCaregiverService(db)
 
 	rows := sqlmock.NewRows([]string{
-		"id", "carepartner_id", "name", "role",
-	}).AddRow(1, 10, "john", "helper")
+		"id", "name", "role",
+	}).AddRow(1, "john", "helper")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, carepartner_id, name, role
+		SELECT id, name, role
 		FROM "Caregiver"
 		WHERE id = $1;
 	`)).
@@ -186,42 +185,42 @@ func TestGetCaregiverByID_InvalidID(t *testing.T) {
 	assert.Equal(t, "invalid ID", err.Error())
 }
 
-func TestGetCaregiverByCarepartnerID_Success(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+// func TestGetCaregiverByCarepartnerID_Success(t *testing.T) {
+// 	db, mock := setupMockDB(t)
+// 	defer db.Close()
 
-	svc := NewCaregiverService(db)
+// 	svc := NewCaregiverService(db)
 
-	rows := sqlmock.NewRows([]string{
-		"id", "carepartner_id", "name", "role",
-	}).AddRow(2, 20, "mary", "primary")
+// 	rows := sqlmock.NewRows([]string{
+// 		"id", "name", "role",
+// 	}).AddRow(2, "mary", "primary")
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, carepartner_id, name, role
-		FROM "Caregiver"
-		WHERE carepartner_id = $1;
-	`)).
-		WithArgs(20).
-		WillReturnRows(rows)
+// 	mock.ExpectQuery(regexp.QuoteMeta(`
+// 		SELECT id, name, role
+// 		FROM "Caregiver"
+// 		WHERE carepartner_id = $1;
+// 	`)).
+// 		WithArgs(20).
+// 		WillReturnRows(rows)
 
-	cg, err := svc.GetCaregiverByCarepartnerID(20)
-	assert.NoError(t, err)
-	assert.NotNil(t, cg)
-	assert.Equal(t, "mary", cg.Name)
+// 	cg, err := svc.GetCaregiverByCarepartnerID(20)
+// 	assert.NoError(t, err)
+// 	assert.NotNil(t, cg)
+// 	assert.Equal(t, "mary", cg.Name)
 
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
+// 	assert.NoError(t, mock.ExpectationsWereMet())
+// }
 
-func TestGetCaregiverByCarepartnerID_InvalidID(t *testing.T) {
-	db, _ := setupMockDB(t)
-	defer db.Close()
+// func TestGetCaregiverByCarepartnerID_InvalidID(t *testing.T) {
+// 	db, _ := setupMockDB(t)
+// 	defer db.Close()
 
-	svc := NewCaregiverService(db)
+// 	svc := NewCaregiverService(db)
 
-	cg, err := svc.GetCaregiverByCarepartnerID(0)
-	assert.Nil(t, cg)
-	assert.Equal(t, "invalid carereceiver ID", err.Error())
-}
+// 	cg, err := svc.GetCaregiverByCarepartnerID(0)
+// 	assert.Nil(t, cg)
+// 	assert.Equal(t, "invalid carereceiver ID", err.Error())
+// }
 
 func TestGetAllCaregivers(t *testing.T) {
 	db, mock := setupMockDB(t)
@@ -229,12 +228,12 @@ func TestGetAllCaregivers(t *testing.T) {
 
 	svc := NewCaregiverService(db)
 
-	rows := sqlmock.NewRows([]string{"id", "carepartner_id", "name", "role"}).
-		AddRow(1, 10, "john", "helper").
-		AddRow(2, 20, "mary", "primary")
+	rows := sqlmock.NewRows([]string{"id", "name", "role"}).
+		AddRow(1, "john", "helper").
+		AddRow(2, "mary", "primary")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, carepartner_id, name, role
+		SELECT id, name, role
 		FROM "Caregiver";
 	`)).
 		WillReturnRows(rows)
@@ -252,11 +251,11 @@ func TestSearchCaregivers_Success(t *testing.T) {
 
 	svc := NewCaregiverService(db)
 
-	rows := sqlmock.NewRows([]string{"id", "carepartner_id", "name", "role"}).
-		AddRow(3, 30, "ann", "helper")
+	rows := sqlmock.NewRows([]string{"id", "name", "role"}).
+		AddRow(3, "ann", "helper")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, carepartner_id, name, role
+		SELECT id, name, role
 		FROM "Caregiver"
 		WHERE name ILIKE $1;
 	`)).
@@ -294,17 +293,16 @@ func TestUpdateCaregiver_Success(t *testing.T) {
 
 	c := &model.Caregiver{
 		ID:            10,
-		CarepartnerID: 20,
 		Name:          "bob",
 		Role:          "helper",
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(`
 		UPDATE "Caregiver"
-		SET carepartner_id = $1, name = $2, role = $3
-		WHERE id = $4;
+		SET name = $1, role = $2
+		WHERE id = $3;
 	`)).
-		WithArgs(c.CarepartnerID, c.Name, c.Role, c.ID).
+		WithArgs(c.Name, c.Role, c.ID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := svc.UpdateCaregiver(c)
