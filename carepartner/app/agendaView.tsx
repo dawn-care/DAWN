@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AudioScreen from './audio';
 import GreetingScreen from './greeting';
 import TextViewerScreen from './text';
 import PhotoViewerScreen from './photo';
-import { getCarepartnerId } from './carepartnerId';
-import { API_URL } from './config';
+import { useSchedule } from './ScheduleContext';
 import React from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
@@ -30,6 +29,8 @@ export type ConfigurationWithMetadata = {
     occurence_definition: string[];
     position: number;
     duration: number;
+    timed: boolean;
+    time: string | null;
     module_type: string;
     metadata_id: number;
     metadata: PhotoMetadata | VideoMetadata | AudioMetadata | WeatherMetadata
@@ -83,53 +84,28 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
 }
 
 export default function AgendaView(){
-    const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
+    const { todaysItems, loading, error, refresh } = useSchedule();
+
+    // --- Local playback state (only regular/non-timed items) ---
+    const [playQueue, setPlayQueue] = useState<ConfigurationWithMetadata[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const playQueueRef = useRef<ConfigurationWithMetadata[]>([]);
 
-    const fetchData = async () => {
-        try{
-            setLoading(true);
+    // Keep ref in sync for use inside duration timer
+    useEffect(() => { playQueueRef.current = playQueue; }, [playQueue]);
 
-            const carepartnerId = await getCarepartnerId();
-            if (!carepartnerId) {
-                setError('No carepartner ID found. Please pair this device first.');
-                const timer = setTimeout(() => {
-                    router.replace('/');
-                }, 5000);
-                return () => clearTimeout(timer);
-            }
-
-            const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
-
-            const params = new URLSearchParams({
-                carepartner_id: String(carepartnerId),
-                day: String(dayOfMonth),
-                month: String(month),
-                day_of_week: String(dayOfWeek),
-            })
-
-            const res = await fetch(`${API_URL}/configurations/day?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch configurations');
-            const data: ConfigurationWithMetadata[] = await res.json();
-            if (!data || !Array.isArray(data)) {
-                throw new Error('Invalid data format received from server');
-            }
-            console.log('Fetched configurations:', data);
-            setItems(data || []);
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'An error occurred';
-            setError(errorMessage);
-            console.error('Error fetching data:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Refresh data every time agendaView mounts
     useEffect(() => {
-        fetchData();
-    }, [])
+        refresh();
+    }, []);
+
+    // Build queue from non-timed items only
+    useEffect(() => {
+        if (!todaysItems.length) return;
+        const regular = todaysItems.filter(i => !i.timed);
+        setCurrentIndex(0);
+        setPlayQueue(regular);
+    }, [todaysItems]);
 
     // When an error occurs, redirect to home after 5 seconds
     useEffect(() => {
@@ -140,10 +116,22 @@ export default function AgendaView(){
         return () => clearTimeout(timer);
     }, [error]);
 
+    // When no items are available, redirect to home after 5 seconds
     useEffect(() => {
-        if (!items.length) return;
+        if (loading || error || playQueue.length > 0) return;
+        const timer = setTimeout(() => {
+            router.replace('/');
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [loading, error, playQueue]);
 
-        const item = items[currentIndex];
+    // Duration timer — depends ONLY on currentIndex (reads queue from ref)
+    useEffect(() => {
+        const queue = playQueueRef.current;
+        if (!queue.length) return;
+
+        const item = queue[currentIndex];
+        if (!item) return;
         console.log('Displaying item:', item);
 
         if (item.module_type === 'audio' || item.module_type === 'video') {
@@ -151,25 +139,16 @@ export default function AgendaView(){
         }
 
         const timer = setTimeout(() => {
-            setCurrentIndex((prev) => {
-                if (prev + 1 >= items.length) {
-                    router.replace('/');
-                    return prev;
-                }
-                return prev + 1;
-            });
+            advanceToNext();
         }, (item.duration || 10) * 1000);
 
         return () => clearTimeout(timer);
-    }, [currentIndex, items]);
+    }, [currentIndex]);
 
-    const goToPreviousItem = () => {
-        setCurrentIndex((prev) => Math.max(prev - 1, 0));
-    };
-
-    const goToNextItem = () => {
-        setCurrentIndex((prev) => {
-            if (prev + 1 >= items.length) {
+    const advanceToNext = () => {
+        setCurrentIndex(prev => {
+            const queue = playQueueRef.current;
+            if (prev + 1 >= queue.length) {
                 router.replace('/');
                 return prev;
             }
@@ -177,18 +156,24 @@ export default function AgendaView(){
         });
     };
 
-    const currentDateToComponents = () => {
-        const currentDate = new Date();
-        const dayOfWeek = currentDate.getDay();
-        const dayOfMonth = currentDate.getDate();
-        const month = currentDate.getMonth() + 1;
-        return { dayOfMonth, month, dayOfWeek };
-    }
+    const goToPreviousItem = () => {
+        setCurrentIndex((prev) => Math.max(prev - 1, 0));
+    };
 
-    const currentItem = items[currentIndex];
+    const goToNextItem = () => {
+        advanceToNext();
+    };
+
+    const currentItem = playQueue[currentIndex];
 
     if (loading) {
-        return <View />;
+        return (
+            <SafeAreaView style={styles.safe}>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorTitle}>Loading…</Text>
+                </View>
+            </SafeAreaView>
+        );
     }
 
     if (error) {
@@ -204,11 +189,18 @@ export default function AgendaView(){
     }
 
     if (!currentItem) {
-        return <View />;
+        return (
+            <SafeAreaView style={styles.safe}>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorTitle}>No items for today</Text>
+                    <Text style={styles.errorSubtext}>Returning to home screen…</Text>
+                </View>
+            </SafeAreaView>
+        );
     }
 
     const canGoPrev = currentIndex > 0;
-    const canGoNext = items.length > 0;
+    const canGoNext = playQueue.length > 0;
     const headerTitle = getHeaderTitle(currentItem);
 
     return (

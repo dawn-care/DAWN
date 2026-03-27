@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-type OccurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+type OccurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'single';
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat'] as const;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
@@ -25,6 +25,8 @@ interface ConfigurationFormProps {
     /** Callback after a successful save / update / delete so they can refresh */
     onSave: () => void;
     onCancel: () => void;
+    /** The currently viewed date (YYYY-MM-DD) — used for creating single-day exceptions */
+    currentDate?: string;
 }
 
 export default function ConfigurationForm({
@@ -33,8 +35,9 @@ export default function ConfigurationForm({
     currentItemCount,
     onSave,
     onCancel,
+    currentDate,
 }: ConfigurationFormProps) {
-    const { user } = useAuth();
+    const { user, activeCarePartnerId } = useAuth();
     const isEditMode = Boolean(existingConfig);
     const [occurrenceType, setOccurrenceType] = useState<OccurrenceType>('daily');
     const [weeklyDays, setWeeklyDays] = useState<string[]>([]);
@@ -42,12 +45,14 @@ export default function ConfigurationForm({
     const [yearlyDates, setYearlyDates] = useState<string[]>([]);
     const [yearlyMonth, setYearlyMonth] = useState<string>('Jan');
     const [yearlyDay, setYearlyDay] = useState<number>(1);
+    const [singleDate, setSingleDate] = useState<string>('');
     const [duration, setDuration] = useState<number>(30);
     const [position, setPosition] = useState<number>(currentItemCount + 1);
     const [timed, setTimed] = useState<boolean>(false);
     const [time, setTime] = useState<string>('');
     const [status, setStatus] = useState('');
     const [saving, setSaving] = useState(false);
+    const [deleteModal, setDeleteModal] = useState<'closed' | 'choose' | 'confirm-single'>('closed');
 
     // Pre-fill for edit mode
     useEffect(() => {
@@ -69,6 +74,9 @@ export default function ConfigurationForm({
             case 'yearly':
                 setYearlyDates(def);
                 break;
+            case 'single':
+                setSingleDate(def[0] || '');
+                break;
         }
     }, [existingConfig]);
 
@@ -83,6 +91,8 @@ export default function ConfigurationForm({
                 return monthlyDays;
             case 'yearly':
                 return yearlyDates;
+            case 'single':
+                return singleDate ? [singleDate] : [];
             default:
                 return [];
         }
@@ -122,7 +132,7 @@ export default function ConfigurationForm({
 
     const handleCreate = async () => {
         if (!selectedModule) return;
-        if (!user?.carepartner_id) {
+        if (!activeCarePartnerId || !user?.id) {
             setStatus('Error: no carepartner is linked to this caregiver account.');
             return;
         }
@@ -145,7 +155,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: user.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     json_config: JSON.stringify([configEntry]),
                 }),
             });
@@ -185,7 +195,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: existingConfig.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     json_config: JSON.stringify([configEntry]),
                 }),
             });
@@ -204,9 +214,49 @@ export default function ConfigurationForm({
         }
     };
 
-    const handleDelete = async () => {
+    const handleDelete = () => {
         if (!existingConfig) return;
-        if (!confirm('Are you sure you want to remove this item from the agenda?')) return;
+
+        // For non-single occurrence types, show the choice modal
+        if (existingConfig.occurence_type !== 'single' && currentDate) {
+            setDeleteModal('choose');
+        } else {
+            // For single-day items, show a simple confirm modal
+            setDeleteModal('confirm-single');
+        }
+    };
+
+    const handleSkipThisDay = async () => {
+        if (!existingConfig || !currentDate) return;
+        setDeleteModal('closed');
+        setSaving(true);
+        setStatus('');
+        try {
+            const res = await fetch(`${API_URL}/exceptions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    configuration_id: existingConfig.id,
+                    exception_type: 'single',
+                    exception_definition: [currentDate],
+                }),
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'Failed to create exception');
+            }
+            setStatus('This day has been skipped.');
+            onSave();
+        } catch (err: any) {
+            setStatus(`Error: ${err.message}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!existingConfig) return;
+        setDeleteModal('closed');
         setSaving(true);
         setStatus('');
 
@@ -215,7 +265,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: existingConfig.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     id_list: [existingConfig.id],
                 }),
             });
@@ -261,10 +311,23 @@ export default function ConfigurationForm({
                         <option value="weekly">Weekly</option>
                         <option value="monthly">Monthly</option>
                         <option value="yearly">Yearly</option>
+                        <option value="single">Single Day</option>
                     </select>
                 </div>
 
                 {/* Occurrence Definition — varies by type */}
+                {occurrenceType === 'single' && (
+                    <div>
+                        <label className="text-lg font-medium text-gray-700">Date</label>
+                        <input
+                            type="date"
+                            value={singleDate}
+                            onChange={(e) => setSingleDate(e.target.value)}
+                            className="w-full mt-2 p-3 border rounded bg-purple-50"
+                        />
+                    </div>
+                )}
+
                 {occurrenceType === 'weekly' && (
                     <div>
                         <label className="text-lg font-medium text-gray-700">Days of the Week</label>
@@ -458,6 +521,63 @@ export default function ConfigurationForm({
                     </p>
                 )}
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {deleteModal !== 'closed' && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 p-8">
+                        {deleteModal === 'choose' ? (
+                            <>
+                                <h2 className="text-2xl font-semibold text-gray-800 text-center mb-2">Remove Item</h2>
+                                <p className="text-gray-600 text-center mb-6">
+                                    Would you like to skip this item just for today, or remove it from the agenda entirely?
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <button
+                                        onClick={handleSkipThisDay}
+                                        className="w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+                                    >
+                                        Skip Just This Day
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteAll}
+                                        className="w-full bg-red-100 hover:bg-red-200 text-red-700 font-semibold py-3 rounded"
+                                    >
+                                        Delete Entire Occurrence
+                                    </button>
+                                    <button
+                                        onClick={() => setDeleteModal('closed')}
+                                        className="w-full border border-gray-300 text-gray-600 font-semibold py-3 rounded hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-2xl font-semibold text-gray-800 text-center mb-2">Confirm Removal</h2>
+                                <p className="text-gray-600 text-center mb-6">
+                                    Are you sure you want to remove this item from the agenda?
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <button
+                                        onClick={handleDeleteAll}
+                                        className="w-full bg-red-100 hover:bg-red-200 text-red-700 font-semibold py-3 rounded"
+                                    >
+                                        Remove
+                                    </button>
+                                    <button
+                                        onClick={() => setDeleteModal('closed')}
+                                        className="w-full border border-gray-300 text-gray-600 font-semibold py-3 rounded hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

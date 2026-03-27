@@ -72,6 +72,26 @@ export default function GreetingScreen({
     setConfig(next);
   }, [configuration]);
 
+  // Programmatically start playback when the video element mounts or src changes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !config.videoUrl) return;
+
+    const tryPlay = () => {
+      video.play().catch((e) => {
+        console.error('Autoplay failed:', e);
+      });
+    };
+
+    // If already loaded enough, play immediately; otherwise wait for canplay
+    if (video.readyState >= 3) {
+      tryPlay();
+    } else {
+      video.addEventListener('canplay', tryPlay, { once: true });
+      return () => video.removeEventListener('canplay', tryPlay);
+    }
+  }, [config.videoUrl]);
+
   const progress = useMemo(() => {
     if (!durationSec) return 0;
     return Math.min(1, Math.max(0, positionSec / durationSec));
@@ -113,8 +133,9 @@ export default function GreetingScreen({
             <video
               ref={videoRef}
               src={config.videoUrl}
-              style={styles.video}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               autoPlay
+              playsInline
               loop={false}
               controls={false}
               onTimeUpdate={onPlaybackStatusUpdate}

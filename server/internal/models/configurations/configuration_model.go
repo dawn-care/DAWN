@@ -148,7 +148,7 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 	return configuration, nil
 }
 
-func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int) ([]ConfigurationWithMetadata, error) {
+func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int, fullDate string) ([]ConfigurationWithMetadata, error) {
 	dayStr := fmt.Sprintf("%d", day)                          //For Monthly Type - int 1 - 31
 	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]             //For Weekly Type - string "Mon" - "Sun"
 	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month-1], day) //For Yearly Type - string "Month day" - i.e. "Jan 1"
@@ -180,10 +180,16 @@ func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, m
 				OR (c.occurence_type = 'weekly' AND $2 = ANY(c.occurence_definition))
 				OR (c.occurence_type = 'monthly' AND $3 = ANY(c.occurence_definition))
 				OR (c.occurence_type = 'yearly' AND $4 = ANY(c.occurence_definition))
+				OR (c.occurence_type = 'single' AND $5 = ANY(c.occurence_definition))
+			)
+			AND NOT EXISTS (
+				SELECT 1 FROM "Exception" e
+				WHERE e.configuration_id = c.id
+				AND $5 = ANY(e.exception_definition)
 			)
 			ORDER BY c.position;
 	`
-	rows, err := db.Query(query, carepartner_id, dayOfWeekStr, dayStr, monthDay)
+	rows, err := db.Query(query, carepartner_id, dayOfWeekStr, dayStr, monthDay, fullDate)
 	if err != nil {
 		return nil, err
 	}

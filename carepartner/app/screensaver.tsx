@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Stack } from "expo-router";
 import {
   ImageBackground,
@@ -11,20 +11,7 @@ import {
 import { router } from "expo-router";
 import { Image } from "react-native";
 import { getCarepartnerId } from "./carepartnerId";
-import { API_URL } from "./config";
-
-// ---- STUB TYPES (replace later with your real backend types) ----
-type ScreensaverConfig = {
-  title: string; // "StartUp"
-  autoStartTimeLabel: string; // e.g. "8:00am"
-  backgroundImageUrl?: string; // remote URL from backend
-};
-
-type Carepartner = {
-  ID: number;
-  Name: string;
-  auto_start: string; // "HH:MM:SS"
-};
+import { useSchedule } from "./ScheduleContext";
 
 function formatTime(timeString: string) {
   const [hourStr, minuteStr] = timeString.split(':');
@@ -38,69 +25,27 @@ function formatTime(timeString: string) {
 }
 
 export default function Screensaver() {
-  const [config, setConfig] = useState<ScreensaverConfig>({
-    title: "StartUp",
-    autoStartTimeLabel: "",
-    backgroundImageUrl: undefined,
-  });
-  const [carepartner, setCarepartner] = useState<Carepartner | null>(null);
+  const { carepartner } = useSchedule();
   const [hasCarepartnerId, setHasCarepartnerId] = useState<boolean | null>(null);
-  const lastAutoStartDateRef = useRef<string | null>(null);
 
-  async function fetchScreensaverConfig(): Promise<ScreensaverConfig> {
-    const res = await fetch(`${API_URL}/users/carepartner/${await getCarepartnerId()}`);
-    if (!res.ok) throw new Error('Failed to fetch configurations');
-
-    const data: Carepartner = await res.json();
-    console.log(data);
-    console.log(data.auto_start);
-    setCarepartner(data);
-    const autoStartTimeLabel = formatTime(data.auto_start);
-    return {
-      title: "Start-Up",
-      autoStartTimeLabel: autoStartTimeLabel,
-      backgroundImageUrl: undefined, // stub: set to a real URL later
-    };
-  }
+  const autoStartTimeLabel = carepartner?.auto_start
+    ? formatTime(carepartner.auto_start)
+    : '...';
 
   useEffect(() => {
     let mounted = true;
-
-    (async () => {
-      try {
-        const next = await fetchScreensaverConfig();
-        if (mounted) setConfig(next);
-      } catch (err) {
-        console.error("Failed to load config:", err);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
     (async () => {
       const carepartnerId = await getCarepartnerId();
       if (mounted) {
         setHasCarepartnerId(carepartnerId != null);
       }
     })();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
-
   const backgroundSource = useMemo(() => {
-    if (config.backgroundImageUrl) return { uri: config.backgroundImageUrl };
-
     return require("../assets/images/defaultBackground.png");
-  }, [config.backgroundImageUrl]);
+  }, []);
 
   const handlePrimaryAction = () => {
     router.push({ pathname: "/agendaView" } as any);
@@ -109,33 +54,6 @@ export default function Screensaver() {
   const handlePairDevice = () => {
     router.push({ pathname: "/pair" } as any);
   };
-
-  useEffect(() => {
-    const maybeAutoStart = () => {
-      const now = new Date();
-      const dateKey = now.toDateString();
-      const [hourStr, minuteStr] = carepartner?.auto_start.split(':') || ['0', '0'];
-      let hour = parseInt(hourStr, 10);
-      const minute = parseInt(minuteStr, 10);
-      const isAutoStartWindow = now.getHours() === hour && now.getMinutes() === minute;
- 
-      if (!isAutoStartWindow) {
-        return;
-      }
-
-      if (lastAutoStartDateRef.current === dateKey) {
-        return;
-      }
-
-      lastAutoStartDateRef.current = dateKey;
-      handlePrimaryAction();
-    };
-
-    maybeAutoStart();
-    
-    const intervalId = setInterval(maybeAutoStart, 15000);
-    return () => clearInterval(intervalId);
-  }, []);
 
   return (
     <>
@@ -159,13 +77,13 @@ export default function Screensaver() {
             <View style={styles.topArea}>
                 <View style={styles.titleGlass}>
                 <Image source={require("../assets/images/icon.png")} style={styles.logo} />
-                <Text style={styles.titleText}>{config.title}</Text>
+                <Text style={styles.titleText}>Start-Up</Text>
                 </View>
 
                 <View style={styles.autoGlass}>
                 <Text style={styles.autoText}>
                     Auto-Starts at{" "}
-                    <Text style={styles.autoTimeText}>{config.autoStartTimeLabel || "Loading..."}</Text>
+                    <Text style={styles.autoTimeText}>{autoStartTimeLabel}</Text>
                 </Text>
                 </View>
             </View>

@@ -1,6 +1,5 @@
 CREATE TABLE "Caregiver" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "carepartner_id" integer,
   "name" text,
   "role" text, 
   "google_id" text UNIQUE
@@ -8,6 +7,7 @@ CREATE TABLE "Caregiver" (
 
 CREATE TABLE "Carepartner" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "caregiver_id" integer,
   "name" text,
   "auto_start" time DEFAULT '08:00:00'
 );
@@ -213,16 +213,16 @@ $$;
 
 -- Test User Setup: Mock Data for Schema
 
-WITH carepartner_insert AS (
-  INSERT INTO "Carepartner" (name) 
-  VALUES ('John Doe')
-  RETURNING id AS carepartner_id
+WITH caregiver_insert AS (
+  INSERT INTO "Caregiver" (name, role, google_id) 
+  VALUES ('Jane Smith', 'ADMIN', 'test.caregiver@example.com')
+  RETURNING id AS caregiver_id
 ),
-caregiver_insert AS (
-  INSERT INTO "Caregiver" (carepartner_id, name, role, google_id) 
-  SELECT carepartner_id, 'Jane Smith', 'ADMIN', 'test.caregiver@example.com'
-  FROM carepartner_insert
-  RETURNING id AS caregiver_id, carepartner_id
+carepartner_insert AS (
+  INSERT INTO "Carepartner" (name, caregiver_id) 
+  SELECT 'John Doe', caregiver_id
+  FROM caregiver_insert
+  RETURNING id AS carepartner_id, caregiver_id
 ),
 photo_insert AS (
   INSERT INTO "PhotoMedia" (uri, displayed_name, filename, extension) 
@@ -258,17 +258,17 @@ message_prompt_insert AS (
 ),
 modules_insert AS (
   INSERT INTO "Module" (module_type, caregiver_id, carepartner_id, metadata_id) 
-  SELECT 'photo', caregiver_id, carepartner_id, photo_id FROM caregiver_insert, photo_insert
+  SELECT 'photo', carepartner_insert.caregiver_id, carepartner_insert.carepartner_id, photo_id FROM carepartner_insert, photo_insert
   UNION ALL
-  SELECT 'video', caregiver_id, carepartner_id, video_id FROM caregiver_insert, video_insert
+  SELECT 'video', carepartner_insert.caregiver_id, carepartner_insert.carepartner_id, video_id FROM carepartner_insert, video_insert
   UNION ALL
-  SELECT 'audio', caregiver_id, carepartner_id, audio_id FROM caregiver_insert, audio_insert
+  SELECT 'audio', carepartner_insert.caregiver_id, carepartner_insert.carepartner_id, audio_id FROM carepartner_insert, audio_insert
   UNION ALL
-  SELECT 'weather', caregiver_id, carepartner_id, weather_id FROM caregiver_insert, weather_widget_insert
+  SELECT 'weather', carepartner_insert.caregiver_id, carepartner_insert.carepartner_id, weather_id FROM carepartner_insert, weather_widget_insert
   UNION ALL
-  SELECT 'news', caregiver_id, carepartner_id, news_id FROM caregiver_insert, news_widget_insert
+  SELECT 'news', carepartner_insert.caregiver_id, carepartner_insert.carepartner_id, news_id FROM carepartner_insert, news_widget_insert
   UNION ALL
-  SELECT 'message', caregiver_id, carepartner_id, message_id FROM caregiver_insert, message_prompt_insert
+  SELECT 'message', carepartner_insert.caregiver_id, carepartner_insert.carepartner_id, message_id FROM carepartner_insert, message_prompt_insert
   RETURNING id AS module_id, carepartner_id
 )
 INSERT INTO "Configuration" (carepartner_id, module_id, occurence_type, occurence_definition, position, duration, timed, "time") 

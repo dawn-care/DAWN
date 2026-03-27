@@ -18,13 +18,14 @@ import (
 ----------------------------------------------------- */
 
 type mockCaregiverService struct {
-	CreateCaregiverFunc             func(cg *caregiverModel.Caregiver) error
-	GetCaregiverByIDFunc            func(id int) (*caregiverModel.Caregiver, error)
-	GetAllCaregiversFunc            func() ([]caregiverModel.Caregiver, error)
-	GetCaregiverByCarepartnerIDFunc func(id int) (*caregiverModel.Caregiver, error)
-	SearchCaregiversFunc            func(query string) ([]caregiverModel.Caregiver, error)
-	UpdateCaregiverFunc             func(cg *caregiverModel.Caregiver) error
-	DeleteCaregiverFunc             func(id int) error
+	CreateCaregiverFunc              func(cg *caregiverModel.Caregiver) error
+	GetCaregiverByIDFunc             func(id int) (*caregiverModel.Caregiver, error)
+	GetCarepartnersByCaregiverIDFunc func(caregiverID int) ([]caregiverModel.Caregiver, error)
+	GetAllCaregiversFunc             func() ([]caregiverModel.Caregiver, error)
+	// GetCaregiverByCarepartnerIDFunc func(id int) (*caregiverModel.Caregiver, error)
+	SearchCaregiversFunc             func(query string) ([]caregiverModel.Caregiver, error)
+	UpdateCaregiverFunc              func(cg *caregiverModel.Caregiver) error
+	DeleteCaregiverFunc              func(id int) error
 }
 
 func (m *mockCaregiverService) CreateCaregiver(cg *caregiverModel.Caregiver) error {
@@ -33,12 +34,15 @@ func (m *mockCaregiverService) CreateCaregiver(cg *caregiverModel.Caregiver) err
 func (m *mockCaregiverService) GetCaregiverByID(id int) (*caregiverModel.Caregiver, error) {
 	return m.GetCaregiverByIDFunc(id)
 }
+func (m *mockCaregiverService) GetCarepartnersByCaregiverID(caregiverID int) ([]caregiverModel.Caregiver, error) {
+	return m.GetCarepartnersByCaregiverIDFunc(caregiverID)
+}
 func (m *mockCaregiverService) GetAllCaregivers() ([]caregiverModel.Caregiver, error) {
 	return m.GetAllCaregiversFunc()
 }
-func (m *mockCaregiverService) GetCaregiverByCarepartnerID(id int) (*caregiverModel.Caregiver, error) {
-	return m.GetCaregiverByCarepartnerIDFunc(id)
-}
+// func (m *mockCaregiverService) GetCaregiverByCarepartnerID(id int) (*caregiverModel.Caregiver, error) {
+// 	return m.GetCaregiverByCarepartnerIDFunc(id)
+// }
 func (m *mockCaregiverService) SearchCaregivers(query string) ([]caregiverModel.Caregiver, error) {
 	return m.SearchCaregiversFunc(query)
 }
@@ -227,86 +231,86 @@ func TestGetAllCaregivers_ServiceError(t *testing.T) {
    GET BY Carepartner ID
 ----------------------------------------------------- */
 
-func TestGetCaregiverByCarepartnerID_Success(t *testing.T) {
-	mockService := &mockCaregiverService{
-		GetCaregiverByCarepartnerIDFunc: func(id int) (*caregiverModel.Caregiver, error) {
-			return &caregiverModel.Caregiver{ID: id}, nil
-		},
-	}
-	controller := NewCaregiverController(mockService)
+// func TestGetCaregiverByCarepartnerID_Success(t *testing.T) {
+// 	mockService := &mockCaregiverService{
+// 		GetCaregiverByCarepartnerIDFunc: func(id int) (*caregiverModel.Caregiver, error) {
+// 			return &caregiverModel.Caregiver{ID: id}, nil
+// 		},
+// 	}
+// 	controller := NewCaregiverController(mockService)
 
-	r := chi.NewRouter()
-	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
+// 	r := chi.NewRouter()
+// 	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
 
-	req := httptest.NewRequest("GET", "/caregivers/carepartner/1", nil)
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest("GET", "/caregivers/carepartner/1", nil)
+// 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req)
+// 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
+// 	if w.Code != http.StatusOK {
+// 		t.Fatalf("expected 200, got %d", w.Code)
+// 	}
+// }
 
-func TestGetCaregiverByCarepartnerID_InvalidID(t *testing.T) {
-	controller := NewCaregiverController(&mockCaregiverService{})
+// func TestGetCaregiverByCarepartnerID_InvalidID(t *testing.T) {
+// 	controller := NewCaregiverController(&mockCaregiverService{})
 
-	r := chi.NewRouter()
-	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
+// 	r := chi.NewRouter()
+// 	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
 
-	req := httptest.NewRequest("GET", "/caregivers/carepartner/abc", nil)
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest("GET", "/caregivers/carepartner/abc", nil)
+// 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req)
+// 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", w.Code)
-	}
-}
+// 	if w.Code != http.StatusBadRequest {
+// 		t.Errorf("expected 400, got %d", w.Code)
+// 	}
+// }
 
-func TestGetCaregiverByCarepartnerID_NotFound(t *testing.T) {
-	mockService := &mockCaregiverService{
-		GetCaregiverByCarepartnerIDFunc: func(id int) (*caregiverModel.Caregiver, error) {
-			return nil, nil
-		},
-	}
+// func TestGetCaregiverByCarepartnerID_NotFound(t *testing.T) {
+// 	mockService := &mockCaregiverService{
+// 		GetCaregiverByCarepartnerIDFunc: func(id int) (*caregiverModel.Caregiver, error) {
+// 			return nil, nil
+// 		},
+// 	}
 
-	controller := NewCaregiverController(mockService)
+// 	controller := NewCaregiverController(mockService)
 
-	r := chi.NewRouter()
-	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
+// 	r := chi.NewRouter()
+// 	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
 
-	req := httptest.NewRequest("GET", "/caregivers/carepartner/1", nil)
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest("GET", "/caregivers/carepartner/1", nil)
+// 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req)
+// 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404, got %d", w.Code)
-	}
-}
+// 	if w.Code != http.StatusNotFound {
+// 		t.Errorf("expected 404, got %d", w.Code)
+// 	}
+// }
 
-func TestGetCaregiverByCarepartnerID_ServiceError(t *testing.T) {
-	mockService := &mockCaregiverService{
-		GetCaregiverByCarepartnerIDFunc: func(id int) (*caregiverModel.Caregiver, error) {
-			return nil, errors.New("db error")
-		},
-	}
+// func TestGetCaregiverByCarepartnerID_ServiceError(t *testing.T) {
+// 	mockService := &mockCaregiverService{
+// 		GetCaregiverByCarepartnerIDFunc: func(id int) (*caregiverModel.Caregiver, error) {
+// 			return nil, errors.New("db error")
+// 		},
+// 	}
 
-	controller := NewCaregiverController(mockService)
+// 	controller := NewCaregiverController(mockService)
 
-	r := chi.NewRouter()
-	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
+// 	r := chi.NewRouter()
+// 	r.Get("/caregivers/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID)
 
-	req := httptest.NewRequest("GET", "/caregivers/carepartner/1", nil)
-	w := httptest.NewRecorder()
+// 	req := httptest.NewRequest("GET", "/caregivers/carepartner/1", nil)
+// 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req)
+// 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d", w.Code)
-	}
-}
+// 	if w.Code != http.StatusInternalServerError {
+// 		t.Errorf("expected 500, got %d", w.Code)
+// 	}
+// }
 
 /* -----------------------------------------------------
    SEARCH

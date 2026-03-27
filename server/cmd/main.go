@@ -11,6 +11,7 @@ import (
 
 	authCtrlr "server/internal/controllers/auth"
 	configurationCtrlr "server/internal/controllers/configurations"
+	exceptionCtrlr "server/internal/controllers/exceptions"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
@@ -20,6 +21,7 @@ import (
 	weatherCtrlr "server/internal/controllers/widgets/weather"
 
 	configurationRts "server/internal/routes/configurations"
+	exceptionRts "server/internal/routes/exceptions"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
@@ -30,6 +32,7 @@ import (
 
 	authSvc "server/internal/services/auth"
 	configurationSvc "server/internal/services/configurations"
+	exceptionSvc "server/internal/services/exceptions"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
@@ -136,11 +139,12 @@ func main() {
 	// Auth
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
-	authService := authSvc.NewAuthService(googleService, caregiverService, sessionService)
+	authService := authSvc.NewAuthService(googleService, caregiverService, carepartnerService, sessionService)
 
 	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)
 	configurationService := configurationSvc.NewConfigurationService(db)
+	exceptionService := exceptionSvc.NewExceptionService(db)
 
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
@@ -170,6 +174,7 @@ func main() {
 	// Agenda
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
+	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -219,6 +224,7 @@ func main() {
 	// Agenda
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
+	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)

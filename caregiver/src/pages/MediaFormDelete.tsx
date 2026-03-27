@@ -25,19 +25,19 @@ export default function MediaFormDelete() {
   const [mediaList, setMediaList] = useState<MediaOption[]>([]);
   const [selected, setSelected] = useState<MediaOption | null>(null);
   const [status, setStatus] = useState("");
-  const { user } = useAuth();
+  const { user, activeCarePartnerId } = useAuth();
 
   /* ---------------- LOAD ALL MEDIA ---------------- */
   useEffect(() => {
     async function loadMedia() {
       try {
-        if (!user?.id || !user.carepartner_id) {
+        if (!user?.id || !activeCarePartnerId) {
           setStatus("Cannot load media: user information missing.");
           return;
         }
 
         const modulesRes = await fetch(
-          `${API_URL}/modules?caregiver_id=${user.id}&carepartner_id=${user.carepartner_id}`
+          `${API_URL}/modules?caregiver_id=${user.id}&carepartner_id=${activeCarePartnerId}`
         );
         const modules: Module[] = await modulesRes.json();
 
@@ -86,7 +86,7 @@ export default function MediaFormDelete() {
     if (!confirmDelete) return;
 
     try {
-      // 1️⃣ Delete metadata (photo/video/audio)
+      // 1Delete metadata (photo/video/audio)
       const metaRes = await fetch(
         `${API_URL}/${selected.type}?id=${selected.metadataId}`,
         {
@@ -99,7 +99,7 @@ export default function MediaFormDelete() {
         throw new Error(text);
       }
 
-      // 2️⃣ Delete module reference
+      // Delete module reference
       const moduleRes = await fetch(
         `${API_URL}/modules?id=${selected.moduleId}`,
         {

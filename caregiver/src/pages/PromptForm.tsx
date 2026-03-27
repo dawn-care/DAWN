@@ -32,7 +32,7 @@ export default function PromptForm({
   const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
   // Deleting Variables
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, activeCarePartnerId } = useAuth();
 
   /*******************************************
    * If form is in edit mode, load message
@@ -90,7 +90,7 @@ export default function PromptForm({
 
       // Upload the optional image first, if provided
       if (file) {
-        if (!user?.id || !user.carepartner_id) {
+        if (!user?.id || !activeCarePartnerId) {
           setUploadStatus("Cannot upload: user information missing.");
           return;
         }
@@ -98,7 +98,7 @@ export default function PromptForm({
         const formData = new FormData();
         formData.append("file", file, file.name);
         formData.append("caregiver_id", user.id.toString());
-        formData.append("carepartner_id", user.carepartner_id.toString());
+        formData.append("carepartner_id", activeCarePartnerId.toString());
 
         const imageResponse = await fetch(`${API_URL}/photo/upload`, {
           method: "POST",
@@ -147,7 +147,7 @@ export default function PromptForm({
         body: JSON.stringify({
           module_type: "messages",
           caregiver_id: user?.id,
-          carepartner_id: user?.carepartner_id,
+          carepartner_id: activeCarePartnerId,
           metadata_id: metadataId,
         }),
       });

@@ -2,6 +2,7 @@ package configurations
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -16,7 +17,7 @@ type ConfigurationServiceInterface interface {
 	DeleteConfigurations(carepartnerID int, idList []int) error
 	CreateConfiguration(configuration *configurations.Configuration) (*configurations.Configuration, error)
 	GetConfigurationByID(id int) (*configurations.Configuration, error)
-	GetConfigurationsByDayAndCarepartner(carepartnerID int, day, month, dayOfWeek int) ([]configurations.ConfigurationWithMetadata, error)
+	GetConfigurationsByDayAndCarepartner(carepartnerID int, day, month, dayOfWeek int, fullDate string) ([]configurations.ConfigurationWithMetadata, error)
 	GetCarePartnerConfigurations(carepartnerID int) ([]configurations.Configuration, error)
 	UpdateConfiguration(configuration *configurations.Configuration) (*configurations.Configuration, error)
 	DeleteConfiguration(id, carepartnerID int) error
@@ -129,7 +130,12 @@ func (c *ConfigurationController) GetConfigurationsByDayAndCarepartnerHandler(w 
 		return
 	}
 
-	configurationList, err := c.Service.GetConfigurationsByDayAndCarepartner(carepartnerID, day, month, dayOfWeek)
+	fullDate := r.URL.Query().Get("date")
+	if fullDate == "" {
+		fullDate = fmt.Sprintf("%04d-%02d-%02d", 0, month, day)
+	}
+
+	configurationList, err := c.Service.GetConfigurationsByDayAndCarepartner(carepartnerID, day, month, dayOfWeek, fullDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

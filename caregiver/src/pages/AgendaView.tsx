@@ -18,27 +18,37 @@ export default function AgendaView() {
     const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { user } = useAuth();
+    const { user, activeCarePartnerId, setActiveCarePartnerId } = useAuth();
 
     // For the create flow: library → config form
     const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
     // For the edit flow: clicking an existing item
     const [editingConfig, setEditingConfig] = useState<ConfigurationWithMetadata | null>(null);
+    // Careapartners associated with logged in caregiver
+    const [carepartners, setCarepartners] = useState<{ id: number; name: string }[]>([]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             setError(null);
 
+            if (!activeCarePartnerId || !user?.id) {
+                setError("Missing user or care partner");
+                setLoading(false);
+                return;
+            }
+
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
             if (dayOfMonth === 0) return;
+            if (!user?.id || !user?.carepartner_id) return;
 
             const params = new URLSearchParams({
                 caregiver_id: String(user?.id),  // TODO - check if this was okay to add here or if it breaks
-                carepartner_id: String(user?.carepartner_id),
+                carepartner_id: String(activeCarePartnerId),
                 day: String(dayOfMonth),
                 month: String(month),
                 day_of_week: String(dayOfWeek),
+                date: date!,
             });
 
             const API_URL = import.meta.env.VITE_API_URL;
@@ -55,9 +65,28 @@ export default function AgendaView() {
         }
     };
 
-    useEffect(() => {
+   useEffect(() => {
         fetchData();
-    }, [date]);
+    }, [date, activeCarePartnerId]);
+
+    useEffect(() => {
+        const fetchCarepartners = async () => {
+            if (!user?.id) return;
+
+            try {
+                const API_URL = import.meta.env.VITE_API_URL;
+                const res = await fetch(`${API_URL}/caregivers/${user.id}/carepartners`);
+                if (!res.ok) throw new Error("Failed to fetch carepartners");
+
+                const data = await res.json();
+                setCarepartners(data);
+            } catch (err) {
+                console.error("Failed to fetch carepartners:", err);
+            }
+        };
+
+        fetchCarepartners();
+    }, [user]);
 
     const currentDateToComponents = () => {
         if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
@@ -145,12 +174,21 @@ export default function AgendaView() {
                                 <span>∨</span>
                             </button>
                         </div>
+
                         <div className="flex items-center gap-4">
                             <label className="text-gray-700 font-medium">Care Partner:</label>
-                            <button className="px-6 py-2 bg-gray-200 border-b-2 border-gray-400 rounded text-gray-800 flex items-center gap-2 hover:bg-gray-300">
-                                Dad
-                                <span>∨</span>
-                            </button>
+
+                            <select
+                                value={activeCarePartnerId ?? ""}
+                                onChange={(e) => setActiveCarePartnerId(Number(e.target.value))}
+                                className="px-6 py-2 bg-gray-200 border-b-2 border-gray-400 rounded text-gray-800 hover:bg-gray-300"
+                            >
+                                {carepartners.map((cp) => (
+                                    <option key={cp.id} value={cp.id}>
+                                        {cp.name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
@@ -215,6 +253,7 @@ export default function AgendaView() {
                                         currentItemCount={items.length}
                                         onSave={handleConfigSaved}
                                         onCancel={() => setSelectedModule(null)}
+                                        currentDate={date}
                                     />
                                 </div>
                             </div>
@@ -237,6 +276,7 @@ export default function AgendaView() {
                                         currentItemCount={items.length}
                                         onSave={handleConfigSaved}
                                         onCancel={() => setEditingConfig(null)}
+                                        currentDate={date}
                                     />
                                 </div>
                             </div>

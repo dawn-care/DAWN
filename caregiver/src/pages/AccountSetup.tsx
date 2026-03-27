@@ -8,8 +8,16 @@ export default function AccountSetupPage() {
   const [pairingCode, setPairingCode] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [carePartnerName, setCarePartnerName] = useState("");
+  const suggestions = ["Mom", "Dad", "Grandma", "Grandpa", "Friend"];
 
   const handleSubmit = async () => {
+    // Ensure name is typed
+    if ((user?.carepartners?.length ?? 0) === 0 && !carePartnerName.trim()) {
+      setSubmitError("Please enter who this is for.");
+      return;
+    }
+
     // Ensure pairing code is entered
     if (!pairingCode.trim()) {
       setSubmitError("Pairing code is required.");
@@ -40,6 +48,7 @@ export default function AccountSetupPage() {
         body: JSON.stringify({
           code: pairingCode,
           caregiver_id: user.id, 
+          carepartner_name: carePartnerName,
         }),
       });
 
@@ -76,6 +85,34 @@ export default function AccountSetupPage() {
       </h1>
 
       <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow">
+
+        {/* Who is this for (ONLY for new caregivers) */}
+        {(user?.carepartners?.length ?? 0) === 0 && (
+          <div className="mb-6">
+            <label className="text-lg font-medium">Who is this for?</label>
+
+            <input
+              type="text"
+              value={carePartnerName}
+              onChange={(e) => setCarePartnerName(e.target.value)}
+              className="w-full mt-2 p-3 border rounded bg-purple-50"
+              placeholder="Enter name"
+            />
+
+            {/* Suggestions */}
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setCarePartnerName(s)}
+                  className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm hover:bg-gray-300"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Pairing Code */}
         <div className="mb-6">

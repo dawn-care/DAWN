@@ -12,6 +12,7 @@ import WidgetForm from "./pages/WidgetForm";
 import Login from "./pages/Login"
 import Settings from "./pages/Settings";
 import AccountSetupPage from "./pages/AccountSetup";
+import RequireCarePartner from "./components/RequireCarepartner";
 
 function App() {
   return (
@@ -20,24 +21,100 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/library" element={<Library />} />
 
-        <Route path="/agenda" element={<CalendarView />} />
-        <Route path="/agenda/:date" element={<AgendaView />} />
+        <Route
+          path="/library"
+          element={
+            <RequireCarePartner>
+              <Library />
+            </RequireCarePartner>
+          }
+        />
 
-        <Route path="/media" element={<MediaFormCreate />} />
-        <Route path="/media/update" element={<MediaFormUpdate />} />
-        <Route path = "/media/delete" element={<MediaFormDelete />} />
+        <Route
+          path="/agenda"
+          element={
+            <RequireCarePartner>
+              <CalendarView />
+            </RequireCarePartner>
+          }
+        />
 
-        <Route path="/prompt" element={<PromptForm />} />
-        <Route path="/prompt/:moduleId" element={<PromptForm />} />
-        
-        <Route path="/widget" element={<WidgetForm />} />
-        <Route path="/widget/:moduleId" element={<WidgetForm />} />
-        <Route path="/login" element={<Login/>} />
+        <Route
+          path="/agenda/:date"
+          element={
+            <RequireCarePartner>
+              <AgendaView />
+            </RequireCarePartner>
+          }
+        />
 
-        <Route path="/settings" element={<Settings/>} />
-        <Route path="/setup" element={<AccountSetupPage/>} />
+        <Route
+          path="/media"
+          element={
+            <RequireCarePartner>
+              <MediaFormCreate />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route
+          path="/media/update"
+          element={
+            <RequireCarePartner>
+              <MediaFormUpdate />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route
+          path="/media/delete"
+          element={
+            <RequireCarePartner>
+              <MediaFormDelete />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route
+          path="/prompt"
+          element={
+            <RequireCarePartner>
+              <PromptForm />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route
+          path="/prompt/:moduleId"
+          element={
+            <RequireCarePartner>
+              <PromptForm />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route
+          path="/widget"
+          element={
+            <RequireCarePartner>
+              <WidgetForm />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route
+          path="/widget/:moduleId"
+          element={
+            <RequireCarePartner>
+              <WidgetForm />
+            </RequireCarePartner>
+          }
+        />
+
+        <Route path="/login" element={<Login />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/setup" element={<AccountSetupPage />} />
       </Routes>
     </>
   );
