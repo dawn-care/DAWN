@@ -21,7 +21,7 @@ type Caregiver struct {
 func CreateCaregiver(db *sql.DB, c *Caregiver) error {
 	query := `
 		INSERT INTO "Caregiver" (name, role, google_id)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
 	return db.QueryRow(query, c.Name, c.Role, c.GoogleID).Scan(&c.ID)
