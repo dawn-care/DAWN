@@ -21,7 +21,7 @@ export default function MediaFormCreate() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { user } = useAuth();
+  const { user, activeCarePartnerId } = useAuth();
 
   function validateFile(f: File) {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
@@ -69,7 +69,7 @@ export default function MediaFormCreate() {
       return;
     }
 
-    if (!user?.id || !user.carepartner_id) {
+    if (!user?.id || !activeCarePartnerId) {
       setUploadStatus("Cannot upload: user information missing.");
       return;
     }
@@ -78,7 +78,7 @@ export default function MediaFormCreate() {
     formData.append("file", file, file.name);
     formData.append("displayed_name", mediaName);
     formData.append("caregiver_id", String(user.id));
-    formData.append("carepartner_id", String(user.carepartner_id));
+    formData.append("carepartner_id", String(activeCarePartnerId));
 
     const endpoint =
       mediaType === "video"
@@ -112,7 +112,7 @@ export default function MediaFormCreate() {
         body: JSON.stringify({
           module_type: mediaType,
           caregiver_id: user.id,
-          carepartner_id: user.carepartner_id,
+          carepartner_id: activeCarePartnerId,
           metadata_id: metadataId,
         }),
       });

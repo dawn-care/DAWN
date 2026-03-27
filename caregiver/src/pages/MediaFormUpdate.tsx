@@ -35,19 +35,19 @@ export default function MediaFormUpdate() {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [status, setStatus] = useState("");
-  const { user } = useAuth();
+  const { user, activeCarePartnerId } = useAuth();
 
   /* ---------------- LOAD ALL MEDIA ---------------- */
   useEffect(() => {
     async function loadMedia() {
       try {
-        if (!user?.id || !user.carepartner_id) {
+        if (!user?.id || !activeCarePartnerId) {
           setStatus("Cannot load media: user information missing.");
           return;
         }
 
         const modulesRes = await fetch(
-          `${API_URL}/modules?caregiver_id=${user.id}&carepartner_id=${user.carepartner_id}`
+          `${API_URL}/modules?caregiver_id=${user.id}&carepartner_id=${activeCarePartnerId}`
         );
 
         if (!modulesRes.ok) throw new Error("Failed to load modules");
@@ -129,8 +129,8 @@ export default function MediaFormUpdate() {
       /* -------- UPDATE FILE (OPTIONAL) -------- */
       if (file) {
         const formData = new FormData();
-        formData.append("carepartner_id", String(user?.carepartner_id));
-        formData.append("file", file);
+          formData.append("carepartner_id", String(activeCarePartnerId));
+          formData.append("file", file);
 
         const fileRes = await fetch(
           `${API_URL}/${selected.type}/file`,

@@ -79,7 +79,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, activeCarePartnerId } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -91,7 +91,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     try {
       // Get modules
       const modulesRes = await fetch(
-        `${API_URL}/modules?caregiver_id=${user?.id}&carepartner_id=${user?.carepartner_id}`
+        `${API_URL}/modules?caregiver_id=${user?.id}&carepartner_id=${activeCarePartnerId}`
       );
 
       if (!modulesRes.ok) {
@@ -116,7 +116,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
             return {
               id: m.id,
               caregiver_id: user!.id,
-              carepartner_id: user!.carepartner_id,
+              carepartner_id: activeCarePartnerId,
               metadata_id: m.metadata_id,
               module_type: type,
               name: data.displayed_name || data.filename,
@@ -128,7 +128,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
             return {
               id: m.id,
               caregiver_id: user!.id,
-              carepartner_id: user!.carepartner_id,
+              carepartner_id: activeCarePartnerId,
               metadata_id: m.metadata_id,
               module_type: "weather",
               type: "weather",
@@ -138,7 +138,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
             return {
               id: m.id,
               caregiver_id: user!.id,
-              carepartner_id: user!.carepartner_id,
+              carepartner_id: activeCarePartnerId,
               metadata_id: m.metadata_id,
               module_type: type,
               type: type,
@@ -150,7 +150,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
             return {
               id: m.id,
               caregiver_id: user!.id,
-              carepartner_id: user!.carepartner_id,
+              carepartner_id: activeCarePartnerId,
               metadata_id: m.metadata_id,
               module_type: "messages",
               type: "messages",

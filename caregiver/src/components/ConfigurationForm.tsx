@@ -34,7 +34,7 @@ export default function ConfigurationForm({
     onSave,
     onCancel,
 }: ConfigurationFormProps) {
-    const { user } = useAuth();
+    const { user, activeCarePartnerId } = useAuth();
     const isEditMode = Boolean(existingConfig);
     const [occurrenceType, setOccurrenceType] = useState<OccurrenceType>('daily');
     const [weeklyDays, setWeeklyDays] = useState<string[]>([]);
@@ -122,7 +122,7 @@ export default function ConfigurationForm({
 
     const handleCreate = async () => {
         if (!selectedModule) return;
-        if (!user?.carepartner_id) {
+        if (!activeCarePartnerId || !user?.id) {
             setStatus('Error: no carepartner is linked to this caregiver account.');
             return;
         }
@@ -145,7 +145,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: user.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     json_config: JSON.stringify([configEntry]),
                 }),
             });
@@ -185,7 +185,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: existingConfig.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     json_config: JSON.stringify([configEntry]),
                 }),
             });
@@ -215,7 +215,7 @@ export default function ConfigurationForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: existingConfig.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     id_list: [existingConfig.id],
                 }),
             });
