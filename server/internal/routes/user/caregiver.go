@@ -14,7 +14,7 @@ func RegisterCaregiverRoutes(r chi.Router, controller *cgController.CaregiverCon
 		r.Get("/", controller.GetAllCaregivers)                                       // GET /users/caregivers
 		r.Get("/search", controller.SearchCaregivers)                                 // GET /users/caregivers/search?q=keyword
 		r.Get("/{id}", controller.GetCaregiverByID)                                   // GET /users/caregivers/{id}
-		r.Get("/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID) // GET /users/caregivers/carepartner/{id}
+		// r.Get("/carepartner/{CarepartnerId}", controller.GetCaregiverByCarepartnerID) // GET /users/caregivers/carepartner/{id}
 		r.Put("/", controller.UpdateCaregiver)                                        // PUT /users/caregivers
 		r.Delete("/{id}", controller.DeleteCaregiver)                                 // DELETE /users/caregivers/{id}
 	})

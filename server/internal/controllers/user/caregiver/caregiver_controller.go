@@ -20,7 +20,7 @@ type CaregiverServiceInterface interface {
 	CreateCaregiver(cg *caregiver.Caregiver) error
 	GetCaregiverByID(id int) (*caregiver.Caregiver, error)
 	GetAllCaregivers() ([]caregiver.Caregiver, error)
-	GetCaregiverByCarepartnerID(id int) (*caregiver.Caregiver, error)
+	// GetCaregiverByCarepartnerID(id int) (*caregiver.Caregiver, error)
 	SearchCaregivers(query string) ([]caregiver.Caregiver, error)
 	UpdateCaregiver(cg *caregiver.Caregiver) error
 	DeleteCaregiver(id int) error
@@ -150,25 +150,25 @@ func (cc *CaregiverController) GetAllCaregivers(w http.ResponseWriter, r *http.R
 // @Failure 404 {object} map[string]string "caregiver not found"
 // @Failure 500 {object} map[string]string "internal server error"
 // @Router /caregivers/carepartner/{CarepartnerId} [get]
-func (cc *CaregiverController) GetCaregiverByCarepartnerID(w http.ResponseWriter, r *http.Request) {
-	id, err := extractIDFromParam(r, "CarepartnerId")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid Carepartner ID")
-		return
-	}
+// func (cc *CaregiverController) GetCaregiverByCarepartnerID(w http.ResponseWriter, r *http.Request) {
+// 	id, err := extractIDFromParam(r, "CarepartnerId")
+// 	if err != nil {
+// 		writeError(w, http.StatusBadRequest, "invalid Carepartner ID")
+// 		return
+// 	}
 
-	cg, err := cc.Service.GetCaregiverByCarepartnerID(id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if cg == nil {
-		writeError(w, http.StatusNotFound, "caregiver not found")
-		return
-	}
+// 	cg, err := cc.Service.GetCaregiverByCarepartnerID(id)
+// 	if err != nil {
+// 		writeError(w, http.StatusInternalServerError, err.Error())
+// 		return
+// 	}
+// 	if cg == nil {
+// 		writeError(w, http.StatusNotFound, "caregiver not found")
+// 		return
+// 	}
 
-	writeJSON(w, http.StatusOK, cg)
-}
+// 	writeJSON(w, http.StatusOK, cg)
+// }
 
 // SearchCaregivers godoc
 // @Summary Search caregivers

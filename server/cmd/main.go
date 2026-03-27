@@ -136,7 +136,7 @@ func main() {
 	// Auth
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
-	authService := authSvc.NewAuthService(googleService, caregiverService, sessionService)
+	authService := authSvc.NewAuthService(googleService, caregiverService, carepartnerService, sessionService)
 
 	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)
