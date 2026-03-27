@@ -1,8 +1,11 @@
 import React from "react";
 import { Stack } from "expo-router";
+import { ScheduleProvider } from "./ScheduleContext";
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }} />
+    <ScheduleProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ScheduleProvider>
   );
 }

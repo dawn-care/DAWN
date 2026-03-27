@@ -181,6 +181,10 @@ export default function WidgetForm({
 
         async function loadWidget() {
             var res = await fetch(`${API_URL}/modules/${actualModuleId}`);
+            if (!res.ok) {
+                setUploadStatus("Failed to load module");
+                return;
+            }
             const module = await res.json();
             console.log("Loaded module for editing:", module);
 
@@ -189,6 +193,10 @@ export default function WidgetForm({
 
             if (module.module_type === "weather") {
                 res = await fetch(`${API_URL}/weather?id=${module.metadata_id}`);
+                if (!res.ok) {
+                    setUploadStatus("Failed to load weather data");
+                    return;
+                }
                 const widget = await res.json();
                 console.log("Loaded weather widget metadata:", widget);
                 setZipCode(widget.zipcode);
@@ -196,6 +204,10 @@ export default function WidgetForm({
 
             if (module.module_type === "sports") {
                 res = await fetch(`${API_URL}/sports?id=${module.metadata_id}`);
+                if (!res.ok) {
+                    setUploadStatus("Failed to load sports data");
+                    return;
+                }
                 const widget = await res.json();
                 console.log("Loaded sports widget metadata:", widget);
                 const teamStr = widget.language;
@@ -214,7 +226,7 @@ export default function WidgetForm({
         }
 
         loadWidget();
-    }, [moduleId]);
+    }, [actualModuleId]);
 
     async function handleUpload() {
         let data;

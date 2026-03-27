@@ -41,7 +41,7 @@ interface AgendaListProps {
 }
 
 export default function AgendaList({ items, setItems, onItemClick }: AgendaListProps) {
-    const { user } = useAuth();
+    const { user, activeCarePartnerId } = useAuth();
     const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
     const [pendingReorder, setPendingReorder] = React.useState<{
         reordered: ConfigurationWithMetadata[];
@@ -178,7 +178,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
 
     const confirmReorder = async () => {
         if (!pendingReorder) return;
-        if (!user?.carepartner_id) {
+        if (!activeCarePartnerId) {
             console.error('Reorder failed: no carepartner linked to caregiver');
             if (preReorderItems) {
                 setItems(preReorderItems);
@@ -190,6 +190,14 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
         const reordered = pendingReorder.reordered;
 
         try {
+            if (!activeCarePartnerId || !user?.id) {
+                console.error("Missing user or active care partner");
+                if (preReorderItems) setItems(preReorderItems);
+                setPendingReorder(null);
+                setPreReorderItems(null);
+                return;
+            }
+
             const configEntries = reordered.map((item) => ({
                 id: item.id,
                 module_id: item.module_id,
@@ -206,7 +214,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    carepartner_id: user.carepartner_id,
+                    carepartner_id: activeCarePartnerId,
                     json_config: JSON.stringify(configEntries),
                 }),
             });

@@ -20,7 +20,7 @@ type DevicePairingServiceInterface interface {
 	UpdatePairing(p *device_pairing.DevicePairing) error
 	DeletePairing(id int) error
 	GeneratePairingCode(carepartnerID int) (*device_pairing.DevicePairing, error)
-	VerifyPairingCode(code string, caregiverID int) error
+	VerifyPairingCode(code string, caregiverID int, carepartnerName string) (int, error)
 	IsDevicePaired(carepartnerID int) (bool, error)
 }
 
@@ -208,8 +208,9 @@ func (cc *DevicePairingController) VerifyPairingCode(w http.ResponseWriter, r *h
 	defer r.Body.Close()
 
 	type request struct {
-		Code        string `json:"code"`
-		CaregiverID int    `json:"caregiver_id"`
+		Code            string `json:"code"`
+		CaregiverID     int    `json:"caregiver_id"`
+		CarepartnerName string `json:"carepartner_name"`
 	}
 
 	var req request
@@ -219,14 +220,15 @@ func (cc *DevicePairingController) VerifyPairingCode(w http.ResponseWriter, r *h
 		return
 	}
 
-	err := cc.Service.VerifyPairingCode(req.Code, req.CaregiverID)
+	carepartnerID, err := cc.Service.VerifyPairingCode(req.Code, req.CaregiverID, req.CarepartnerName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]bool{
-		"ok": true,
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"ok":             true,
+		"carepartner_id": carepartnerID,
 	})
 }
 

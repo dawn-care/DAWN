@@ -5,20 +5,23 @@ import (
 	"errors"
 	caregiverModel "server/internal/models/user/caregiver"
 	"server/internal/services/user/caregiver"
+	"server/internal/services/user/carepartner"
 )
 
 type AuthService struct {
-	Google     GoogleAuthService
-	Caregivers *caregiver.CaregiverService
-	Sessions   SessionService
+	Google       GoogleAuthService
+	Caregivers   *caregiver.CaregiverService
+	Carepartners *carepartner.CarepartnerService
+	Sessions     SessionService
 }
 
 func NewAuthService(
 	google GoogleAuthService,
 	caregivers *caregiver.CaregiverService,
+	carepartners *carepartner.CarepartnerService,
 	sessions SessionService,
 ) *AuthService {
-	return &AuthService{google, caregivers, sessions}
+	return &AuthService{google, caregivers, carepartners, sessions}
 }
 
 func (a *AuthService) LoginWithGoogle(ctx context.Context, idToken string) (string, error) {
@@ -42,7 +45,7 @@ func (s *AuthService) GetUserByID(ctx context.Context, id int) (*caregiverModel.
 
 func (a *AuthService) UpdateCarepartnerID(ctx context.Context, userID int, carepartnerID int) error {
 	// Find the caregiver to update info on
-	user, err := a.Caregivers.GetCaregiverByID(userID)
+	user, err := a.Carepartners.GetCarepartnerByID(carepartnerID)
 	if err != nil {
 		return err
 	}
@@ -62,9 +65,9 @@ func (a *AuthService) UpdateCarepartnerID(ctx context.Context, userID int, carep
 			}
 	*/
 
-	// Register their pairing code/care partner ID
-	user.CarepartnerID = carepartnerID
+	// Register their pairing code/care giver ID
+	user.CaregiverID = userID
 
 	// Update the record
-	return a.Caregivers.UpdateCaregiver(user)
+	return a.Carepartners.UpdateCarepartner(user)
 }

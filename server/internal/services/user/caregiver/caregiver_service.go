@@ -55,12 +55,20 @@ func (s *CaregiverService) GetCaregiverByID(id int) (*caregiver.Caregiver, error
 	return caregiver.GetCaregiverByID(s.DB, id)
 }
 
-func (s *CaregiverService) GetCaregiverByCarepartnerID(crID int) (*caregiver.Caregiver, error) {
-	if crID <= 0 {
-		return nil, errors.New("invalid carepartner ID")
+func (s *CaregiverService) GetCarepartnersByCaregiverID(caregiverID int) ([]caregiver.Caregiver, error) {
+	if caregiverID <= 0 {
+		return nil, errors.New("invalid caregiver ID")
 	}
-	return caregiver.GetCaregiverByCarepartner(s.DB, crID)
+
+	return caregiver.GetCarepartnersByCaregiverID(s.DB, caregiverID)
 }
+
+// func (s *CaregiverService) GetCaregiverByCarepartnerID(crID int) (*caregiver.Caregiver, error) {
+// 	if crID <= 0 {
+// 		return nil, errors.New("invalid carepartner ID")
+// 	}
+// 	return caregiver.GetCaregiverByCarepartner(s.DB, crID)
+// }
 
 func (s *CaregiverService) GetAllCaregivers() ([]caregiver.Caregiver, error) {
 	return caregiver.GetCaregivers(s.DB)
@@ -133,10 +141,9 @@ func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (
 
 	// if not found -> create new caregiver
 	c := &caregiver.Caregiver{
-		Name:          googleUser.Name,
-		Role:          "caregiver",
-		CarepartnerID: 0, // set later (?)
-		GoogleID:      &googleUser.ID,
+		Name:     googleUser.Name,
+		Role:     "caregiver",
+		GoogleID: &googleUser.ID,
 	}
 
 	if err := caregiver.CreateCaregiver(s.DB, c); err != nil {
