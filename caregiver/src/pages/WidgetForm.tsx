@@ -271,7 +271,7 @@ export default function WidgetForm({
 
             const metadataId = widgetMetadata.id;
             if (metadataId) {
-                setUploadStatus(`Saved! Metadata ID: ${metadataId}`);
+                setUploadStatus(`Saved!`);
             } else {
                 setUploadStatus("Saved!");
             }
