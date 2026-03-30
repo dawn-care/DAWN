@@ -3,6 +3,7 @@ import { Trash2, Plus, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import WidgetForm from "./WidgetForm";
 import PromptForm from "./PromptForm";
+import MediaFormCreate from "./MediaFormCreate";
 // import type { Module } from "../components/AgendaList";
 import { useAuth } from "../context/AuthContext";
 
@@ -59,12 +60,6 @@ const FILTERS: Filter[] = [
   { key: "sports", label: "Sports News", value: "sports" },
   { key: "news", label: "Good News", value: "news" },
   { key: "messages", label: "Messages", value: "messages" },
-  { key: "png", label: ".png", value: ".png" },
-  { key: "jpg", label: ".jpg", value: ".jpg" },
-  { key: "mov", label: ".mov", value: ".mov" },
-  { key: "wav", label: ".wav", value: ".wav" },
-  { key: "mp3", label: ".mp3", value: ".mp3" },
-  { key: "ogg", label: ".ogg", value: ".ogg" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -78,6 +73,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [showCreateMedia, setShowCreateMedia] = useState(false);
+  const [showCreatePrompt, setShowCreatePrompt] = useState(false);
+  const [showCreateWidget, setShowCreateWidget] = useState(false);
   const navigate = useNavigate();
   const { user, activeCarePartnerId } = useAuth();
 
@@ -368,12 +366,124 @@ export default function Library({ onSelect }: LibraryProps = {}) {
         )}
       </div>
 
-      <button
-        onClick={() => navigate("/media")}
-        className="fixed bottom-6 right-6 bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-full shadow-lg flex items-center justify-center"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      <div className="fixed bottom-6 right-6 flex flex-col gap-3 items-end">
+
+        {/* Add Media */}
+        <button
+          onClick={() => {
+            setShowCreateMedia(true);
+            navigate("/library");
+          }}
+          className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2"
+        >
+          <Plus className="h-5 w-5" />
+          Media
+        </button>
+
+        {/* Add Message */}
+        <button
+          onClick={() => {
+              setShowCreatePrompt(true);
+              navigate("/library");
+            }
+          }
+          className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2"
+        >
+          <Plus className="h-5 w-5" />
+          Message
+        </button>
+
+        {/* Add Widget */}
+        <button
+          onClick={() => {
+              setShowCreateWidget(true);
+              navigate("/library");
+            }
+        }
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2"
+        >
+          <Plus className="h-5 w-5" />
+          Widget
+        </button>
+      </div>
+
+      {/* Create Prompt Modal */}
+      {showCreatePrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowCreatePrompt(false)}
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+            >
+              ✕
+            </button>
+            <div className="p-8">
+              <PromptForm
+                onUpdateSuccess={() => {
+                  fetchModules();
+                  setShowCreatePrompt(false);
+                  navigate('/library')
+                }}
+                onDeleteSuccess={() => {
+                  fetchModules();
+                  setShowCreatePrompt(false);
+                  navigate('/library')
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Widget Modal */}
+      {showCreateWidget && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowCreateWidget(false)}
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+            >
+              ✕
+            </button>
+            <div className="p-8">
+              <WidgetForm
+                onUpdateSuccess={() => {
+                  fetchModules();
+                  setShowCreateWidget(false);
+                  navigate('/library')
+                }}
+                onDeleteSuccess={() => {
+                  fetchModules();
+                  setShowCreateWidget(false);
+                  navigate('/library')
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Media Modal */}
+      {showCreateMedia && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowCreateMedia(false)}
+              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+            >
+              ✕
+            </button>
+            <div className="p-8">
+              <MediaFormCreate
+                onUploadSuccess={() => {
+                  fetchModules();
+                  setShowCreateMedia(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -405,10 +515,53 @@ function MediaCard({
     }
   };
 
+  {isEditing && !onSelect && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+        <button
+          onClick={() => setIsEditing(false)}
+          className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 text-2xl z-10"
+        >
+          ✕
+        </button>
+
+        <div className="p-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-4">Edit Media</h2>
+
+            <p className="mb-4">{item.name}</p>
+
+            {/* Example preview */}
+            {item.type === "photo" && (
+              <img src={item.uri} className="max-h-64 mx-auto rounded" />
+            )}
+
+            {item.type === "audio" && (
+              <audio controls className="w-full">
+                <source src={item.uri} />
+              </audio>
+            )}
+
+            {item.type === "video" && (
+              <div className="bg-gray-200 p-8 rounded">Video Preview</div>
+            )}
+
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
   return (
     <div
       className={`relative flex flex-col items-center text-center border border-gray-200 rounded-xl shadow-sm hover:shadow-md p-6 w-full h-64 bg-white ${onSelect ? 'cursor-pointer ring-2 ring-transparent hover:ring-teal-400' : ''}`}
-      onClick={onSelect ? handleClick : undefined}
+      onClick={() => {
+        if (onSelect) {
+          handleClick();
+        } else {
+          setIsEditing(true);
+        }
+      }}
     >
       {item.type === "photo" ? (
         <img
@@ -448,7 +601,10 @@ function MediaCard({
       ) : (
         <h3
           className="text-lg font-medium cursor-pointer hover:text-teal-500"
-          onClick={() => setIsEditing(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsEditing(true);
+          }}
         >
           {item.name}
         </h3>

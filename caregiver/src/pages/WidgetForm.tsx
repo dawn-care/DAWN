@@ -268,13 +268,8 @@ export default function WidgetForm({
                     console.warn("Response not valid JSON, using empty object");
                 }
             }
-
-            const metadataId = widgetMetadata.id;
-            if (metadataId) {
-                setUploadStatus(`Saved! Metadata ID: ${metadataId}`);
-            } else {
-                setUploadStatus("Saved!");
-            }
+            
+            setUploadStatus(`Saved!`);
 
             // Reset form if needed
             setSportsTeam(null);

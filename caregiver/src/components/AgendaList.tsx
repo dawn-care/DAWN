@@ -191,7 +191,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
 
         try {
             if (!activeCarePartnerId || !user?.id) {
-                console.error("Missing user or active care partner");
+                console.error("Missing caregiver or active carepartner");
                 if (preReorderItems) setItems(preReorderItems);
                 setPendingReorder(null);
                 setPreReorderItems(null);
