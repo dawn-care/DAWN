@@ -137,6 +137,18 @@ export default function ConfigurationForm({
     const moduleLabel = isEditMode
         ? getModuleLabel(existingConfig!)
         : selectedModule?.label || 'Unknown Module';
+    
+    const moduleType = isEditMode
+        ? existingConfig?.module_type
+        : selectedModule?.moduleType;
+
+    const isMediaType = moduleType === 'video' || moduleType === 'audio';
+
+    useEffect(() => {
+        if (isMediaType) {
+            setDuration(0);
+        }
+    }, [isMediaType]);
 
     const handleCreate = async () => {
         if (!selectedModule) return;
@@ -509,8 +521,18 @@ export default function ConfigurationForm({
                         min={1}
                         value={duration}
                         onChange={(e) => setDuration(Number(e.target.value))}
-                        className="w-full mt-2 p-3 border rounded bg-purple-50"
+                        disabled={isMediaType}
+                        className={`w-full mt-2 p-3 border rounded ${
+                            isMediaType
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-purple-50'
+                        }`}
                     />
+                    {isMediaType && (
+                        <p className="text-sm text-gray-500 mt-1">
+                            Duration is automatically determined for video/audio.
+                        </p>
+                    )}
                 </div>
 
                 {/* Action Buttons */}

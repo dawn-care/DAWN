@@ -33,7 +33,7 @@ export default function AgendaView() {
             setError(null);
 
             if (!activeCarePartnerId || !user?.id) {
-                setError("Missing user or care partner");
+                setError("Missing caregiver or carepartner");
                 setLoading(false);
                 return;
             }
