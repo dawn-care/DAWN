@@ -53,7 +53,7 @@ function App() {
           path="/media"
           element={
             <RequireCarePartner>
-              <MediaFormCreate />
+              <MediaFormCreate onUploadSuccess={() => {}} />
             </RequireCarePartner>
           }
         />

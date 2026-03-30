@@ -11,7 +11,7 @@ const allowedExtensions = {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-export default function MediaFormCreate() {
+export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: () => void }) {
   const [mediaName, setMediaName] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("video");
   const [file, setFile] = useState<File | null>(null);
@@ -126,6 +126,12 @@ export default function MediaFormCreate() {
       setUploadStatus("Saved!");
       setFile(null);
       setMediaName("");
+
+      setUploadStatus("Saved!");
+      setFile(null);
+      setMediaName("");
+
+      if (onUploadSuccess) onUploadSuccess();
 
       // Reset input after success
       if (fileInputRef.current) {
