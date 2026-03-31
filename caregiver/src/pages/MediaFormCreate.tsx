@@ -127,10 +127,6 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
       setFile(null);
       setMediaName("");
 
-      setUploadStatus("Saved!");
-      setFile(null);
-      setMediaName("");
-
       if (onUploadSuccess) onUploadSuccess();
 
       // Reset input after success

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { Image } from "react-native";
@@ -25,8 +26,9 @@ function formatTime(timeString: string) {
 }
 
 export default function Screensaver() {
-  const { carepartner } = useSchedule();
+  const { carepartner, refresh } = useSchedule();
   const [hasCarepartnerId, setHasCarepartnerId] = useState<boolean | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const autoStartTimeLabel = carepartner?.auto_start
     ? formatTime(carepartner.auto_start)
@@ -48,11 +50,20 @@ export default function Screensaver() {
   }, []);
 
   const handlePrimaryAction = () => {
-    router.push({ pathname: "/agendaView" } as any);
+    router.push({ pathname: "/agendaView", params: { trigger: 'manual' } } as any);
   };
 
   const handlePairDevice = () => {
     router.push({ pathname: "/pair" } as any);
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await refresh();
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -62,6 +73,19 @@ export default function Screensaver() {
         <ImageBackground source={backgroundSource} style={styles.bg} resizeMode="cover">
         <SafeAreaView style={styles.safe}>
           <View style={styles.topRightActionRow}>
+            <Pressable
+            onPress={handleSync}
+            style={({ pressed }) => [
+              styles.topRightButton,
+              pressed && { transform: [{ scale: 0.98 }] },
+            ]}
+            >
+            {syncing ? (
+              <ActivityIndicator size="small" color="rgba(0,0,0,0.8)" />
+            ) : (
+              <Text style={styles.topRightButtonText}>Sync</Text>
+            )}
+            </Pressable>
             <Pressable
             onPress={handlePairDevice}
             style={({ pressed }) => [
@@ -121,6 +145,8 @@ const styles = StyleSheet.create({
     top: 20,
     right: 20,
     zIndex: 2,
+    flexDirection: "row",
+    gap: 10,
   },
   topRightButton: {
     paddingVertical: 10,

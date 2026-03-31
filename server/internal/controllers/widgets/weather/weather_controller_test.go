@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	models "server/internal/models/widgets/weather"
+	services "server/internal/services/widgets/weather"
 )
 
 type mockWeatherWidgetService struct {
@@ -18,7 +19,7 @@ type mockWeatherWidgetService struct {
 	GetWeatherWidgetsByCarepartnerIDAndDayFunc     func(carepartner_id int, day, month, year int) ([]models.WeatherWidget, error)
 	UpdateWeatherWidgetFunc                        func(weather_widget *models.WeatherWidget) error
 	DeleteWeatherWidgetFunc                        func(id int) error
-	GetWeatherOverviewFunc                         func(weather_widget *models.WeatherWidget) (string, error)
+	GetWeatherOverviewFunc                         func(weather_widget *models.WeatherWidget) (*services.WeatherOverviewResponse, error)
 	GetWeatherWidgetStatsFunc                      func() (int, error)
 }
 
@@ -50,7 +51,7 @@ func (m *mockWeatherWidgetService) DeleteWeatherWidget(id int) error {
 	return m.DeleteWeatherWidgetFunc(id)
 }
 
-func (m *mockWeatherWidgetService) GetWeatherOverview(weather_widget *models.WeatherWidget) (string, error) {
+func (m *mockWeatherWidgetService) GetWeatherOverview(weather_widget *models.WeatherWidget) (*services.WeatherOverviewResponse, error) {
 	return m.GetWeatherOverviewFunc(weather_widget)
 }
 
@@ -182,8 +183,19 @@ func TestDeleteWeatherWidgetHandler(t *testing.T) {
 
 func TestWeatherOverviewHandler(t *testing.T) {
 	mockService := &mockWeatherWidgetService{
-		GetWeatherOverviewFunc: func(weather_widget *models.WeatherWidget) (string, error) {
-			return "", nil
+		GetWeatherOverviewFunc: func(weather_widget *models.WeatherWidget) (*services.WeatherOverviewResponse, error) {
+			return &services.WeatherOverviewResponse{
+				Location:    "Rochester",
+				Temp:        72,
+				FeelsLike:   70,
+				TempMin:     65,
+				TempMax:     78,
+				Humidity:    55,
+				WindSpeed:   10,
+				Condition:   "Clear",
+				Description: "clear sky",
+				Message:     "A beautiful day.",
+			}, nil
 		},
 	}
 

@@ -55,7 +55,7 @@ export default function PhotoViewerScreen({
       }
 
       return {
-        photoUrls: [metadata.image_uri],
+        photoUrls: metadata.image_uri ? [`${API_URL}${metadata.image_uri}`] : [],
       };
     }
   };

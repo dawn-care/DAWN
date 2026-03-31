@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import AudioScreen from './audio';
 import GreetingScreen from './greeting';
 import TextViewerScreen from './text';
+import WidgetViewerScreen from './widget';
 import PhotoViewerScreen from './photo';
 import { useSchedule } from './ScheduleContext';
 import React from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 // Metadata shapes returned inline by the backend
 export type PhotoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
@@ -62,9 +63,9 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
         return metadata?.displayed_name ?? 'Photos';
     }
 
-    if (item.module_type === 'message') {
+    if (item.module_type === 'messages') {
         const metadata = item.metadata as MessageMetadata | null;
-        return metadata?.message ?? 'Photos';
+        return metadata?.message ?? 'Message';
     }
 
     if (item.module_type === 'weather') {
@@ -85,8 +86,9 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
 
 export default function AgendaView(){
     const { todaysItems, loading, error, refresh } = useSchedule();
+    const { trigger } = useLocalSearchParams<{ trigger?: string }>();
 
-    // --- Local playback state (only regular/non-timed items) ---
+    // --- Local playback state ---
     const [playQueue, setPlayQueue] = useState<ConfigurationWithMetadata[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const playQueueRef = useRef<ConfigurationWithMetadata[]>([]);
@@ -99,24 +101,30 @@ export default function AgendaView(){
         refresh();
     }, []);
 
-    // Build queue: due timed items first, then regular (non-timed) items
+    // Build queue based on trigger:
+    // - 'scheduled' → only due timed items
+    // - 'manual' / 'auto_start' → only regular (non-timed) items
     useEffect(() => {
         if (!todaysItems.length) return;
 
-        const currentTime = (() => {
-            const now = new Date();
-            return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        })();
+        let queue: ConfigurationWithMetadata[];
 
-        const dueTimed = todaysItems
-            .filter(i => i.timed && (i.time ?? '').slice(0, 5) <= currentTime)
-            .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+        if (trigger === 'scheduled') {
+            const currentTime = (() => {
+                const now = new Date();
+                return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            })();
 
-        const regular = todaysItems.filter(i => !i.timed);
+            queue = todaysItems
+                .filter(i => i.timed && (i.time ?? '').slice(0, 5) <= currentTime)
+                .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
+        } else {
+            queue = todaysItems.filter(i => !i.timed);
+        }
 
         setCurrentIndex(0);
-        setPlayQueue([...dueTimed, ...regular]);
-    }, [todaysItems]);
+        setPlayQueue(queue);
+    }, [todaysItems, trigger]);
 
     // When an error occurs, redirect to home after 5 seconds
     useEffect(() => {
@@ -221,14 +229,17 @@ export default function AgendaView(){
             </View>
 
             <View style={styles.container}>
-                {(currentItem.module_type === "photo" || currentItem.module_type === "message") && (
+                {(currentItem.module_type === "photo" || currentItem.module_type === "messages") && (
                     <PhotoViewerScreen configuration={currentItem} />
                 )}
 
                 {(currentItem.module_type === "weather" ||
                 currentItem.module_type === "sports" ||
-                currentItem.module_type === "news" ||
-                currentItem.module_type === "event") && (
+                currentItem.module_type === "news") && (
+                    <WidgetViewerScreen configuration={currentItem} />
+                )}
+
+                {currentItem.module_type === "event" && (
                     <TextViewerScreen configuration={currentItem} />
                 )}
 

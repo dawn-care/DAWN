@@ -123,6 +123,6 @@ func TestGetWeatherOverview(t *testing.T) {
 
 	weather_overview, err := weather_service.GetWeatherOverview(weather_widget)
 
-	fmt.Printf("%s", weather_overview)
+	fmt.Printf("%+v", weather_overview)
 	assert.NoError(t, err)
 }

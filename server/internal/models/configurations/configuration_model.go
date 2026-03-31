@@ -166,7 +166,7 @@ func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, m
 					WHEN 'weather' THEN (SELECT row_to_json(t) FROM (SELECT id, zipcode FROM "WeatherWidget" WHERE id = m.metadata_id) t)
 					WHEN 'news' THEN (SELECT row_to_json(t) FROM (SELECT id, category, language, country FROM "NewsWidget" WHERE id = m.metadata_id) t)
 					WHEN 'sports' THEN (SELECT row_to_json(t) FROM (SELECT id, category, language, country FROM "NewsWidget" WHERE id = m.metadata_id) t)
-					WHEN 'message' THEN (SELECT row_to_json(t) FROM (SELECT id, message, image_uri FROM "MessagePrompt" WHERE id = m.metadata_id) t)
+					WHEN 'messages' THEN (SELECT row_to_json(t) FROM (SELECT id, message, image_uri FROM "MessagePrompt" WHERE id = m.metadata_id) t)
 					WHEN 'event' THEN (SELECT row_to_json(t) FROM (SELECT id, list_id, time, text FROM "EventPrompt" WHERE id = m.metadata_id) t)
 					WHEN 'carepartner_location' THEN (SELECT row_to_json(t) FROM (SELECT id, location, message, image_uri FROM "CarepartnerLocationPrompt" WHERE id = m.metadata_id) t)
 					WHEN 'caregiver_location' THEN (SELECT row_to_json(t) FROM (SELECT id, location, message, image_uri FROM "CaregiverLocationPrompt" WHERE id = m.metadata_id) t)

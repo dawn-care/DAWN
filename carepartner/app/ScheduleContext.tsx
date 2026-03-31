@@ -95,13 +95,26 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refresh = async () => {
-    await fetchCarepartner();
-    await fetchConfigurations();
+    try {
+      await fetchCarepartner();
+      await fetchConfigurations();
+    } catch (error) {
+      console.error('Error refreshing schedule:', error); 
+    }
   };
 
   // Initial fetch
   useEffect(() => {
     refresh();
+  }, []);
+
+  // Poll for configuration & auto-start updates every 5 minutes
+  useEffect(() => {
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const id = setInterval(() => {
+      refresh();
+    }, FIVE_MINUTES);
+    return () => clearInterval(id);
   }, []);
 
   // ---- Global auto-start trigger ----
@@ -118,7 +131,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       if (lastAutoStartDateRef.current === dateKey) return;
 
       lastAutoStartDateRef.current = dateKey;
-      router.navigate('/agendaView' as any);
+      router.navigate({ pathname: '/agendaView', params: { trigger: 'auto_start' } } as any);
     };
 
     check();
@@ -145,7 +158,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (shouldNavigate) {
-        router.navigate('/agendaView' as any);
+        router.navigate({ pathname: '/agendaView', params: { trigger: 'scheduled' } } as any);
       }
     };
 

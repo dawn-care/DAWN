@@ -231,47 +231,69 @@ export default function Library({ onSelect }: LibraryProps = {}) {
   };
 
   const handleMediaDelete = async (
-    // metadataId: number,
+    metadataId: number,
     moduleId: number,
-    // type: MediaType
+    type: MediaType
   ) => {
     if (!confirm("Are you sure you want to delete this item?")) return;
 
     try {
-      // // Delete module first
-      // await fetch(`${API_URL}/modules/${moduleId}`, {
-      //   method: "DELETE",
-      // });
+      // Delete module reference
+      const moduleRes = await fetch(`${API_URL}/modules/delete?id=${moduleId}`, {
+        method: "DELETE",
+      });
 
-      // // Delete actual media metadata/file
-      // await fetch(`${API_URL}/${type}?id=${metadataId}`, {
-      //   method: "DELETE",
-      // });
+      if (!moduleRes.ok) {
+        const errText = await moduleRes.text();
+        console.error("Module delete error:", moduleRes.status, errText);
+        throw new Error(`Failed to delete module: ${errText}`);
+      }
+
+      // Delete actual media metadata
+      const metaRes = await fetch(`${API_URL}/${type}?id=${metadataId}`, {
+        method: "DELETE",
+      });
+
+      if (!metaRes.ok) {
+        const errText = await metaRes.text();
+        console.error("Media metadata delete error:", metaRes.status, errText);
+      }
+
+      // Delete actual file from storage
+      const fileRes = await fetch(`${API_URL}/${type}/file?id=${metadataId}`, {
+        method: "DELETE",
+      });
+
+      if (!fileRes.ok) {
+        const errText = await fileRes.text();
+        console.error("Media file delete error:", fileRes.status, errText);
+      }
 
       setModules((prev) =>
         prev.filter((m) => m.id !== moduleId)
       );
     } catch (err) {
       console.error("Delete failed:", err);
+      alert("Failed to delete media. Please try again.");
     }
   };
 
   const handleMediaRename = async (
     metadataId: number,
-    // type: MediaType,
+    type: MediaType,
     newName: string
   ) => {
     try {
-      // const res = await fetch(`${API_URL}/${type}`, {
-      //   method: "PUT",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     id: metadataId,
-      //     displayed_name: newName,
-      //   }),
-      // });
+      const res = await fetch(`${API_URL}/${type}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: metadataId,
+          displayed_name: newName,
+        }),
+      });
 
-      // if (!res.ok) throw new Error("Rename failed");
+      if (!res.ok) throw new Error("Rename failed");
 
       setModules((prev) =>
         prev.map((m) =>
@@ -366,6 +388,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
         )}
       </div>
 
+      {!onSelect && (
       <div className="fixed bottom-6 right-6 flex flex-col gap-3 items-end">
 
         {/* Add Media */}
@@ -406,6 +429,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           Widget
         </button>
       </div>
+      )}
 
       {/* Create Prompt Modal */}
       {showCreatePrompt && (
@@ -504,7 +528,7 @@ function MediaCard({
 
   const handleBlurOrEnter = async () => {
     if (tempName.trim() && tempName !== item.name) {
-      await onRename(item.id, item.type, tempName.trim());
+      await onRename(item.metadata_id, item.type, tempName.trim());
     }
     setIsEditing(false);
   };
@@ -615,7 +639,7 @@ function MediaCard({
       {/* Delete Button */}
       {onSelect == undefined && (
         <button
-          onClick={() => onDelete(item.metadata_id, item.id, item.type)}
+          onClick={(e) => { e.stopPropagation(); onDelete(item.metadata_id, item.id, item.type); }}
           className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
           title="Delete"
         >
@@ -713,7 +737,7 @@ function WidgetCard({
         {/* Delete Button */}
         {onSelect == undefined && (
           <button
-            onClick={() => onDelete(item.id, item.metadata_id, item.module_type, isEditing)}
+            onClick={(e) => { e.stopPropagation(); onDelete(item.id, item.metadata_id, item.module_type, isEditing); }}
             className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
             title="Delete"
           >
@@ -809,7 +833,7 @@ function PromptCard({
           {/* Delete Button */}
           {onSelect == undefined && (
             <button
-              onClick={() => onDelete(item.id, item.metadata_id, isEditing)}
+              onClick={(e) => { e.stopPropagation(); onDelete(item.id, item.metadata_id, isEditing); }}
               className="absolute bottom-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full"
               title="Delete"
             >

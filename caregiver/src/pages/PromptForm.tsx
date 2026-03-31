@@ -90,7 +90,6 @@ export default function PromptForm({
 
     try {
       let imageUri: string | null = null;
-      let metadataId: number | null = null;
 
       // Upload the optional image first, if provided
       if (file) {
@@ -115,9 +114,7 @@ export default function PromptForm({
         }
 
         const imageData = await imageResponse.json();
-        var uri = `/photo/file?id=${imageData.id}`;
-        imageUri = uri;
-        metadataId = imageData.id; // assuming the image upload returns a metadata id
+        imageUri = `/photo/file?id=${imageData.id}`;
       }
 
       // Create the message/prompt
@@ -136,15 +133,14 @@ export default function PromptForm({
       }
 
       const promptData = await promptResponse.json();
-      // Use the returned id from the prompt creation as the metadata ID
-      if (!metadataId) metadataId = promptData.id;
+      const metadataId = promptData.id;
 
       if (!metadataId) {
         setUploadStatus("Saved but could not determine metadata ID.");
         return;
       }
 
-      // Create a module pointing to this metadata
+      // Create a module pointing to this message
       const moduleResponse = await fetch(`${API_URL}/modules`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,6 +161,10 @@ export default function PromptForm({
       setUploadStatus("Saved!");
       setFile(null);
       setPromptMessage("");
+
+      if (onUpdateSuccess) {
+        onUpdateSuccess();
+      }
     } catch (err: any) {
       setUploadStatus("Upload failed: " + err.message);
     }
@@ -199,7 +199,8 @@ export default function PromptForm({
         });
 
         if (!res.ok) throw new Error("Image upload failed");
-        imageUri = (await res.json()).uri;
+        const imageData = await res.json();
+        imageUri = `/photo/file?id=${imageData.id}`;
       }
 
       const res = await fetch(`${API_URL}/messages/update/${promptId}`, {

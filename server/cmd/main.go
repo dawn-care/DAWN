@@ -152,9 +152,11 @@ func main() {
 	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
 
 	// Widgets
-	newsService := newsSvc.NewNewsWidgetService(db, "api key")
+	openWeatherKey := getEnvOrDefault("OPENWEATHER_API_KEY", "")
+	newsAPIKey := getEnvOrDefault("NEWS_API_KEY", "")
+	newsService := newsSvc.NewNewsWidgetService(db, newsAPIKey)
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
-	weatherService := weatherSvc.NewWeatherService(db, "api key")
+	weatherService := weatherSvc.NewWeatherService(db, openWeatherKey)
 
 	// Prompts
 	messageService := promptsSvc.NewMessageService(db)
