@@ -65,11 +65,14 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
                 return "Audio  - " + ((meta as AudioMetadata).displayed_name ?? `Module ${item.module_id}`);
             case 'weather':
                 return `Weather - Zip Code: ${(meta as WeatherMetadata).zipcode}`;
-            case 'news':
             case 'sports':
-                return `News - Category: ${(meta as NewsMetadata).category}`;
-            case 'message':
-                return 'Message';
+                return `Sports - ${(meta as NewsMetadata).language || 'Sports News'}`;
+            case 'news':
+                return 'Good News';
+            case 'messages': {
+                const msg = (meta as MessageMetadata).message;
+                return msg ? (msg.length > 30 ? `Message - ${msg.slice(0, 30)}...` : `Message - ${msg}`) : 'Message';
+            }
             case 'event':
                 return `Event - ${(meta as EventMetadata).text}`;
             case 'carepartner_location':
@@ -92,7 +95,7 @@ export default function AgendaList({ items, setItems, onItemClick }: AgendaListP
             case 'news':
             case 'sports':
                 return widgetIcon;
-            case 'message':
+            case 'messages':
             case 'event':
             case 'carepartner_location':
             case 'caregiver_location':

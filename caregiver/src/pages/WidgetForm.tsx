@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from "../context/AuthContext";
 
 type WidgetType = "weather" | "sports" | "good";
 type SportsType = "nfl" | "nba" | "mlb" | "nhl";
@@ -175,12 +176,13 @@ export default function WidgetForm({
     const [zipCode, setZipCode] = useState<string>("10001");
     const [uploadStatus, setUploadStatus] = useState("");
     const navigate = useNavigate();
+    const { user, activeCarePartnerId } = useAuth();
 
     useEffect(() => {
         if (!actualModuleId) return;
 
         async function loadWidget() {
-            var res = await fetch(`${API_URL}/modules/${actualModuleId}`);
+            let res = await fetch(`${API_URL}/modules/${actualModuleId}`);
             if (!res.ok) {
                 setUploadStatus("Failed to load module");
                 return;
@@ -230,10 +232,12 @@ export default function WidgetForm({
 
     async function handleUpload() {
         let data;
+        const moduleType = widgetType === "good" ? "news" : widgetType;
+
         if (widgetType === "weather") {
             data = { ZIPCODE: zipCode };
         } else if (widgetType === "sports") {
-            data = { CATEGORY: "", COUNTRY: sportsType, LANGUAGE: `${sportsTeam?.name} (${sportsTeam?.abbr})` || "" };
+            data = { CATEGORY: "", COUNTRY: sportsType, LANGUAGE: sportsTeam ? `${sportsTeam.name} (${sportsTeam.abbr})` : "" };
         } else {
             data = { CATEGORY: "", COUNTRY: "", LANGUAGE: "" };
         }
@@ -244,6 +248,11 @@ export default function WidgetForm({
                 : widgetType === "sports"
                 ? "/sports/upload"
                 : "/news/upload";
+
+        if (!user?.id || !activeCarePartnerId) {
+            setUploadStatus("Cannot save: user information missing.");
+            return;
+        }
 
         try {
             const response = await fetch(`${API_URL}${endpoint}`, {
@@ -258,29 +267,48 @@ export default function WidgetForm({
                 return;
             }
 
-            // Safely parse JSON if any
-            const text = await response.text();
-            let widgetMetadata: any = {};
-            if (text) {
-                try {
-                    widgetMetadata = JSON.parse(text);
-                } catch {
-                    console.warn("Response not valid JSON, using empty object");
-                }
+            const widgetData = await response.json();
+            const metadataId = widgetData.id;
+
+            if (!metadataId) {
+                setUploadStatus("Widget saved but metadata ID not returned.");
+                return;
             }
-            
+
+            // Create a module pointing to this widget
+            const moduleResponse = await fetch(`${API_URL}/modules`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    module_type: moduleType,
+                    caregiver_id: user.id,
+                    carepartner_id: activeCarePartnerId,
+                    metadata_id: metadataId,
+                }),
+            });
+
+            if (!moduleResponse.ok) {
+                const text = await moduleResponse.text();
+                setUploadStatus(`Widget saved but failed to create module: ${text}`);
+                return;
+            }
+
             setUploadStatus(`Saved!`);
 
-            // Reset form if needed
+            // Reset form
             setSportsTeam(null);
             setZipCode("10001");
+
+            if (onUpdateSuccess) {
+                onUpdateSuccess();
+            }
         } catch (err: any) {
             setUploadStatus("Upload failed: " + err.message);
         }
     }
 
     async function handleUpdate() {
-        var data;
+        let data;
         if (widgetType === "weather") {
             data = {
                 ID: widgetId,
@@ -291,7 +319,7 @@ export default function WidgetForm({
                 ID: widgetId,
                 CATEGORY: "",
                 COUNTRY: sportsType,
-                LANGUAGE: `${sportsTeam?.name} (${sportsTeam?.abbr})` || "",
+                LANGUAGE: sportsTeam ? `${sportsTeam.name} (${sportsTeam.abbr})` : "",
             };
         } else {
             data = {

@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 
 	widgets "server/internal/models/widgets/weather"
-	modules "server/internal/services/modules"
 )
 
 type WeatherService struct {
@@ -34,6 +34,37 @@ type OneCallOverviewResponse struct {
 	WeatherOverview string  `json:"weather_overview"`
 }
 
+type CurrentWeatherResponse struct {
+	Main struct {
+		Temp      float64 `json:"temp"`
+		FeelsLike float64 `json:"feels_like"`
+		Humidity  int     `json:"humidity"`
+		TempMin   float64 `json:"temp_min"`
+		TempMax   float64 `json:"temp_max"`
+	} `json:"main"`
+	Weather []struct {
+		Main        string `json:"main"`
+		Description string `json:"description"`
+	} `json:"weather"`
+	Wind struct {
+		Speed float64 `json:"speed"`
+	} `json:"wind"`
+	Name string `json:"name"`
+}
+
+type WeatherOverviewResponse struct {
+	Location    string `json:"location"`
+	Temp        int    `json:"temp"`
+	FeelsLike   int    `json:"feels_like"`
+	TempMin     int    `json:"temp_min"`
+	TempMax     int    `json:"temp_max"`
+	Humidity    int    `json:"humidity"`
+	WindSpeed   int    `json:"wind_speed"`
+	Condition   string `json:"condition"`
+	Description string `json:"description"`
+	Message     string `json:"message"`
+}
+
 func NewWeatherService(db *sql.DB, apiKey string) *WeatherService {
 	return &WeatherService{
 		db:     db,
@@ -52,13 +83,11 @@ func (s *WeatherService) CreateWeatherWidget(weather_widget *widgets.WeatherWidg
 	if !match {
 		return errors.New("ZIPCODE must be in valid zip code format")
 	}
-	metadata_id, err := widgets.CreateWeather(s.db, weather_widget)
+	_, err := widgets.CreateWeather(s.db, weather_widget)
 	if err != nil {
 		return fmt.Errorf("failed to create weather widget: %v", err)
 	}
-	moduleService := modules.NewModuleService(s.db)
-	_, err = moduleService.CreateModule("weather", 1, 1, metadata_id)
-	return err
+	return nil
 }
 
 // Create multiple weather widgets in bulk
@@ -132,9 +161,10 @@ func (s *WeatherService) DeleteWeatherWidget(id int) error {
 }
 
 /*
-Uses OpenWeather API to get coordinates from zipcode, then fetches the weather overview for the day
+Uses OpenWeather API to get coordinates from zipcode, then fetches current weather and the overview for the day
 */
-func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (string, error) {
+func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (*WeatherOverviewResponse, error) {
+	// 1. Geocode zipcode to coordinates
 	url := fmt.Sprintf(
 		"https://api.openweathermap.org/geo/1.0/zip?zip=%s,US&appid=%s",
 		weather_widget.ZIPCODE,
@@ -143,46 +173,88 @@ func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidge
 
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("failed geocode request: %v", err)
+		return nil, fmt.Errorf("failed geocode request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("geocode API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("geocode API returned status %d", resp.StatusCode)
 	}
 
 	var coordinate_response CoordinateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&coordinate_response); err != nil {
-		return "", fmt.Errorf("failed parsing geocode response: %v", err)
+		return nil, fmt.Errorf("failed parsing geocode response: %v", err)
 	}
 
 	unitsParam := "imperial"
 
-	url = fmt.Sprintf(
+	// 2. Fetch current weather (temp, conditions, etc.)
+	currentURL := fmt.Sprintf(
+		"https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&units=%s&appid=%s",
+		coordinate_response.Lat, coordinate_response.Lon, unitsParam, s.apiKey,
+	)
+
+	currentResp, err := s.client.Get(currentURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed current weather request: %v", err)
+	}
+	defer currentResp.Body.Close()
+
+	if currentResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("current weather API returned status %d", currentResp.StatusCode)
+	}
+
+	var currentWeather CurrentWeatherResponse
+	if err := json.NewDecoder(currentResp.Body).Decode(&currentWeather); err != nil {
+		return nil, fmt.Errorf("failed parsing current weather response: %v", err)
+	}
+
+	// 3. Fetch overview text
+	overviewURL := fmt.Sprintf(
 		"https://api.openweathermap.org/data/3.0/onecall/overview?lon=%f&lat=%f&units=%s&appid=%s",
 		coordinate_response.Lon, coordinate_response.Lat, unitsParam, s.apiKey,
 	)
 
-	resp, err = s.client.Get(url)
+	overviewResp, err := s.client.Get(overviewURL)
 	if err != nil {
-		return "", fmt.Errorf("failed overview request: %v", err)
+		return nil, fmt.Errorf("failed overview request: %v", err)
 	}
-	defer resp.Body.Close()
+	defer overviewResp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("overview API returned status %d", resp.StatusCode)
+	if overviewResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("overview API returned status %d", overviewResp.StatusCode)
 	}
 
 	var oneCallResponse OneCallOverviewResponse
-	if err := json.NewDecoder(resp.Body).Decode(&oneCallResponse); err != nil {
-		return "", fmt.Errorf("failed parsing overview response: %v", err)
+	if err := json.NewDecoder(overviewResp.Body).Decode(&oneCallResponse); err != nil {
+		return nil, fmt.Errorf("failed parsing overview response: %v", err)
 	}
 
-	if oneCallResponse.WeatherOverview == "" {
-		return "", fmt.Errorf("overview response missing weather_overview")
+	// 4. Build structured response
+	condition := ""
+	description := ""
+	if len(currentWeather.Weather) > 0 {
+		condition = currentWeather.Weather[0].Main
+		description = currentWeather.Weather[0].Description
 	}
 
-	return oneCallResponse.WeatherOverview, nil
+	location := currentWeather.Name
+	if location == "" {
+		location = coordinate_response.Name
+	}
+
+	return &WeatherOverviewResponse{
+		Location:    location,
+		Temp:        int(math.Round(currentWeather.Main.Temp)),
+		FeelsLike:   int(math.Round(currentWeather.Main.FeelsLike)),
+		TempMin:     int(math.Round(currentWeather.Main.TempMin)),
+		TempMax:     int(math.Round(currentWeather.Main.TempMax)),
+		Humidity:    currentWeather.Main.Humidity,
+		WindSpeed:   int(math.Round(currentWeather.Wind.Speed)),
+		Condition:   condition,
+		Description: description,
+		Message:     oneCallResponse.WeatherOverview,
+	}, nil
 }
 
 // Get total number of weather widgets

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	widgets "server/internal/models/widgets/news"
+	services "server/internal/services/widgets/news"
 	"strconv"
 )
 
@@ -17,7 +18,7 @@ type SportsNewsWidgetServiceInterface interface {
 	UpdateSportsNewsWidget(sport_news_widget *widgets.NewsWidget) error
 	DeleteSportsNewsWidget(id int) error
 	GetSportsNewsWidgetStats() (int, error)
-	GetTeamGame(sports_news_widget *widgets.NewsWidget) (string, error)
+	GetTeamGame(sports_news_widget *widgets.NewsWidget) (*services.GameSummaryResponse, error)
 }
 
 // Controller

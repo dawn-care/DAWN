@@ -1,4 +1,3 @@
-// app/text.tsx (or whatever route you want)
 import React, { useEffect, useState } from "react";
 import {
   ScrollView,
@@ -7,8 +6,7 @@ import {
   View,
 } from "react-native";
 import { Stack } from "expo-router";
-import { type ConfigurationWithMetadata, WeatherMetadata, NewsMetadata, EventMetadata } from "./agendaView";
-import { API_URL } from "./config";
+import { type ConfigurationWithMetadata, EventMetadata } from "./agendaView";
 
 type TextViewerConfig = {
   content: string;
@@ -18,75 +16,10 @@ interface TextViewerProps {
   configuration: ConfigurationWithMetadata;
 }
 
-async function fetchWeather(metadata: WeatherMetadata): Promise<string> {
-  var response = "";
-  try{
-    const res = await fetch(`${API_URL}/weather/overview`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(metadata),
-    });
-    response = await res.text();
-  } catch (err: any){
-    console.error("Failed getting weather overview: " + err.message);
-  }
-  return response;
-}
-
-async function fetchSports(metadata: NewsMetadata): Promise<string>{
-  var response = "";
-  try{
-    const res = await fetch(`${API_URL}/sports/team-game`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(metadata),
-    });
-    response = await res.text();
-  } catch (err: any){
-    console.error("Failed getting sports overview: " + err.message);
-  }
-  return response;
-}
-
-async function fetchNews(): Promise<string>{
-  var response = "";
-  try{
-    const res = await fetch(`${API_URL}/news/good-news`);
-    response = await res.text();
-  } catch (err: any){
-    console.error("Failed getting sports overview: " + err.message);
-  }
-  return response;
-}
-
 async function buildConfig(
   configuration: ConfigurationWithMetadata
 ): Promise<TextViewerConfig> {
-  let metadata;
-
-  if (configuration.module_type === "weather") {
-    metadata = configuration.metadata as WeatherMetadata | null;
-
-    return {
-      content: metadata ? await fetchWeather(metadata) : "",
-    };
-  }
-
-  if (configuration.module_type === "sports") {
-    metadata = configuration.metadata as NewsMetadata | null;
-
-    return {
-      content: metadata ? await fetchSports(metadata) : "",
-    };
-  }
-
-  if (configuration.module_type === "news") {
-    return {
-      content: await fetchNews(),
-    };
-  }
-
-  metadata = configuration.metadata as EventMetadata | null;
+  const metadata = configuration.metadata as EventMetadata | null;
 
   return {
     content: metadata?.text ?? "",

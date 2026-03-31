@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	widgets "server/internal/models/widgets/weather"
+	services "server/internal/services/widgets/weather"
 	"strconv"
 )
 
@@ -16,7 +17,7 @@ type WeatherWidgetServiceInterface interface {
 	GetWeatherWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.WeatherWidget, error)
 	UpdateWeatherWidget(weather_widget *widgets.WeatherWidget) error
 	DeleteWeatherWidget(id int) error
-	GetWeatherOverview(weather_widget *widgets.WeatherWidget) (string, error)
+	GetWeatherOverview(weather_widget *widgets.WeatherWidget) (*services.WeatherOverviewResponse, error)
 	GetWeatherWidgetStats() (int, error)
 }
 

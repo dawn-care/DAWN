@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	models "server/internal/models/widgets/news"
+	services "server/internal/services/widgets/news"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -21,7 +22,7 @@ type mockSportsNewsWidgetService struct {
 	UpdateSportsNewsWidgetFunc                        func(news_widget *models.NewsWidget) error
 	DeleteSportsNewsWidgetFunc                        func(id int) error
 	GetSportsNewsWidgetStatsFunc                      func() (int, error)
-	GetTeamGameFunc                                   func(news_widget *models.NewsWidget) (string, error)
+	GetTeamGameFunc                                   func(news_widget *models.NewsWidget) (*services.GameSummaryResponse, error)
 }
 
 func (m *mockSportsNewsWidgetService) CreateSportsNewsWidget(news_widget *models.NewsWidget) error {
@@ -48,7 +49,7 @@ func (m *mockSportsNewsWidgetService) DeleteSportsNewsWidget(id int) error {
 func (m *mockSportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 	return m.GetSportsNewsWidgetStatsFunc()
 }
-func (m *mockSportsNewsWidgetService) GetTeamGame(news_widget *models.NewsWidget) (string, error) {
+func (m *mockSportsNewsWidgetService) GetTeamGame(news_widget *models.NewsWidget) (*services.GameSummaryResponse, error) {
 	return m.GetTeamGameFunc(news_widget)
 }
 
@@ -200,8 +201,14 @@ func TestGetSportsNewsWidgetStatsHandler(t *testing.T) {
 
 func TestGetTeamGameHandler(t *testing.T) {
 	mockService := &mockSportsNewsWidgetService{
-		GetTeamGameFunc: func(news_widget *models.NewsWidget) (string, error) {
-			return "you win!", nil
+		GetTeamGameFunc: func(news_widget *models.NewsWidget) (*services.GameSummaryResponse, error) {
+			return &services.GameSummaryResponse{
+				UserTeamName:     "Bills",
+				OpponentTeamName: "Chiefs",
+				UserScore:        24,
+				OpponentScore:    17,
+				Message:          "you win!",
+			}, nil
 		},
 	}
 

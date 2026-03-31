@@ -663,11 +663,14 @@ function getModuleLabel(cfg: ConfigurationWithMetadata): string {
             return `Audio - ${(meta as any).displayed_name ?? `Module ${cfg.module_id}`}`;
         case 'weather':
             return `Weather - Zip: ${(meta as any).zipcode}`;
-        case 'news':
         case 'sports':
-            return `News - ${(meta as any).category}`;
-        case 'message':
-            return `Message`;
+            return `Sports - ${(meta as any).language || 'Sports News'}`;
+        case 'news':
+            return 'Good News';
+        case 'messages': {
+            const msg = (meta as any).message;
+            return msg ? (msg.length > 30 ? `Message - ${msg.slice(0, 30)}...` : `Message - ${msg}`) : 'Message';
+        }
         case 'event':
             return `Event - ${(meta as any).text}`;
         case 'carepartner_location':

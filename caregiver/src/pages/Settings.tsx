@@ -199,6 +199,13 @@ const handleLogout = async () => {
           </button>
 
           <button
+            className="mt-4 flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-semibold py-3 rounded"
+            onClick={() => navigate("/setup")}
+          >
+            Repair Device
+          </button>
+
+          <button
             className="mt-4 flex-1 bg-red-500 hover:bg-red-600 text-gray-800 font-semibold py-3 rounded"
             onClick={handleLogout}
           >

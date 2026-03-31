@@ -10,7 +10,6 @@ import (
 	"time"
 
 	models "server/internal/models/widgets/news"
-	modules "server/internal/services/modules"
 )
 
 type SportsNewsWidgetService struct {
@@ -42,6 +41,14 @@ type Team struct {
 	Score    float64
 }
 
+type GameSummaryResponse struct {
+	UserTeamName     string `json:"user_team_name"`
+	OpponentTeamName string `json:"opponent_team_name"`
+	UserScore        int    `json:"user_score"`
+	OpponentScore    int    `json:"opponent_score"`
+	Message          string `json:"message"`
+}
+
 var SPORTS_LEAGUES_MAP = map[string]string{"nfl": "football", "nba": "basketball", "mlb": "baseball", "nhl": "hockey"}
 
 func NewSportsNewsWidgetService(db *sql.DB) *SportsNewsWidgetService {
@@ -62,13 +69,11 @@ func (s *SportsNewsWidgetService) CreateSportsNewsWidget(sports_news_widget *mod
 	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
 		return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
 	}
-	metadata_id, err := models.CreateNews(s.db, sports_news_widget)
+	_, err := models.CreateNews(s.db, sports_news_widget)
 	if err != nil {
 		return fmt.Errorf("failed to create sports news widget: %v", err)
 	}
-	moduleService := modules.NewModuleService(s.db)
-	_, err = moduleService.CreateModule("sports", 1, 1, metadata_id)
-	return err
+	return nil
 }
 
 // Create multiple sports widgets in bulk
@@ -152,9 +157,9 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 }
 
 // Gets the the schedule for a team then calls the helper function to parse that data into a game summary
-func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWidget) (string, error) {
+func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWidget) (*GameSummaryResponse, error) {
 	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
-		return "", errors.New("league and team cannot be empty")
+		return nil, errors.New("league and team cannot be empty")
 	}
 	sport := SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY]
 	re := regexp.MustCompile(`\(([^)]+)\)$`)
@@ -170,29 +175,29 @@ func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWid
 	)
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch team schedule: %v", err)
+		return nil, fmt.Errorf("failed to fetch team schedule: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("ESPN APi returend status %d", resp.StatusCode)
+		return nil, fmt.Errorf("ESPN APi returend status %d", resp.StatusCode)
 	}
 	var apiResponse SportAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
-		return "", fmt.Errorf("failed to parse team schedule response: %v", err)
+		return nil, fmt.Errorf("failed to parse team schedule response: %v", err)
 	}
 
-	game_summary, err := CreateGameSummary(&apiResponse, sports_news_widget.LANGUAGE)
+	game_summary, err := CreateGameSummary(&apiResponse, teamAbbr)
 	if err != nil {
-		return "", fmt.Errorf("failed to create game summary: %v", err)
+		return nil, fmt.Errorf("failed to create game summary: %v", err)
 	}
 
 	return game_summary, nil
 }
 
-// Parses the API response into a game_summary string
-func CreateGameSummary(apiResponse *SportAPIResponse, team string) (string, error) {
+// Parses the API response into a structured GameSummaryResponse
+func CreateGameSummary(apiResponse *SportAPIResponse, team string) (*GameSummaryResponse, error) {
 	if apiResponse == nil || len(apiResponse.Events) == 0 {
-		return "No upcoming games found.", nil
+		return &GameSummaryResponse{Message: "No upcoming games found."}, nil
 	}
 
 	game_index := 0
@@ -200,7 +205,7 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (string, erro
 	for i := len(apiResponse.Events) - 1; i >= 0; i-- {
 		date, err := time.Parse("2006-01-02T15:04Z", apiResponse.Events[i].Competitions[0].Date)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if date.Before(now) {
 			game_index = i
@@ -226,17 +231,23 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (string, erro
 		}
 	}
 
-	if user_team.Score > opponent_team.Score {
-		if user_team.HomeAway == "home" {
-			return fmt.Sprintf("In the last game, your team the %s won against the %s at home, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
-		} else {
-			return fmt.Sprintf("In the last game, your team the %s won against the %s away, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
-		}
-	} else {
-		if user_team.HomeAway == "home" {
-			return fmt.Sprintf("In the last game, your team the %s lost against the %s at home, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
-		} else {
-			return fmt.Sprintf("In the last game, your team the %s lost against the %s away, with a score of %d to %d.", user_team.Name, opponent_team.Name, int(user_team.Score), int(opponent_team.Score)), nil
-		}
+	var message string
+	result := "won"
+	if user_team.Score <= opponent_team.Score {
+		result = "lost"
 	}
+	location := "away"
+	if user_team.HomeAway == "home" {
+		location = "at home"
+	}
+	message = fmt.Sprintf("In the last game, your team the %s %s against the %s %s, with a score of %d to %d.",
+		user_team.Name, result, opponent_team.Name, location, int(user_team.Score), int(opponent_team.Score))
+
+	return &GameSummaryResponse{
+		UserTeamName:     user_team.Name,
+		OpponentTeamName: opponent_team.Name,
+		UserScore:        int(user_team.Score),
+		OpponentScore:    int(opponent_team.Score),
+		Message:          message,
+	}, nil
 }
