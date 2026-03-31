@@ -85,7 +85,7 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
 }
 
 export default function AgendaView(){
-    const { todaysItems, loading, error, refresh } = useSchedule();
+    const { todaysItems, loading, error, refresh, playedIds, markPlayed } = useSchedule();
     const { trigger } = useLocalSearchParams<{ trigger?: string }>();
 
     // --- Local playback state ---
@@ -101,11 +101,12 @@ export default function AgendaView(){
         refresh();
     }, []);
 
-    // Build queue based on trigger:
-    // - 'scheduled' → only due timed items
-    // - 'manual' / 'auto_start' → only regular (non-timed) items
+    // Build queue ONCE when data first loads. Played items are excluded.
+    // The queue is NOT rebuilt on subsequent refreshes to prevent periodic replays.
+    const queueBuiltRef = useRef(false);
     useEffect(() => {
-        if (!todaysItems.length) return;
+        if (queueBuiltRef.current) return;
+        if (loading || !todaysItems.length) return;
 
         let queue: ConfigurationWithMetadata[];
 
@@ -116,15 +117,16 @@ export default function AgendaView(){
             })();
 
             queue = todaysItems
-                .filter(i => i.timed && (i.time ?? '').slice(0, 5) <= currentTime)
+                .filter(i => i.timed && (i.time ?? '').slice(0, 5) <= currentTime && !playedIds.has(i.id))
                 .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
         } else {
-            queue = todaysItems.filter(i => !i.timed);
+            queue = todaysItems.filter(i => !i.timed && !playedIds.has(i.id));
         }
 
+        queueBuiltRef.current = true;
         setCurrentIndex(0);
         setPlayQueue(queue);
-    }, [todaysItems, trigger]);
+    }, [todaysItems, loading, trigger, playedIds]);
 
     // When an error occurs, redirect to home after 5 seconds
     useEffect(() => {
@@ -144,7 +146,7 @@ export default function AgendaView(){
         return () => clearTimeout(timer);
     }, [loading, error, playQueue]);
 
-    // Duration timer — depends ONLY on currentIndex (reads queue from ref)
+    // Duration timer — re-runs when currentIndex changes OR when the queue is first populated
     useEffect(() => {
         const queue = playQueueRef.current;
         if (!queue.length) return;
@@ -162,11 +164,13 @@ export default function AgendaView(){
         }, (item.duration || 10) * 1000);
 
         return () => clearTimeout(timer);
-    }, [currentIndex]);
+    }, [currentIndex, playQueue]);
 
     const advanceToNext = () => {
         setCurrentIndex(prev => {
             const queue = playQueueRef.current;
+            const current = queue[prev];
+            if (current) markPlayed(current.id);
             if (prev + 1 >= queue.length) {
                 router.replace('/');
                 return prev;

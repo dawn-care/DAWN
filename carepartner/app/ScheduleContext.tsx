@@ -15,6 +15,8 @@ interface ScheduleContextType {
   loading: boolean;
   error: string | null;
   carepartner: Carepartner | null;
+  playedIds: Set<number>;
+  markPlayed: (id: number) => void;
   refresh: () => Promise<void>;
 }
 
@@ -48,6 +50,22 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const lastAutoStartDateRef = useRef<string | null>(null);
   // Dedup ref so the scheduled-item trigger navigates at most once per item
   const navFiredRef = useRef<Set<number>>(new Set());
+
+  // Track which items have already been played today
+  const [playedIds, setPlayedIds] = useState<Set<number>>(new Set());
+  const playedIdsRef = useRef<Set<number>>(playedIds);
+  useEffect(() => { playedIdsRef.current = playedIds; }, [playedIds]);
+
+  const todaysItemsRef = useRef<ConfigurationWithMetadata[]>(todaysItems);
+  useEffect(() => { todaysItemsRef.current = todaysItems; }, [todaysItems]);
+
+  const markPlayed = (id: number) => {
+    setPlayedIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
 
   // ---- Fetch carepartner info ----
   const fetchCarepartner = async (): Promise<Carepartner | null> => {
@@ -117,6 +135,19 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
+  // Reset played-item tracking at midnight
+  useEffect(() => {
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    const timer = setTimeout(() => {
+      setPlayedIds(new Set());
+      navFiredRef.current = new Set();
+      lastAutoStartDateRef.current = null;
+    }, msUntilMidnight);
+    return () => clearTimeout(timer);
+  }, []);
+
   // ---- Global auto-start trigger ----
   useEffect(() => {
     const check = () => {
@@ -129,6 +160,12 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
       if (now.getHours() !== h || now.getMinutes() !== m) return;
       if (lastAutoStartDateRef.current === dateKey) return;
+
+      // Only trigger if there are unplayed non-timed items
+      const hasUnplayed = todaysItemsRef.current.some(
+        i => !i.timed && !playedIdsRef.current.has(i.id)
+      );
+      if (!hasUnplayed) return;
 
       lastAutoStartDateRef.current = dateKey;
       router.navigate({ pathname: '/agendaView', params: { trigger: 'auto_start' } } as any);
@@ -150,8 +187,9 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
       for (const item of scheduled) {
         if (navFiredRef.current.has(item.id)) continue;
+        if (playedIdsRef.current.has(item.id)) continue;
         const itemTime = (item.time ?? '').slice(0, 5);
-        if (itemTime <= currentTime) {
+        if (itemTime === currentTime) {
           navFiredRef.current.add(item.id);
           shouldNavigate = true;
         }
@@ -174,6 +212,8 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         carepartner,
+        playedIds,
+        markPlayed,
         refresh,
       }}
     >
