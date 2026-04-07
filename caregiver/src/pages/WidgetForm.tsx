@@ -50,7 +50,7 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Seattle Seahawks", abbr: "SEA" },
     { name: "Tampa Bay Buccaneers", abbr: "TB" },
     { name: "Tennessee Titans", abbr: "TEN" },
-    { name: "Washington Commanders", abbr: "WAS" }
+    { name: "Washington Commanders", abbr: "WSH" }
   ],
 
   nba: [
@@ -63,7 +63,7 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Dallas Mavericks", abbr: "DAL" },
     { name: "Denver Nuggets", abbr: "DEN" },
     { name: "Detroit Pistons", abbr: "DET" },
-    { name: "Golden State Warriors", abbr: "GSW" },
+    { name: "Golden State Warriors", abbr: "GS" },
     { name: "Houston Rockets", abbr: "HOU" },
     { name: "Indiana Pacers", abbr: "IND" },
     { name: "LA Clippers", abbr: "LAC" },
@@ -72,8 +72,8 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Miami Heat", abbr: "MIA" },
     { name: "Milwaukee Bucks", abbr: "MIL" },
     { name: "Minnesota Timberwolves", abbr: "MIN" },
-    { name: "New Orleans Pelicans", abbr: "NOP" },
-    { name: "New York Knicks", abbr: "NYK" },
+    { name: "New Orleans Pelicans", abbr: "NO" },
+    { name: "New York Knicks", abbr: "NY" },
     { name: "Oklahoma City Thunder", abbr: "OKC" },
     { name: "Orlando Magic", abbr: "ORL" },
     { name: "Philadelphia 76ers", abbr: "PHI" },
@@ -82,8 +82,8 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Sacramento Kings", abbr: "SAC" },
     { name: "San Antonio Spurs", abbr: "SAS" },
     { name: "Toronto Raptors", abbr: "TOR" },
-    { name: "Utah Jazz", abbr: "UTA" },
-    { name: "Washington Wizards", abbr: "WAS" }
+    { name: "Utah Jazz", abbr: "UTAH" },
+    { name: "Washington Wizards", abbr: "WSH" }
   ],
 
   mlb: [
@@ -92,7 +92,7 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Baltimore Orioles", abbr: "BAL" },
     { name: "Boston Red Sox", abbr: "BOS" },
     { name: "Chicago Cubs", abbr: "CHC" },
-    { name: "Chicago White Sox", abbr: "CWS" },
+    { name: "Chicago White Sox", abbr: "CHW" },
     { name: "Cincinnati Reds", abbr: "CIN" },
     { name: "Cleveland Guardians", abbr: "CLE" },
     { name: "Colorado Rockies", abbr: "COL" },
@@ -106,7 +106,7 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Minnesota Twins", abbr: "MIN" },
     { name: "New York Mets", abbr: "NYM" },
     { name: "New York Yankees", abbr: "NYY" },
-    { name: "Oakland Athletics", abbr: "OAK" },
+    { name: "Oakland Athletics", abbr: "ATH" },
     { name: "Philadelphia Phillies", abbr: "PHI" },
     { name: "Pittsburgh Pirates", abbr: "PIT" },
     { name: "San Diego Padres", abbr: "SD" },
@@ -121,7 +121,6 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
 
   nhl: [
     { name: "Anaheim Ducks", abbr: "ANA" },
-    { name: "Arizona Coyotes", abbr: "ARI" },
     { name: "Boston Bruins", abbr: "BOS" },
     { name: "Buffalo Sabres", abbr: "BUF" },
     { name: "Calgary Flames", abbr: "CGY" },
@@ -133,11 +132,11 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "Detroit Red Wings", abbr: "DET" },
     { name: "Edmonton Oilers", abbr: "EDM" },
     { name: "Florida Panthers", abbr: "FLA" },
-    { name: "Los Angeles Kings", abbr: "LAK" },
+    { name: "Los Angeles Kings", abbr: "LA" },
     { name: "Minnesota Wild", abbr: "MIN" },
     { name: "Montreal Canadiens", abbr: "MTL" },
     { name: "Nashville Predators", abbr: "NSH" },
-    { name: "New Jersey Devils", abbr: "NJD" },
+    { name: "New Jersey Devils", abbr: "NJ" },
     { name: "New York Islanders", abbr: "NYI" },
     { name: "New York Rangers", abbr: "NYR" },
     { name: "Ottawa Senators", abbr: "OTT" },
@@ -148,6 +147,7 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
     { name: "St. Louis Blues", abbr: "STL" },
     { name: "Tampa Bay Lightning", abbr: "TB" },
     { name: "Toronto Maple Leafs", abbr: "TOR" },
+    { name: "Utah Mammoth", abbr: "UTA" },
     { name: "Vancouver Canucks", abbr: "VAN" },
     { name: "Vegas Golden Knights", abbr: "VGK" },
     { name: "Washington Capitals", abbr: "WSH" },
@@ -430,7 +430,7 @@ export default function WidgetForm({
                         >
                         <option value="weather">Weather News</option>
                         <option value="sports">Sports News</option>
-                        <option value="good">Good News</option>
+                        {/* <option value="good">Good News</option> */} {/* The API is not returning any articles from the good news website, so I think we should just disable it */}
                         </select>
                     )}
                 </div>
