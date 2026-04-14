@@ -1,15 +1,79 @@
+/**
+ * Login.tsx
+ * 
+ * This component handles user authentication via Google OAuth.
+ * 
+ * Responsibilities:
+ *  - Initiate Google login flow
+ *  - Send ID token to backend for verification
+ *  - Fetch authenticated user data
+ *  - Update global AuthContext
+ *  - Redirect user based on account state
+ * 
+ * Redirect logic:
+ *  - No carepartners → Account setup page
+ *  - Has carepartners → Library page
+ */
+
 import { GoogleLogin } from "@react-oauth/google";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * Login Component
+ * 
+ * Handles:
+ *  - Google authentication
+ *  - Backend session creation
+ *  - User state initialization
+ */
 const Login = () => {
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
-  const [loading, setLoading] = useState(false);
+  
+  /* ============================
+     Routing / Context
+  ============================ */
+
   const navigate = useNavigate();
   const { setUser, setIsAuthenticated, setActiveCarePartnerId } = useAuth();
+
+  /**
+   * Base API URL
+   */
   const API_URL = import.meta.env.VITE_API_URL;
 
+  /* ============================
+     State
+  ============================ */
+
+  /**
+   * Status of login process
+   */
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+
+  /**
+   * Loading indicator for login request
+   */
+  const [loading, setLoading] = useState(false);
+
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Handles successful Google authentication
+   * 
+   * Flow:
+   *  1. Send Google ID token to backend
+   *  2. Backend verifies and creates session
+   *  3. Fetch authenticated user data
+   *  4. Store user in global context
+   *  5. Redirect based on carepartner state
+   */
   const handleSuccess = async (credentialResponse: any) => {
     setStatus("idle");
     setLoading(true);
@@ -17,7 +81,9 @@ const Login = () => {
     try {
       const idToken = credentialResponse.credential;
 
-      // Login with Google 
+      /* ============================
+         Step 1: Backend Login
+      ============================ */
       const loginRes = await fetch(`${API_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -31,7 +97,9 @@ const Login = () => {
         return;
       }
 
-      // Fetch logged-in user 
+      /* ============================
+         Step 2: Fetch User
+      ============================ */
       const meRes = await fetch(`${API_URL}/me`, {
         credentials: "include",
       });
@@ -44,11 +112,15 @@ const Login = () => {
 
       const user = await meRes.json();
 
-      // Update AuthContext so user info can be accessed globally
+      /* ============================
+         Step 3: Update Context
+      ============================ */
       setUser(user);
       setIsAuthenticated(true);
 
-      // Redirect to pairing if no carepartners linked, or library if they have some
+      /* ============================
+         Step 4: Redirect Logic
+      ============================ */
       if (!user.carepartners || user.carepartners.length === 0) {
         navigate("/setup");
       } else {
@@ -65,31 +137,42 @@ const Login = () => {
     }
   };
 
+  /**
+   * Handles Google login error
+   */
   const handleError = () => {
     setStatus("error");
   };
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Welcome!</h1>
 
       <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+
+        {/* Description */}
         <div className="mb-6 text-center">
           <label className="text-lg font-medium">
             Log in or sign up with Google to access your agenda and library.
           </label>
         </div>
 
+        {/* Google Login Button */}
         <div className="flex justify-center">
           <GoogleLogin onSuccess={handleSuccess} onError={handleError} />
         </div>
 
+        {/* Error Message */}
         {status === "error" && (
           <p style={{ color: "red", marginTop: 12 }}>
             Login failed. Please try again.
           </p>
         )}
 
+        {/* Loading Indicator */}
         {loading && (
           <p style={{ marginTop: 12 }}>Logging in… please wait.</p>
         )}

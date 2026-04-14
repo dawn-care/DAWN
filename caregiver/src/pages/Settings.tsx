@@ -1,41 +1,118 @@
+/**
+ * SettingsPage.tsx
+ * 
+ * This component allows users to manage account and care partner settings.
+ * 
+ * Responsibilities:
+ *  - View and update caregiver profile information
+ *  - View active carepartner details
+ *  - Configure carepartner auto-start time
+ *  - Logout user and clear session
+ *  - Navigate to device repair/setup flow
+ */
+
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
+/* ============================
+   Types
+============================ */
+
+/**
+ * Caregiver profile structure
+ */
 interface Caregiver {
   id: number;
   name: string;
   role: string;
 }
 
+/**
+ * Default fallback caregiver state
+ */
 const DEFAULT_CAREGIVER: Caregiver = {
   id: 0,
   name: "Your Name",
   role: "Primary Caregiver",
 };
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * SettingsPage Component
+ * 
+ * Provides account settings, carepartner configuration,
+ * and session management actions.
+ */
 export default function SettingsPage() {
-  const { setIsAuthenticated, setUser, activeCarePartnerId, setActiveCarePartnerId } = useAuth();
+
+  /* ============================
+     Routing / Context
+  ============================ */
+
   const navigate = useNavigate();
 
-  const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
-  const [autoStart, setAutoStart] = useState<string>("08:00"); // default
-  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const {
+    setIsAuthenticated,
+    setUser,
+    activeCarePartnerId,
+    setActiveCarePartnerId,
+  } = useAuth();
+
+  /**
+   * Base API URL
+   */
   const API_URL = import.meta.env.VITE_API_URL;
 
-  // Get the caregiver info
+  /* ============================
+     State
+  ============================ */
+
+  /**
+   * Caregiver profile data
+   */
+  const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
+
+  /**
+   * Carepartner auto-start time (HH:mm format)
+   */
+  const [autoStart, setAutoStart] = useState<string>("08:00");
+
+  /**
+   * UI status messages for updates
+   */
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+
+  /**
+   * Logout error message
+   */
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Fetch caregiver and carepartner settings on load
+   */
   useEffect(() => {
     const fetchCaregiverAndCarepartner = async () => {
       try {
-        // Fetch caregiver info
+        /* ============================
+           Fetch caregiver profile
+        ============================ */
         const resCg = await fetch(`${API_URL}/me`, { method: "GET", credentials: "include" });
         if (!resCg.ok) return;
 
         const cgData = await resCg.json();
         setCaregiver(cgData);
 
-        // Fetch associated carepartner
+        /* ============================
+           Fetch carepartner settings
+        ============================ */
         if (!activeCarePartnerId) return;
         const resCp = await fetch(`${API_URL}/users/carepartner/${activeCarePartnerId}`, {
           method: "GET",
@@ -57,32 +134,41 @@ export default function SettingsPage() {
     fetchCaregiverAndCarepartner();
   }, [activeCarePartnerId]);
 
-  // Logout
-const handleLogout = async () => {
-  try {
-    // Call the backend to clear the cookie
-    const res = await fetch(`${API_URL}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
 
-    if (!res.ok) {
-      throw new Error("Failed to logout");
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Logs the user out and clears authentication state
+   */
+  const handleLogout = async () => {
+    try {
+      // Call the backend to clear the cookie
+      const res = await fetch(`${API_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to logout");
+      }
+
+      // Update global auth state
+      setIsAuthenticated(false);
+      setUser(null);
+      setActiveCarePartnerId(null);
+
+      // Redirect to login
+      navigate("/login");
+    } catch (err: any) {
+      setLogoutError("Logout failed: " + err.message);
     }
+  };
 
-    // Update global auth state
-    setIsAuthenticated(false);
-    setUser(null);
-    setActiveCarePartnerId(null);
-
-    // Redirect to login
-    navigate("/login");
-  } catch (err: any) {
-    setLogoutError("Logout failed: " + err.message);
-  }
-};
-
-  // Update caregiver info
+  /**
+   * Updates caregiver profile information
+   */
   const handleUpdate = async () => {
     try {
       const res = await fetch(`${API_URL}/caregivers`, {
@@ -108,6 +194,9 @@ const handleLogout = async () => {
     }
   };
 
+  /**
+   * Updates carepartner auto-start configuration
+   */
   const handleUpdateAutoStart = async () => {
     if (!activeCarePartnerId) return;
 
@@ -135,12 +224,16 @@ const handleLogout = async () => {
     }
   };
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Settings</h1>
 
       <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
-        {/* Name */}
+        
+        {/* Caregiver Name */}
         <div className="mb-6">
           <label className="text-lg font-medium">Name:</label>
           <input

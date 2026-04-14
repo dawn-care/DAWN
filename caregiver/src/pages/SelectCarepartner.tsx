@@ -1,21 +1,67 @@
+/**
+ * SelectCarePartnerPage.tsx
+ * 
+ * This component allows a logged-in caregiver to select an active care partner.
+ * 
+ * Responsibilities:
+ *  - Display list of available carepartners from authenticated user
+ *  - Allow user to select one carepartner
+ *  - Store selection in AuthContext (and persisted storage)
+ *  - Redirect user to Library after selection
+ */
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * SelectCarePartnerPage Component
+ * 
+ * Used when a user has multiple carepartners and must choose one
+ * before accessing the main application.
+ */
 export default function SelectCarePartnerPage() {
-  const { user, setActiveCarePartnerId } = useAuth();
+
+  /* ============================
+     Routing / Context
+  ============================ */
+
   const navigate = useNavigate();
+  const { user, setActiveCarePartnerId } = useAuth();
+
+  /* ============================
+     State
+  ============================ */
+
+  /**
+   * Currently selected carepartner ID (string for select input binding)
+   */
   const [selectedId, setSelectedId] = useState("");
 
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Handles continuation after selecting a carepartner
+   */
   const handleContinue = () => {
     if (!selectedId) return;
 
     // store selection via context (which syncs to localStorage)
     setActiveCarePartnerId(Number(selectedId));
 
+    // Navigate to main application
     navigate("/library");
   };
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">
@@ -24,7 +70,7 @@ export default function SelectCarePartnerPage() {
 
       <div className="border p-8 max-w-xl w-full rounded-lg bg-white shadow">
 
-        {/* Dropdown */}
+        {/* Carepartner Selection Dropdown */}
         <select
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
@@ -44,6 +90,7 @@ export default function SelectCarePartnerPage() {
           <span className="italic font-medium">Agenda</span>
         </p>
 
+        {/* Continue Button */}
         <button
           onClick={handleContinue}
           className="mt-6 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
