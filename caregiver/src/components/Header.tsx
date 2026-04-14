@@ -14,6 +14,10 @@ export default function Header() {
       </div>
 
       <nav className="flex gap-10 text-xl font-medium text-gray-800 items-center">
+        <Link to="/guide" className="hover:underline">
+          Help
+        </Link>
+        
         {isAuthenticated ? (
           <>
             {/* Only show when logged in */}

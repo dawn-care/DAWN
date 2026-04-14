@@ -13,8 +13,10 @@ import (
 )
 
 var VALID_IMAGE_TYPES = map[string]bool{
+	"image/jpg":  true,
 	"image/jpeg": true,
 	"image/png":  true,
+	"image/heic": true,
 	"image/gif":  true,
 	"image/webp": true,
 }

@@ -13,6 +13,7 @@ import Login from "./pages/Login"
 import Settings from "./pages/Settings";
 import AccountSetupPage from "./pages/AccountSetup";
 import RequireCarePartner from "./components/RequireCarepartner";
+import UserGuide from "./pages/UserGuide";
 
 function App() {
   return (
@@ -21,6 +22,8 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
+
+        <Route path="/guide" element={<UserGuide />} />
 
         <Route
           path="/library"

@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 type MediaType = "video" | "photo" | "audio";
 
 const allowedExtensions = {
-  video: [".mp4", ".mov", ".avi"],
-  photo: [".jpg", ".jpeg", ".png", ".heic"],
+  video: [".mp4", ".mov", ".avi", ".webm", ".ogg"],
+  photo: [".jpg", ".jpeg", ".png", ".heic", ".gif", ".webp"],
   audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
 
