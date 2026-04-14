@@ -14,6 +14,8 @@ import (
 
 var VALID_VIDEO_TYPES = map[string]bool{
 	"video/mp4":  true,
+	"video/mov":  true,
+	"video/avi": true,
 	"video/webm": true,
 	"video/ogg":  true,
 }
