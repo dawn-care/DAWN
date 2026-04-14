@@ -119,12 +119,12 @@ func TestGetTeamGame(t *testing.T) {
 
 	news_widget := &modelsWidget.NewsWidget{
 		ID:       1,
-		LANGUAGE: "BUF",
+		LANGUAGE: "Bills (BUF)",
 		COUNTRY:  "nfl",
 	}
 
 	game_overview, err := sports_news_service.GetTeamGame(news_widget)
 
-	fmt.Printf("%s", game_overview)
+	fmt.Printf("%v+\n", game_overview)
 	assert.NoError(t, err)
 }

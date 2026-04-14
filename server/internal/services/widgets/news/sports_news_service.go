@@ -179,7 +179,7 @@ func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWid
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ESPN APi returend status %d", resp.StatusCode)
+		return nil, fmt.Errorf("ESPN API returned status %d", resp.StatusCode)
 	}
 	var apiResponse SportAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
