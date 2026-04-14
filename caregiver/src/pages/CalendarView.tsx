@@ -1,25 +1,97 @@
+/**
+ * CalendarView.tsx
+ * 
+ * A simple monthly calendar UI component.
+ * 
+ * Responsibilities:
+ * - Display a calendar grid for the current month
+ * - Allow navigation between months
+ * - Allow users to select a date
+ * - Navigate to the agenda view for a selected date
+ * 
+ * Navigation:
+ * - On date click → redirects to `/agenda/YYYY-MM-DD`
+ * 
+ * Notes:
+ * - Dates are formatted manually to avoid timezone/UTC shift issues
+ * - Calendar is generated dynamically based on the currentDate state
+ */
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function CalendarView() {
+  /* ============================
+     Routing
+  ============================ */
+
+  /**
+   * React Router navigation hook
+   * Used to navigate to agenda view on date click
+   */
   const navigate = useNavigate();
+
+  /* ============================
+     State
+  ============================ */
+
+  /**
+   * Tracks the currently displayed month/year
+   * Defaults to today's date
+   */
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  /* ============================
+     Helper Functions
+  ============================ */
+
+  /**
+   * Returns the number of days in a given month
+   * 
+   * @param date - Reference date
+   * @returns number of days in the month
+   */
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
 
+  /**
+   * Returns the day index (0–6) of the first day of the month
+   * 
+   * @param date - Reference date
+   * @returns index of first weekday (0 = Sunday)
+   */
   const getFirstDayOfMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
+  /* ============================
+     Constants
+  ============================ */
+
+  /**
+   * Month names for display
+   */
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  /**
+   * Day-of-week labels
+   */
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  /* ============================
+     Calendar Grid Generation
+  ============================ */
+
+  /**
+   * Array representing all cells in the calendar grid
+   * Includes:
+   * - null values for leading empty cells
+   * - numeric day values for actual dates
+   */
   const days: (number | null)[] = [];
   const firstDay = getFirstDayOfMonth(currentDate);
   const daysInMonth = getDaysInMonth(currentDate);
@@ -34,30 +106,59 @@ export default function CalendarView() {
     days.push(i);
   }
 
+  /* ============================
+     Event Handlers
+  ============================ */
+
+  /**
+   * Handles clicking a calendar day
+   * 
+   * Converts selected day into YYYY-MM-DD format
+   * and navigates to the agenda page
+   * 
+   * @param day - selected day of the month
+   */
   const handleDateClick = (day: number) => {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
-    const formattedDate = `${y}-${m}-${d}`; // YYYY-MM-DD format without UTC shift
+
+    /**
+     * Format: YYYY-MM-DD without UTC shift
+     * Avoids UTC conversion issues by using local date parts
+     */
+    const formattedDate = `${y}-${m}-${d}`; 
     navigate(`/agenda/${formattedDate}`);
   };
 
+  /**
+   * Navigate to previous month
+   */
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
   };
 
+  /**
+   * Navigate to next month
+   */
   const handleNextMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-8 py-12">
+        {/* Page Title */}
         <h1 className="text-4xl font-light text-gray-800 mb-8 text-center">Calendar</h1>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
-          {/* Month/Year Header */}
+          {/* ============================
+              Month Navigation Header
+          ============================ */}
           <div className="flex items-center justify-between mb-8">
             <button
               onClick={handlePrevMonth}
@@ -76,7 +177,9 @@ export default function CalendarView() {
             </button>
           </div>
 
-          {/* Day Names */}
+          {/* ============================
+              Day Labels (Sun–Sat)
+          ============================ */}
           <div className="grid grid-cols-7 gap-2 mb-4">
             {dayNames.map((day) => (
               <div
@@ -88,7 +191,9 @@ export default function CalendarView() {
             ))}
           </div>
 
-          {/* Calendar Days */}
+          {/* ============================
+              Calendar Grid
+          ============================ */}
           <div className="grid grid-cols-7 gap-2">
             {days.map((day, index) => (
               <div

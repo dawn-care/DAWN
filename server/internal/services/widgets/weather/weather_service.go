@@ -12,12 +12,14 @@ import (
 	widgets "server/internal/models/widgets/weather"
 )
 
+// Service struct
 type WeatherService struct {
 	db     *sql.DB
 	apiKey string
 	client *http.Client
 }
 
+// Struct to represent the geocoding response from OpenWeather API
 type CoordinateResponse struct {
 	Lat  float64 `json:"lat"`
 	Lon  float64 `json:"lon"`
@@ -25,6 +27,7 @@ type CoordinateResponse struct {
 	Zip  string  `json:"zip"`
 }
 
+// Struct to represent the overview response from OpenWeather API
 type OneCallOverviewResponse struct {
 	Lat             float64 `json:"lat"`
 	Lon             float64 `json:"lon"`
@@ -34,6 +37,7 @@ type OneCallOverviewResponse struct {
 	WeatherOverview string  `json:"weather_overview"`
 }
 
+// Struct to represent the current weather response from OpenWeather API
 type CurrentWeatherResponse struct {
 	Main struct {
 		Temp      float64 `json:"temp"`
@@ -52,6 +56,7 @@ type CurrentWeatherResponse struct {
 	Name string `json:"name"`
 }
 
+// Struct to represent the weather overview information to be sent to the frontend for display in the weather widget
 type WeatherOverviewResponse struct {
 	Location    string `json:"location"`
 	Temp        int    `json:"temp"`
@@ -73,7 +78,12 @@ func NewWeatherService(db *sql.DB, apiKey string) *WeatherService {
 	}
 }
 
-// Create a new weather widget module
+// CREATE OPERATIONS
+
+/*
+Create a new weather widget module
+weather_widget - information inputted formatted as a WeatherWidget struct
+*/
 func (s *WeatherService) CreateWeatherWidget(weather_widget *widgets.WeatherWidget) error {
 	if weather_widget == nil {
 		return errors.New("WeatherWidget cannot be nil")
@@ -90,7 +100,10 @@ func (s *WeatherService) CreateWeatherWidget(weather_widget *widgets.WeatherWidg
 	return nil
 }
 
-// Create multiple weather widgets in bulk
+/*
+Create multiple weather widgets in bulk
+weather_widget - information inputted formatted as a WeatherWidget struct
+*/
 func (s *WeatherService) CreateWeatherWidgetsBulk(weather_widgets []widgets.WeatherWidget) error {
 	if len(weather_widgets) == 0 {
 		return errors.New("no weather widgets to create")
@@ -107,7 +120,12 @@ func (s *WeatherService) CreateWeatherWidgetsBulk(weather_widgets []widgets.Weat
 	return widgets.CreateWeathersBulk(s.db, weather_widgets)
 }
 
-// Retrieve a weather widget by its ID
+// RETRIEVE OPERATIONS
+
+/*
+Retrieve a weather widget by its ID
+id - The ID of the weather widget to retrieve
+*/
 func (s *WeatherService) GetWeatherWidgetByID(id int) (*widgets.WeatherWidget, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid WeatherWidget ID")
@@ -122,7 +140,11 @@ func (s *WeatherService) GetWeatherWidgetByID(id int) (*widgets.WeatherWidget, e
 	return weather_widget, nil
 }
 
-// Retrieve all weather widgets for given carepartner and caregiver
+/*
+Retrieve all weather widgets for given carepartner and caregiver
+carepartner_id - The carepartner ID associated with the weather widgets to retrieve
+caregiver_id - The caregiver ID associated with the weather widgets to retrieve
+*/
 func (s *WeatherService) GetWeatherWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.WeatherWidget, error) {
 	if carepartner_id <= 0 || caregiver_id <= 0 {
 		return nil, errors.New("invalid Carepartner ID or Caregiver ID")
@@ -130,7 +152,11 @@ func (s *WeatherService) GetWeatherWidgetsByCarepartnerAndCaregiver(carepartner_
 	return widgets.GetWeatherByCarepartnerAndCaregiver(s.db, carepartner_id, caregiver_id)
 }
 
-// Retrieve all weather widgets for a carepartner
+/*
+Retrieve all weather widgets for a carepartner on a given day
+carepartner_id - The carepartner ID associated with the weather widgets to retrieve
+day, month, year - The date to retrieve weather widgets for
+*/
 func (s *WeatherService) GetWeatherWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.WeatherWidget, error) {
 	if carepartner_id <= 0 {
 		return nil, errors.New("invalid Carepartner ID")
@@ -141,7 +167,12 @@ func (s *WeatherService) GetWeatherWidgetsByCarepartnerIDAndDay(carepartner_id i
 	return widgets.GetWeatherByDayAndCarepartner(s.db, carepartner_id, day, month, year)
 }
 
-// Update an existing weather widget
+// UPDATE OPERATION
+
+/*
+Update an existing weather widget
+weather_widget - information inputted formatted as a WeatherWidget struct
+*/
 func (s *WeatherService) UpdateWeatherWidget(weather_widget *widgets.WeatherWidget) error {
 	if weather_widget == nil {
 		return errors.New("WeatherWidget cannot be nil")
@@ -152,7 +183,12 @@ func (s *WeatherService) UpdateWeatherWidget(weather_widget *widgets.WeatherWidg
 	return widgets.UpdateWeather(s.db, weather_widget)
 }
 
-// Delete a weather widget by its ID
+// DELETE OPERATION
+
+/*
+Delete a weather widget by its ID
+id - The ID of the weather widget to delete
+*/
 func (s *WeatherService) DeleteWeatherWidget(id int) error {
 	if id <= 0 {
 		return errors.New("invalid WeatherWidget ID")
@@ -160,8 +196,20 @@ func (s *WeatherService) DeleteWeatherWidget(id int) error {
 	return widgets.DeleteWeather(s.db, id)
 }
 
+// ANALYTICS & STATS
+
+/*
+Get total number of weather widgets in the database for analytics purposes
+*/
+func (s *WeatherService) GetWeatherWidgetStats() (int, error) {
+	return widgets.GetWeatherStats(s.db)
+}
+
+// EXTERNAL API CALLS
+
 /*
 Uses OpenWeather API to get coordinates from zipcode, then fetches current weather and the overview for the day
+weather_widget - weather widget containing the zipcode information
 */
 func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (*WeatherOverviewResponse, error) {
 	// 1. Geocode zipcode to coordinates
@@ -255,9 +303,4 @@ func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidge
 		Description: description,
 		Message:     oneCallResponse.WeatherOverview,
 	}, nil
-}
-
-// Get total number of weather widgets
-func (s *WeatherService) GetWeatherWidgetStats() (int, error) {
-	return widgets.GetWeatherStats(s.db)
 }

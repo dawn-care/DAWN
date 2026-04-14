@@ -1,22 +1,69 @@
+/**
+ * WidgetForm.tsx
+ * 
+ * This component provides a unified form for creating, editing, and deleting widgets.
+ * Supported widget types:
+ *  - Weather (by ZIP code)
+ *  - Sports (by league + team)
+ *  - Good News (generic news feed) (Hidden because API does not work as intended)
+ * 
+ * The component supports both:
+ *  - Create mode (no moduleId)
+ *  - Edit mode (moduleId provided via props or URL params)
+ * 
+ * API interactions:
+ *  - Fetch existing module + metadata (edit mode)
+ *  - Create widget + module
+ *  - Update widget metadata
+ *  - Delete widget + module
+ */
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from "../context/AuthContext";
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Supported widget categories
+ */
 type WidgetType = "weather" | "sports" | "good";
+
+/**
+ * Supported sports leagues
+ */
 type SportsType = "nfl" | "nba" | "mlb" | "nhl";
 
+/**
+ * Represents a sports team
+ */
 type Team = {
   name: string;
   abbr: string;
 };
 
-// Create a prop interface so that Library can pass parameters to the form for editing existing widgets without relying on URL params
+/**
+ * Props for WidgetForm component
+ * 
+ * @property moduleId - Optional module ID for edit mode
+ * @property onDeleteSuccess - Callback after successful deletion
+ * @property onUpdateSuccess - Callback after successful update/save
+ */
 interface WidgetFormProps {
   moduleId?: number;
   onDeleteSuccess?: () => void;
   onUpdateSuccess?: () => void;
 }
 
+/* ============================
+   Static Data
+============================ */
+
+/**
+ * Mapping of leagues to their teams
+ */
 const SPORTS_TEAMS: Record<SportsType, Team[]> = {
   nfl: [
     { name: "Arizona Cardinals", abbr: "ARI" },
@@ -155,29 +202,74 @@ const SPORTS_TEAMS: Record<SportsType, Team[]> = {
   ]
 };
 
+/**
+ * Base API URL from environment config
+ */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * WidgetForm Component
+ * 
+ * Handles:
+ *  - Creating new widgets
+ *  - Editing existing widgets
+ *  - Deleting widgets
+ * 
+ * Determines mode based on:
+ *  - prop moduleId OR URL param moduleId
+ */
 export default function WidgetForm({ 
         moduleId: propModuleId,
         onDeleteSuccess,
         onUpdateSuccess
     }: WidgetFormProps) {
-    //For Edit Mode
+
+    /* ============================
+      Routing / Context
+    ============================ */
     const { moduleId } = useParams<{ moduleId: string }>();
-
-    // Use either the prop for library call or the URL param for link access
-    const actualModuleId = propModuleId ?? moduleId;
-    const isEditMode = Boolean(actualModuleId);
-
-    const [widgetType, setWidgetType] = useState<WidgetType>("weather");
-    const [widgetId, setWidgetId] = useState<number | null>(null);
-    const [sportsType, setSportsType] = useState<SportsType>("nfl");
-    const [sportsTeam, setSportsTeam] = useState<Team | null>(null);
-    const [zipCode, setZipCode] = useState<string>("10001");
-    const [uploadStatus, setUploadStatus] = useState("");
     const navigate = useNavigate();
     const { user, activeCarePartnerId } = useAuth();
 
+    /**
+     * Resolve actual module ID:
+     * Priority: prop > URL param
+     */
+    const actualModuleId = propModuleId ?? moduleId;
+
+    /**
+     * Determines whether component is in edit mode
+     */
+    const isEditMode = Boolean(actualModuleId);
+
+    /* ============================
+        State
+    ============================ */
+
+    const [widgetType, setWidgetType] = useState<WidgetType>("weather");
+    const [widgetId, setWidgetId] = useState<number | null>(null);
+
+    const [sportsType, setSportsType] = useState<SportsType>("nfl");
+    const [sportsTeam, setSportsTeam] = useState<Team | null>(null);
+
+    const [zipCode, setZipCode] = useState<string>("10001");
+
+    /**
+     * UI status message for user feedback
+     */
+    const [uploadStatus, setUploadStatus] = useState("");
+
+    /* ============================
+        Effects
+    ============================ */
+
+    /**
+     * Load existing widget data in edit mode
+     */
     useEffect(() => {
         if (!actualModuleId) return;
 
@@ -193,6 +285,7 @@ export default function WidgetForm({
             setWidgetType(module.module_type);
             setWidgetId(module.metadata_id);
 
+            // Loads weather metadata
             if (module.module_type === "weather") {
                 res = await fetch(`${API_URL}/weather?id=${module.metadata_id}`);
                 if (!res.ok) {
@@ -204,6 +297,7 @@ export default function WidgetForm({
                 setZipCode(widget.zipcode);
             }
 
+            // Loads sports metadata
             if (module.module_type === "sports") {
                 res = await fetch(`${API_URL}/sports?id=${module.metadata_id}`);
                 if (!res.ok) {
@@ -230,6 +324,13 @@ export default function WidgetForm({
         loadWidget();
     }, [actualModuleId]);
 
+    /* ============================
+        Handlers
+    ============================ */
+
+    /**
+     * Handles creation of a new widget + module
+     */
     async function handleUpload() {
         let data;
         const moduleType = widgetType === "good" ? "news" : widgetType;
@@ -255,6 +356,7 @@ export default function WidgetForm({
         }
 
         try {
+            //Create widget metadata
             const response = await fetch(`${API_URL}${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -307,6 +409,9 @@ export default function WidgetForm({
         }
     }
 
+    /**
+     * Updates existing widget metadata
+     */
     async function handleUpdate() {
         let data;
         if (widgetType === "weather") {
@@ -361,6 +466,9 @@ export default function WidgetForm({
         }
     }
 
+    /**
+     * Deletes widget and associated module
+     */
     async function handleDelete() {
         if (!confirm("Are you sure you want to delete this widget?")) return;
         if (!actualModuleId) return;
@@ -405,6 +513,10 @@ export default function WidgetForm({
         }
     }
 
+    /* ============================
+        Render
+    ============================ */
+
     return (
         <div className="w-full flex flex-col items-center mt-8 px-6">
             {isEditMode ? (<h1 className="text-3xl font-semibold mb-6">Edit Widget</h1>) : 
@@ -430,7 +542,7 @@ export default function WidgetForm({
                         >
                         <option value="weather">Weather News</option>
                         <option value="sports">Sports News</option>
-                        <option value="good">Good News</option>
+                        {/* <option value="good">Good News</option> */}
                         </select>
                     )}
                 </div>

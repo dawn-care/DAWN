@@ -1,5 +1,9 @@
 package widgets
 
+/*
+**API DID NOT WORK THE WAY WE INTENDED SO WE DID NOT INCLUDE THIS IN MVP.
+ */
+
 import (
 	"encoding/json"
 	"net/http"
