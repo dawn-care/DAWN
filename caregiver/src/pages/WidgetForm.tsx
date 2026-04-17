@@ -1,6 +1,8 @@
 /**
  * WidgetForm.tsx
  * 
+ * User: Caregiver
+ * 
  * This component provides a unified form for creating, editing, and deleting widgets.
  * Supported widget types:
  *  - Weather (by ZIP code)

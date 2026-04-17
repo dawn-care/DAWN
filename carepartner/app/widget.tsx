@@ -1,3 +1,24 @@
+/**
+ * widget.tsx
+ * 
+ * User: Carepartner
+ * 
+ * Displays dynamic informational widgets (weather and sports).
+ * 
+ * Responsibilities:
+ * - Fetch data from backend based on module type
+ * - Render appropriate widget UI (weather, sports, or text)
+ * - Handle loading state and fallback content
+ * 
+ * Navigation:
+ * - Controlled by AgendaView
+ * 
+ * Notes:
+ * - Uses POST requests for weather and sports APIs
+ * - News content is aggregated and formatted as text
+ * - Each widget is rendered via a dedicated subcomponent
+ */
+
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Stack } from "expo-router";
@@ -8,8 +29,13 @@ import {
 } from "./agendaView";
 import { API_URL } from "./config";
 
-// ── Types ──────────────────────────────────────────────────────
+/* ============================
+   TYPES
+============================ */
 
+/**
+ * Response structure for sports API
+ */
 type GameSummary = {
   user_team_name: string;
   opponent_team_name: string;
@@ -18,6 +44,9 @@ type GameSummary = {
   message: string;
 };
 
+/**
+ * Response structure for weather API
+ */
 type WeatherData = {
   location: string;
   temp: number;
@@ -31,12 +60,16 @@ type WeatherData = {
   message: string;
 };
 
+/**
+ * Props passed from AgendaView.
+ */
 interface WidgetViewerProps {
   configuration: ConfigurationWithMetadata;
 }
 
-// ── API helpers ────────────────────────────────────────────────
-
+/* ============================
+   HELPERS
+============================ */
 async function fetchWeather(
   metadata: WeatherMetadata
 ): Promise<WeatherData | null> {
@@ -69,25 +102,29 @@ async function fetchSports(
   }
 }
 
-async function fetchNews(): Promise<string> {
-  try {
-    const res = await fetch(`${API_URL}/news/good-news`);
-    const data = await res.json();
-    const articles: { title: string; description: string }[] = data.articles ?? [];
-    if (articles.length === 0) return "No good news articles found.";
-    return articles
-      .filter((a) => a.title && a.description)
-      .slice(0, 5)
-      .map((a) => `${a.title}\n${a.description}`)
-      .join("\n\n---\n\n");
-  } catch (err: any) {
-    console.error("Failed getting news: " + err.message);
-    return "";
-  }
-}
+/**
+ *** API BROKEN ***
+ * async function fetchNews(): Promise<string> {
+ *   try {
+ *     const res = await fetch(`${API_URL}/news/good-news`);
+ *     const data = await res.json();
+ *     const articles: { title: string; description: string }[] = data.articles ?? [];
+ *     if (articles.length === 0) return "No good news articles found.";
+ *     return articles
+ *       .filter((a) => a.title && a.description)
+ *       .slice(0, 5)
+ *       .map((a) => `${a.title}\n${a.description}`)
+ *       .join("\n\n---\n\n");
+ *   } catch (err: any) {
+ *     console.error("Failed getting news: " + err.message);
+ *     return "";
+ *   }
+ *  }
+ */
 
-// ── Glass card ─────────────────────────────────────────────────
-
+/**
+ * Reusable glass-style container
+ */
 function GlassCard({
   children,
   style,
@@ -98,8 +135,17 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
-// ── Weather screen ─────────────────────────────────────────────
+/* ============================
+   SUBCOMPONENTS
+============================ */
 
+/**
+ * WeatherView Component
+ * 
+ * Handles:
+ *  - Displaying current temperature and condition
+ *  - Showing location and descriptive message
+ */
 function WeatherView({ weather }: { weather: WeatherData }) {
   return (
     <GlassCard style={styles.card}>
@@ -136,8 +182,13 @@ function WeatherView({ weather }: { weather: WeatherData }) {
   );
 }
 
-// ── Sports screen ──────────────────────────────────────────────
-
+/**
+ * SportsView Component
+ * 
+ * Handles:
+ *  - Displaying team names and scores
+ *  - Showing summary of last game
+ */
 function SportsView({ game }: { game: GameSummary }) {
   return (
     <GlassCard style={styles.card}>
@@ -175,31 +226,57 @@ function SportsView({ game }: { game: GameSummary }) {
   );
 }
 
-// ── Generic text screen (weather / news) ───────────────────────
+/**
+ * TextContentView Component
+ * 
+ * Handles:
+ *  - Displaying scrollable text content (used for news)
+ * 
+ * function TextContentView({ content }: { content: string }) {
+ *  return (
+ *    <GlassCard style={styles.card}>
+ *       <ScrollView
+ *         contentContainerStyle={styles.scrollContent}
+ *         showsVerticalScrollIndicator={false}
+ *       >
+ *         <Text style={styles.contentText}>{content}</Text>
+ *       </ScrollView>
+ *     </GlassCard>
+ *   );
+ * }
+ */
 
-function TextContentView({ content }: { content: string }) {
-  return (
-    <GlassCard style={styles.card}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.contentText}>{content}</Text>
-      </ScrollView>
-    </GlassCard>
-  );
-}
 
-// ── Main export ────────────────────────────────────────────────
+/* ============================
+   COMPONENT
+============================ */
 
+/**
+ * WidgetViewerScreen Component
+ * 
+ * Handles:
+ *  - Determining widget type from configuration
+ *  - Fetching appropriate backend data
+ *  - Rendering correct widget view
+ *  - Managing loading state
+ */
 export default function WidgetViewerScreen({
   configuration,
 }: WidgetViewerProps) {
-  const [textContent, setTextContent] = useState<string>("");
+  /* ============================
+     State
+  ============================ */
   const [gameSummary, setGameSummary] = useState<GameSummary | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ============================
+     EFFECTS
+  ============================ */
+
+  /**
+   * When configuration changes, fetch new data based on widget type
+   */
   useEffect(() => {
     let mounted = true;
 
@@ -214,9 +291,6 @@ export default function WidgetViewerScreen({
         const meta = configuration.metadata as NewsMetadata | null;
         const game = meta ? await fetchSports(meta) : null;
         if (mounted) setGameSummary(game);
-      } else if (configuration.module_type === "news") {
-        const text = await fetchNews();
-        if (mounted) setTextContent(text);
       }
 
       if (mounted) setLoading(false);
@@ -228,6 +302,9 @@ export default function WidgetViewerScreen({
     };
   }, [configuration]);
 
+  /* ============================
+       RENDER
+    ============================ */
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -245,7 +322,8 @@ export default function WidgetViewerScreen({
           ) : configuration.module_type === "sports" && gameSummary ? (
             <SportsView game={gameSummary} />
           ) : (
-            <TextContentView content={textContent} />
+            <></>
+            // <TextContentView content={textContent} />
           )}
         </View>
       </View>

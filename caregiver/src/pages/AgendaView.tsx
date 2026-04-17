@@ -1,6 +1,8 @@
 /**
  * AgendaView.tsx
  * 
+ * User: Caregiver
+ * 
  * Main agenda management screen for a selected date.
  * 
  * Responsibilities:

@@ -1,3 +1,26 @@
+/**
+ * AgendaView.tsx
+ * 
+ * User: Carepartner
+ * 
+ * Displays and manages playback of the daily scheduled routine.
+ * 
+ * Responsibilities:
+ * - Build a playback queue from today's schedule
+ * - Render appropriate media/content screens (photo, audio, video, widgets, text)
+ * - Handle timed vs non-timed item execution
+ * - Track and skip already played items
+ * - Auto-advance content based on duration or playback completion
+ * 
+ * Navigation:
+ * - On completion → redirects to `/`
+ * - On error or empty state → redirects to `/`
+ * 
+ * Notes:
+ * - Queue is built once per session to prevent replay loops
+ * - Uses ScheduleContext for data, playback tracking, and refresh
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import AudioScreen from './audio';
 import GreetingScreen from './greeting';
@@ -9,7 +32,13 @@ import React from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
-// Metadata shapes returned inline by the backend
+/* ============================
+   Types
+============================ */
+
+/**
+ * Metadata shapes returned inline by the backend
+ */
 export type PhotoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
 export type VideoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
 export type AudioMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
@@ -20,7 +49,10 @@ export type EventMetadata = { id: number; list_id: number; time: string; text: s
 export type CarepartnerLocationMetadata = { id: number; location: string; message: string; image_uri: string };
 export type CaregiverLocationMetadata = { id: number; location: string; message: string; image_uri: string };
 
-// Matches the ConfigurationWithMetadata Go struct returned by GetConfigurationsByDayAndCarepartner
+/**
+ * Matches the ConfigurationWithMetadata Go struct 
+ * returned by GetConfigurationsByDayAndCarepartner
+ */
 export type ConfigurationWithMetadata = {
     id: number;
     caregiver_id: number;
@@ -39,14 +71,27 @@ export type ConfigurationWithMetadata = {
         | CarepartnerLocationMetadata | CaregiverLocationMetadata | null;
 };
 
+/**
+ * Props used by media playback components.
+ */
 export type MediaPlaybackProps = {
     onPlaybackComplete: () => void;
 };
 
+/* ============================
+   Helpers
+============================ */
+
+/**
+ * Reusable glass-style container for UI.
+ */
 function GlassCard({ children, style }: { children: React.ReactNode; style?: any }) {
     return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
+/**
+ * Determines the header title based on module type + metadata.
+ */
 function getHeaderTitle(item: ConfigurationWithMetadata): string {
     if (item.module_type === 'audio') {
         const metadata = item.metadata as AudioMetadata | null;
@@ -84,25 +129,49 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
     return metadata?.time ?? 'Event';
 }
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * AgendaView Component
+ * 
+ * Handles:
+ *  - Building playback queue
+ *  - Managing playback state
+ *  - Rendering media components
+ *  - Advancing through content
+ */
 export default function AgendaView(){
+
+    /* ============================
+        State
+    ============================ */
+
     const { todaysItems, loading, error, refresh, playedIds, markPlayed } = useSchedule();
     const { trigger } = useLocalSearchParams<{ trigger?: string }>();
 
-    // --- Local playback state ---
+    /** Local playback state */
     const [playQueue, setPlayQueue] = useState<ConfigurationWithMetadata[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const playQueueRef = useRef<ConfigurationWithMetadata[]>([]);
 
-    // Keep ref in sync for use inside duration timer
+    /* ============================
+        Effects
+    ============================ */
+
+    /** Keep ref in sync for use inside duration timer */
     useEffect(() => { playQueueRef.current = playQueue; }, [playQueue]);
 
-    // Refresh data every time agendaView mounts
+    /** Refresh data every time agendaView mounts */
     useEffect(() => {
         refresh();
     }, []);
 
-    // Build queue ONCE when data first loads. Played items are excluded.
-    // The queue is NOT rebuilt on subsequent refreshes to prevent periodic replays.
+    /**
+     * Build queue ONCE when data first loads. Played items are excluded.
+     * The queue is NOT rebuilt on subsequent refreshes to prevent periodic replays.
+     */
     const queueBuiltRef = useRef(false);
     useEffect(() => {
         if (queueBuiltRef.current) return;
@@ -128,7 +197,7 @@ export default function AgendaView(){
         setPlayQueue(queue);
     }, [todaysItems, loading, trigger, playedIds]);
 
-    // When an error occurs, redirect to home after 5 seconds
+    /** When an error occurs, redirect to home after 5 seconds */
     useEffect(() => {
         if (!error) return;
         const timer = setTimeout(() => {
@@ -137,7 +206,7 @@ export default function AgendaView(){
         return () => clearTimeout(timer);
     }, [error]);
 
-    // When no items are available, redirect to home after 5 seconds
+    /** When no items are available, redirect to home after 5 seconds */
     useEffect(() => {
         if (loading || error || playQueue.length > 0) return;
         const timer = setTimeout(() => {
@@ -146,7 +215,10 @@ export default function AgendaView(){
         return () => clearTimeout(timer);
     }, [loading, error, playQueue]);
 
-    // Duration timer — re-runs when currentIndex changes OR when the queue is first populated
+    /** 
+     * Auto-advance timer — re-runs when currentIndex changes OR when the queue is first populated
+     * non-audio/video items
+     */
     useEffect(() => {
         const queue = playQueueRef.current;
         if (!queue.length) return;
@@ -166,6 +238,7 @@ export default function AgendaView(){
         return () => clearTimeout(timer);
     }, [currentIndex, playQueue]);
 
+    /** Move to next item */
     const advanceToNext = () => {
         setCurrentIndex(prev => {
             const queue = playQueueRef.current;
@@ -179,15 +252,19 @@ export default function AgendaView(){
         });
     };
 
+    /** Navigation helpers */
     const goToPreviousItem = () => {
         setCurrentIndex((prev) => Math.max(prev - 1, 0));
     };
-
     const goToNextItem = () => {
         advanceToNext();
     };
 
     const currentItem = playQueue[currentIndex];
+
+    /* ============================
+       UI STATES
+    ============================ */
 
     if (loading) {
         return (
@@ -226,6 +303,9 @@ export default function AgendaView(){
     const canGoNext = playQueue.length > 0;
     const headerTitle = getHeaderTitle(currentItem);
 
+    /* ============================
+       RENDER
+    ============================ */
     return (
         <SafeAreaView style={styles.safe}>
             <View style={styles.topBar}>
@@ -233,6 +313,7 @@ export default function AgendaView(){
             </View>
 
             <View style={styles.container}>
+                {/* Render correct module type */}
                 {(currentItem.module_type === "photo" || currentItem.module_type === "messages") && (
                     <PhotoViewerScreen configuration={currentItem} />
                 )}
@@ -261,6 +342,7 @@ export default function AgendaView(){
                     />
                 )}
 
+                {/* Navigation arrows */}
                 <Pressable
                     onPress={goToPreviousItem}
                     disabled={!canGoPrev}

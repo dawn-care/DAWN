@@ -1,5 +1,7 @@
 /**
- * SettingsPage.tsx
+ * Settings.tsx
+ * 
+ * User: Caregiver
  * 
  * This component allows users to manage account and care partner settings.
  * 

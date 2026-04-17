@@ -1,6 +1,8 @@
 /**
  * Home.tsx
  * 
+ * User: Caregiver
+ * 
  * This component serves as the main landing page of the application.
  * It provides:
  *  - A carousel of images using Swiper

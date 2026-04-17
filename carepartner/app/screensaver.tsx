@@ -1,3 +1,25 @@
+/**
+ * screensaver.tsx
+ * 
+ * User: Carepartner
+ * 
+ * The main idle/home screen for the device.
+ * 
+ * Responsibilities:
+ * - Display Start-Up branding and auto-start time
+ * - Allow manual entry into the daily routine
+ * - Provide access to syncing schedule/content
+ * - Provide access to device pairing
+ * 
+ * Navigation:
+ * - On "Enter Start-Up" → redirects to `/agendaView`
+ * - On "Pair Device" → redirects to `/pair`
+ * 
+ * Notes:
+ * - Auto-start time is formatted from backend (HH:MM:SS → 12-hour)
+ * - Sync button refreshes schedule data from backend
+ */
+
 import React, { useEffect, useMemo, useState } from "react";
 import { Stack } from "expo-router";
 import {
@@ -14,6 +36,16 @@ import { Image } from "react-native";
 import { getCarepartnerId } from "./carepartnerId";
 import { useSchedule } from "./ScheduleContext";
 
+/* ============================
+   Helpers
+============================ */
+
+/**
+ * Converts backend time (HH:MM:SS) into user-friendly 12-hour format.
+ * Example:
+ *  "08:00:00" → "8:00 AM"
+ *  "14:30:00" → "2:30 PM"
+ */
 function formatTime(timeString: string) {
   const [hourStr, minuteStr] = timeString.split(':');
   let hour = parseInt(hourStr, 10);
@@ -25,7 +57,24 @@ function formatTime(timeString: string) {
   return `${hour}:${minute.toString().padStart(2, '0')} ${ampm}`;
 }
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * Screensaver Component
+ * 
+ * Handles:
+ *  - Home screen UI
+ *  - Navigation to schedule
+ *  - Sync trigger
+ *  - Pairing navigation
+ */
 export default function Screensaver() {
+
+  /* ============================
+     State
+  ============================ */
   const { carepartner, refresh } = useSchedule();
   const [hasCarepartnerId, setHasCarepartnerId] = useState<boolean | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -34,6 +83,13 @@ export default function Screensaver() {
     ? formatTime(carepartner.auto_start)
     : '...';
 
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * On mount, check if carepartner ID exists
+   */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -45,18 +101,35 @@ export default function Screensaver() {
     return () => { mounted = false; };
   }, []);
 
+  /**
+   * Background image for screensaver
+   * (Memoized so it doesn't reload on every render)
+   */
   const backgroundSource = useMemo(() => {
     return require("../assets/images/defaultBackground.png");
   }, []);
 
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Handles navigation to manually start daily agenda
+   */
   const handlePrimaryAction = () => {
     router.push({ pathname: "/agendaView", params: { trigger: 'manual' } } as any);
   };
 
+  /**
+   * Handles navigation to device pairing screen
+   */
   const handlePairDevice = () => {
     router.push({ pathname: "/pair" } as any);
   };
 
+  /**
+   * Handles syncing start time and scheduled content with caregiver's account
+   */
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -66,6 +139,9 @@ export default function Screensaver() {
     }
   };
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <>
     <Stack.Screen options={{ headerShown: false }} />
@@ -73,6 +149,7 @@ export default function Screensaver() {
         <ImageBackground source={backgroundSource} style={styles.bg} resizeMode="cover">
         <SafeAreaView style={styles.safe}>
           <View style={styles.topRightActionRow}>
+            {/* Sync Button */}
             <Pressable
             onPress={handleSync}
             style={({ pressed }) => [
@@ -86,6 +163,7 @@ export default function Screensaver() {
               <Text style={styles.topRightButtonText}>Sync</Text>
             )}
             </Pressable>
+            {/* Pair Device Button */}
             <Pressable
             onPress={handlePairDevice}
             style={({ pressed }) => [
@@ -99,6 +177,7 @@ export default function Screensaver() {
             <View style={styles.content}>
             {/* TOP */}
             <View style={styles.topArea}>
+                {/* App Logo and Title */}
                 <View style={styles.titleGlass}>
                 <Image source={require("../assets/images/icon.png")} style={styles.logo} />
                 <Text style={styles.titleText}>Start-Up</Text>
@@ -114,13 +193,14 @@ export default function Screensaver() {
 
             {/* BOTTOM */}
             <View style={styles.bottomArea}>
-                <Pressable
-              onPress={handlePrimaryAction}
-                style={({ pressed }) => [
-                    styles.arrowButton,
-                    pressed && { transform: [{ scale: 0.98 }] },
-                ]}
-                >
+              {/* Manual Start Button */}
+              <Pressable
+                onPress={handlePrimaryAction}
+                  style={({ pressed }) => [
+                      styles.arrowButton,
+                      pressed && { transform: [{ scale: 0.98 }] },
+                  ]}
+              >
               <Text style={styles.arrowText}>›</Text>
                 </Pressable>
 

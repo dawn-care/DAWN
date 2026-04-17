@@ -1,6 +1,8 @@
 /**
  * Login.tsx
  * 
+ * User: Caregiver
+ * 
  * This component handles user authentication via Google OAuth.
  * 
  * Responsibilities:

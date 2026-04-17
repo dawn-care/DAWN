@@ -1,5 +1,7 @@
 /**
- * AccountSetupPage.tsx
+ * AccountSetup.tsx
+ * 
+ * User: Caregiver
  * 
  * This component handles the final onboarding step for caregivers.
  * It allows users to:

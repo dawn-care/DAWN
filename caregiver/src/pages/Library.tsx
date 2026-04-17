@@ -1,6 +1,8 @@
 /**
  * Library.tsx
  * 
+ * User: Caregiver
+ * 
  * Main content management interface for the application.
  * 
  * Responsibilities:

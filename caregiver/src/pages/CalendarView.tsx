@@ -1,6 +1,8 @@
 /**
  * CalendarView.tsx
  * 
+ * User: Caregiver
+ * 
  * A simple monthly calendar UI component.
  * 
  * Responsibilities:

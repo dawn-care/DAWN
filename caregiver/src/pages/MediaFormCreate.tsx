@@ -1,17 +1,76 @@
+/**
+ * MediaFormCreate.tsx
+ * 
+ * User: Caregiver
+ *
+ * This component provides a form for uploading media content.
+ * Supported media types:
+ *  - Video
+ *  - Photo
+ *  - Audio
+ *
+ * Features:
+ *  - File validation based on media type
+ *  - Drag-and-drop upload support
+ *  - Manual file selection
+ *  - Uploads media to backend
+ *  - Creates associated module after upload
+ *
+ * API interactions:
+ *  - Upload media file (video/photo/audio endpoints)
+ *  - Create module linked to uploaded media
+ */
+
 import { useState, useRef } from "react";
 import { useAuth } from '../context/AuthContext';
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Supported media types
+ */
 type MediaType = "video" | "photo" | "audio";
 
+/* ============================
+   Static Data
+============================ */
+
+/**
+ * Allowed file extensions per media type
+ */
 const allowedExtensions = {
   video: [".mp4", ".mov", ".avi", ".webm", ".ogg"],
   photo: [".jpg", ".jpeg", ".png", ".heic", ".gif", ".webp"],
   audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
 
+/**
+ * Base API URL from environment config
+ */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * MediaFormCreate Component
+ *
+ * Handles:
+ *  - Uploading media files
+ *  - Validating file types
+ *  - Creating modules linked to uploaded media
+ *
+ * @param onUploadSuccess - Callback triggered after successful upload
+ */
 export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: () => void }) {
+  
+  /* ============================
+      State
+  ============================ */
+
   const [mediaName, setMediaName] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("video");
   const [file, setFile] = useState<File | null>(null);
@@ -19,10 +78,23 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
   const [uploadStatus, setUploadStatus] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
+  /**
+   * Reference to hidden file input
+   */
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  /**
+   * Auth context
+   */
   const { user, activeCarePartnerId } = useAuth();
 
+  /* ============================
+      File Validation
+  ============================ */
+
+  /**
+   * Validates selected file against allowed extensions
+   */
   function validateFile(f: File) {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
     if (!allowedExtensions[mediaType].includes(ext)) {
@@ -38,6 +110,10 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
       setFile(f);
     }
   }
+
+  /* ============================
+      Drag & Drop Handlers
+  ============================ */
 
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
@@ -58,7 +134,16 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
     }
   }
 
+  /* ============================
+      Upload Handler
+  ============================ */
+
+  /**
+   * Handles media upload and module creation
+   */
   async function handleUpload() {
+
+    // Input Validation
     if (!mediaName.trim()) {
       setUploadStatus("Please enter a media name.");
       return;
@@ -74,12 +159,16 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
       return;
     }
 
+    // Prepare form data for upload
     const formData = new FormData();
     formData.append("file", file, file.name);
     formData.append("displayed_name", mediaName);
     formData.append("caregiver_id", String(user.id));
     formData.append("carepartner_id", String(activeCarePartnerId));
 
+    /**
+     * Select correct endpoint based on media type
+     */
     const endpoint =
       mediaType === "video"
         ? "/video/upload"
@@ -88,6 +177,9 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
         : "/audio/upload";
 
     try {
+      /* ============================
+         Upload Media File
+      ============================ */
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         body: formData,
@@ -106,6 +198,9 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
         return;
       }
 
+      /* ============================
+         Create Module
+      ============================ */
       const moduleResponse = await fetch(`${API_URL}/modules`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,6 +218,9 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
         return;
       }
 
+      /* ============================
+         Success Handling
+      ============================ */
       setUploadStatus("Saved!");
       setFile(null);
       setMediaName("");
@@ -139,6 +237,9 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
     }
   }
 
+  /* ============================
+      Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Add Media</h1>

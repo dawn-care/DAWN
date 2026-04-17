@@ -1,15 +1,54 @@
+/**
+ * MediaFormDelete.tsx
+ * 
+ * User: Caregiver
+ *
+ * This component allows users to delete previously uploaded media.
+ * Supported media types:
+ *  - Video
+ *  - Photo
+ *  - Audio
+ *
+ * Features:
+ *  - Fetches all media modules for the current caregiver + carepartner
+ *  - Displays media in a dropdown for selection
+ *  - Deletes both:
+ *      1. Media metadata (photo/video/audio)
+ *      2. Associated module reference
+ *  - Updates UI immediately after deletion
+ *
+ * API interactions:
+ *  - GET modules (filtered by caregiver + carepartner)
+ *  - GET metadata for each media item
+ *  - DELETE media metadata
+ *  - DELETE module
+ */
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthContext';
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Supported media types
+ */
 type MediaType = "video" | "photo" | "audio";
 
+/**
+ * Represents a module returned from backend
+ */
 interface Module {
   id: number;
   module_type: MediaType;
   metadata_id: number;
 }
 
+/**
+ * Represents a selectable media item in the UI
+ */
 interface MediaOption {
   moduleId: number;
   metadataId: number;
@@ -17,17 +56,51 @@ interface MediaOption {
   name: string;
 }
 
+/* ============================
+   Static Data
+============================ */
+
+/**
+ * Base API URL from environment config
+ */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * MediaFormDelete Component
+ *
+ * Handles:
+ *  - Fetching media list
+ *  - Selecting media item
+ *  - Deleting media + associated module
+ */
 export default function MediaFormDelete() {
+  
+  /* ============================
+      Routing / Context
+  ============================ */
+
   const navigate = useNavigate();
+  const { user, activeCarePartnerId } = useAuth();
+
+  /* ============================
+      State
+  ============================ */
 
   const [mediaList, setMediaList] = useState<MediaOption[]>([]);
   const [selected, setSelected] = useState<MediaOption | null>(null);
   const [status, setStatus] = useState("");
-  const { user, activeCarePartnerId } = useAuth();
 
-  /* ---------------- LOAD ALL MEDIA ---------------- */
+  /* ============================
+      Effects
+  ============================ */
+
+  /**
+   * Load all media associated with caregiver + carepartner
+   */
   useEffect(() => {
     async function loadMedia() {
       try {
@@ -36,15 +109,24 @@ export default function MediaFormDelete() {
           return;
         }
 
+        /* ============================
+           Fetch Modules
+        ============================ */
         const modulesRes = await fetch(
           `${API_URL}/modules?caregiver_id=${user.id}&carepartner_id=${activeCarePartnerId}`
         );
         const modules: Module[] = await modulesRes.json();
 
+        /**
+         * Filter only media-related modules
+         */
         const mediaModules = modules.filter((m) =>
           ["photo", "video", "audio"].includes(m.module_type)
         );
 
+        /* ============================
+           Fetch Metadata for Each Media
+        ============================ */
         const results = await Promise.all(
           mediaModules.map(async (m) => {
             const res = await fetch(
@@ -72,7 +154,13 @@ export default function MediaFormDelete() {
     loadMedia();
   }, []);
 
-  /* ---------------- DELETE ---------------- */
+  /* ============================
+      Delete Handler
+  ============================ */
+
+  /**
+   * Deletes selected media and its module
+   */
   async function handleDelete() {
     if (!selected) {
       setStatus("Please select media to delete.");
@@ -86,7 +174,9 @@ export default function MediaFormDelete() {
     if (!confirmDelete) return;
 
     try {
-      // 1Delete metadata (photo/video/audio)
+      /* ============================
+         Delete Media Metadata
+      ============================ */
       const metaRes = await fetch(
         `${API_URL}/${selected.type}?id=${selected.metadataId}`,
         {
@@ -99,7 +189,9 @@ export default function MediaFormDelete() {
         throw new Error(text);
       }
 
-      // Delete module reference
+      /* ============================
+         Delete Module Reference
+      ============================ */
       const moduleRes = await fetch(
         `${API_URL}/modules?id=${selected.moduleId}`,
         {
@@ -112,9 +204,12 @@ export default function MediaFormDelete() {
         throw new Error(text);
       }
 
+      /* ============================
+         Success Handling
+      ============================ */
       setStatus("Deleted successfully.");
 
-      // Remove from dropdown immediately
+      // Remove deleted item from UI immediately
       setMediaList((prev) =>
         prev.filter((m) => m.metadataId !== selected.metadataId)
       );
@@ -125,6 +220,9 @@ export default function MediaFormDelete() {
     }
   }
 
+  /* ============================
+      Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Delete Media</h1>

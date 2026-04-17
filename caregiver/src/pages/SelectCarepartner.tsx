@@ -1,5 +1,7 @@
 /**
- * SelectCarePartnerPage.tsx
+ * SelectCarePartner.tsx
+ * 
+ * User: Caregiver
  * 
  * This component allows a logged-in caregiver to select an active care partner.
  * 

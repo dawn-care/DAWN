@@ -1,3 +1,34 @@
+/**
+ * pair.tsx
+ * 
+ * User: Carepartner
+ * 
+ * This component handles pairing a carepartner device with a caregiver account.
+ * It is designed for the carepartner-side application.
+ * 
+ * Core functionality:
+ *  - Creates or retrieves a persistent carepartner ID for the device
+ *  - Generates a temporary pairing code for the caregiver to enter
+ *  - Displays the pairing code with expiration countdown
+ *  - Verifies whether the device has been successfully paired
+ * 
+ * Pairing Flow:
+ *  1. Device initializes and retrieves or creates a carepartner ID
+ *  2. A pairing code is generated via backend
+ *  3. Caregiver enters this code on their web app
+ *  4. Carepartner device checks pairing status
+ *  5. If paired → user proceeds to terms screen
+ * 
+ * API interactions:
+ *  - POST /carepartner/create-carepartner → create new carepartner
+ *  - POST /device-pairing/code → generate pairing code
+ *  - POST /device-pairing/status → verify pairing completion
+ *  - GET  /carepartner/:id → validate existing carepartner
+ * 
+ * Local storage:
+ *  - Uses getCarepartnerId / storeCarepartnerId to persist ID on device
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,17 +44,41 @@ import { Stack, router, type Href } from "expo-router";
 import { API_URL } from "./config";
 import { getCarepartnerId, storeCarepartnerId } from "./carepartnerId";
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Result of pairing code generation
+ */
 type CodeResult =
   | { ok: true; pairingCode: string; expiresInSec?: number }
   | { ok: false; message: string };
 
+/**
+ * Result of pairing verification
+ */
 type VerifyResult =
   | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
+/* ============================
+   Static Data
+============================ */
+
+/**
+ * Base API URL from environment config
+ */
 const API_BASE = `${API_URL}/users`;
 
-// ---- API CALLS ----
+/* ============================
+   API Functions
+============================ */
+
+/**
+ * Creates a new carepartner record for this device
+ */
+
 async function createNewCarepartner(): Promise<number> {
   const res = await fetch(`${API_BASE}/carepartner/create-carepartner`, { 
     method: "POST",
@@ -35,6 +90,9 @@ async function createNewCarepartner(): Promise<number> {
   return data.carepartner_id;
 }
 
+/**
+ * Requests a pairing code for this device
+ */
 async function fetchPairingCodeForThisDevice(carepartnerID: number): Promise<CodeResult> {
   try {
     const res = await fetch(`${API_BASE}/device-pairing/code`, {
@@ -55,6 +113,9 @@ async function fetchPairingCodeForThisDevice(carepartnerID: number): Promise<Cod
   }
 }
 
+/**
+ * Checks whether this device has been paired by caregiver
+ */
 async function verifyThisDeviceIsPaired(carepartnerID: number): Promise<VerifyResult> {
   try {
     const res = await fetch(`${API_BASE}/device-pairing/status`, {
@@ -75,6 +136,9 @@ async function verifyThisDeviceIsPaired(carepartnerID: number): Promise<VerifyRe
   }
 }
 
+/**
+ * Validates whether a carepartner ID exists in backend
+ */
 async function carepartnerExists(id: number): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/carepartner/${id}`);
@@ -88,6 +152,13 @@ async function carepartnerExists(id: number): Promise<boolean> {
   }
 }
 
+/* ============================
+   Helpers
+============================ */
+
+/**
+ * Formats countdown timer (seconds → mm:ss)
+ */
 function formatCountdown(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));
   const m = Math.floor(sec / 60);
@@ -95,7 +166,24 @@ function formatCountdown(totalSeconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * PairScreen Component
+ * 
+ * Handles:
+ *  - Initializing carepartner ID
+ *  - Generating pairing code
+ *  - Displaying expiration countdown
+ *  - Verifying pairing status
+ */
 export default function PairScreen() {
+
+  /* ============================
+     State
+  ============================ */
   const { height, width } = useWindowDimensions();
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [expiresInSec, setExpiresInSec] = useState<number | null>(null);
@@ -109,7 +197,13 @@ export default function PairScreen() {
   const isCompactScreen = height < 760 || width < 520;
   const isShortScreen = height < 640;
 
-  // ---- Load or create carepartnerID ----
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Initialize carepartner ID and load pairing code
+   */
   useEffect(() => {
     async function init() {
       setIsLoadingCode(true);
@@ -118,6 +212,7 @@ export default function PairScreen() {
       try {
         let id = await getCarepartnerId();
 
+        // Validate stored ID
         if (id) {
           const valid = await carepartnerExists(id);
           if (!valid) {
@@ -125,6 +220,7 @@ export default function PairScreen() {
           }
         }
 
+        // Create new carepartner if needed
         if (!id) {
           id = await createNewCarepartner();
           await storeCarepartnerId(id);
@@ -132,6 +228,7 @@ export default function PairScreen() {
 
         setCarepartnerID(id);
 
+        // Fetch pairing code
         const result = await fetchPairingCodeForThisDevice(id);
         if (!result.ok) {
           setError(result.message);
@@ -153,7 +250,9 @@ export default function PairScreen() {
     init();
   }, []);
 
-  // Countdown for expiration
+  /**
+   * Countdown timer for code expiration
+   */
   useEffect(() => {
     if (expiresInSec == null || expiresInSec <= 0) return;
     const id = setInterval(() => {
@@ -162,13 +261,22 @@ export default function PairScreen() {
     return () => clearInterval(id);
   }, [expiresInSec]);
 
-  // Expired handling
+  /**
+   * Handle expiration
+   */
   useEffect(() => {
     if (expiresInSec == null || expiresInSec > 0) return;
     setPairingCode(null);
     setError("This code expired. Tap Refresh Code to generate a new one.");
   }, [expiresInSec]);
 
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Verify pairing status
+   */
   const handleVerify = async () => {
     if (!carepartnerID) {
       setError("Carepartner ID not initialized");
@@ -193,6 +301,7 @@ export default function PairScreen() {
       // TODO: store deviceId if needed
       // await SecureStore.setItemAsync("deviceId", result.deviceId)
 
+      // Success → navigate to terms screen
       router.push("/terms" as Href);
     } catch {
       setError("Something went wrong. Please check your connection and try again.");
@@ -201,6 +310,9 @@ export default function PairScreen() {
     }
   };
 
+  /**
+   * Reload pairing code manually
+   */
   const loadCode = async () => {
     if (!carepartnerID) return;
     setError(null);
@@ -224,6 +336,9 @@ export default function PairScreen() {
     }
   };
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

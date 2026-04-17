@@ -1,5 +1,7 @@
 /**
  * UserGuide.tsx
+ * 
+ * User: Caregiver
  *
  * This component renders the StartUp caregiver manual.
  * It is a static informational page designed to guide caregivers

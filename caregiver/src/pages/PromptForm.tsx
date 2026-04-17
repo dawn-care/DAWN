@@ -1,6 +1,8 @@
 /**
  * PromptForm.tsx
  * 
+ * User: Caregiver
+ * 
  * This component provides a unified form for creating, editing, and deleting prompt messages.
  * A prompt consists of:
  *  - Text message (required)
