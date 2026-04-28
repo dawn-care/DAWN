@@ -150,14 +150,19 @@ BEGIN
         WHERE carepartner_id = p_carepartner_id
     )
     UPDATE "Configuration" c
-    SET position = ranked.new_pos
+    SET position = -ranked.new_pos
     FROM ranked
     WHERE c.id = ranked.id;
+
+    UPDATE "Configuration"
+    SET position = -position
+    WHERE carepartner_id = p_carepartner_id
+      AND position < 0;
 
     -- Insert all configurations, shifting existing rows as needed
     FOR new_row IN SELECT * FROM tmp_configs ORDER BY position ASC LOOP
         UPDATE "Configuration"
-        SET position = "Configuration".position + 1
+        SET position = -("Configuration".position + 1)
         FROM (
             SELECT id, position
             FROM "Configuration"
@@ -166,6 +171,11 @@ BEGIN
             ORDER BY position DESC
         ) desc_positions
         WHERE "Configuration".id = desc_positions.id;
+
+        UPDATE "Configuration"
+        SET position = -position
+        WHERE carepartner_id = p_carepartner_id
+          AND position < 0;
 
         INSERT INTO "Configuration" (
             carepartner_id,
@@ -206,7 +216,16 @@ BEGIN
     LOOP
         SELECT position INTO pos FROM "Configuration" WHERE id = current_id;
         DELETE FROM "Configuration" WHERE id = current_id;
-        UPDATE "Configuration" SET position = position - 1 WHERE carepartner_id = p_carepartner_id AND position > pos;
+
+        UPDATE "Configuration"
+        SET position = -(position - 1)
+        WHERE carepartner_id = p_carepartner_id
+          AND position > pos;
+
+        UPDATE "Configuration"
+        SET position = -position
+        WHERE carepartner_id = p_carepartner_id
+          AND position < 0;
     END LOOP;
 END;
 $$;
