@@ -46,6 +46,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const [todaysItems, setTodaysItems] = useState<ConfigurationWithMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasInitializedRef = useRef(false);
 
   const lastAutoStartDateRef = useRef<string | null>(null);
   // Dedup ref so the scheduled-item trigger navigates at most once per item
@@ -80,8 +81,13 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
   // ---- Fetch today's configurations ----
   const fetchConfigurations = async () => {
+    // This check ensures the loading state doesn't occur mid way through normal usage and unmount the active media component
+    const isInitialLoad = !hasInitializedRef.current; 
+
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       setError(null);
 
       const cpId = await getCarepartnerId();
@@ -108,7 +114,10 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        hasInitializedRef.current = true;
+        setLoading(false);
+      }
     }
   };
 
