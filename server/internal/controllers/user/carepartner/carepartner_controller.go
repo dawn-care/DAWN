@@ -131,6 +131,16 @@ func (cc *CarepartnerController) UpdateCarepartner(w http.ResponseWriter, r *htt
 		return
 	}
 
+	existingCarepartner, err := cc.Service.GetCarepartnerByID(req.ID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if existingCarepartner == nil {
+		writeError(w, http.StatusBadRequest, "carepartner not found")
+		return
+	}
+
 	// Parse time
 	autoStart, err := time.Parse("15:04:05", req.AutoStart)
 	if err != nil {
@@ -139,9 +149,14 @@ func (cc *CarepartnerController) UpdateCarepartner(w http.ResponseWriter, r *htt
 	}
 
 	c := &model.Carepartner{
-		ID:        req.ID,
-		Name:      req.Name,
-		AutoStart: autoStart,
+		ID:          req.ID,
+		Name:        existingCarepartner.Name,
+		CaregiverID: existingCarepartner.CaregiverID,
+		AutoStart:   autoStart,
+	}
+
+	if req.Name != "" {
+		c.Name = req.Name
 	}
 
 	if err := cc.Service.UpdateCarepartner(c); err != nil {
