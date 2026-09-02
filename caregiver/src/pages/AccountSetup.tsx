@@ -72,7 +72,7 @@ export default function AccountSetupPage() {
    */
   const handleSubmit = async () => {
     // Ensure name is typed
-    if ((user?.carepartners?.length ?? 0) === 0 && !carePartnerName.trim()) {
+    if (!carePartnerName.trim()) {
       setSubmitError("Please enter who this is for.");
       return;
     }
@@ -148,7 +148,7 @@ export default function AccountSetupPage() {
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">
-        Complete Account Setup
+        Pair New Device
       </h1>
 
       <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow">
@@ -160,13 +160,13 @@ export default function AccountSetupPage() {
           <div className="mb-6">
             <label className="text-lg font-medium">Who is this for?</label>
 
-            <input
-              type="text"
-              value={carePartnerName}
-              onChange={(e) => setCarePartnerName(e.target.value)}
-              className="w-full mt-2 p-3 border rounded bg-purple-50"
-              placeholder="Enter name"
-            />
+          <input
+            type="text"
+            value={carePartnerName}
+            onChange={(e) => setCarePartnerName(e.target.value)}
+            className="w-full mt-2 p-3 border rounded bg-purple-50"
+            placeholder="Enter name"
+          />
 
             {/* Suggestions */}
             <div className="flex gap-2 mt-2 flex-wrap">
@@ -181,7 +181,7 @@ export default function AccountSetupPage() {
               ))}
             </div>
           </div>
-        )}
+        </div>
 
         {/* ============================
             Pairing Code
@@ -240,7 +240,7 @@ export default function AccountSetupPage() {
           onClick={handleSubmit}
           className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
         >
-          Complete Setup
+          Pair Device
         </button>
       </div>
     </div>

@@ -111,6 +111,23 @@ export default function SettingsPage() {
 
         const cgData = await resCg.json();
         setCaregiver(cgData);
+        setUser(cgData);
+
+        const connectedCarepartners = Array.isArray(cgData.carepartners) ? cgData.carepartners : [];
+
+        if (connectedCarepartners.length === 0) {
+          setActiveCarePartnerId(null);
+          setAutoStart("08:00");
+          return;
+        }
+
+        const hasActiveCarepartner = activeCarePartnerId !== null
+          && connectedCarepartners.some((cp: { id: number }) => cp.id === activeCarePartnerId);
+
+        if (!hasActiveCarepartner) {
+          setActiveCarePartnerId(connectedCarepartners[0].id);
+          return;
+        }
 
         /* ============================
            Fetch carepartner settings
@@ -189,7 +206,17 @@ export default function SettingsPage() {
       }
 
       const result = await res.json();
-      setUser({ ...caregiver });
+      setUser((currentUser) => {
+        if (!currentUser) {
+          return { ...caregiver, carepartners: [] };
+        }
+
+        return {
+          ...currentUser,
+          name: caregiver.name,
+          role: caregiver.role,
+        };
+      });
       setUpdateStatus(result.message || "Settings updated!");
     } catch (err: any) {
       setUpdateStatus("Update failed: " + err.message);
@@ -248,15 +275,25 @@ export default function SettingsPage() {
           />
         </div>
 
-        {/* Care Partner ID */}
+        {/* Active Care Partner */}
         <div className="mb-6">
-          <label className="text-lg font-medium">Care Partner ID:</label>
-          <input
-            type="number"
-            value={activeCarePartnerId ?? 0}
-            className="w-full mt-2 p-3 border rounded bg-gray-200 text-gray-700"
-            readOnly
-          />
+          <label className="text-lg font-medium">Active Care Partner:</label>
+          <select
+            value={activeCarePartnerId ?? ""}
+            onChange={(e) => setActiveCarePartnerId(Number(e.target.value))}
+            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
+            disabled={carepartners.length === 0}
+          >
+            {carepartners.length === 0 ? (
+              <option value="">No connected care partners</option>
+            ) : (
+              carepartners.map((carepartner) => (
+                <option key={carepartner.id} value={carepartner.id}>
+                  {carepartner.name} (ID: {carepartner.id})
+                </option>
+              ))
+            )}
+          </select>
         </div>
 
         {/* Role */}
@@ -297,7 +334,7 @@ export default function SettingsPage() {
             className="mt-4 flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-semibold py-3 rounded"
             onClick={() => navigate("/setup")}
           >
-            Repair Device
+            Pair New Device
           </button>
 
           <button

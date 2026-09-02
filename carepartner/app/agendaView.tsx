@@ -44,7 +44,7 @@ export type VideoMetadata = { id: number; uri: string; displayed_name: string; f
 export type AudioMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
 export type WeatherMetadata = { ID: number; ZIPCODE: string };
 export type NewsMetadata = { ID: number; CATEGORY: string; LANGUAGE: string; COUNTRY: string };
-export type MessageMetadata = { id: number; message: string; image_uri: string };
+export type MessageMetadata = { id: number; message: string; image_uri?: string | null };
 export type EventMetadata = { id: number; list_id: number; time: string; text: string };
 export type CarepartnerLocationMetadata = { id: number; location: string; message: string; image_uri: string };
 export type CaregiverLocationMetadata = { id: number; location: string; message: string; image_uri: string };
@@ -109,8 +109,7 @@ function getHeaderTitle(item: ConfigurationWithMetadata): string {
     }
 
     if (item.module_type === 'messages') {
-        const metadata = item.metadata as MessageMetadata | null;
-        return metadata?.message ?? 'Message';
+        return 'Message';
     }
 
     if (item.module_type === 'weather') {
@@ -189,7 +188,7 @@ export default function AgendaView(){
                 .filter(i => i.timed && (i.time ?? '').slice(0, 5) <= currentTime && !playedIds.has(i.id))
                 .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''));
         } else {
-            queue = todaysItems.filter(i => !i.timed && !playedIds.has(i.id));
+            queue = todaysItems.filter(i => !i.timed);
         }
 
         queueBuiltRef.current = true;
@@ -324,7 +323,7 @@ export default function AgendaView(){
                     <WidgetViewerScreen configuration={currentItem} />
                 )}
 
-                {currentItem.module_type === "event" && (
+                {(currentItem.module_type === "event" || currentItem.module_type === "messages") && (
                     <TextViewerScreen configuration={currentItem} />
                 )}
 

@@ -267,9 +267,9 @@ export default function AudioScreen({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#d9d9d9" },
+  safe: { flex: 1, backgroundColor: "#d9d9d9", overflow: "hidden" },
 
-  body: { flex: 1, position: "relative" },
+  body: { flex: 1, position: "relative", overflow: "hidden" },
 
   // --- center cover ---
   centerWrap: {

@@ -220,7 +220,7 @@ export default function GreetingScreen({
             <video
               ref={videoRef}
               src={config.videoUrl}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               autoPlay
               playsInline
               loop={false}

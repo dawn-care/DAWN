@@ -37,7 +37,7 @@ type ConfigurationWithMetadata struct {
 	Metadata             json.RawMessage `json:"metadata"`
 }
 
-var DAYS_OF_WEEK_STR = [7]string{"Mon", "Tues", "Wed", "Thur", "Fri", "Sat", "Sun"}
+var DAYS_OF_WEEK_STR = [7]string{"Sun", "Mon", "Tues", "Wed", "Thur", "Fri", "Sat"}
 var MONTH_STR = [12]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 
 // configJSON is the JSON shape expected by the insert_configurations stored procedure.
@@ -150,7 +150,7 @@ func GetConfigurationByID(db *sql.DB, id int) (*Configuration, error) {
 
 func GetConfigurationsByDayAndCarepartner(db *sql.DB, carepartner_id int, day, month, day_of_week int, fullDate string) ([]ConfigurationWithMetadata, error) {
 	dayStr := fmt.Sprintf("%d", day)                          //For Monthly Type - int 1 - 31
-	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]             //For Weekly Type - string "Mon" - "Sun"
+	dayOfWeekStr := DAYS_OF_WEEK_STR[day_of_week]             //For Weekly Type - string "Sun" - "Sat"
 	monthDay := fmt.Sprintf("%s %d", MONTH_STR[month-1], day) //For Yearly Type - string "Month day" - i.e. "Jan 1"
 	var configurations []ConfigurationWithMetadata
 
