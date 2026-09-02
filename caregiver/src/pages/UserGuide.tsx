@@ -1,16 +1,62 @@
+/**
+ * UserGuide.tsx
+ * 
+ * User: Caregiver
+ *
+ * This component renders the StartUp caregiver manual.
+ * It is a static informational page designed to guide caregivers
+ * through setup, usage, and best practices.
+ *
+ * Features:
+ *  - Accordion-based expandable sections
+ *  - Embedded instructional images
+ *  - Step-by-step onboarding guide
+ *  - Recommendations and usage guidance
+ */
+
 import Accordion from "../components/Accordion";
+
+/* ============================
+   Static Assets
+============================ */
 import LoginPic from "../assets/user_guide/Login.png"
 import CarepartnerPairingPic from "../assets/user_guide/CarepartnerPairing.png"
 import AccountSetupPic from "../assets/user_guide/AccountSetup.png"
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * UserGuide Component
+ *
+ * Displays a structured manual for caregivers using StartUp.
+ * Covers:
+ *  - What the system does
+ *  - Account setup process
+ *  - Device pairing workflow
+ *  - Feature usage (Media, Messages, Widgets, Scheduling)
+ *  - Best practices and recommendations
+ */
 export default function UserGuide() {
+
+  /* ============================
+      Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
+
+      {/* ============================
+          Page Header
+      ============================ */}
       <h1 className="text-3xl font-semibold mb-6">
         StartUp Caregiver Manual
       </h1>
 
       <div className="border p-10 max-w-5xl w-full rounded-lg bg-white shadow space-y-6 text-gray-800 leading-relaxed">
+        {/* ============================
+            Introduction
+        ============================ */}
         <p>
           Start-Up is designed to gently begin each morning for your carepartner by automatically playing meaningful videos, photos, messages, and helpful information. This daily “start-up routine” can help them feel calm, oriented, and connected to the people they love.
         </p>
@@ -19,7 +65,9 @@ export default function UserGuide() {
           This guide will walk you through setting everything up step-by-step.
         </p>
 
-        {/* What Start-Up Does */}
+        {/* ============================
+            What Start-Up Does
+        ============================ */}
         <Accordion title="What Start-Up Does" defaultOpen>
           <p>
             Start-Up allows you to upload special media, like videos, photos, audio, reminders, and daily messages, that will automatically play for your carepartner each morning.
@@ -39,8 +87,11 @@ export default function UserGuide() {
           </p>
         </Accordion>
 
-        {/* Setting Up */}
+        {/* ============================
+            Setup Section
+        ============================ */}
         <Accordion title="Setting Up Start-Up">
+          {/* Step 1 */}
           <h3 className="text-lg font-semibold mt-4">Step 1: Create Your Account</h3>
           <p className="mt-2">Here is how to <b>create an account</b> if you do not have one already:</p>
           <ul className="list-disc ml-6 mt-2 space-y-1">
@@ -63,6 +114,7 @@ export default function UserGuide() {
 
           <hr></hr>
 
+          {/* Step 2 */}
           <h3 className="text-lg font-semibold mt-6">Step 2: Set Up Your Carepartner’s Device</h3>
           <ul className="list-disc ml-6 mt-2 space-y-1">
             <li><b>Download</b> the Start-Up application.</li>
@@ -82,6 +134,7 @@ export default function UserGuide() {
 
           <hr></hr>
 
+          {/* Step 3 */}
           <h3 className="text-lg font-semibold mt-6">Step 3: Pair the Devices</h3>
           <p className="mt-2">Once you’re signed in to the caregiver portal:</p>
           <ul className="list-disc ml-6 mt-2 space-y-1">
@@ -108,7 +161,9 @@ export default function UserGuide() {
           </p>
         </Accordion>
 
-        {/* Using Start-Up */}
+        {/* ============================
+            Usage Section
+        ============================ */}
         <Accordion title="Using Start-Up">
           <p>
             As a caregiver, you can create a gentle morning experience using the following modules.
@@ -175,7 +230,9 @@ export default function UserGuide() {
           </ul>
         </Accordion>
 
-        {/* Recommendations */}
+        {/* ============================
+            Recommendations
+        ============================ */}
         <Accordion title="Our Recommendations">
           <h3 className="text-lg font-semibold mt-4">Default Media</h3>
           <p>
@@ -219,7 +276,9 @@ export default function UserGuide() {
           </p>
         </Accordion>
 
-        {/* Final Thoughts */}
+        {/* ============================
+            Closing Section
+        ============================ */}
         <Accordion title="Final Thoughts">
           <p>Start-Up is designed to help your carepartner feel:</p>
           <ul className="list-disc ml-6 mt-2 space-y-1">

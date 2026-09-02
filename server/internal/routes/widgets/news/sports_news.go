@@ -21,8 +21,8 @@ func RegisterSportsNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.SportsNe
 		r.Get("/stats", controller.GetSportsNewsWidgetStatsHandler)
 
 		// Custom retrievals
-		r.Get("/by-carepartner-and-caregiver", controller.GetSportsNewsWidgetsByCarepartnerAndCaregiverHandler) // ?carepartner_id=&caregiver_id=
-		r.Get("/by-day-and-carepartner", controller.GetSportsNewsByDayAndCarepartnerHandler)                    // ?carepartner_id=&day=&month=&year=
+		r.Get("/by-carepartner-and-caregiver", controller.GetSportsNewsWidgetsByCarepartnerAndCaregiverHandler) // Get by caregiver and carepartner ?carepartner_id=&caregiver_id=
+		r.Get("/by-day-and-carepartner", controller.GetSportsNewsByDayAndCarepartnerHandler)                    // Get by carepartner and day ?carepartner_id=&day=&month=&year=
 
 		// Team-specific game endpoint
 		r.Post("/team-game", controller.GetTeamGameHandler)

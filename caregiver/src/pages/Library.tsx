@@ -1,3 +1,23 @@
+/**
+ * Library.tsx
+ * 
+ * User: Caregiver
+ * 
+ * Main content management interface for the application.
+ * 
+ * Responsibilities:
+ * - Fetch and display all modules (media, widgets, messages)
+ * - Provide filtering and search capabilities
+ * - Handle CRUD operations (delete, rename, update)
+ * - Launch creation modals for:
+ *    - Media
+ *    - Widgets
+ *    - Messages
+ * - Optionally act as a selector (via `onSelect` prop)
+ * 
+ * This component acts as the central hub for managing all uploaded content.
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { Trash2, Plus, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -7,9 +27,23 @@ import MediaFormCreate from "./MediaFormCreate";
 // import type { Module } from "../components/AgendaList";
 import { useAuth } from "../context/AuthContext";
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * All supported module types
+ */
 type ModuleType = "photo" | "video" | "audio" | "weather" | "sports" | "news" | "messages";
+
+/**
+ * Media-specific types
+ */
 type MediaType = "video" | "photo" | "audio";
 
+/**
+ * Base module structure returned from backend
+ */
 interface ModuleItem {
   id: number;
   caregiver_id: number;
@@ -18,6 +52,9 @@ interface ModuleItem {
   metadata_id: number;
 }
 
+/**
+ * Media module with additional metadata
+ */
 interface MediaItem extends ModuleItem {
   name: string;
   filename: string;
@@ -25,11 +62,17 @@ interface MediaItem extends ModuleItem {
   uri: string;
 }
 
+/**
+ * Weather widget module
+ */
 interface WeatherItem extends ModuleItem {
   module_type: "weather";
   zipcode: string;
 }
 
+/**
+ * News / Sports widget module
+ */
 interface NewsItem extends ModuleItem {
   module_type: "news" | "sports";
   category: string;
@@ -37,20 +80,32 @@ interface NewsItem extends ModuleItem {
   country: string;
 }
 
+/**
+ * Message (prompt) module
+ */
 interface PromptItem extends ModuleItem {
   type: "messages";
   message: string;
   image_uri?: string;
 }
 
+/**
+ * Union of all widget types
+ */
 type WidgetItem = WeatherItem | NewsItem;
 
+/**
+ * Filter configuration
+ */
 type Filter = {
   key: string;
   label: string;
   value: string;
 };
 
+/**
+ * Available UI filters
+ */
 const FILTERS: Filter[] = [
   { key: "all", label: "All", value: "" },
   { key: "pictures", label: "Pictures", value: "photo" },
@@ -62,29 +117,56 @@ const FILTERS: Filter[] = [
   { key: "messages", label: "Messages", value: "messages" },
 ];
 
+/**
+ * Props for Library component
+ * 
+ * @property onSelect - Optional callback when selecting an item (used in agenda mode)
+ */
 const API_URL = import.meta.env.VITE_API_URL;
 
-// Props for Library when it is acting as the agenda selector
+/* ============================
+   Main Component
+============================ */
 interface LibraryProps {
   onSelect?: (module: { moduleId: number; moduleType: string; label: string }) => void;
 }
 
 export default function Library({ onSelect }: LibraryProps = {}) {
+  /* ============================
+     State
+  ============================ */
+
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
   const [showCreateMedia, setShowCreateMedia] = useState(false);
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showCreateWidget, setShowCreateWidget] = useState(false);
+
   const navigate = useNavigate();
   const { user, activeCarePartnerId } = useAuth();
 
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Fetch modules when user or care partner changes
+   */
   useEffect(() => {
     if (user) {
       fetchModules();
     }
   }, [user, activeCarePartnerId]);
 
+  /* ============================
+     Data Fetching
+  ============================ */
+
+  /**
+   * Fetches all modules and their corresponding metadata
+   */
   const fetchModules = async () => {
     try {
       // Get modules
@@ -101,7 +183,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
 
       const modules = JSON.parse(text);
 
-      // Fetch metadata for each module
+      /**
+       * Fetch metadata for each module type
+       */
       const moduleResults = await Promise.all(
         modules.map(async (m: any) => {
           const type = m.module_type as ModuleType;
@@ -110,6 +194,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
           if (!res.ok) return null;
 
           const data = await res.json();
+          
+          // Media Modules
           if (type === "video" || type === "photo" || type === "audio") {
             return {
               id: m.id,
@@ -122,6 +208,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
               type: type,
               uri: `${API_URL}/${type}/file?id=${data.id}`,
             } as MediaItem;
+
+          // Weather Widget
           } else if (type === "weather") {
             return {
               id: m.id,
@@ -132,6 +220,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
               type: "weather",
               zipcode: data.zipcode,
             } as WeatherItem;
+
+          // Sports and News Widgets
           } else if (type === "news" || type === "sports") {
             return {
               id: m.id,
@@ -144,6 +234,8 @@ export default function Library({ onSelect }: LibraryProps = {}) {
               language: data.language,
               country: data.country,
             } as NewsItem;
+
+          // Prompt Modules
           } else {
             return {
               id: m.id,
@@ -165,6 +257,13 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     }
   };
 
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Deletes widget + module
+   */
   const handleWidgetDelete = async (moduleId: number, metadataId: number, widgetType: string,  isEditing: boolean) => {
     if (!isEditing) {
       // If Delete is coming from the library delete button instead of the widget form, confirm deletion and delete both module and widget
@@ -199,6 +298,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     setModules((prev) => prev.filter((m) => m.id !== moduleId));
   };
 
+  /**
+   * Deletes prompt + module
+   */
   const handlePromptDelete = async (moduleId: number, metadataId: number, isEditing: boolean) => {
     if (!isEditing) {
       // If Delete is coming from the library delete button instead of the prompt form, confirm deletion and delete both module and prompt
@@ -226,10 +328,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     setModules((prev) => prev.filter((m) => m.id !== moduleId));
   };
 
-  const handleUpdate = () => {
-    fetchModules();
-  };
-
+  /**
+   * Deletes media (module + metadata + file)
+   */
   const handleMediaDelete = async (
     metadataId: number,
     moduleId: number,
@@ -278,6 +379,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     }
   };
 
+  /**
+   * Renames media item
+   */
   const handleMediaRename = async (
     metadataId: number,
     type: MediaType,
@@ -305,6 +409,22 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     }
   };
 
+  /**
+   * Refresh modules after update
+   */
+  const handleUpdate = () => {
+    fetchModules();
+  };
+
+  /* ============================
+     Derived Data
+  ============================ */
+
+  /**
+   * Filters modules based on:
+   * - Search input
+   * - Selected filter
+   */
   const filteredModules = useMemo(() => {
     return modules.filter((item) => {
       if (item.module_type === "video" || item.module_type === "photo" || item.module_type === "audio") {
@@ -330,6 +450,9 @@ export default function Library({ onSelect }: LibraryProps = {}) {
     });
   }, [modules, search, activeFilter]);
 
+  /* ============================
+     Render
+  ============================ */
   return (
     <div className="relative w-full px-8 py-10">
       <h1 className="text-4xl font-medium text-center mb-8">
@@ -512,6 +635,19 @@ export default function Library({ onSelect }: LibraryProps = {}) {
   );
 }
 
+/* ============================
+   Subcomponents
+============================ */
+
+/**
+ * MediaCard Component
+ * 
+ * Displays media item (photo, video, audio)
+ * Supports:
+ * - Inline rename
+ * - Delete
+ * - Selection mode
+ */
 function MediaCard({
   item,
   onDelete,
@@ -650,6 +786,15 @@ function MediaCard({
   );
 }
 
+/**
+ * WidgetCard Component
+ * 
+ * Displays widget (weather, sports, news)
+ * Supports:
+ * - Edit modal
+ * - Delete
+ * - Selection mode
+ */
 function WidgetCard({
     item,
     onDelete,
@@ -749,6 +894,15 @@ function WidgetCard({
   );
 }
 
+/**
+ * PromptCard Component
+ * 
+ * Displays message/prompt modules
+ * Supports:
+ * - Edit modal
+ * - Delete
+ * - Selection mode
+ */
 function PromptCard({
     item,
     onDelete,

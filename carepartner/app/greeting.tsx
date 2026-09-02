@@ -1,3 +1,26 @@
+/**
+ * greeting.tsx
+ * 
+ * User: Carepartner
+ * 
+ * Displays video-based greeting or content playback.
+ * 
+ * Responsibilities:
+ * - Load video from backend using metadata
+ * - Automatically play video content
+ * - Track playback progress and duration
+ * - Allow user to seek through video
+ * - Notify parent when playback is complete
+ * 
+ * Navigation:
+ * - Controlled by AgendaView
+ * 
+ * Notes:
+ * - Uses HTML5 <video> element for playback
+ * - Autoplay is handled programmatically to avoid browser restrictions
+ * - Falls back to placeholder UI if no video is available
+ */
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
@@ -12,15 +35,32 @@ import { Video } from "expo-av";
 import { type ConfigurationWithMetadata, type MediaPlaybackProps, VideoMetadata } from "./agendaView";
 import { API_URL } from "./config";
 
+/* ============================
+   TYPES
+============================ */
+
+/**
+ * Normalized configuration used internally by this component.
+ */
 type GreetingMediaConfig = {
   videoUrl?: string;
 };
 
+/**
+ * Props passed from AgendaView.
+ */
 interface GreetingScreenProps {
   configuration: ConfigurationWithMetadata;
   onPlaybackComplete: MediaPlaybackProps["onPlaybackComplete"];
 }
 
+/* ============================
+   HELPERS
+============================ */
+
+/**
+ * Formats seconds into mm:ss format
+ */
 function formatTime(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));
   const m = Math.floor(sec / 60);
@@ -28,7 +68,9 @@ function formatTime(totalSeconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// Simple reusable glass container (local to this file for now)
+/**
+ * Simple reusable glass container
+ */
 function GlassCard({
   children,
   style,
@@ -39,40 +81,77 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
+/* ============================
+   COMPONENT
+============================ */
+
+/**
+ * GreetingScreen Component
+ * 
+ * Handles:
+ *  - Building video config from metadata
+ *  - Auto-playing video content
+ *  - Tracking playback progress
+ *  - Allowing user seek interaction
+ *  - Triggering completion callback
+ */
 export default function GreetingScreen({
   configuration: configuration,
   onPlaybackComplete,
   }: GreetingScreenProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  /**
+   * Converts configuration metadata into video URL.
+   */
   const buildConfig = (configuration: ConfigurationWithMetadata): GreetingMediaConfig => {
-      const metadata = configuration.metadata as VideoMetadata | null;
-  
-      if (!metadata) {
-        return {
-          videoUrl: "",
-        };
-      }
-  
-      return {
-        videoUrl: `${API_URL}/video/file?id=${metadata.id}`,
-      };
-    };
-  
-    const [config, setConfig] = useState<GreetingMediaConfig>(
-      buildConfig(configuration)
-    );
+    const metadata = configuration.metadata as VideoMetadata | null;
 
+    if (!metadata) {
+      return {
+        videoUrl: "",
+      };
+    }
+
+    return {
+      videoUrl: `${API_URL}/video/file?id=${metadata.id}`,
+    };
+  };
+
+  /* ============================
+       STATE
+    ============================ */
+  const [config, setConfig] = useState<GreetingMediaConfig>(
+    buildConfig(configuration)
+  );
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const [barWidth, setBarWidth] = useState(1);
   const [durationSec, setDurationSec] = useState(0);
   const [positionSec, setPositionSec] = useState(0);
 
-  const [barWidth, setBarWidth] = useState(1);
+  /**
+   * Playback progress (0 → 1).
+   */
+  const progress = useMemo(() => {
+    if (!durationSec) return 0;
+    return Math.min(1, Math.max(0, positionSec / durationSec));
+  }, [positionSec, durationSec]);
 
+  /* ============================
+     EFFECTS
+  ============================ */
+
+  /**
+   * Rebuild config when agenda item changes.
+   */
   useEffect(() => {
     const next = buildConfig(configuration);
     setConfig(next);
   }, [configuration]);
 
-  // Programmatically start playback when the video element mounts or src changes
+  /**
+   * Autoplays when video url changes
+   */
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !config.videoUrl) return;
@@ -92,11 +171,13 @@ export default function GreetingScreen({
     }
   }, [config.videoUrl]);
 
-  const progress = useMemo(() => {
-    if (!durationSec) return 0;
-    return Math.min(1, Math.max(0, positionSec / durationSec));
-  }, [positionSec, durationSec]);
+  /* ============================
+      HANDLERS
+  ============================ */
 
+  /**
+   * Updates playback position and duration.
+   */
   const onPlaybackStatusUpdate = (
     event: React.SyntheticEvent<HTMLVideoElement>
   ) => {
@@ -109,6 +190,9 @@ export default function GreetingScreen({
     setPositionSec(p);
   };
 
+  /**
+   * Handles user seeking via progress bar.
+   */
   const handleSeek = async (newProgress: number) => {
     if (!videoRef.current || !durationSec) return;
     const targetSeconds = newProgress * durationSec;
@@ -123,6 +207,9 @@ export default function GreetingScreen({
     setBarWidth(e.nativeEvent.layout.width || 1);
   };
 
+  /* ============================
+      RENDER
+  ============================ */
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

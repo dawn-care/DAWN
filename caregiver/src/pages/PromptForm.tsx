@@ -1,42 +1,118 @@
+/**
+ * PromptForm.tsx
+ * 
+ * User: Caregiver
+ * 
+ * This component provides a unified form for creating, editing, and deleting prompt messages.
+ * A prompt consists of:
+ *  - Text message (required)
+ *  - Optional image upload
+ * 
+ * The component supports both:
+ *  - Create mode (no moduleId)
+ *  - Edit mode (moduleId provided via props or URL params)
+ * 
+ * API interactions:
+ *  - Fetch existing module + message metadata (edit mode)
+ *  - Upload image (optional)
+ *  - Create message + module
+ *  - Update message
+ *  - Delete message + module
+ */
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+/* ============================
+   Constants / Types
+============================ */
+
+/**
+ * Allowed file extensions for uploaded images
+ */
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".heic"];
 
-// Create a prop interface so that Library can pass parameters to the form for editing existing prompts without relying on URL params
+/**
+ * Props for PromptForm component
+ * 
+ * @property moduleId - Optional module ID for edit mode
+ * @property onDeleteSuccess - Callback after successful deletion
+ * @property onUpdateSuccess - Callback after successful update/save
+ */
 interface PromptFormProps {
   moduleId?: number;
   onDeleteSuccess?: () => void;
   onUpdateSuccess?: () => void;
 }
 
+/**
+ * Base API URL from environment config
+ */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * PromptForm Component
+ * 
+ * Handles:
+ *  - Creating new prompts
+ *  - Editing existing prompts
+ *  - Deleting prompts
+ * 
+ * Determines mode based on:
+ *  - prop moduleId OR URL param moduleId
+ */
 export default function PromptForm({
         moduleId: propModuleId,
         onDeleteSuccess,
         onUpdateSuccess
     }: PromptFormProps
   ) {
+
+  /* ============================
+     Routing / Context
+  ============================ */
+
+  const { moduleId } = useParams<{ moduleId: string }>();
+  const navigate = useNavigate();
+  const { user, activeCarePartnerId } = useAuth();
+
+  /**
+   * Resolve actual module ID:
+   * Priority: prop > URL param
+   */
+  const actualModuleId = propModuleId ?? moduleId;
+
+  /**
+   * Determines whether component is in edit mode
+   */
+  const isEditMode = Boolean(actualModuleId);
+
+  /* ============================
+     State
+  ============================ */
+
   // Creating Variables
   const [promptMessage, setPromptMessage] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
-  // Editing Variables
-  const { moduleId } = useParams<{ moduleId: string }>();
-  const actualModuleId = propModuleId ?? moduleId;
-  const [promptId, setPromptId] = useState<number | null>(null);
-  const isEditMode = Boolean(actualModuleId);
-  const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
-  // Deleting Variables
-  const navigate = useNavigate();
-  const { user, activeCarePartnerId } = useAuth();
 
-  /*******************************************
-   * If form is in edit mode, load message
-   *******************************************/
+  // Editing Variables
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const [existingImageUri, setExistingImageUri] = useState<string | null>(null);
+
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Load existing prompt data in edit mode
+   */
   useEffect(() => {
     if (!actualModuleId) return;
 
@@ -65,9 +141,13 @@ export default function PromptForm({
     loadPrompt();
   }, [actualModuleId]);
 
-  /*******************************************
+  /* ============================
+     Helpers
+  ============================ */
+
+  /**
    * Check if the uploaded file is a picture
-   *******************************************/ 
+   */ 
   function validateFile(f: File) {
     const ext = "." + f.name.split(".").pop()?.toLowerCase();
     if (!allowedExtensions.includes(ext)) {
@@ -79,9 +159,13 @@ export default function PromptForm({
     }
   }
 
-  /*******************************************
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
    * Message Creation and Photo Upload
-   *******************************************/ 
+   */  
   async function handleUpload() {
     if (!promptMessage.trim()) {
       setUploadStatus("Please enter text to go alongside this picture.");
@@ -170,9 +254,9 @@ export default function PromptForm({
     }
   }
 
-  /*******************************************
+  /**
    * Update/Edit
-   *******************************************/ 
+   */ 
   async function handleUpdate() {
     if (!promptMessage.trim()) {
       setUploadStatus("Message text cannot be empty.");
@@ -223,9 +307,9 @@ export default function PromptForm({
     }
   }
 
-  /*******************************************
+  /**
    * Delete
-   *******************************************/ 
+   */ 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this message?")) return;
 
@@ -253,9 +337,9 @@ export default function PromptForm({
     }
   }
 
-  /*******************************************
-   * Returned Webpage
-   *******************************************/ 
+  /* ============================
+     Render
+  ============================ */
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">

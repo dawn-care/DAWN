@@ -1,4 +1,25 @@
-// app/photos.tsx (or whatever route you want)
+/**
+ * photo.tsx
+ * 
+ * User: Carepartner
+ * 
+ * Displays photo-based content within the agenda flow.
+ * 
+ * Responsibilities:
+ * - Render photos from backend media endpoints
+ * - Support both photo and message modules
+ * - Convert metadata into usable image URLs
+ * - Display fallback UI when no image is available
+ * 
+ * Navigation:
+ * - Controlled by AgendaView
+ * 
+ * Notes:
+ * - Uses backend `/photo/file?id=` endpoint for photos
+ * - Message modules may include image URIs
+ * - Only displays one image at a time (future: carousel support)
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   Image,
@@ -10,15 +31,31 @@ import { Stack } from "expo-router";
 import { type ConfigurationWithMetadata, PhotoMetadata, MessageMetadata } from "./agendaView";
 import { API_URL } from "./config";
 
+/* ============================
+   Types
+============================ */
+
+/**
+ * Normalized configuration used internally by this component.
+ */
 type PhotoViewerConfig = {
   photoUrls?: string[];
 };
 
+/**
+ * Props passed from AgendaView.
+ */
 interface PhotoViewerProps {
   configuration: ConfigurationWithMetadata;
 }
 
-// Simple reusable glass container (local to this file for now)
+/* ============================
+   Helpers
+============================ */
+
+/**
+ * Reusable glass-style container.
+ */
 function GlassCard({
   children,
   style,
@@ -29,10 +66,29 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * PhotoViewerScreen Component
+ * 
+ * Handles:
+ * - Parsing configuration metadata
+ * - Building backend image URLs
+ * - Rendering image or fallback UI
+ */
 export default function PhotoViewerScreen({
   configuration: configuration,
   }: PhotoViewerProps){
 
+  /**
+   * Converts backend configuration into a usable photo URL list.
+   * 
+   * Handles:
+   * - Photo modules → fetch from `/photo/file`
+   * - Message modules → use `image_uri` if present
+   */
   const buildConfig = (configuration: ConfigurationWithMetadata): PhotoViewerConfig => {
     var metadata;
     if (configuration.module_type === "photo"){
@@ -60,19 +116,30 @@ export default function PhotoViewerScreen({
     }
   };
 
+  /* ============================
+     State
+  ============================ */
   const [config, setConfig] = useState<PhotoViewerConfig>(
     buildConfig(configuration)
   );
+  const hasPhotos = !!config.photoUrls?.length;
+  const currentUrl = hasPhotos ? config.photoUrls![0] : undefined;
 
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Rebuild config whenever the active agenda item changes.
+   */
   useEffect(() => {
     const next = buildConfig(configuration);
     setConfig(next);
   }, [configuration]);
 
-  const hasPhotos = !!config.photoUrls?.length;
-  const currentUrl = hasPhotos ? config.photoUrls![0] : undefined;
-  console.log("PhotoViewer config:", config, "currentUrl:", currentUrl);
-
+  /* ============================
+     Render
+  ============================ */
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

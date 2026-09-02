@@ -1,4 +1,25 @@
-// app/audio.tsx (or wherever your route lives)
+/**
+ * audio.tsx
+ * 
+ * User: Carepartner
+ * 
+ * Plays audio content within the agenda flow.
+ * 
+ * Responsibilities:
+ * - Stream audio from backend endpoints
+ * - Display playback progress and duration
+ * - Allow user seeking via progress bar
+ * - Notify AgendaView when playback completes
+ * 
+ * Navigation:
+ * - Controlled by AgendaView
+ * 
+ * Notes:
+ * - Uses hidden HTML <audio> element for playback
+ * - Progress bar supports click-to-seek interaction
+ * - Audio auto-plays when loaded
+ */
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
@@ -12,16 +33,32 @@ import { Stack } from "expo-router";
 import { type ConfigurationWithMetadata, type MediaPlaybackProps, AudioMetadata } from "./agendaView";
 import { API_URL } from "./config";
 
+/* ============================
+   Types
+============================ */
+
+/**
+ * Normalized configuration used internally by this component.
+ */
 type AudioMediaConfig = {
   audioUrl?: string;
 };
 
+/**
+ * Props passed from AgendaView.
+ */
 interface AudioScreenProps {
   configuration: ConfigurationWithMetadata;
   onPlaybackComplete: MediaPlaybackProps["onPlaybackComplete"];
 }
 
+/* ============================
+   Helpers
+============================ */
 
+/**
+ * Formats seconds into MM:SS.
+ */
 function formatTime(totalSeconds: number) {
   const sec = Math.max(0, Math.floor(totalSeconds));
   const m = Math.floor(sec / 60);
@@ -29,7 +66,9 @@ function formatTime(totalSeconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// Simple reusable glass container (local to this file for now)
+/**
+ * Reusable glass-style container.
+ */
 function GlassCard({
   children,
   style,
@@ -40,11 +79,27 @@ function GlassCard({
   return <View style={[styles.glassBase, style]}>{children}</View>;
 }
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * AudioScreen Component
+ * 
+ * Handles:
+ * - Building audio URL from metadata
+ * - Managing playback state (time, duration)
+ * - Rendering progress UI
+ * - Handling playback completion
+ */
 export default function AudioScreen({
   configuration: configuration,
   onPlaybackComplete,
   }: AudioScreenProps){
-  const audioRef = useRef<HTMLAudioElement>(null);
+
+  /**
+   * Converts configuration metadata into audio URL.
+   */
   const buildConfig = (configuration: ConfigurationWithMetadata): AudioMediaConfig => {
     const metadata = configuration.metadata as AudioMetadata | null;
 
@@ -59,26 +114,46 @@ export default function AudioScreen({
     };
   };
 
+  /* ============================
+       STATE
+    ============================ */
   const [config, setConfig] = useState<AudioMediaConfig>(
     buildConfig(configuration)
   );
 
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const [barWidth, setBarWidth] = useState(1);
   const [durationSec, setDurationSec] = useState(0);
   const [positionSec, setPositionSec] = useState(0);
 
-  const [barWidth, setBarWidth] = useState(1);
-
-  // Fetch config
-  useEffect(() => {
-     const next = buildConfig(configuration);
-     setConfig(next);
-   }, [configuration]);
-
+  /**
+   * Playback progress (0 → 1).
+   */
   const progress = useMemo(() => {
     if (!durationSec) return 0;
     return Math.min(1, Math.max(0, positionSec / durationSec));
   }, [positionSec, durationSec]);
 
+  /* ============================
+       EFFECTS
+    ============================ */
+
+  /**
+   * Rebuild config when agenda item changes.
+   */
+  useEffect(() => {
+     const next = buildConfig(configuration);
+     setConfig(next);
+   }, [configuration]);
+
+  /* ============================
+       HANDLERS
+    ============================ */
+
+  /**
+   * Updates playback position and duration.
+   */
   const onPlaybackStatusUpdate = (
     event: React.SyntheticEvent<HTMLAudioElement>
   ) => {
@@ -89,6 +164,9 @@ export default function AudioScreen({
     setPositionSec(p);
   };
 
+  /**
+   * Handles user seeking via progress bar.
+   */
   const handleSeek = async (newProgress: number) => {
     if (!audioRef.current || !durationSec) return;
     const targetSeconds = newProgress * durationSec;
@@ -99,10 +177,16 @@ export default function AudioScreen({
     }
   };
 
+  /**
+   * Tracks progress bar width for accurate seeking.
+   */
   const onBarLayout = (e: LayoutChangeEvent) => {
     setBarWidth(e.nativeEvent.layout.width || 1);
   };
 
+  /* ============================
+       RENDER
+    ============================ */
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

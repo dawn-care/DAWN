@@ -12,11 +12,13 @@ import (
 	models "server/internal/models/widgets/news"
 )
 
+// Service sturct (ESPN API does not require key)
 type SportsNewsWidgetService struct {
 	db     *sql.DB
 	client *http.Client
 }
 
+// Struct to parse response from ESPN Sports API for team schedule
 type SportAPIResponse struct {
 	Events []struct {
 		Competitions []struct {
@@ -35,12 +37,14 @@ type SportAPIResponse struct {
 	} `json:"events"`
 }
 
+// Struct to represent a team from the ESPN Sports API response, used for easier handling in game summary creation
 type Team struct {
 	Name     string
 	HomeAway string
 	Score    float64
 }
 
+// Struct to represent the game summary information to be sent to the frontend for display in the sports news widget
 type GameSummaryResponse struct {
 	UserTeamName     string `json:"user_team_name"`
 	OpponentTeamName string `json:"opponent_team_name"`
@@ -58,7 +62,15 @@ func NewSportsNewsWidgetService(db *sql.DB) *SportsNewsWidgetService {
 	}
 }
 
-// Create a new sports sports widget module
+// CREATE OPERATIONS
+
+/*
+Create a new sports news widget module
+sports_news_widget - information inputted formatted as a NewsWidget struct
+
+	** The COUNTRY field representing the league and the LANGUAGE field
+	   representing the team (formatted as "Team Name (TEAM ABBREVIATION)")
+*/
 func (s *SportsNewsWidgetService) CreateSportsNewsWidget(sports_news_widget *models.NewsWidget) error {
 	if sports_news_widget == nil {
 		return errors.New("NewsWidget cannot be nil")
@@ -76,7 +88,13 @@ func (s *SportsNewsWidgetService) CreateSportsNewsWidget(sports_news_widget *mod
 	return nil
 }
 
-// Create multiple sports widgets in bulk
+/*
+Create multiple sports widgets in bulk
+sports_news_widgets - List of NewsWidget structs
+
+	** The COUNTRY field representing the league and the LANGUAGE field
+	   representing the team (formatted as "Team Name (TEAM ABBREVIATION)")
+*/
 func (s *SportsNewsWidgetService) CreateSportsNewsWidgetsBulk(sports_news_widgets []models.NewsWidget) error {
 	if len(sports_news_widgets) == 0 {
 		return errors.New("no news widgets to create")
@@ -92,7 +110,12 @@ func (s *SportsNewsWidgetService) CreateSportsNewsWidgetsBulk(sports_news_widget
 	return models.CreateNewsBulk(s.db, sports_news_widgets)
 }
 
-// Retrieve a sports widget by its ID
+// RETRIEVE OPERATIONS
+
+/*
+Retrieve a sports widget by its ID
+id - The ID of the sports widget to retrieve
+*/
 func (s *SportsNewsWidgetService) GetSportsNewsWidgetByID(id int) (*models.NewsWidget, error) {
 	if id <= 0 {
 		return nil, errors.New("invalid NewsWidget ID")
@@ -107,7 +130,11 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetByID(id int) (*models.NewsW
 	return sports_news_widget, nil
 }
 
-// Retrieve all sports widgets for given carepartner and caregiver
+/*
+Retrieve all sports widgets for given carepartner and caregiver
+carepartner_id - The carepartner ID associated with the sports widgets to retrieve
+caregiver_id - The caregiver ID associated with the sports widgets to retrieve
+*/
 func (s *SportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]models.NewsWidget, error) {
 	if carepartner_id <= 0 || caregiver_id <= 0 {
 		return nil, errors.New("invalid Carepartner ID or Caregiver ID")
@@ -115,7 +142,11 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerAndCaregiver(
 	return models.GetNewsByCarepartnerAndCaregiver(s.db, carepartner_id, caregiver_id)
 }
 
-// Retrieve all sports widgets for a carepartner
+/*
+Retrieve all sports widgets for a carepartner on a given day
+carepartner_id - The carepartner ID associated with the sports widgets to retrieve
+day, month, year - The date to retrieve sports widgets for
+*/
 func (s *SportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]models.NewsWidget, error) {
 	if carepartner_id <= 0 {
 		return nil, errors.New("invalid Carepartner ID")
@@ -126,7 +157,12 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerIDAndDay(care
 	return models.GetNewsByDayAndCarepartner(s.db, carepartner_id, day, month, year)
 }
 
-// Update an existing sports widget
+// UPDATE OPERATION
+
+/*
+Update an existing sports widget
+sports_news_widget - information inputted formatted as a NewsWidget struct
+*/
 func (s *SportsNewsWidgetService) UpdateSportsNewsWidget(sports_news_widget *models.NewsWidget) error {
 	if sports_news_widget == nil {
 		return errors.New("NewsWidget cannot be nil")
@@ -143,7 +179,12 @@ func (s *SportsNewsWidgetService) UpdateSportsNewsWidget(sports_news_widget *mod
 	return models.UpdateNews(s.db, sports_news_widget)
 }
 
-// Delete a sports widget by its ID
+// DELETE OPERATION
+
+/*
+Delete a sports widget by its ID
+id - The ID of the sports widget to delete
+*/
 func (s *SportsNewsWidgetService) DeleteSportsNewsWidget(id int) error {
 	if id <= 0 {
 		return errors.New("invalid NewsWidget ID")
@@ -151,12 +192,21 @@ func (s *SportsNewsWidgetService) DeleteSportsNewsWidget(id int) error {
 	return models.DeleteNews(s.db, id)
 }
 
-// Get total number of sports widgets
+// ANALYTICS & STATS
+
+/*
+Get total number of sports widgets in the database for analytics purposes
+*/
 func (s *SportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 	return models.GetNewsStats(s.db)
 }
 
-// Gets the the schedule for a team then calls the helper function to parse that data into a game summary
+// EXTERNAL API CALLS
+
+/*
+Gets the the schedule for a team then calls the helper function to parse that data into a game summary
+sports_news_widget - sports news widget containing the league and team information
+*/
 func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWidget) (*GameSummaryResponse, error) {
 	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
 		return nil, errors.New("league and team cannot be empty")
@@ -194,7 +244,11 @@ func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWid
 	return game_summary, nil
 }
 
-// Parses the API response into a structured GameSummaryResponse
+/*
+Parses the API response into a structured GameSummaryResponse
+apiResponse - the response from the ESPN Sports API containing the team schedule and game information
+team - the team abbreviation to identify the user's team in the API response
+*/
 func CreateGameSummary(apiResponse *SportAPIResponse, team string) (*GameSummaryResponse, error) {
 	if apiResponse == nil || len(apiResponse.Events) == 0 {
 		return &GameSummaryResponse{Message: "No upcoming games found."}, nil

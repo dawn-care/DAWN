@@ -1,15 +1,51 @@
+/**
+ * MediaFormUpdate.tsx
+ * 
+ * User: Caregiver
+ * 
+ * This component provides functionality for updating existing media items.
+ * Supported media types:
+ *  - Video
+ *  - Photo
+ *  - Audio
+ * 
+ * Features:
+ *  - Fetch and display all existing media for the current caregiver + carepartner
+ *  - Select a media item to update
+ *  - Update media metadata (display name)
+ *  - Optionally replace the media file
+ * 
+ * API interactions:
+ *  - Fetch modules and associated media metadata
+ *  - Update media metadata (PUT)
+ *  - Update media file (optional PUT)
+ */
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthContext';
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Supported media types
+ */
 type MediaType = "video" | "photo" | "audio";
 
+/**
+ * Represents a module returned from backend
+ */
 interface Module {
   id: number;
   module_type: MediaType;
   metadata_id: number;
 }
 
+/**
+ * Represents a selectable media item in the UI
+ */
 interface MediaOption {
   moduleId: number;
   metadataId: number;
@@ -17,15 +53,43 @@ interface MediaOption {
   name: string;
 }
 
+/* ============================
+   Static Data
+============================ */
+
+/**
+ * Allowed file extensions per media type
+ */
 const allowedExtensions: Record<MediaType, string[]> = {
   video: [".mp4", ".mov", ".avi"],
   photo: [".jpg", ".jpeg", ".png", ".heic"],
   audio: [".mp3", ".wav", ".ogg", ".flac", ".aac"],
 };
 
+/**
+ * Base API URL from environment config
+ */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * MediaFormUpdate Component
+ * 
+ * Handles:
+ *  - Loading existing media
+ *  - Selecting media to update
+ *  - Updating media name
+ *  - Replacing media file (optional)
+ */
 export default function MediaFormUpdate() {
+
+  /* ============================
+     State
+  ============================ */
+
   const navigate = useNavigate();
 
   const [mediaList, setMediaList] = useState<MediaOption[]>([]);
@@ -37,7 +101,13 @@ export default function MediaFormUpdate() {
   const [status, setStatus] = useState("");
   const { user, activeCarePartnerId } = useAuth();
 
-  /* ---------------- LOAD ALL MEDIA ---------------- */
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Load all media associated with the current caregiver + carepartner
+   */
   useEffect(() => {
     async function loadMedia() {
       try {
@@ -86,7 +156,13 @@ export default function MediaFormUpdate() {
     loadMedia();
   }, []);
 
-  /* ---------------- FILE VALIDATION ---------------- */
+  /* ============================
+     Helpers
+  ============================ */
+
+  /**
+   * Validates uploaded file based on selected media type
+   */
   function validateFile(f: File) {
     if (!selected) return;
 
@@ -101,7 +177,13 @@ export default function MediaFormUpdate() {
     }
   }
 
-  /* ---------------- UPDATE ---------------- */
+  /* ============================
+     Handlers
+  ============================ */
+
+  /**
+   * Handles updating media metadata and optional file replacement
+   */
   async function handleUpdate() {
     if (!selected) {
       setStatus("Please select media to update.");
@@ -161,6 +243,10 @@ export default function MediaFormUpdate() {
       setStatus("Update failed: " + err.message);
     }
   }
+
+  /* ============================
+     Render
+  ============================ */
 
   return (
     <div className="w-full flex flex-col items-center mt-8 px-6">

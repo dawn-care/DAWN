@@ -1,3 +1,22 @@
+/**
+ * AgendaView.tsx
+ * 
+ * User: Caregiver
+ * 
+ * Main agenda management screen for a selected date.
+ * 
+ * Responsibilities:
+ * - Fetch and display agenda configurations for a given day
+ * - Separate and manage timed vs non-timed items
+ * - Allow navigation between days
+ * - Support creating and editing agenda configurations
+ * - Integrate with Library for module selection
+ * - Handle care partner selection context
+ * 
+ * Data Flow:
+ * Calendar → AgendaView → Library (select module) → ConfigurationForm → Save → Refresh
+ */
+
 import { useNavigate, useParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import AgendaList, { type ConfigurationWithMetadata } from '../components/AgendaList';
@@ -5,28 +24,90 @@ import ConfigurationForm from '../components/ConfigurationForm';
 import Library from './Library';
 import { useAuth } from '../context/AuthContext';
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Represents a selected module coming from the Library
+ * Used when creating a new configuration
+ */
 interface SelectedModule {
     moduleId: number;
     moduleType: string;
     label: string;
 }
 
+/* ============================
+   Main Component
+============================ */
 export default function AgendaView() {
+    /* ============================
+       Routing / Context
+    ============================ */
+
+    /**
+     * Date comes from route param (format: YYYY-MM-DD)
+     */
     const { date } = useParams();
+
+    /**
+     * Used for navigation between days
+     */
     const navigate = useNavigate();
-    const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
-    const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+
+    /**
+     * Auth context:
+     * - user (caregiver)
+     * - active care partner
+     */
     const { user, activeCarePartnerId, setActiveCarePartnerId } = useAuth();
 
+    /* ============================
+       State
+    ============================ */
+
+    /**
+     * All agenda configurations for the selected date
+     */
+    const [items, setItems] = useState<ConfigurationWithMetadata[]>([]);
+
+    /**
+     * Controls Library modal visibility
+     */
+    const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+
+    /**
+     * Loading & error states for API calls
+     */
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
     // For the create flow: library → config form
+    /**
+     * Stores selected module when creating a new configuration
+     */
     const [selectedModule, setSelectedModule] = useState<SelectedModule | null>(null);
+
     // For the edit flow: clicking an existing item
+    /**
+     * Stores the configuration being edited
+     */
     const [editingConfig, setEditingConfig] = useState<ConfigurationWithMetadata | null>(null);
+
     // Careapartners associated with logged in caregiver
+    /**
+     * List of care partners available to the caregiver
+     */
     const [carepartners, setCarepartners] = useState<{ id: number; name: string }[]>([]);
 
+    /* ============================
+       Data Fetching
+    ============================ */
+
+    /**
+     * Fetch agenda configurations for the current date
+     */
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -39,6 +120,9 @@ export default function AgendaView() {
             }
 
             const { dayOfMonth, month, dayOfWeek } = currentDateToComponents();
+            /**
+             * Guard against invalid date
+             */
             if (dayOfMonth === 0) {
                 setLoading(false);
                 return;
@@ -48,8 +132,11 @@ export default function AgendaView() {
                 return;
             }
 
+            /**
+             * Build query params for backend
+             */
             const params = new URLSearchParams({
-                caregiver_id: String(user?.id),  // TODO - check if this was okay to add here or if it breaks
+                caregiver_id: String(user?.id),
                 carepartner_id: String(activeCarePartnerId),
                 day: String(dayOfMonth),
                 month: String(month),
@@ -58,6 +145,10 @@ export default function AgendaView() {
             });
 
             const API_URL = import.meta.env.VITE_API_URL;
+
+            /**
+             * Fetch configurations for the selected day
+             */
             const res = await fetch(`${API_URL}/configurations/day?${params}`);
             if (!res.ok) throw new Error('Failed to fetch configurations');
             const data: ConfigurationWithMetadata[] = await res.json();
@@ -71,10 +162,23 @@ export default function AgendaView() {
         }
     };
 
-   useEffect(() => {
+    /* ============================
+        Effects
+    ============================ */
+
+    /**
+     * Refetch data when:
+     * - date changes
+     * - care partner changes
+     * - user changes
+     */
+    useEffect(() => {
         fetchData();
     }, [date, activeCarePartnerId, user]);
 
+    /**
+     * Fetch all care partners for the current caregiver
+     */
     useEffect(() => {
         const fetchCarepartners = async () => {
             if (!user?.id) return;
@@ -94,6 +198,13 @@ export default function AgendaView() {
         fetchCarepartners();
     }, [user]);
 
+    /* ============================
+       Date Utilities
+    ============================ */
+
+    /**
+     * Converts current date string into components used by backend
+     */
     const currentDateToComponents = () => {
         if (!date) return { dayOfMonth: 0, month: 0, dayOfWeek: 0 };
         const currentDate = new Date(date + 'T00:00:00');
@@ -103,6 +214,13 @@ export default function AgendaView() {
         return { dayOfMonth, month, dayOfWeek };
     }
 
+    /* ============================
+       Navigation Handlers
+    ============================ */
+
+    /**
+     * Navigate to previous day
+     */
     const handlePreviousDay = () => {
         if (!date) return;
         const currentDate = new Date(date + 'T00:00:00');
@@ -114,6 +232,9 @@ export default function AgendaView() {
         navigate(`/agenda/${newDate}`);
     };
 
+    /**
+     * Navigate to next day
+     */
     const handleNextDay = () => {
         if (!date) return;
         const currentDate = new Date(date + 'T00:00:00');
@@ -125,34 +246,68 @@ export default function AgendaView() {
         navigate(`/agenda/${newDate}`);
     };
 
+    /* ============================
+       Interaction Handlers
+    ============================ */
+
+    /**
+     * Called when a module is selected from the Library
+     */
     const handleModuleSelect = (module: SelectedModule) => {
         setIsLibraryModalOpen(false);
         setSelectedModule(module);
     };
 
+    /**
+     * Called when an existing item is clicked (edit mode)
+     */
     const handleItemClick = (item: ConfigurationWithMetadata) => {
         setEditingConfig(item);
     };
 
+    /**
+     * Called after a configuration is saved (create/update)
+     */
     const handleConfigSaved = () => {
         setSelectedModule(null);
         setEditingConfig(null);
         fetchData(); // refresh the agenda list
     };
 
+    /* ============================
+       Derived Data
+    ============================ */
+
+    /**
+     * Non-timed agenda items
+     */
     const regularItems = useMemo(() => items.filter(i => !i.timed), [items]);
+
+    /**
+     * Timed agenda items (sorted by time)
+     */
     const timedItems = useMemo(
         () => items.filter(i => i.timed).sort((a, b) => (a.time ?? '').localeCompare(b.time ?? '')),
         [items],
     );
 
+    /**
+     * Update only regular items
+     */
     const setRegularItems = (newRegular: ConfigurationWithMetadata[]) => {
         setItems(prev => [...prev.filter(i => i.timed), ...newRegular]);
     };
+
+    /**
+     * Update only timed items
+     */
     const setTimedItems = (newTimed: ConfigurationWithMetadata[]) => {
         setItems(prev => [...prev.filter(i => !i.timed), ...newTimed]);
     };
 
+    /* ============================
+       Render
+    ============================ */
     return (
         <div className="min-h-screen bg-white">
             {loading && (

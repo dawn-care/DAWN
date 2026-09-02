@@ -1,5 +1,9 @@
 package news
 
+/*
+**API DID NOT WORK THE WAY WE INTENDED SO WE DID NOT INCLUDE THIS IN MVP.
+ */
+
 import (
 	newsCtrlr "server/internal/controllers/widgets/news"
 

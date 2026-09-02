@@ -1,14 +1,48 @@
+/**
+ * ScheduleContext.tsx
+ * 
+ * User: Carepartner
+ * 
+ * Provides scheduled start for daily agenda and access to today's schedule items.
+ * 
+ * Responsibilities:
+ * - Fetch and store carepartner data
+ * - Fetch and store daily schedule configurations
+ * - Track played items to prevent repeats
+ * - Handle auto-start and scheduled triggers
+ * - Provide refresh functionality across the app
+ * 
+ * Navigation:
+ * - Auto-start trigger → `/agendaView`
+ * - Scheduled trigger → `/agendaView`
+ * 
+ * Notes:
+ * - Polls backend every 5 minutes
+ * - Resets state at midnight
+ */
+
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { getCarepartnerId } from './carepartnerId';
 import { API_URL } from './config';
 import type { ConfigurationWithMetadata } from './agendaView';
 
+/* ============================
+   Type Definitions
+============================ */
+
+/**
+ * Carepartner data structure from database
+ */
 type Carepartner = {
   id: number;
   name: string;
   auto_start: string; // "HH:MM:SS"
 };
+
+/* ============================
+   Context Setup
+============================ */
 
 interface ScheduleContextType {
   todaysItems: ConfigurationWithMetadata[];
@@ -28,6 +62,15 @@ export function useSchedule() {
   return ctx;
 }
 
+/* ============================
+   Helpers
+============================ */
+
+/**
+ * Formats backend time (HH:MM:SS) into user-friendly 12-hour format.
+ * Example:
+ *  "08:00:00" → "8:00 AM"
+ */
 function todayDateStr() {
   const now = new Date();
   const y = now.getFullYear();
@@ -41,7 +84,24 @@ function nowHHMM() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
 
+/* ============================
+   Component
+============================ */
+
+/**
+ * ScheduleProvider Component
+ * 
+ * Handles:
+ *  - Global schedule state
+ *  - API fetching
+ *  - Auto triggers
+ *  - Played-item tracking
+ */
 export function ScheduleProvider({ children }: { children: React.ReactNode }) {
+
+  /* ============================
+     State
+  ============================ */
   const [carepartner, setCarepartner] = useState<Carepartner | null>(null);
   const [todaysItems, setTodaysItems] = useState<ConfigurationWithMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,14 +109,15 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const hasInitializedRef = useRef(false);
 
   const lastAutoStartDateRef = useRef<string | null>(null);
-  // Dedup ref so the scheduled-item trigger navigates at most once per item
+  /** Dedup ref so the scheduled-item trigger navigates at most once per item */
   const navFiredRef = useRef<Set<number>>(new Set());
 
-  // Track which items have already been played today
+  /** Track which items have already been played today */
   const [playedIds, setPlayedIds] = useState<Set<number>>(new Set());
   const playedIdsRef = useRef<Set<number>>(playedIds);
   useEffect(() => { playedIdsRef.current = playedIds; }, [playedIds]);
 
+  /** Track today's schedule items */
   const todaysItemsRef = useRef<ConfigurationWithMetadata[]>(todaysItems);
   useEffect(() => { todaysItemsRef.current = todaysItems; }, [todaysItems]);
 
@@ -68,7 +129,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // ---- Fetch carepartner info ----
+  /** Fetch carepartner info */
   const fetchCarepartner = async (): Promise<Carepartner | null> => {
     const cpId = await getCarepartnerId();
     if (!cpId) return null;
@@ -79,7 +140,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return data;
   };
 
-  // ---- Fetch today's configurations ----
+  /** Fetch today's configurations */
   const fetchConfigurations = async () => {
     // This check ensures the loading state doesn't occur mid way through normal usage and unmount the active media component
     const isInitialLoad = !hasInitializedRef.current; 
@@ -121,6 +182,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /** Sync with caregiver */
   const refresh = async () => {
     try {
       await fetchCarepartner();
@@ -130,12 +192,12 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Initial fetch
+  /** Initial fetch */
   useEffect(() => {
     refresh();
   }, []);
 
-  // Poll for configuration & auto-start updates every 5 minutes
+  /** Poll for configuration & auto-start updates every 5 minutes */
   useEffect(() => {
     const FIVE_MINUTES = 5 * 60 * 1000;
     const id = setInterval(() => {
@@ -144,7 +206,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  // Reset played-item tracking at midnight
+  /** Reset played-item tracking at midnight */
   useEffect(() => {
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -157,7 +219,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, []);
 
-  // ---- Global auto-start trigger ----
+  /** Global auto-start trigger */
   useEffect(() => {
     const check = () => {
       if (!carepartner?.auto_start) return;
@@ -170,7 +232,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       if (now.getHours() !== h || now.getMinutes() !== m) return;
       if (lastAutoStartDateRef.current === dateKey) return;
 
-      // Only trigger if there are unplayed non-timed items
+      /** Only trigger if there are unplayed non-timed items */
       const hasUnplayed = todaysItemsRef.current.some(
         i => !i.timed && !playedIdsRef.current.has(i.id)
       );
@@ -185,7 +247,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [carepartner]);
 
-  // ---- Global scheduled-item trigger (navigate only, no queue management) ----
+  /** Global scheduled-item trigger (navigate only, no queue management) */
   useEffect(() => {
     const scheduled = todaysItems.filter(i => i.timed);
     if (!scheduled.length) return;

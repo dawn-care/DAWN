@@ -10,8 +10,8 @@ import (
 NewsWidget represents info required to retrieve news information for the news widget
 ID - the ID of the entry inthe database
 CATEGORY - the category of news
-LANGUAGE - the language of the news
-COUNTRY - the country the news should be for
+LANGUAGE - the language of the news (Used for team in SportsNewsWidget)
+COUNTRY - the country the news should be for (Used for league in SportsNewsWidget)
 */
 type NewsWidget struct {
 	ID       int    `json:"id"`
