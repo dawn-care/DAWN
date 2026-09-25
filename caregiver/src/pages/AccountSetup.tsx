@@ -181,7 +181,7 @@ export default function AccountSetupPage() {
               ))}
             </div>
           </div>
-        </div>
+        )}
 
         {/* ============================
             Pairing Code
