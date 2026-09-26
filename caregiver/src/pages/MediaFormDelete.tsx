@@ -215,8 +215,8 @@ export default function MediaFormDelete() {
       );
 
       setSelected(null);
-    } catch (err: any) {
-      setStatus("Delete failed: " + err.message);
+    } catch (err) {
+      setStatus("Delete failed: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 

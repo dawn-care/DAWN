@@ -239,8 +239,8 @@ export default function MediaFormUpdate() {
         setSelected(null);
       }
 
-    } catch (err: any) {
-      setStatus("Update failed: " + err.message);
+    } catch (err) {
+      setStatus("Update failed: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 
