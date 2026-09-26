@@ -58,11 +58,14 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   const {
+    user,
     setIsAuthenticated,
     setUser,
     activeCarePartnerId,
     setActiveCarePartnerId,
   } = useAuth();
+
+  const carepartners = user?.carepartners ?? [];
 
   /**
    * Base API URL
@@ -180,8 +183,8 @@ export default function SettingsPage() {
 
       // Redirect to login
       navigate("/login");
-    } catch (err: any) {
-      setLogoutError("Logout failed: " + err.message);
+    } catch (err) {
+      setLogoutError("Logout failed: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -218,8 +221,8 @@ export default function SettingsPage() {
         };
       });
       setUpdateStatus(result.message || "Settings updated!");
-    } catch (err: any) {
-      setUpdateStatus("Update failed: " + err.message);
+    } catch (err) {
+      setUpdateStatus("Update failed: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -248,8 +251,8 @@ export default function SettingsPage() {
 
       const result = await res.json();
       setUpdateStatus(result.message || "Carepartner settings updated!");
-    } catch (err: any) {
-      setUpdateStatus("Update failed: " + err.message);
+    } catch (err) {
+      setUpdateStatus("Update failed: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
