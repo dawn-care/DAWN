@@ -406,8 +406,8 @@ export default function WidgetForm({
             if (onUpdateSuccess) {
                 onUpdateSuccess();
             }
-        } catch (err: any) {
-            setUploadStatus("Upload failed: " + err.message);
+        } catch (err) {
+            setUploadStatus("Upload failed: " + (err instanceof Error ? err.message : String(err)));
         }
     }
 
@@ -463,8 +463,8 @@ export default function WidgetForm({
             if (onUpdateSuccess) {
                 onUpdateSuccess();
             }
-        } catch (err: any) {
-            setUploadStatus("Update failed: " + err.message);
+        } catch (err) {
+            setUploadStatus("Update failed: " + (err instanceof Error ? err.message : String(err)));
         }
     }
 
@@ -510,8 +510,8 @@ export default function WidgetForm({
             } else {
                 navigate("/library");
             }
-        } catch (err: any) {
-            setUploadStatus("Delete failed: " + err.message);
+        } catch (err) {
+            setUploadStatus("Delete failed: " + (err instanceof Error ? err.message : String(err)));
         }
     }
 

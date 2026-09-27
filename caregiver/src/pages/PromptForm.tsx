@@ -249,8 +249,8 @@ export default function PromptForm({
       if (onUpdateSuccess) {
         onUpdateSuccess();
       }
-    } catch (err: any) {
-      setUploadStatus("Upload failed: " + err.message);
+    } catch (err) {
+      setUploadStatus("Upload failed: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -302,8 +302,8 @@ export default function PromptForm({
       if (onUpdateSuccess) {
           onUpdateSuccess();
       }
-    } catch (err: any) {
-      setUploadStatus(err.message);
+    } catch (err) {
+      setUploadStatus(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -332,8 +332,8 @@ export default function PromptForm({
       } else {
           navigate("/library");
       }
-    } catch (err: any) {
-      setUploadStatus(err.message);
+    } catch (err) {
+      setUploadStatus(err instanceof Error ? err.message : String(err));
     }
   }
 

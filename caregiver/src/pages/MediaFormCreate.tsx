@@ -232,8 +232,8 @@ export default function MediaFormCreate({ onUploadSuccess }: { onUploadSuccess: 
         fileInputRef.current.value = "";
       }
 
-    } catch (err: any) {
-      setUploadStatus("Upload failed: " + err.message);
+    } catch (err) {
+      setUploadStatus("Upload failed: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 

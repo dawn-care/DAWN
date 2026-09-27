@@ -289,7 +289,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
 
           if (!widgetResponse.ok) throw new Error("Delete failed");
       }
-      catch (err: any) {
+      catch (err) {
             console.error("Widget delete failed:", err);
             alert("Failed to delete widget. Please try again.");
             return;
@@ -319,7 +319,7 @@ export default function Library({ onSelect }: LibraryProps = {}) {
 
           if (!promptRes.ok) throw new Error("Delete failed");
       }
-      catch (err: any) {
+      catch (err) {
             console.error("Prompt delete failed:", err);
             alert("Failed to delete message. Please try again.");
             return;

@@ -206,8 +206,8 @@ export default function ConfigurationForm({
 
             setStatus('Configuration created successfully!');
             onSave();
-        } catch (err: any) {
-            setStatus(`Error: ${err.message}`);
+        } catch (err) {
+            setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setSaving(false);
         }
@@ -265,8 +265,8 @@ export default function ConfigurationForm({
 
             setStatus('Configuration updated successfully!');
             onSave();
-        } catch (err: any) {
-            setStatus(`Error: ${err.message}`);
+        } catch (err) {
+            setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setSaving(false);
         }
@@ -305,8 +305,8 @@ export default function ConfigurationForm({
             }
             setStatus('This day has been skipped.');
             onSave();
-        } catch (err: any) {
-            setStatus(`Error: ${err.message}`);
+        } catch (err) {
+            setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setSaving(false);
         }
@@ -335,8 +335,8 @@ export default function ConfigurationForm({
 
             setStatus('Configuration removed successfully!');
             onSave();
-        } catch (err: any) {
-            setStatus(`Error: ${err.message}`);
+        } catch (err) {
+            setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
             setSaving(false);
         }
