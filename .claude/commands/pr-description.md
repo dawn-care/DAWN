@@ -26,19 +26,19 @@ Then generate a pull request description using exactly this format:
 
 **Related Ticket:** [<ticket link>](<ticket link>)
 
-## Summary
+## 📝 Summary
 
 - <Bulleted summary of what changed, derived from the description and/or the actual diff>
 
-## Screenshots/Recordings
+## 📸 Screenshots/Recordings
 
 _<To be filled in manually by the PR creator>_
 
-## Breaking Changes
+## ⚠️ Breaking Changes
 
 <Anything reviewers should prioritize: breaking changes, risky areas, or parts of the diff that need closer attention. Leave empty if none.>
 
-## Test Plan
+## ✅ Test Plan
 
 - [ ] <Checkbox item for something the PR creator should verify before merging>
 ```
