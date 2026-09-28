@@ -20,8 +20,8 @@ This is a link to an existing ticket (a GitHub Issue or GitHub Projects item).
    - User Story → `.github/ISSUE_TEMPLATE/user-story-template.md`
 
 4. Reformat the ticket's existing description into that exact template's structure:
-   - For an **Epic**, write a `### Description` paragraph summarizing the work, and fill in `### Acceptance criteria` with a checklist (`- [ ]`) of concrete conditions that must be true for the epic to be considered done. Leave `### Notes` empty unless the original description calls out something worth noting.
-   - For a **User Story**, write the `### User Story` line in the "As a ___, I want to ___ so that ___" form, and fill in `### Acceptance Criteria` with a checklist (`- [ ]`) of concrete, testable conditions. Leave `### Notes` empty unless the original description calls out something worth noting.
+   - For an **Epic**, write a `### Description` paragraph summarizing the work, and fill in `### Acceptance criteria` with a checklist (`- [ ]`) of concrete conditions that must be true for the epic to be considered done. Fill `### Notes` with `N/A` unless the original description calls out something worth noting.
+   - For a **User Story**, write the `### User Story` line in the "As a ___, I want to ___ so that ___" form, and fill in `### Acceptance Criteria` with a checklist (`- [ ]`) of concrete, testable conditions. Fill `### Notes` with `N/A` unless the original description calls out something worth noting.
    - Base all of this on the ticket's actual existing description — do not invent new scope that wasn't already implied by it.
 
 Do not include the template's YAML frontmatter (`name`/`about`/`title`/`labels`/`assignees`) in the output — only the body content (the `###` sections onward).
