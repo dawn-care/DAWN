@@ -46,7 +46,7 @@ _<To be filled in manually by the PR creator>_
 Formatting rules:
 
 - **Title**: a short, descriptive title summarizing the change, derived from the provided description.
-- **Related Ticket**: if a ticket link was provided, render it as a Markdown link using the link itself as the text. If no ticket link was provided, leave this line empty (e.g. `**Related Ticket:**`).
+- **Related Ticket**: if a ticket link was provided, render it as a Markdown link using the link itself as the text. If no ticket link was provided, write `None` (e.g. `**Related Ticket:** None`).
 - **Summary**: a bulleted list of what changed, grounded in the actual diff inspected above (not just the inline description). Call out new/modified files, endpoints, config, and dependencies as relevant.
 - **Screenshots/Recordings**: always leave this section as the placeholder text `_<To be filled in manually by the PR creator>_` — this is filled in manually, not generated.
 - **Breaking Changes**: derived from the actual diff, call out anything reviewers should prioritize, including but not limited to:
