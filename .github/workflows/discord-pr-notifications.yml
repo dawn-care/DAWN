@@ -1,0 +1,54 @@
+name: Discord PR Notifications
+
+on:
+  pull_request:
+    types: [opened, closed]
+
+permissions: {}
+
+jobs:
+  notify:
+    # Only PRs from branches in this repo (i.e. people with write access), never from forks
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+    steps:
+      - name: PR opened
+        if: github.event.action == 'opened'
+        env:
+          REQUESTED_REVIEWERS: ${{ toJSON(github.event.pull_request.requested_reviewers.*.login) }}
+          DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+        run: |
+          # Escape [ and ] so a title can't break the markdown link
+          TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
+
+          # Requested reviewers -> Discord mentions (falls back to the GitHub username if unmapped)
+          REVIEWERS=$(jq -r --argjson users "$DISCORD_USER_MAP" '
+            map(if $users[.] then "<@\($users[.])>" else . end) | join(", ")
+          ' <<< "$REQUESTED_REVIEWERS")
+
+          MESSAGE="🟢 ${PR_AUTHOR} opened [${TITLE}](${PR_URL})."
+          if [ -n "$REVIEWERS" ]; then
+            MESSAGE="${MESSAGE} Review requested from ${REVIEWERS}."
+          fi
+
+          jq -n --arg content "$MESSAGE" \
+            '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+            | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      - name: PR merged
+        if: github.event.action == 'closed' && github.event.pull_request.merged == true
+        env:
+          MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+        run: |
+          TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
+
+          MESSAGE="🟣 [${TITLE}](${PR_URL}) merged by ${MERGED_BY}."
+
+          jq -n --arg content "$MESSAGE" \
+            '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+            | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
