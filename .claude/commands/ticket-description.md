@@ -49,7 +49,8 @@ As a <role>, I want <goal>, so that <benefit>.
 - [ ] ...
 
 ### Definition of Done
-<what must be true for this story to be considered complete>
+- <something that must be true for this story to be considered complete>
+- ...
 
 ### Notes
 <additional notes about the story, or N/A if there is nothing additional>
@@ -68,7 +69,8 @@ As a <role>, I want <goal>, so that <benefit>.
 - [ ] ...
 
 ### Definition of Done
-<what must be true for this task to be considered complete>
+- <something that must be true for this task to be considered complete>
+- ...
 ```
 
 Tasks are smaller than user stories and are assumed to be linked to a parent story and/or epic, so do not write a user story line or mention the parent.
