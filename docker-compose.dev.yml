@@ -26,12 +26,3 @@ services:
     ports:
       - "8080:8080"
     volumes: []
-
-  carepartner-build:
-    profiles:
-      - build-rpi
-    build:
-      context: ./carepartner
-      dockerfile: Dockerfile.build
-      args:
-        API_URL: http://localhost:8080/api
