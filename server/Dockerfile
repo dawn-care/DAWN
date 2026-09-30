@@ -6,7 +6,9 @@ FROM node:24.6-bookworm AS frontend-builder
 WORKDIR /frontend
 
 ARG VITE_API_URL
+ARG VITE_GOOGLE_CLIENT_ID
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 
 COPY caregiver/package*.json ./
 RUN npm install
