@@ -1,29 +1,78 @@
 ---
-description: Reformat an existing GitHub ticket's description into the repo's epic/user-story template
+description: Write a ticket description (epic, story, or task) from a GitHub ticket link and short brief
+argument-hint: <epic|task|story> <link-to-ticket> <short description of what you want>
 ---
 
-The user ran `/ticket-description` with the following argument:
+The user ran `/ticket-description` with the following arguments:
 
 $ARGUMENTS
 
-This is a link to an existing ticket (a GitHub Issue or GitHub Projects item).
+The arguments have this shape: `<type> <link-to-ticket> <short description>`
 
-1. Fetch the ticket's existing content from the link (e.g. via `gh issue view <url> --json title,body,labels` if it's a GitHub Issue URL, or `gh api` for a GitHub Projects item URL). Extract its current description/body text — this is the raw description to reformat.
+- `<type>` is the first word and must be one of `epic`, `story`, or `task` (case-insensitive; accept `user story` / `user-story` as `story`).
+- `<link-to-ticket>` is the second token, a GitHub Issue or GitHub Projects item URL.
+- Everything after the link is a short description of what the user wants the ticket to cover or look like.
 
-2. Decide whether this ticket is an **Epic** or a **User Story**:
-   - **Epic**: a broad body of work or feature area, usually made up of multiple smaller stories (e.g. "device pairing flow", "caregiver media library").
-   - **User Story**: a single, specific piece of functionality from one user's perspective (caregiver or carepartner), usually expressible as "As a ___, I want to ___ so that ___".
-   - If it cannot be clearly determined from the ticket's existing labels/title/body, **default to User Story**.
+If the type is missing or isn't one of the three, or the link is missing, do not guess. Reply with the usage line `/ticket-description <epic|task|story> <link-to-ticket> <short description>` and stop.
 
-3. Read the matching template from this repo before generating anything:
-   - Epic → `.github/ISSUE_TEMPLATE/epic-template.md`
-   - User Story → `.github/ISSUE_TEMPLATE/user-story-template.md`
+## Steps
 
-4. Reformat the ticket's existing description into that exact template's structure:
-   - For an **Epic**, write a `### Description` paragraph summarizing the work, and fill in `### Acceptance criteria` with a checklist (`- [ ]`) of concrete conditions that must be true for the epic to be considered done. Fill `### Notes` with `N/A` unless the original description calls out something worth noting.
-   - For a **User Story**, write the `### User Story` line in the "As a ___, I want to ___ so that ___" form, and fill in `### Acceptance Criteria` with a checklist (`- [ ]`) of concrete, testable conditions. Fill `### Notes` with `N/A` unless the original description calls out something worth noting.
-   - Base all of this on the ticket's actual existing description — do not invent new scope that wasn't already implied by it.
+1. Fetch the ticket from the link (e.g. `gh issue view <url> --json title,body,labels` for a GitHub Issue, or `gh api` for a Projects item). The ticket is expected to contain only a short description of what the user wants it to cover; use its title and body, together with the description in the arguments, as the source material. If the two conflict, the arguments win.
 
-Do not include the template's YAML frontmatter (`name`/`about`/`title`/`labels`/`assignees`) in the output — only the body content (the `###` sections onward).
+2. Write the description using the format for the requested type below. Base it on the source material and what it reasonably implies; do not invent unrelated scope. Keep items concrete, short, and testable.
 
-Before showing the result, state which type you chose (Epic or User Story) and a one-sentence reason why (or note that it defaulted to User Story because the type couldn't be determined), then show the reformatted template.
+3. Do not include YAML frontmatter or a title. Output only the body sections.
+
+## Formats
+
+### epic
+
+```
+### Description
+<what the epic is and what it covers>
+
+### Subtasks
+- [ ] <short description of a task or user story that belongs under this epic>
+- [ ] ...
+```
+
+Subtasks are short, one-line items that could each later be broken out into their own user story or task. They must be checkboxes.
+
+### story
+
+```
+### User Story
+As a <role>, I want <goal>, so that <benefit>.
+
+### Acceptance Criteria
+- [ ] <condition that must be done as part of this story>
+- [ ] ...
+
+### Definition of Done
+<what must be true for this story to be considered complete>
+
+### Notes
+<additional notes about the story, or N/A if there is nothing additional>
+```
+
+`<role>` should be a real user of the product (e.g. caregiver, carepartner) unless the source clearly says otherwise.
+
+### task
+
+```
+### Description
+<short description; does not need to be in user story format>
+
+### Acceptance Criteria
+- [ ] <condition that must be done as part of this task>
+- [ ] ...
+
+### Definition of Done
+<what must be true for this task to be considered complete>
+```
+
+Tasks are smaller than user stories and are assumed to be linked to a parent story and/or epic, so do not write a user story line or mention the parent.
+
+## Output
+
+Output the result as **raw markdown inside a single fenced code block** (use a ` ```markdown ` fence) so the user can copy it verbatim and paste it into the ticket. Put nothing inside the fence except the description itself. Do not edit the ticket on GitHub. Outside the fence, add at most one short line if something in the source was ambiguous and you made an assumption.
