@@ -129,32 +129,123 @@ Each configuration row links:
 ## Setup Instructions
 
 ### Prerequisites
-- npm
-- Node.js
-- Go 1.20+
-- Docker
-- PostgreSQL
-- MinIO
+- Docker (with Docker Compose)
+- Node.js and npm
+- Go 1.25+ (only for running the backend outside Docker)
+- PostgreSQL 15 (only for running the backend outside Docker)
 
 ---
 
-### Run locally
-#### For more options, run *npm run*
+### 1. Create your `.env`
 
-#### Backend
+Docker Compose reads a `.env` file in the repo root. It is gitignored, so each developer creates their own:
+
 ```bash
-cd server
-go run cmd/main.go
+cp .env.example .env
 ```
 
-#### Frontend Caregiver
+Then fill in:
+
+| Variable | What it is |
+|---|---|
+| `OPENWEATHER_API_KEY` | Weather widget key from https://openweathermap.org/api |
+| `NEWS_API_KEY` | News widget key from https://newsapi.org |
+| `GOOGLE_CLIENT_ID` | Google sign-in client ID. Already filled in by `.env.example`; leave it as is. |
+
+Compose refuses to start if `GOOGLE_CLIENT_ID` is missing.
+
+---
+
+### 2. Run in development mode
+
+There are two ways to run the app locally. Use Option A to just get the app running, and Option B when you are actively changing code and want hot reload.
+
+#### Option A: everything in Docker
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+Both `-f` flags are needed: `docker-compose.yml` on its own is the production setup (HTTPS on the RIT domain).
+
+This starts Postgres, MinIO, and the Go server, which also serves the built caregiver web app:
+
+| What | URL |
+|---|---|
+| Caregiver web app + API | http://localhost:8080 |
+| API docs (Swagger) | http://localhost:8080/swagger/ |
+| MinIO console (`localuser` / `localpass123`) | http://localhost:9001 |
+
+Code changes need a rebuild (`up --build` again). The database is seeded from `init/database.sql` only the first time its volume is created; to reset it, run the command above with `down -v` in place of `up --build`, then start again.
+
+#### Option B: backend and frontend on your machine (hot reload)
+
+The backend needs Postgres and MinIO to be reachable on `localhost`.
+
+**MinIO** — start just that service from Compose:
+
+```bash
+docker compose up -d minio minio-init
+```
+
+**Postgres** — the Compose database is not exposed to your machine, so use a local Postgres on port 5432. One-time setup, run as a Postgres superuser:
+
+```bash
+psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
+psql -c "CREATE DATABASE mydb OWNER myuser;"
+psql -h localhost -U myuser -d mydb -f init/database.sql
+```
+
+**Backend** — the Go server does not read `.env` itself, so load it into your shell first. `RUN_MODE=dev` is required; without it the server starts in production mode and tries to bind ports 80/443.
+
+```bash
+set -a; source .env; set +a
+cd server
+RUN_MODE=dev go run cmd/main.go
+```
+
+The API is now at http://localhost:8080/api.
+
+**Caregiver web app** — in a second terminal:
+
 ```bash
 cd caregiver
+npm install
 npm run dev
 ```
 
-#### Frontend Carepartner
+Open http://localhost:5173. Its settings (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`) come from `caregiver/.env.development`, which is committed.
+
+#### Carepartner app
+
+The carepartner app is never part of the Docker stack. With the backend running (either option), start it separately:
+
 ```bash
 cd carepartner
-npm start
+npm install
+npm start        # or: npm run web
 ```
+
+The web version opens at http://localhost:8081 and talks to the backend at `http://localhost:8080/api` (set in `carepartner/app/config.ts`).
+
+---
+
+### Google sign-in
+
+The client ID appears in two places and both must hold the same value:
+
+- `GOOGLE_CLIENT_ID` in the root `.env` — used by the backend, and by the frontend when built in Docker
+- `VITE_GOOGLE_CLIENT_ID` in `caregiver/.env.development` — used by `npm run dev`
+
+If the Google button fails with "The given origin is not allowed for the given client ID", the URL you are on is not listed under **Authorized JavaScript origins** for the OAuth client in Google Cloud. `http://localhost:5173` and `http://localhost:8080` are the two used in development.
+
+---
+
+### Tests
+
+```bash
+cd server
+go test ./...
+```
+
+Some backend tests need MinIO running on `localhost:9000` and real weather/news API keys.
