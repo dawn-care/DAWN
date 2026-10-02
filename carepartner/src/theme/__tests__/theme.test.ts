@@ -14,7 +14,7 @@ function contrast(a: string, b: string) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe("theme legibility (NFR-D)", () => {
+describe("theme legibility", () => {
   it.each([
     ["day text on background", colors.day.text, colors.day.background],
     ["day text on surface", colors.day.text, colors.day.surface],

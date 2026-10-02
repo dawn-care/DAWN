@@ -1,8 +1,8 @@
 /**
  * theme.ts
  *
- * Palette, type sizes and spacing for the tablet, taken from
- * mockups/DAWN Carepartner UI.html (drawn at 1280×800).
+ * Palette, type sizes and spacing for the tablet, taken from the
+ * visual design (drawn at 1280×800).
  */
 
 export const colors = {
@@ -32,7 +32,7 @@ export const colors = {
   },
 } as const;
 
-/** Legibility floors from NFR-D in docs/features.md. */
+/** Legibility floors every tablet screen must meet. */
 export const legibility = {
   minOrientationText: 76,
   minText: 26,
