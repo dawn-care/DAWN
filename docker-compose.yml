@@ -7,6 +7,7 @@ services:
       dockerfile: server/Dockerfile
       args:
         VITE_API_URL: https://startup-da.gccis.rit.edu/api
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -20,6 +21,7 @@ services:
       API_URL: https://startup-da.gccis.rit.edu
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
       NEWS_API_KEY: ${NEWS_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     depends_on:
       db:
         condition: service_healthy

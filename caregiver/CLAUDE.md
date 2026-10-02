@@ -17,7 +17,7 @@ npm run preview   # preview a production build locally
 
 There is no test suite in this package (no `test`/`vitest` script, no `*.test.tsx` files) — the backend (`server/`) is where automated tests live.
 
-Env vars come from `.env.development` (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`), loaded by Vite at dev/build time.
+Env vars (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`) come from `.env.development` under `npm run dev` only. `vite build` does not read that file, so Docker builds get both as build args from the compose files; `VITE_GOOGLE_CLIENT_ID` is fed from `GOOGLE_CLIENT_ID` in the repo-root `.env`.
 
 ## Architecture
 
