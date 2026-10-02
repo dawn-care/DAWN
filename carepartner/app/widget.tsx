@@ -27,7 +27,7 @@ import {
   WeatherMetadata,
   NewsMetadata,
 } from "./agendaView";
-import { API_URL } from "./config";
+import { API_URL } from "../src/api/config";
 
 /* ============================
    TYPES

@@ -23,8 +23,8 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { getCarepartnerId } from './carepartnerId';
-import { API_URL } from './config';
+import { getCarepartnerId } from '../src/pairing/carepartnerId';
+import { API_URL } from '../src/api/config';
 import type { ConfigurationWithMetadata } from './agendaView';
 
 /* ============================

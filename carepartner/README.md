@@ -25,6 +25,32 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Project layout
+
+- `app/` holds routes only. Every file in it becomes a screen.
+- `src/` holds everything a route is made of, grouped by feature (`api/`, `pairing/`, `theme/`). Each feature's tests are in its `__tests__/` folder.
+- `.maestro/` holds end-to-end flows.
+
+## Backend address
+
+The app talks to the Go backend at `EXPO_PUBLIC_API_URL`, which defaults to `http://localhost:8080/api`. To point it elsewhere, copy `.env.example` to `.env.local` and edit it. On an Android emulator the dev machine is `10.0.2.2`, not `localhost`.
+
+## Tests
+
+```bash
+npm test        # unit and component tests (Jest + React Native Testing Library)
+npm run e2e     # end-to-end flows (Maestro) against the app installed on an emulator or tablet
+```
+
+Unit tests live in a `__tests__/` folder inside each feature folder (`src/pairing/carepartnerId.ts` is covered by `src/pairing/__tests__/carepartnerId.test.ts`). Keep test files out of `app/`, where they would become routes.
+
+The end-to-end flows in `.maestro/` need [Maestro](https://maestro.dev) installed and a build of the app on a running emulator or connected tablet:
+
+```bash
+npx expo run:android --variant release   # needs JDK 17 or 21
+npm run e2e
+```
+
 ## Get a fresh project
 
 When you're ready, run:

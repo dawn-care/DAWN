@@ -1,0 +1,6 @@
+# Smoke test: the app starts and reaches its home screen.
+appId: com.anonymous.carepartner
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Start-Up"
