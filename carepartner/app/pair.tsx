@@ -41,8 +41,8 @@ import {
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
-import { API_URL } from "./config";
-import { getCarepartnerId, storeCarepartnerId } from "./carepartnerId";
+import { API_URL } from "../src/api/config";
+import { getCarepartnerId, storeCarepartnerId } from "../src/pairing/carepartnerId";
 
 /* ============================
    Type Definitions

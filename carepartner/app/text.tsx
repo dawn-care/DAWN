@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { Stack } from "expo-router";
-import { API_URL } from "./config";
+import { API_URL } from "../src/api/config";
 import {
   type ConfigurationWithMetadata,
   EventMetadata,

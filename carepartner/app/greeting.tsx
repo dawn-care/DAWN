@@ -33,7 +33,7 @@ import {
 import { Stack } from "expo-router";
 import { Video } from "expo-av";
 import { type ConfigurationWithMetadata, type MediaPlaybackProps, VideoMetadata } from "./agendaView";
-import { API_URL } from "./config";
+import { API_URL } from "../src/api/config";
 
 /* ============================
    TYPES

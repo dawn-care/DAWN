@@ -53,7 +53,11 @@ npm start                 # expo start
 npm run web                # expo start --web
 npm run android / ios      # native builds
 npm run lint                # expo lint
+npm test                    # unit and component tests (Jest + React Native Testing Library)
+npm run e2e                 # end-to-end flows (Maestro), against the app installed on an emulator or tablet
 ```
+
+Carepartner tests live in a `__tests__/` folder inside each feature folder under `carepartner/src/`, never in `carepartner/app/` (files there become routes). End-to-end flows are in `carepartner/.maestro/`. See `carepartner/CLAUDE.md` for details.
 
 ### Full stack via Docker
 
@@ -83,7 +87,7 @@ All wiring happens in `server/cmd/main.go`: services and controllers are constru
 There are two distinct identity flows, not one:
 
 - **Caregiver**: Google OAuth (`POST /api/auth/google` → `auth_service.LoginWithGoogle` verifies the ID token, finds/creates a `Caregiver` row, creates a session). Session cookie (`session`) is validated by `middleware.RequireAuth` (`server/internal/middleware/auth_middleware.go`), which puts the caregiver's user ID on the request context. Only a couple of routes (`/api/me`) are currently wrapped in this middleware — most routes are not yet auth-gated, so don't assume a route is protected just because a session exists elsewhere.
-- **Carepartner device**: no login — it pairs to a caregiver's account via a short pairing code (`POST /api/users/device-pairing/code|verify|status`), then stores its own `carepartnerID` locally (`localStorage` on web, `expo-secure-store` on native — see `carepartner/app/carepartnerId.ts`). All subsequent carepartner API calls are scoped by that ID as a query param/body field, not a session.
+- **Carepartner device**: no login — it pairs to a caregiver's account via a short pairing code (`POST /api/users/device-pairing/code|verify|status`), then stores its own `carepartnerID` locally (`localStorage` on web, `expo-secure-store` on native — see `carepartner/src/pairing/carepartnerId.ts`). All subsequent carepartner API calls are scoped by that ID as a query param/body field, not a session.
 
 ### Data model
 
@@ -107,4 +111,4 @@ Standard Vite + React Router SPA (`src/App.tsx`). `AuthContext` (`src/context/Au
 
 ### Carepartner (`carepartner/`)
 
-Expo Router app (file-based routing under `carepartner/app/`) targeting native (Android tablet is the deployment target) and web (used for development). `app/config.ts` hardcodes the dev `API_URL`. `app/pair.tsx` handles the device-pairing UI; `app/carepartnerId.ts` is the cross-platform (web localStorage vs. `expo-secure-store`) storage shim for the paired ID, used throughout instead of talking to `AuthContext`-style state. An earlier Electron/Raspberry Pi kiosk build was dropped in favor of the Android tablet target — don't reintroduce Electron-specific code.
+Expo Router app (file-based routing under `carepartner/app/`) targeting native (Android tablet is the deployment target) and web (used for development). `app/` holds routes only; everything else lives in feature folders under `src/`. `src/api/config.ts` exports `API_URL`, read from `EXPO_PUBLIC_API_URL` and defaulting to the local dev backend. `app/pair.tsx` handles the device-pairing UI; `src/pairing/carepartnerId.ts` is the cross-platform (web localStorage vs. `expo-secure-store`) storage shim for the paired ID, used throughout instead of talking to `AuthContext`-style state. An earlier Electron/Raspberry Pi kiosk build was dropped in favor of the Android tablet target — don't reintroduce Electron-specific code.

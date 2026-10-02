@@ -33,7 +33,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Image } from "react-native";
-import { getCarepartnerId } from "./carepartnerId";
+import { getCarepartnerId } from "../src/pairing/carepartnerId";
 import { useSchedule } from "./ScheduleContext";
 
 /* ============================

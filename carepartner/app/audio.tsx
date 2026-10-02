@@ -31,7 +31,7 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import { type ConfigurationWithMetadata, type MediaPlaybackProps, AudioMetadata } from "./agendaView";
-import { API_URL } from "./config";
+import { API_URL } from "../src/api/config";
 
 /* ============================
    Types
