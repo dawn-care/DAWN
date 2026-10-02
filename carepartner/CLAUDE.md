@@ -6,6 +6,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The carepartner-facing app for StartUp (SUDA-Start-Up-Dementia-Assistance): an Expo Router / React Native app that pairs to a caregiver's account and plays back the carepartner's daily agenda. It is deployed as a **React Native app on an Android tablet**; the web build (`npm run web`) is mainly a development convenience. (An earlier Electron/Raspberry Pi kiosk build was removed — don't reintroduce it.) See the repo-root `CLAUDE.md` for the full monorepo picture (backend, caregiver app, data model). This file covers only what's specific to `carepartner/`.
 
+This app is being **replaced outright**. "What is being built" describes the target, "Redesign" records the agreed decisions and governs new work, and "Current architecture" describes the code that still exists until each piece is replaced; update it as pieces land.
+
+## What is being built
+
+D.A.W.N. is becoming three apps on one backend: this tablet in the resident's room, a family app that supplies content, and a staff phone app that decides when content plays. In the code, the resident is the `carepartner` and family is the `caregiver`; keep those names.
+
+The tablet's job is to show a calm, always-on screen and to play media when it is scheduled or when staff start it. The resident never has to touch it.
+
+**Always-on screen**
+- The day of the week and the time of day (morning, afternoon, evening) in very large type, at all times.
+- A large photo of a family member.
+- What's next (lunch, bingo, a visit) as a picture plus a clock face.
+- Small extras the family chooses, such as the weather as one icon and one word, or a sports result. Staff can switch any of them off for a resident.
+- Later: today's nurse's photo and first name, and an invitation shortly before an activity.
+- At night the screen turns dim and warm, with one reassuring line.
+
+**Playback**
+- Family schedule media to play at set times, such as a morning message at 8 AM or a favourite song. It plays full screen with no tap needed.
+- Staff start a clip from their phone and it begins on the tablet within 3 seconds; they can stop it from the phone too.
+- When playback ends, the screen returns to the always-on view by itself.
+- Later: captions and the sender's photo and name on every video, and tapping the family photo to replay the latest message as an optional shortcut.
+
+**Device**
+- The tablet pairs by a code shown on its screen and will eventually run locked in kiosk mode.
+- It reports what was shown and every play (start, finish, stop, and whether it was scheduled, staff-started or tapped).
+
+**Design rules** (these apply to every tablet screen)
+- Nothing requires a tap. Tapping is at most an optional shortcut.
+- Nothing moves or flashes on its own apart from playing content.
+- Orientation text (day, time of day) is 76px or larger; all other text is 26px or larger; text contrast is 7:1 or better; touch targets are about 20 mm or larger.
+- Each screen uses a handful of words at most.
+- No medical information in anything the tablet reports, and structured fields only, never free text.
+
 ## Commands
 
 ```bash
@@ -13,21 +46,106 @@ npm start                    # expo start
 npm run web                  # expo start --web (localhost:8081), needs the Go backend on :8080
 npm run android              # expo run:android (build + install on a connected tablet/emulator)
 npm run lint                 # expo lint
+npm test                     # jest (jest-expo preset); `npx jest src/pairing` for one folder, `-t "name"` for one test
+npm run e2e                  # maestro test .maestro, against the app installed on an emulator or tablet
 ```
 
-This package has no test suite. `npm run reset-project` is left over from the Expo template, and the `scripts/` directory it points to doesn't exist.
+- The Android build needs JDK 17 or 21 (set `JAVA_HOME`); the Gradle version in use does not run on JDK 25.
+- For Maestro, install a release build first (`npx expo run:android --variant release`) so the bundle is embedded and no Metro server is needed. `android/` is generated and gitignored.
+- Test files live in a `__tests__/` folder inside each feature folder (`src/pairing/x.ts` → `src/pairing/__tests__/x.test.ts`), never in `app/` (where they would become routes). A test of a route file goes in the matching feature's `__tests__/`. React Native Testing Library is v14, where `render` is async (`await render(...)`).
+- `npm run lint` reports existing problems in the old `app/` screens (one error in `photo.tsx`); those files are due to be deleted, so don't fix them in passing.
+- `npm run reset-project` is left over from the Expo template, and the `scripts/` directory it points to doesn't exist.
 
-## Architecture
+## Redesign
 
-### API URL is a hardcoded file
+### Assumptions
 
-`app/config.ts` exports a single `API_URL` constant (`http://localhost:8080/api`). There is no env-var mechanism, so pointing a tablet build at another backend means editing this file. Note that `localhost` on an Android device/emulator is the device itself, not your dev machine.
+- The tablet shares its backend with the caregiver app, so endpoints the caregiver app uses must keep working. Where a caregiver setting has no UI yet (widget and photo choices), the server supplies a default.
+- Target device: an 11-inch Samsung Galaxy Tab A class tablet (Tab A9+ / A11+), 1920×1200, **landscape**, tested on an Android 15 emulator. The exact model isn't confirmed, so compute layout from the reported screen size and never hardcode dimensions. The visual design is drawn at 1280×800, the same 16:10 shape.
+- Tablets are assumed to have live internet. Don't build dedicated offline behaviour; keep the last good data and send play reports when the connection returns.
+- Floor staff carry phones, so the tablet has no staff controls. Play and stop commands reach it from the server.
 
-Every screen imports `API_URL` and calls `fetch` inline. There is no shared API client.
+### Playback
 
-### Everything lives in `app/`, so every file is a route
+- `Module` is the playable unit. There are two media kinds, **video** and **audio**, plus a category label (family message, song, news, weather, and later ones). News and weather reports are videos, not generated cards. The tablet needs only those two players; the category doesn't affect how something plays.
+- Caregiver scheduling stays on `Configuration`, **timed items only**. The untimed routine and `auto_start` go away.
+- A scheduled item plays when it is due and hasn't played today, within a grace window (about 10 minutes), not on an exact-minute match.
+- Every play is a `Playback` row on the server with a source (`scheduled`, `staff`, `tap`) and a status (`requested` → `acknowledged` → `started` → `finished` / `stopped` / `failed` / `expired`). The tablet reports each step, including plays it starts itself. Played state lives there, not in memory.
+- Staff-triggered play and stop arrive over a WebSocket, and the tablet acknowledges them. Commands expire after about 30 seconds so a clip never starts late. On reconnect the tablet asks for any live command. The socket also carries a "refresh now" nudge.
+- A staff play pre-empts a scheduled one; a scheduled item never interrupts a staff clip.
+- The tablet caches **all** of the resident's playable content ahead of time, so a staff-started clip can begin within 3 seconds. The cache is synced from a server manifest, and the tablet streams as a fallback if a file isn't downloaded yet.
+- If the tablet can't play something, it reports the `Playback` as `failed`.
 
-Expo Router treats each file in `app/` as a route, including the non-screen modules `config.ts`, `carepartnerId.ts` and `ScheduleContext.tsx`. The media screens (`photo.tsx`, `audio.tsx`, `greeting.tsx`, `text.tsx`, `widget.tsx`) are also routes, but they are really child components: `agendaView.tsx` imports and renders them directly with a `configuration` prop. They aren't navigated to.
+### Always-on screen and widgets
+
+- The tablet polls one "screen" endpoint about every 10–15 minutes. Widget changes don't need to be immediate.
+- The server resolves every widget and returns layout plus display data together. Widgets do not fetch for themselves, so renderers are pure display.
+- The screen is a coarse grid (about 4 columns × 3 rows). Everything on it is a widget, including day and time, the photo and "what's next". Each widget type declares the sizes it supports; day and time is locked.
+- The caregiver picks widgets and the **server arranges them**. Positions are stored and sent explicitly (column, row, width, height) so free placement can be added later.
+- The tablet has one renderer per *look*, not per widget: orientation (day and time), photo, next event, person, and a generic tile (icon, word, short label) shared by weather, sports and future data widgets. An unknown renderer is skipped.
+- Updates apply in place with no animation. At night the grid is replaced by the night screen. A widget whose data has gone stale for hours hides instead of showing old information.
+- The design rules above apply to every widget: no taps required, no motion, and the text-size floors.
+
+### State machine, not routes
+
+Only two routes exist: `index` and `pair`. The index route shows the always-on screen or the full-screen player depending on one playback state machine. Playback is started by the schedule or the socket, never by navigation, so there is no player route, no transition and no back stack. An unpaired tablet opens `pair` by itself.
+
+### Target structure
+
+```
+carepartner/
+  app/                    routes only, each a few lines
+    _layout.tsx           providers (screen data, playback)
+    index.tsx             always-on screen, or the player when something is playing
+    pair.tsx
+  src/
+    api/                  server address, shared request helper
+    theme/                palette, font, sizes
+    screen/               polling hook, screen response types
+    widgets/
+      types.ts            shared widget interface
+      Grid.tsx
+      WidgetFrame.tsx
+      registry.ts
+      renderers/          Orientation.tsx, Photo.tsx, Tile.tsx, ...
+    playback/             state machine, players, cache, socket
+    schedule/             what is due, grace window
+    pairing/              stored id, pairing requests
+    clock/                controllable clock for tests
+    <feature>/__tests__/  unit and component tests for that feature
+  .maestro/               end-to-end flows
+```
+
+- Group by feature. There is no shared `src/components` folder; add one only when a second feature needs the same visual.
+- Inside a feature, keep logic files (plain functions and hooks, no layout) separate from visual files (take data in and draw it; no fetching, clock reads or timers).
+- Check the shape of server responses once where they enter the app, and drop malformed items there.
+- Read the time through `src/clock` so tests can control it.
+- `android/` is generated and never edited by hand. Native code, such as kiosk mode, goes in an Expo module with a config plugin.
+
+### Styling
+
+- Use a shared theme (palette, Atkinson Hyperlegible font, sizes, corner radii) so the tablet matches the other apps.
+- The grid and tile are our own components: positions are data-driven and the look is fixed by the visual design.
+- Gluestack (the free, MIT-licensed library) is the intended component library for the staff and family apps. Its current version installs only into Expo and React Native projects; confirm it renders on Expo web before adopting it here.
+
+### Testing
+
+- **Maestro** for end-to-end flows (pairing, always-on screen by time of day, a scheduled play and return, staff play and stop). A flow can call the server directly to stand in for the staff app.
+- **Jest with React Native Testing Library** for logic and components. Tests live in each feature's `__tests__/` folder, and new code comes with tests.
+
+## Current architecture
+
+### What has moved to `src/` so far
+
+- `src/api/config.ts` exports `API_URL`, read from `EXPO_PUBLIC_API_URL` (set it in `.env.local`; see `.env.example`) and defaulting to `http://localhost:8080/api`. `localhost` on an Android device/emulator is the device itself; the emulator reaches the dev machine at `10.0.2.2`.
+- `src/pairing/carepartnerId.ts` is the stored-ID shim.
+- `src/theme/theme.ts` holds the palette, type sizes and spacing from the visual design. Its test enforces the contrast and text-size floors in the design rules.
+
+Every screen imports `API_URL` and calls `fetch` inline. There is no shared API client yet.
+
+### The old screens still live in `app/`, so each is a route
+
+Expo Router treats each file in `app/` as a route, including the non-screen module `ScheduleContext.tsx`. The media screens (`photo.tsx`, `audio.tsx`, `greeting.tsx`, `text.tsx`, `widget.tsx`) are also routes, but they are really child components: `agendaView.tsx` imports and renders them directly with a `configuration` prop. They aren't navigated to.
 
 ### Flow and global scheduling (`app/ScheduleContext.tsx`)
 
@@ -52,9 +170,9 @@ The queue is deliberately not rebuilt on later refreshes, to avoid replay loops.
 
 ### Web-only media playback
 
-`audio.tsx` and `greeting.tsx` (video) render raw HTML `<audio>`/`<video>` elements, not React Native components, so playback currently only works on web — these need native replacements (e.g. `expo-av`, already a dependency) for the Android tablet target. Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`.
+`audio.tsx` and `greeting.tsx` (video) render raw HTML `<audio>`/`<video>` elements, not React Native components, so playback currently only works on web. They need native replacements for the Android tablet. Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`.
 
-### Pairing and identity (`app/pair.tsx`, `app/carepartnerId.ts`)
+### Pairing and identity (`app/pair.tsx`, `src/pairing/carepartnerId.ts`)
 
 There is no login. On the pair screen, the device:
 1. Validates its stored ID, or creates a new carepartner (`POST /users/carepartner/create-carepartner` with a placeholder name).
@@ -62,3 +180,7 @@ There is no login. On the pair screen, the device:
 3. Polls `/users/device-pairing/status` when the user taps Verify.
 
 The ID is stored under the key `carepartnerID`, via `carepartnerId.ts` (`localStorage` on web, `expo-secure-store` on native). `terms.tsx` is still a stub.
+
+The home screen is shown whether or not the tablet is paired; pairing is reached only through its Pair Device button. If the stored ID is lost, the tablet creates a new carepartner row instead of reattaching to the existing one.
+
+Nothing authenticates the device: the carepartner ID is its only credential, and it is a guessable integer. The intended fix is a device record with a secret token issued at pairing, which the tablet presents on every request and on its socket. That should be in place before tablets are deployed in residents' rooms.
