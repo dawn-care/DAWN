@@ -8,7 +8,7 @@ StartUp is a dementia-assistance product for SUDA (SUDA-Start-Up-Dementia-Assist
 
 - `server/` — Go backend (chi router), the only piece talking to Postgres/MinIO/external APIs.
 - `caregiver/` — React + TypeScript + Vite web app used by caregivers to manage content.
-- `carepartner/` — Expo/React Native app (web, mobile, and Electron desktop/Raspberry Pi builds) that displays the agenda to the carepartner.
+- `carepartner/` — Expo/React Native app that displays the agenda to the carepartner. The deployment target is a React Native app on an **Android tablet**; the web build is used for local development.
 
 ## Commands
 
@@ -53,8 +53,6 @@ npm start                 # expo start
 npm run web                # expo start --web
 npm run android / ios      # native builds
 npm run lint                # expo lint
-npm run electron:dev        # web export + electron together, for desktop/kiosk testing
-npm run electron:build:rpi  # export web build + package as arm64 .deb (Raspberry Pi target)
 ```
 
 ### Full stack via Docker
@@ -63,7 +61,7 @@ npm run electron:build:rpi  # export web build + package as arm64 .deb (Raspberr
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The carepartner app is never bundled into this image; it ships separately (Expo/web/Electron/.deb).
+`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The carepartner app is never bundled into this image; it ships separately as an Android app.
 
 ## Backend architecture (`server/internal/`)
 
@@ -109,4 +107,4 @@ Standard Vite + React Router SPA (`src/App.tsx`). `AuthContext` (`src/context/Au
 
 ### Carepartner (`carepartner/`)
 
-Expo Router app (file-based routing under `carepartner/app/`) targeting web, native, and Electron simultaneously. `app/config.ts` hardcodes the dev `API_URL`. `app/pair.tsx` handles the device-pairing UI; `app/carepartnerId.ts` is the cross-platform (web localStorage vs. `expo-secure-store`) storage shim for the paired ID, used throughout instead of talking to `AuthContext`-style state. `electron.js` + `Dockerfile.build` + the `build` block in `carepartner/package.json` support packaging the exported web build as an Electron `.deb` for Raspberry Pi kiosk deployment — that pipeline only runs under the `build-rpi` Docker Compose profile.
+Expo Router app (file-based routing under `carepartner/app/`) targeting native (Android tablet is the deployment target) and web (used for development). `app/config.ts` hardcodes the dev `API_URL`. `app/pair.tsx` handles the device-pairing UI; `app/carepartnerId.ts` is the cross-platform (web localStorage vs. `expo-secure-store`) storage shim for the paired ID, used throughout instead of talking to `AuthContext`-style state. An earlier Electron/Raspberry Pi kiosk build was dropped in favor of the Android tablet target — don't reintroduce Electron-specific code.

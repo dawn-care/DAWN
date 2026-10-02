@@ -1,7 +1,0 @@
-node_modules
-.expo
-dist
-electron-dist
-web-build
-.git
-*.md
