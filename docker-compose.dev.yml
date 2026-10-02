@@ -7,6 +7,7 @@ services:
       dockerfile: server/Dockerfile
       args:
         VITE_API_URL: http://localhost:8080/api
+        VITE_GOOGLE_CLIENT_ID: "533592863390-120rud7incnvs8d4vecocs07cpt5ij5m.apps.googleusercontent.com"
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -26,12 +27,3 @@ services:
     ports:
       - "8080:8080"
     volumes: []
-
-  carepartner-build:
-    profiles:
-      - build-rpi
-    build:
-      context: ./carepartner
-      dockerfile: Dockerfile.build
-      args:
-        API_URL: http://localhost:8080/api

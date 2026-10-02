@@ -14,11 +14,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint",
-    "electron:dev": "concurrently \"expo start --web\" \"electron .\"",
-    "electron:export": "npx expo export --platform web",
-    "electron:build:rpi": "npx expo export --platform web && npx electron-builder --linux deb --arm64",
-    "electron:build:rpi32": "npx expo export --platform web && npx electron-builder --linux deb --armv7l"
+    "lint": "expo lint"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -51,38 +47,10 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "concurrently": "^9.2.1",
-    "electron": "^38.2.2",
-    "electron-builder": "^26.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "expo-module-scripts": "^55.0.2",
     "typescript": "~5.9.2"
-  },
-  "build": {
-    "appId": "com.anonymous.carepartner",
-    "productName": "CarePartner",
-    "extraMetadata": {
-      "main": "electron.js"
-    },
-    "files": [
-      "electron.js",
-      "dist/**/*"
-    ],
-    "directories": {
-      "output": "electron-dist"
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "deb",
-          "arch": [
-            "arm64"
-          ]
-        }
-      ],
-      "category": "Utility"
-    }
   },
   "private": true
 }

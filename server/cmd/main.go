@@ -76,7 +76,6 @@ func main() {
 			"http://localhost:5173",
 			"http://localhost:8081",
 			"http://startup-da.gccis.rit.edu",
-			"app://bundle",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
