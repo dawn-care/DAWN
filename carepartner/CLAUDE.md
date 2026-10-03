@@ -51,7 +51,7 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 ```
 
 - The Android build needs JDK 17 or 21 (set `JAVA_HOME`); the Gradle version in use does not run on JDK 25.
-- For Maestro, install a release build first (`npx expo run:android --variant release`) so the bundle is embedded and no Metro server is needed. `android/` is generated and gitignored.
+- For Maestro, build with the emulator closed (`npm run build:emulator`, x86_64 only), then start the emulator and run `npm run e2e:install` and `npm run e2e`. Building and emulating at the same time needs a lot of memory. `android/` is generated and gitignored.
 - Test files live in a `__tests__/` folder inside each feature folder (`src/pairing/x.ts` → `src/pairing/__tests__/x.test.ts`), never in `app/` (where they would become routes). A test of a route file goes in the matching feature's `__tests__/`. React Native Testing Library is v14, where `render` is async (`await render(...)`).
 - `npm run lint` reports existing problems in the old `app/` screens (one error in `photo.tsx`); those files are due to be deleted, so don't fix them in passing.
 - `npm run reset-project` is left over from the Expo template, and the `scripts/` directory it points to doesn't exist.
@@ -145,7 +145,7 @@ Every screen imports `API_URL` and calls `fetch` inline. There is no shared API 
 
 ### The old screens still live in `app/`, so each is a route
 
-Expo Router treats each file in `app/` as a route, including the non-screen module `ScheduleContext.tsx`. The media screens (`photo.tsx`, `audio.tsx`, `greeting.tsx`, `text.tsx`, `widget.tsx`) are also routes, but they are really child components: `agendaView.tsx` imports and renders them directly with a `configuration` prop. They aren't navigated to.
+Expo Router treats each file in `app/` as a route, including the non-screen module `ScheduleContext.tsx`. The content screens (`photo.tsx`, `text.tsx`, `widget.tsx`) are also routes, but they are really child components: `agendaView.tsx` imports and renders them directly with a `configuration` prop. They aren't navigated to.
 
 ### Flow and global scheduling (`app/ScheduleContext.tsx`)
 
@@ -162,15 +162,21 @@ Expo Router treats each file in `app/` as a route, including the non-screen modu
 - `scheduled` trigger → timed items due now or earlier that haven't played, sorted by time.
 - Any other trigger → all non-timed items.
 
-The queue is deliberately not rebuilt on later refreshes, to avoid replay loops. Audio and video advance through the `onPlaybackComplete` callback. Everything else advances after `duration` seconds (default 10). When the queue ends or errors, the app returns to `/`.
+The queue is deliberately not rebuilt on later refreshes, to avoid replay loops. Audio and video advance when `Player` reports finished or failed. Everything else advances after `duration` seconds (default 10). When the queue ends or errors, the app returns to `/`.
 
 ### Types mirror the backend by hand
 
 `ConfigurationWithMetadata` and the per-type metadata types are defined in `agendaView.tsx`. They mirror the Go `ConfigurationWithMetadata` struct returned by `GetConfigurationsByDayAndCarepartner`, and other files import them from there. Casing is inconsistent: weather and news metadata use upper-case keys (`ID`, `ZIPCODE`). Match whatever the backend actually serializes. The `module_type` → screen mapping lives in `AgendaView`'s render; `messages` renders both the photo and text viewers.
 
-### Web-only media playback
+### Media playback (`src/playback/`)
 
-`audio.tsx` and `greeting.tsx` (video) render raw HTML `<audio>`/`<video>` elements, not React Native components, so playback currently only works on web. They need native replacements for the Android tablet. Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`.
+`Player` takes a `kind` (`video` or `audio`), a `uri`, and `onFinished` / `onFailed` callbacks, and renders `VideoPlayer` (`expo-video`) or `AudioPlayer` (`expo-audio`). Both start on their own, show no controls and work on Android and web. Each instance plays one source; give it a new `key` to play something else. `expo-audio` reports no load errors, so `AudioPlayer` treats a source that hasn't loaded within `AUDIO_LOAD_TIMEOUT_MS` as failed.
+
+`AudioPlayer` takes an optional `imageUri` (a song's album cover, or later a sender's photo) and falls back to a music note when it is missing or fails to load. The agenda reads it from an optional `cover_uri` field on audio metadata, a full URL or a path relative to `API_URL` (resolved by `src/api/resolveApiUri.ts`). The server doesn't send `cover_uri` yet; once it extracts embedded album art and returns that field, covers appear with no tablet change.
+
+`agendaView.tsx` renders `Player` for `video` and `audio` items and advances on either callback. The `expo-audio` plugin in `app.json` has its microphone permissions switched off; keep them off, since the tablet never records.
+
+Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`. A release build blocks plain `http://`, so it can only reach an `https://` backend unless cleartext traffic is enabled in the build.
 
 ### Pairing and identity (`app/pair.tsx`, `src/pairing/carepartnerId.ts`)
 

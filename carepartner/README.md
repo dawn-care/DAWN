@@ -46,10 +46,18 @@ Unit tests live in a `__tests__/` folder inside each feature folder (`src/pairin
 
 The end-to-end flows in `.maestro/` need [Maestro](https://maestro.dev) installed and a build of the app on a running emulator or connected tablet:
 
+Build first with the emulator closed, then start the emulator. Running both at once needs a lot of memory.
+
 ```bash
-npx expo run:android --variant release   # needs JDK 17 or 21
+npm run build:emulator   # release build for an x86_64 emulator; needs JDK 17 or 21 (set JAVA_HOME)
+# start the emulator, then:
+npm run e2e:install
 npm run e2e
 ```
+
+`build:emulator` builds for the emulator's processor only. A real tablet needs `arm64-v8a`; use `npx expo run:android --variant release` with the tablet connected.
+
+A release build refuses plain `http://` connections, so it can launch but can't reach a local backend. To test against one, add `android:usesCleartextTraffic="true"` to the `<application>` tag in the generated `android/app/src/main/AndroidManifest.xml` before building, and set `EXPO_PUBLIC_API_URL=http://10.0.2.2:8080/api`.
 
 ## Get a fresh project
 

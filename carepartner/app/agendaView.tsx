@@ -22,12 +22,13 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import AudioScreen from './audio';
-import GreetingScreen from './greeting';
 import TextViewerScreen from './text';
 import WidgetViewerScreen from './widget';
 import PhotoViewerScreen from './photo';
 import { useSchedule } from './ScheduleContext';
+import { API_URL } from '../src/api/config';
+import { resolveApiUri } from '../src/api/resolveApiUri';
+import Player from '../src/playback/Player';
 import React from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -41,7 +42,8 @@ import { router, useLocalSearchParams } from 'expo-router';
  */
 export type PhotoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
 export type VideoMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
-export type AudioMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string };
+/** cover_uri: the song's embedded album art, a full URL or a path relative to the API. Not sent by the server yet. */
+export type AudioMetadata = { id: number; uri: string; displayed_name: string; filename: string; extension: string; cover_uri?: string | null };
 export type WeatherMetadata = { ID: number; ZIPCODE: string };
 export type NewsMetadata = { ID: number; CATEGORY: string; LANGUAGE: string; COUNTRY: string };
 export type MessageMetadata = { id: number; message: string; image_uri?: string | null };
@@ -69,13 +71,6 @@ export type ConfigurationWithMetadata = {
     metadata: PhotoMetadata | VideoMetadata | AudioMetadata | WeatherMetadata
         | NewsMetadata | MessageMetadata | EventMetadata
         | CarepartnerLocationMetadata | CaregiverLocationMetadata | null;
-};
-
-/**
- * Props used by media playback components.
- */
-export type MediaPlaybackProps = {
-    onPlaybackComplete: () => void;
 };
 
 /* ============================
@@ -259,6 +254,12 @@ export default function AgendaView(){
         advanceToNext();
     };
 
+    /** Skip media that can't be played, so one bad file doesn't hold up the queue */
+    const skipFailedItem = (reason: string) => {
+        console.error('Playback failed:', reason);
+        advanceToNext();
+    };
+
     const currentItem = playQueue[currentIndex];
 
     /* ============================
@@ -327,17 +328,17 @@ export default function AgendaView(){
                     <TextViewerScreen configuration={currentItem} />
                 )}
 
-                {currentItem.module_type === "video" && (
-                    <GreetingScreen
-                        configuration={currentItem}
-                        onPlaybackComplete={goToNextItem}
-                    />
-                )}
-
-                {currentItem.module_type === "audio" && (
-                    <AudioScreen
-                        configuration={currentItem}
-                        onPlaybackComplete={goToNextItem}
+                {/* Keyed by item so each one gets a fresh player */}
+                {(currentItem.module_type === "video" || currentItem.module_type === "audio") &&
+                    currentItem.metadata && (
+                    <Player
+                        key={currentItem.id}
+                        kind={currentItem.module_type}
+                        uri={`${API_URL}/${currentItem.module_type}/file?id=${(currentItem.metadata as VideoMetadata | AudioMetadata).id}`}
+                        title={(currentItem.metadata as VideoMetadata | AudioMetadata).displayed_name}
+                        imageUri={resolveApiUri((currentItem.metadata as AudioMetadata).cover_uri)}
+                        onFinished={goToNextItem}
+                        onFailed={skipFailedItem}
                     />
                 )}
 

@@ -39,7 +39,15 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
