@@ -147,7 +147,12 @@ export default function PhotoViewerScreen({
       <View style={styles.safe}>
         <View style={styles.photoWrap}>
           {currentUrl ? (
-            <img src={currentUrl} style={styles.photo} onError={(e) => console.log("Image failed:", e.nativeEvent)} />
+            <Image
+              source={{ uri: currentUrl }}
+              style={styles.photo}
+              resizeMode="contain"
+              onError={(e) => console.log("Image failed:", e.nativeEvent.error)}
+            />
           ) : (
             <View style={[styles.photo, styles.placeholder]}>
               <Text style={styles.placeholderText}>Photo will load from backend</Text>

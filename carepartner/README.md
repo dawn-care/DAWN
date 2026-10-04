@@ -33,7 +33,14 @@ You can start developing by editing the files inside the **app** directory. This
 
 ## Backend address
 
-The app talks to the Go backend at `EXPO_PUBLIC_API_URL`, which defaults to `http://localhost:8080/api`. To point it elsewhere, copy `.env.example` to `.env.local` and edit it. On an Android emulator the dev machine is `10.0.2.2`, not `localhost`.
+With no setup, the app talks to a backend running on your computer at port 8080:
+
+- **Web:** `http://localhost:8080/api`
+- **Android emulator:** `http://10.0.2.2:8080/api`, which is how the emulator reaches the computer it runs on. No `adb reverse` is needed.
+
+To use any other backend, copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_API_URL`. A real tablet always needs this: use your computer's address on the local network (for example `http://192.168.1.20:8080/api`) or the deployed server.
+
+Android blocks plain `http://` connections in release builds. The build allows them automatically when the server address is `http://` (including the local defaults above) and keeps them blocked for an `https://` server, so production builds stay secure. After changing `EXPO_PUBLIC_API_URL`, rebuild the app.
 
 ## Tests
 
@@ -56,8 +63,6 @@ npm run e2e
 ```
 
 `build:emulator` builds for the emulator's processor only. A real tablet needs `arm64-v8a`; use `npx expo run:android --variant release` with the tablet connected.
-
-A release build refuses plain `http://` connections, so it can launch but can't reach a local backend. To test against one, add `android:usesCleartextTraffic="true"` to the `<application>` tag in the generated `android/app/src/main/AndroidManifest.xml` before building, and set `EXPO_PUBLIC_API_URL=http://10.0.2.2:8080/api`.
 
 ## Get a fresh project
 
