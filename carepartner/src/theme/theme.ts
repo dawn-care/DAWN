@@ -51,11 +51,6 @@ export const fontSizes = {
   small: 26,
 } as const;
 
-export const fontWeights = {
-  bold: "700",
-  heavy: "800",
-} as const;
-
 export const space = {
   xs: 12,
   sm: 20,

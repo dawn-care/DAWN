@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import { colors, fontSizes, fontWeights, radii, space } from "../theme/theme";
+import { fonts } from "../theme/fonts";
+import { colors, fontSizes, radii, space } from "../theme/theme";
 import type { MediaPlayerProps } from "./types";
 
 /**
@@ -99,7 +100,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fontSizes.tileWord,
-    fontWeight: fontWeights.bold,
+    fontFamily: fonts.bold,
     color: colors.player.text,
     textAlign: "center",
   },

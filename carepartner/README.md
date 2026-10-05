@@ -28,7 +28,7 @@ You can start developing by editing the files inside the **app** directory. This
 ## Project layout
 
 - `app/` holds routes only. Every file in it becomes a screen.
-- `src/` holds everything a route is made of, grouped by feature (`api/`, `pairing/`, `theme/`). Each feature's tests are in its `__tests__/` folder.
+- `src/` holds everything a route is made of, grouped by feature (`api/`, `clock/`, `pairing/`, `playback/`, `theme/`). Each feature's tests are in its `__tests__/` folder.
 - `.maestro/` holds end-to-end flows.
 
 ## Backend address
@@ -41,6 +41,10 @@ With no setup, the app talks to a backend running on your computer at port 8080:
 To use any other backend, copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_API_URL`. A real tablet always needs this: use your computer's address on the local network (for example `http://192.168.1.20:8080/api`) or the deployed server.
 
 Android blocks plain `http://` connections in release builds. The build allows them automatically when the server address is `http://` (including the local defaults above) and keeps them blocked for an `https://` server, so production builds stay secure. After changing `EXPO_PUBLIC_API_URL`, rebuild the app.
+
+## Testing at a different time of day
+
+To see how the app behaves at another time, set `EXPO_PUBLIC_FAKE_TIME` in `.env.local` (for example `EXPO_PUBLIC_FAKE_TIME=2026-10-03T21:30:00`). The app's clock starts at that time and runs forward normally. Leave it unset for the real time. Code reads the time through `src/clock`, never `new Date()` directly, so this works everywhere.
 
 ## Tests
 
