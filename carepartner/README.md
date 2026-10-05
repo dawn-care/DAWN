@@ -68,6 +68,12 @@ npm run e2e
 
 `build:emulator` builds for the emulator's processor only. A real tablet needs `arm64-v8a`; use `npx expo run:android --variant release` with the tablet connected.
 
+The emulator starts at Android's home screen and doesn't open the app by itself. Open it from the app drawer (swipe up, tap **carepartner**) or with `adb shell am start -n com.anonymous.carepartner/.MainActivity`. The app stays installed across emulator restarts; reinstall only after code changes.
+
+### Known issue: emulator sound
+
+On Linux, the emulator's sound can stop working after the first video or song: later items play (their position advances and they move on when they end) but are silent, and the emulator's log reports a stalled audio device. Restarting the emulator with `-no-snapshot-load` brings sound back for the first item only. This hasn't been seen in the browser. Check sound in the web build or on a real Android device, and use the emulator for everything else.
+
 ## Get a fresh project
 
 When you're ready, run:
