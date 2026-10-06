@@ -137,9 +137,13 @@ carepartner/
 
 ### What has moved to `src/` so far
 
-- `src/api/config.ts` exports `API_URL`, read from `EXPO_PUBLIC_API_URL` (set it in `.env.local`; see `.env.example`) and defaulting to `http://localhost:8080/api`. `localhost` on an Android device/emulator is the device itself; the emulator reaches the dev machine at `10.0.2.2`.
+- `src/api/config.ts` exports `API_URL`: `EXPO_PUBLIC_API_URL` if set (in `.env.local`; see `.env.example`), otherwise the local backend for the platform, `http://localhost:8080/api` on web and `http://10.0.2.2:8080/api` on Android (the emulator's address for the computer it runs on).
+- `app.config.ts` extends `app.json` with build settings that depend on the environment. It allows plain `http://` traffic in Android builds only when the server address is `http://` or unset, so production builds against `https://` keep it blocked. Rebuild after changing `EXPO_PUBLIC_API_URL`.
 - `src/pairing/carepartnerId.ts` is the stored-ID shim.
 - `src/theme/theme.ts` holds the palette, type sizes and spacing from the visual design. Its test enforces the contrast and text-size floors in the design rules.
+- `src/theme/fonts.ts` loads Atkinson Hyperlegible Next (regular, bold, extra bold) and exports `fonts`, the family names to use in styles. On Android a custom font's weight comes from its family name, so set `fontFamily: fonts.bold` and never `fontWeight`. `app/_layout.tsx` keeps the splash screen up until the fonts load, and carries on with the system font if they fail.
+- `src/clock/clock.ts` is the only source of the current time (`now()`). `EXPO_PUBLIC_FAKE_TIME` starts the clock at a given time for manual checks, and tests call `setClock`. Never call `new Date()` for the current time in app code.
+- The app is locked to landscape in `app.json`. On the target tablet and the emulator it lays out at 1280 x 800 dp, the same size as the visual design.
 
 Every screen imports `API_URL` and calls `fetch` inline. There is no shared API client yet.
 
@@ -176,7 +180,7 @@ The queue is deliberately not rebuilt on later refreshes, to avoid replay loops.
 
 `agendaView.tsx` renders `Player` for `video` and `audio` items and advances on either callback. The `expo-audio` plugin in `app.json` has its microphone permissions switched off; keep them off, since the tablet never records.
 
-Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`. A release build blocks plain `http://`, so it can only reach an `https://` backend unless cleartext traffic is enabled in the build.
+Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`. Plain `http://` is allowed in Android builds only for an `http://` server address (see `app.config.ts`).
 
 ### Pairing and identity (`app/pair.tsx`, `src/pairing/carepartnerId.ts`)
 

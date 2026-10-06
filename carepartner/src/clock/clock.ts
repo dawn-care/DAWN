@@ -1,0 +1,47 @@
+/**
+ * clock.ts
+ *
+ * The tablet's only source of the current time. Read the time through `now()`
+ * so tests and manual checks can control it.
+ *
+ * Set EXPO_PUBLIC_FAKE_TIME (an ISO date-time, for example
+ * "2026-10-03T21:30:00") in .env.local to start the app's clock at that time.
+ * It then runs forward normally, so night mode or an 8:00 schedule can be
+ * checked without waiting for the real time.
+ */
+
+type TimeSource = () => number;
+
+const realTime: TimeSource = () => Date.now();
+
+/** A clock that starts at `start` now and runs forward in real time. */
+function startingAt(start: Date): TimeSource {
+  const offset = start.getTime() - Date.now();
+  return () => Date.now() + offset;
+}
+
+/** Reads a fake start time setting; null when it is unset or not a valid date. */
+export function parseFakeTime(value: string | undefined): Date | null {
+  if (!value) return null;
+  const start = new Date(value);
+  if (Number.isNaN(start.getTime())) {
+    console.warn(`Ignoring EXPO_PUBLIC_FAKE_TIME: "${value}" is not a valid date`);
+    return null;
+  }
+  return start;
+}
+
+const fakeStart = parseFakeTime(process.env.EXPO_PUBLIC_FAKE_TIME);
+let source: TimeSource = fakeStart ? startingAt(fakeStart) : realTime;
+
+export function now(): Date {
+  return new Date(source());
+}
+
+/**
+ * Starts the clock at the given time, running forward from there, or returns
+ * it to the real time when given null. For tests and developer tools only.
+ */
+export function setClock(start: Date | null): void {
+  source = start ? startingAt(start) : realTime;
+}
