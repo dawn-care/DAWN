@@ -58,7 +58,7 @@ export default function SelectCarePartnerPage() {
     setActiveCarePartnerId(Number(selectedId));
 
     // Navigate to main application
-    navigate("/library");
+    navigate("/");
   };
 
   /* ============================

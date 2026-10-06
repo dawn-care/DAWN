@@ -134,7 +134,7 @@ export default function AccountSetupPage() {
       setUser(refreshedUser);
 
       // Pairing succeeded
-      navigate("/library");
+      navigate("/");
     } catch (err) {
       console.error(err);
       setSubmitError("Something went wrong. Please try again.");

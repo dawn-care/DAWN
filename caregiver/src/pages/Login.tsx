@@ -127,7 +127,7 @@ const Login = () => {
         navigate("/setup");
       } else {
         setActiveCarePartnerId(user.carepartners[0].id);
-        navigate("/library");
+        navigate("/");
       }
 
       setStatus("success");
