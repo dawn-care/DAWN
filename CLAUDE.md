@@ -80,7 +80,7 @@ models/<domain>/      → plain structs representing DB rows
 
 Controllers depend on a **service interface** defined in the same file as the controller (e.g. `ModuleServiceInterface` in `module_controller.go`), not a concrete type — this is what makes controllers unit-testable against mocks. When adding a new endpoint, follow this same route → controller → service → model chain and add tests at the service (sqlmock) and controller (via the interface) layers, matching the existing `*_test.go` siblings.
 
-All wiring happens in `server/cmd/main.go`: services and controllers are constructed there (with real `*sql.DB` and `minio.Client`), then routes are registered onto a single `chi.NewRouter()`. There's no DI framework — just explicit constructor calls in main, grouped by domain (User / Auth / Agenda / Media / Widgets / Prompts). `server/internal/db/db.go` also exposes a `db.Initialize`/`GetDB` singleton pattern, but note `main.go` currently opens its own `*sql.DB` directly rather than using it — check which one an area of code actually depends on before assuming a shared DB handle.
+All wiring happens in `server/cmd/main.go`: services and controllers are constructed there (with real `*sql.DB` and `minio.Client`), then routes are registered onto a single `chi.NewRouter()`. There's no DI framework — just explicit constructor calls in main, grouped by domain (User / Auth / Agenda / Media / Widgets / Prompts). The API and `server/cmd/migrate` both use `internal/db.Open` for database settings and connection checks. See `server/CLAUDE.md` for migration commands and the current baseline requirement.
 
 ### Auth & pairing model
 

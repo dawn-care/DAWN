@@ -32,7 +32,7 @@ COPY server/ ./
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN swag init -g ./cmd/main.go -o ./cmd/docs
 
-RUN go build -o main ./cmd
+RUN go build -o main ./cmd && go build -o migrate ./cmd/migrate
 
 
 # ===============================
@@ -43,7 +43,7 @@ FROM ubuntu:24.04
 WORKDIR /app
 
 # Copy Go binary
-COPY --from=builder /app/main .
+COPY --from=builder /app/main /app/migrate ./
 
 # Copy built frontend
 COPY --from=frontend-builder /frontend/dist /app/frontend
