@@ -16,7 +16,7 @@ import (
 //go:embed sql/*.sql
 var files embed.FS
 
-var ErrBaselineRequired = errors.New("existing database requires baselining before migrations can run; do not replay the initial schema or delete the database volume")
+var ErrBaselineRequired = errors.New("existing database requires baselining: run migrate baseline first; do not replay the initial schema or delete the database volume")
 
 // Up applies pending migrations. Existing databases without a recorded initial
 // migration must be baselined separately.

@@ -12,7 +12,13 @@ Add the next numbered SQL file to `internal/migrations/sql/`, starting with
 `-- +goose Up`. Wrap procedure bodies in Goose `StatementBegin` / `StatementEnd`
 annotations. Do not edit applied migrations. Keep the initial demo data.
 
-Existing databases created by `init/database.sql` still require baselining;
-that step is not implemented yet. Do not bypass the guard or delete volumes.
+For databases created by `init/database.sql`, first run the same command with
+`baseline` appended. This validates migration 1 using temporary reference tables
+and records it without replaying seeds. Then run the normal command for future
+migrations. Do not bypass failed schema checks or delete volumes.
 
 Safety tests: `go test -race ./internal/db ./internal/migrations`.
+
+Integration tests also run when `MIGRATION_TEST_DSN` is set to a disposable
+PostgreSQL database (lib/pq keyword connection string). They create and remove
+isolated test schemas. Never point this setting at an application database.

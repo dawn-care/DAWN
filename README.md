@@ -216,7 +216,7 @@ npm run dev
 
 Open http://localhost:5173. Its settings (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`) come from `caregiver/.env.development`, which is committed.
 
-#### Database migrations (incremental rollout)
+#### Database migrations
 
 Apply pending migrations with `go run ./cmd/migrate` from `server/`, using the
 same `DB_*` environment variables as the API. For Docker, rebuild the image
@@ -233,11 +233,24 @@ SQL. Use Goose's `StatementBegin` / `StatementEnd` around procedure bodies.
 Do not edit already-applied migrations. The initial migration retains demo data;
 no rollback command is provided.
 
-**Existing databases:** Compose still initializes volumes using
-`init/database.sql`. These databases must be baselined (recorded as migration 1
-without replaying it) before this command can upgrade them. That registration
-step is not implemented yet; the command safely refuses unregistered existing
-schemas. Do not delete your database volume to bypass the check.
+**Existing databases:** register a database created by `init/database.sql` once,
+without replaying the schema or demo inserts:
+
+```bash
+# Local (from server/)
+go run ./cmd/migrate baseline
+# Docker (from the repo root, after rebuilding/recreating the server)
+docker compose exec server ./migrate baseline
+```
+
+Then run the normal migration command above to apply future migrations.
+Baselining checks the original tables' columns, defaults, identity modes,
+constraints and stored procedures. It uses temporary reference tables that are
+removed automatically, and records version 1 only if validation succeeds.
+Application rows and sequence counters are untouched. Repeating a successful
+baseline is safe. A failed check may leave an empty Goose tracking table, but
+never marks migration 1 applied. Resolve reported schema differences before
+retrying; do not delete your database volume.
 
 #### Carepartner app
 
