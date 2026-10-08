@@ -106,15 +106,15 @@ CREATE TABLE "Session" (
     id SERIAL PRIMARY KEY,
     session_id TEXT UNIQUE NOT NULL,
     user_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    expires_at TIMESTAMP NOT NULL
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE "DevicePairing" (
   "id" SERIAL PRIMARY KEY,
   "carepartner_id" INTEGER NOT NULL REFERENCES "Carepartner"("id"),
   "pairing_code" VARCHAR(10) NOT NULL UNIQUE,
-  "expires_at" TIMESTAMP NOT NULL,
+  "expires_at" TIMESTAMPTZ NOT NULL,
   "paired" BOOLEAN DEFAULT FALSE
 );
 
