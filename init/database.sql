@@ -61,14 +61,16 @@ CREATE TABLE "ScreenSettings" (
   "bed_time" time NOT NULL DEFAULT '21:00' CHECK ("bed_time" BETWEEN '19:00' AND '22:00')
 );
 
--- Widgets on the carepartner's screen, in order. Widgets that don't fit the
--- current layout preset are kept; the /screen endpoint reports them as overflow.
+-- Widgets placed in the slots of a layout preset's regions (e.g. the second of
+-- Balanced's three tiles is region 'tiles', slot 1). Region names and sizes are
+-- defined per preset in Go. A widget whose slot doesn't exist in the current
+-- preset is kept but hidden, and reappears if the caregiver switches back.
 CREATE TABLE "ScreenWidget" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "carepartner_id" integer NOT NULL REFERENCES "Carepartner"("id") ON DELETE CASCADE,
   "type" text NOT NULL CHECK ("type" IN ('photo', 'message', 'reminder', 'weather', 'sports', 'news')),
-  -- Gaps are allowed; readers order by position
-  "position" integer NOT NULL CHECK ("position" >= 0),
+  "region" text NOT NULL CHECK ("region" <> ''),
+  "slot" integer NOT NULL CHECK ("slot" >= 0),
   -- Validated per type in Go
   "config" jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof("config") = 'object'),
   -- SET NULL clears a message widget's photo. Photo widgets must be deleted by the
@@ -80,8 +82,8 @@ CREATE TABLE "ScreenWidget" (
     WHEN 'message' THEN TRUE
     ELSE "photo_media_id" IS NULL
   END),
-  -- Deferred so a reorder can swap positions inside one transaction
-  UNIQUE ("carepartner_id", "position") DEFERRABLE INITIALLY DEFERRED
+  -- One widget per slot; deferred so two widgets can swap slots in one transaction
+  UNIQUE ("carepartner_id", "region", "slot") DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX "ScreenWidget_photo_media_idx" ON "ScreenWidget" ("photo_media_id");
