@@ -15,6 +15,7 @@ import (
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
+	screenSettingsCtrlr "server/internal/controllers/screen_settings"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
 	newsCtrlr "server/internal/controllers/widgets/news"
@@ -25,6 +26,7 @@ import (
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
+	screenSettingsRts "server/internal/routes/screen_settings"
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
@@ -36,6 +38,7 @@ import (
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
+	screenSettingsSvc "server/internal/services/screen_settings"
 	caregiverSvc "server/internal/services/user/caregiver"
 	pairingSvc "server/internal/services/user/device_pairing"
 	newsSvc "server/internal/services/widgets/news"
@@ -146,6 +149,9 @@ func main() {
 	configurationService := configurationSvc.NewConfigurationService(db)
 	exceptionService := exceptionSvc.NewExceptionService(db)
 
+	// Screen
+	screenSettingsService := screenSettingsSvc.NewScreenSettingsService(db)
+
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
@@ -178,6 +184,9 @@ func main() {
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
+
+	// Screen
+	screenSettingsCtrl := screenSettingsCtrlr.NewScreenSettingsController(screenSettingsService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -229,6 +238,9 @@ func main() {
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
+
+	// Screen
+	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
