@@ -77,7 +77,7 @@ func main() {
 			"http://localhost:8081",
 			"http://startup-da.gccis.rit.edu",
 		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -150,6 +150,7 @@ func main() {
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
+	mediaService := mediaSvc.NewMediaService(db, minioClient, "media")
 
 	// Widgets
 	openWeatherKey := getEnvOrDefault("OPENWEATHER_API_KEY", "")
@@ -182,6 +183,7 @@ func main() {
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
+	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
 
 	// Widgets
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
@@ -232,6 +234,7 @@ func main() {
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
+	mediaRts.RegisterMediaRoutes(r, mediaCtrl)
 
 	// Widgets
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
