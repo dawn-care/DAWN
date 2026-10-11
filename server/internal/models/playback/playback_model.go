@@ -1,0 +1,32 @@
+package playback
+
+import "time"
+
+const (
+	SourceScheduled = "scheduled"
+	SourceStaff     = "staff"
+	SourceTap       = "tap"
+
+	StatusRequested    = "requested"
+	StatusAcknowledged = "acknowledged"
+	StatusStarted      = "started"
+	StatusFinished     = "finished"
+	StatusStopped      = "stopped"
+	StatusFailed       = "failed"
+	StatusExpired      = "expired"
+)
+
+// Playback records one attempt to play a module, not the module itself.
+type Playback struct {
+	ID             int        `json:"id"`
+	CarepartnerID  int        `json:"carepartner_id"`
+	ModuleID       int        `json:"module_id"`
+	Source         string     `json:"source"`
+	Status         string     `json:"status"`
+	RequestedAt    time.Time  `json:"requested_at"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at"`
+	StartedAt      *time.Time `json:"started_at"`
+	EndedAt        *time.Time `json:"ended_at"`
+	ExpiresAt      time.Time  `json:"expires_at"`
+	Rating         *int       `json:"rating"`
+}
