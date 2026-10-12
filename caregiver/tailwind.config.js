@@ -7,6 +7,7 @@ export default {
       colors: {
         dawn: {
           page: "#FAF8F4",
+          preview: "#F2EADB",
           sidebar: "#F1ECE3",
           line: "#E2DCD2",
           "line-strong": "#D6CEC1",
