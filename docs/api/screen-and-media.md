@@ -614,4 +614,4 @@ If this guide and the server ever disagree, the server is right; please update t
 | Sports teams | `server/internal/routes/widgets/news/sports_news.go` | `server/internal/services/widgets/news/sports_teams.go` |
 | Scheduled items and calendar | `server/internal/routes/scheduled_items/` | `server/internal/models/scheduled_items/scheduled_item_model.go` (`ScheduledItem`, `Occurrence`), `server/internal/services/scheduled_items/` (`recurrence.go`, validation) |
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
-| Database | | `init/database.sql` |
+| Database | | `server/internal/migrations/sql/` (migration 2 creates these tables) |

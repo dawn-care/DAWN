@@ -176,7 +176,13 @@ This starts Postgres, MinIO, and the Go server, which also serves the built care
 | API docs (Swagger) | http://localhost:8080/swagger/ |
 | MinIO console (`localuser` / `localpass123`) | http://localhost:9001 |
 
-Code changes need a rebuild (`up --build` again). The database is seeded from `init/database.sql` only the first time its volume is created; to reset it, run the command above with `down -v` in place of `up --build`, then start again.
+The database starts empty the first time its volume is created. Once the stack is up, create the tables and demo data (a demo caregiver and carepartner) by running the migrations from the repo root:
+
+```bash
+docker compose exec server ./migrate
+```
+
+Code changes need a rebuild (`up --build` again); run `./migrate` again after pulling new migrations. To reset the database, run the command above with `down -v` in place of `up --build`, start again, and run `./migrate`.
 
 #### Option B: backend and frontend on your machine (hot reload)
 
@@ -193,7 +199,13 @@ docker compose up -d minio minio-init
 ```bash
 psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
 psql -c "CREATE DATABASE mydb OWNER myuser;"
-psql -h localhost -U myuser -d mydb -f init/database.sql
+```
+
+Then create the tables and demo data by running the migrations (from `server/`; they connect with the same `DB_*` defaults as the API):
+
+```bash
+cd server
+go run ./cmd/migrate
 ```
 
 **Backend** — the Go server does not read `.env` itself, so load it into your shell first. `RUN_MODE=dev` is required; without it the server starts in production mode and tries to bind ports 80/443.
@@ -228,13 +240,14 @@ docker compose exec server ./migrate
 
 Migrations run only when this command is invoked. SQL files are embedded in the
 executable. Add the next numbered file under `server/internal/migrations/sql/`
-(for example `00002_add_album_covers.sql`) with `-- +goose Up` and the forward
+(for example `00004_add_album_covers.sql`) with `-- +goose Up` and the forward
 SQL. Use Goose's `StatementBegin` / `StatementEnd` around procedure bodies.
 Do not edit already-applied migrations. The initial migration retains demo data;
 no rollback command is provided.
 
-**Existing databases:** register a database created by `init/database.sql` once,
-without replaying the schema or demo inserts:
+**Existing databases:** a database created by the old `init/database.sql`, before
+migrations existed, must be registered once, without replaying the schema or demo
+inserts:
 
 ```bash
 # Local (from server/)
