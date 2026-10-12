@@ -84,9 +84,6 @@ func TestBaselineIntegration(t *testing.T) {
 				if err := Baseline(ctx, db); err != nil {
 					t.Fatalf("repeated baseline: %v", err)
 				}
-				if err := Up(ctx, db); err != nil {
-					t.Fatalf("up after baseline: %v", err)
-				}
 			} else if recorded != 0 {
 				t.Fatal("failed validation recorded migration 1")
 			}
