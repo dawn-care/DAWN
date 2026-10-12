@@ -12,3 +12,8 @@ html, body, #root {
   color: #000000;
   font-family: system-ui, sans-serif;
 }
+
+/* Atkinson Hyperlegible, matching the font-dawn family in tailwind.config.js */
+body {
+  font-family: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+}
