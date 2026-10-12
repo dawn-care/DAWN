@@ -16,6 +16,7 @@ import (
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
 	screenSettingsCtrlr "server/internal/controllers/screen_settings"
+	screenWidgetsCtrlr "server/internal/controllers/screen_widgets"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
 	newsCtrlr "server/internal/controllers/widgets/news"
@@ -27,6 +28,7 @@ import (
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
 	screenSettingsRts "server/internal/routes/screen_settings"
+	screenWidgetsRts "server/internal/routes/screen_widgets"
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
@@ -39,6 +41,7 @@ import (
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
 	screenSettingsSvc "server/internal/services/screen_settings"
+	screenWidgetsSvc "server/internal/services/screen_widgets"
 	caregiverSvc "server/internal/services/user/caregiver"
 	pairingSvc "server/internal/services/user/device_pairing"
 	newsSvc "server/internal/services/widgets/news"
@@ -151,6 +154,7 @@ func main() {
 
 	// Screen
 	screenSettingsService := screenSettingsSvc.NewScreenSettingsService(db)
+	screenWidgetsService := screenWidgetsSvc.NewScreenWidgetService(db)
 
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
@@ -187,6 +191,7 @@ func main() {
 
 	// Screen
 	screenSettingsCtrl := screenSettingsCtrlr.NewScreenSettingsController(screenSettingsService)
+	screenWidgetsCtrl := screenWidgetsCtrlr.NewScreenWidgetController(screenWidgetsService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -241,6 +246,7 @@ func main() {
 
 	// Screen
 	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)
+	screenWidgetsRts.RegisterScreenWidgetRoutes(r, screenWidgetsCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
@@ -251,6 +257,7 @@ func main() {
 	// Widgets
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
+	newsRts.RegisterSportsTeamsRoutes(r)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
 	// Prompts

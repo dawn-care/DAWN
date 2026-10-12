@@ -28,3 +28,8 @@ func RegisterSportsNewsWidgetRoutes(r chi.Router, controller *newsCtrlr.SportsNe
 		r.Post("/team-game", controller.GetTeamGameHandler)
 	})
 }
+
+// RegisterSportsTeamsRoutes registers the list of leagues and teams sports widgets can follow
+func RegisterSportsTeamsRoutes(r chi.Router) {
+	r.Get("/api/widgets/sports/teams", newsCtrlr.SportsTeamsHandler) // ?league= optional
+}

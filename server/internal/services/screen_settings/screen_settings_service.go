@@ -9,9 +9,81 @@ import (
 	"server/internal/models/screen_settings"
 )
 
-// LayoutPresets are the allowed layout_preset values. The database doesn't check
-// them, so a new preset only needs adding here.
-var LayoutPresets = []string{"balanced"}
+// Region is an area of a layout preset with a fixed number of widget slots,
+// e.g. the three tiles in the middle row of Balanced
+type Region struct {
+	Name    string   `json:"name"`
+	Slots   int      `json:"slots"`
+	Accepts []string `json:"accepts"` // widget types that can be placed here
+}
+
+// Preset is a screen layout the caregiver fills slot by slot
+type Preset struct {
+	Name    string   `json:"name"`
+	Regions []Region `json:"regions"`
+}
+
+// Presets are the layouts a carepartner's screen can use. The database doesn't
+// check layout_preset, so a new preset only needs adding here.
+var Presets = []Preset{
+	{
+		// The carepartner home screen mockup: a large photo frame on the right,
+		// three tiles in the middle row and a plate along the bottom
+		Name: "balanced",
+		Regions: []Region{
+			{Name: "photo_frame", Slots: 1, Accepts: []string{"photo"}},
+			{Name: "tiles", Slots: 3, Accepts: []string{"reminder", "weather", "sports", "news"}},
+			{Name: "plate", Slots: 1, Accepts: []string{"message"}},
+		},
+	},
+}
+
+// LayoutPresets are the allowed layout_preset values
+var LayoutPresets = presetNames()
+
+func presetNames() []string {
+	names := make([]string, len(Presets))
+	for i, p := range Presets {
+		names[i] = p.Name
+	}
+	return names
+}
+
+// PresetByName returns the preset with this name
+func PresetByName(name string) (Preset, bool) {
+	for _, p := range Presets {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return Preset{}, false
+}
+
+// Region returns the region with this name
+func (p Preset) Region(name string) (Region, bool) {
+	for _, r := range p.Regions {
+		if r.Name == name {
+			return r, true
+		}
+	}
+	return Region{}, false
+}
+
+// HasSlot reports whether the preset has this region and slot
+func (p Preset) HasSlot(region string, slot int) bool {
+	r, ok := p.Region(region)
+	return ok && slot >= 0 && slot < r.Slots
+}
+
+// AcceptsType reports whether a widget type can be placed in this region
+func (r Region) AcceptsType(widgetType string) bool {
+	for _, t := range r.Accepts {
+		if t == widgetType {
+			return true
+		}
+	}
+	return false
+}
 
 // Allowed awake hours, inclusive. The database enforces the same ranges.
 const (
@@ -45,12 +117,8 @@ type UpdateInput struct {
 }
 
 func validPreset(preset string) bool {
-	for _, p := range LayoutPresets {
-		if p == preset {
-			return true
-		}
-	}
-	return false
+	_, ok := PresetByName(preset)
+	return ok
 }
 
 // normalizeTime parses "HH:MM" and returns it zero-padded if it falls in [earliest, latest]
@@ -67,6 +135,11 @@ func normalizeTime(value, earliest, latest string) (string, bool) {
 // ─────────────────────────────────────────────
 // READ
 // ─────────────────────────────────────────────
+
+// GetPresets returns every layout preset and its regions
+func (s *ScreenSettingsService) GetPresets() []Preset {
+	return Presets
+}
 
 func (s *ScreenSettingsService) GetScreenSettings(carepartnerID int) (*screen_settings.ScreenSettings, error) {
 	if carepartnerID <= 0 {

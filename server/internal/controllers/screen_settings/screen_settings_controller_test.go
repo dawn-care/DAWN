@@ -23,6 +23,8 @@ type mockScreenSettingsService struct {
 	updateCalled bool
 }
 
+func (m *mockScreenSettingsService) GetPresets() []svc.Preset { return svc.Presets }
+
 func (m *mockScreenSettingsService) GetScreenSettings(carepartnerID int) (*model.ScreenSettings, error) {
 	m.gotID = carepartnerID
 	return m.settings, m.err
@@ -114,4 +116,20 @@ func TestUpdateScreenSettingsHandler_Errors(t *testing.T) {
 		httptest.NewRequest(http.MethodPut, "/api/screen-settings", strings.NewReader(`{}`)))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.False(t, m.updateCalled)
+}
+
+func TestGetPresetsHandler(t *testing.T) {
+	w := httptest.NewRecorder()
+	NewScreenSettingsController(&mockScreenSettingsService{}).GetPresetsHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-settings/presets", nil))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var presets []svc.Preset
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &presets))
+	require.Len(t, presets, 1)
+	assert.Equal(t, "balanced", presets[0].Name)
+	assert.Equal(t, []svc.Region{
+		{Name: "photo_frame", Slots: 1, Accepts: []string{"photo"}},
+		{Name: "tiles", Slots: 3, Accepts: []string{"reminder", "weather", "sports", "news"}},
+		{Name: "plate", Slots: 1, Accepts: []string{"message"}},
+	}, presets[0].Regions)
 }

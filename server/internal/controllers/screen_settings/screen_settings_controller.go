@@ -22,6 +22,7 @@ const (
 
 // ---- Interface ----
 type ScreenSettingsServiceInterface interface {
+	GetPresets() []svc.Preset
 	GetScreenSettings(carepartnerID int) (*model.ScreenSettings, error)
 	UpdateScreenSettings(carepartnerID int, in svc.UpdateInput) (*model.ScreenSettings, error)
 }
@@ -71,6 +72,17 @@ func writeServiceError(w http.ResponseWriter, err error) {
 func carepartnerIDParam(r *http.Request) (int, bool) {
 	id, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
 	return id, err == nil && id > 0
+}
+
+// GetPresetsHandler godoc
+// @Summary List the layout presets
+// @Description Each preset is a set of regions with a fixed number of slots and the widget types each region accepts. Widgets are placed by region name and slot index (0-based).
+// @Tags screen-settings
+// @Produce json
+// @Success 200 {array} screen_settings.Preset
+// @Router /screen-settings/presets [get]
+func (c *ScreenSettingsController) GetPresetsHandler(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, c.Service.GetPresets())
 }
 
 // GetScreenSettingsHandler godoc
