@@ -13,6 +13,7 @@ import (
 	exceptionCtrlr "server/internal/controllers/exceptions"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
+	playbackCtrlr "server/internal/controllers/playback"
 	promptsCtrlr "server/internal/controllers/prompts"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
@@ -23,6 +24,7 @@ import (
 	exceptionRts "server/internal/routes/exceptions"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
+	playbackRts "server/internal/routes/playback"
 	promptsRts "server/internal/routes/prompts"
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
@@ -34,6 +36,7 @@ import (
 	exceptionSvc "server/internal/services/exceptions"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
+	playbackSvc "server/internal/services/playback"
 	promptsSvc "server/internal/services/prompts"
 	caregiverSvc "server/internal/services/user/caregiver"
 	pairingSvc "server/internal/services/user/device_pairing"
@@ -76,7 +79,7 @@ func main() {
 			"http://localhost:8081",
 			"http://startup-da.gccis.rit.edu",
 		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -134,6 +137,7 @@ func main() {
 	modulesService := modulesSvc.NewModuleService(db)
 	configurationService := configurationSvc.NewConfigurationService(db)
 	exceptionService := exceptionSvc.NewExceptionService(db)
+	playbackService := playbackSvc.NewPlaybackService(db)
 
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
@@ -166,6 +170,7 @@ func main() {
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
+	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -216,6 +221,7 @@ func main() {
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
+	playbackRts.RegisterPlaybackRoutes(r, playbackCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
