@@ -8,14 +8,16 @@
  * Responsibilities:
  *  - Show the D.A.W.N. branding
  *  - Show the active carepartner's initials avatar and name
- *  - Link to Carepartner Screen, Calendar, and Photos, videos & audio
- *  - Show the signed-in caregiver's name
+ *  - Link to Carepartner Screen, Calendar, and Photos, Videos & Audio
+ *  - Link to account settings, labeled with the signed-in caregiver's name
  *
  * /family exists as a stub route but is intentionally not linked here yet.
  */
 
+import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import { Calendar, Image, Monitor, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 /* ============================
@@ -26,21 +28,6 @@ import { useAuth } from "../context/AuthContext";
 const FACILITY = "St. Ann's";
 
 /**
- * Shared SVG attributes for the nav item icons
- */
-const iconProps = {
-  width: 22,
-  height: 22,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-/**
  * Nav items, in display order
  */
 const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: ReactNode }[] = [
@@ -48,33 +35,17 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: ReactNode }[]
     to: "/",
     label: "Carepartner Screen",
     end: true, // otherwise "/" would match every route
-    icon: (
-      <svg {...iconProps}>
-        <rect x="3" y="4" width="18" height="12" rx="2" />
-        <path d="M8 20h8M12 16v4" />
-      </svg>
-    ),
+    icon: <Monitor size={22} aria-hidden="true" />,
   },
   {
     to: "/calendar",
     label: "Calendar",
-    icon: (
-      <svg {...iconProps}>
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M3 10h18M8 3v4M16 3v4" />
-      </svg>
-    ),
+    icon: <Calendar size={22} aria-hidden="true" />,
   },
   {
     to: "/media",
-    label: "Photos, videos & audio",
-    icon: (
-      <svg {...iconProps}>
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <circle cx="9" cy="10" r="1.5" />
-        <path d="m21 16-5-5-9 8" />
-      </svg>
-    ),
+    label: "Photos, Videos & Audio",
+    icon: <Image size={22} aria-hidden="true" />,
   },
 ];
 
@@ -111,7 +82,32 @@ export default function NavBar() {
      Context
   ============================ */
 
-  const { user, activeCarePartnerId } = useAuth();
+  const API_URL = import.meta.env.VITE_API_URL;
+
+  const { user, setUser, activeCarePartnerId } = useAuth();
+
+  /* ============================
+     Effects
+  ============================ */
+
+  /**
+   * Reload the caregiver after a page refresh, since the auth context
+   * only holds the user until the page reloads
+   */
+  useEffect(() => {
+    if (user) return;
+
+    const fetchCaregiver = async () => {
+      try {
+        const res = await fetch(`${API_URL}/me`, { credentials: "include" });
+        if (res.ok) setUser(await res.json());
+      } catch (err) {
+        console.error("Error fetching caregiver:", err);
+      }
+    };
+
+    fetchCaregiver();
+  }, [user, setUser, API_URL]);
 
   /* ============================
      Derived Values
@@ -139,7 +135,7 @@ export default function NavBar() {
           aria-hidden="true"
           className="w-12 h-12 shrink-0 rounded-full bg-dawn-avatar text-dawn-avatar-ink flex items-center justify-center text-lg font-bold"
         >
-          {getInitials(carepartnerName)}
+          {carepartnerName ? getInitials(carepartnerName) : <User size={24} />}
         </div>
         <div className="flex flex-col min-w-0">
           <div className="text-[17px] font-bold truncate">{carepartnerName}</div>
@@ -166,9 +162,15 @@ export default function NavBar() {
       ))}
 
       <div className="grow" />
-      <div className="text-base text-dawn-muted">
-        {user?.name ? `Signed in as ${user.name}` : "Signed in"}
-      </div>
+
+      {/* Account settings, labeled with the signed-in caregiver's name */}
+      <Link
+        to="/settings"
+        className="flex items-center gap-2.5 h-12 px-2.5 rounded-[10px] text-base hover:bg-white/60"
+      >
+        <User size={22} aria-hidden="true" />
+        <span className="truncate">{user?.name}</span>
+      </Link>
     </nav>
   );
 }

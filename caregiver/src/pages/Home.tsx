@@ -3,19 +3,20 @@
  *
  * User: Caregiver
  *
- * Placeholder landing page shown after login, account setup, or
- * carepartner selection. To be replaced by the new app shell.
+ * Carepartner Screen page at `/`, and the redirect target after login,
+ * account setup, and carepartner selection. Placeholder until the page
+ * is built.
  */
 
 import { Link } from "react-router-dom";
 
 export default function Home() {
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">StartUp</h1>
+    <div className="p-7">
+      <h1 className="text-3xl font-extrabold">Carepartner Screen</h1>
       <Link to="/settings" className="underline">
         Settings
       </Link>
-    </main>
+    </div>
   );
 }
