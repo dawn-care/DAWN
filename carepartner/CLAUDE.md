@@ -170,7 +170,7 @@ Expo Router treats each file in `app/` as a route, including the non-screen modu
 - `scheduled` trigger → timed items due now or earlier that haven't played, sorted by time.
 - Any other trigger → all non-timed items.
 
-The queue is deliberately not rebuilt on later refreshes, to avoid replay loops. Audio and video advance when `Player` reports finished or failed. Everything else advances after `duration` seconds (default 10). When the queue ends or errors, the app returns to `/`.
+The queue is deliberately not rebuilt on later refreshes, to avoid replay loops. Video, audio and photo items advance when their player reports finished or failed. Everything else advances after `duration` seconds (default 10). When the queue ends or errors, the app returns to `/`.
 
 ### Types mirror the backend by hand
 
@@ -178,11 +178,15 @@ The queue is deliberately not rebuilt on later refreshes, to avoid replay loops.
 
 ### Media playback (`src/playback/`)
 
-`Player` takes a `kind` (`video` or `audio`), a `uri`, and `onFinished` / `onFailed` callbacks, and renders `VideoPlayer` (`expo-video`) or `AudioPlayer` (`expo-audio`). Both start on their own, show no controls and work on Android and web. Each instance plays one source; give it a new `key` to play something else. `expo-audio` reports no load errors, so `AudioPlayer` treats a source that hasn't loaded within `AUDIO_LOAD_TIMEOUT_MS` as failed.
+`MediaPlayer` takes a media item (`MediaItem`: `module_type`, optional `duration`, and `metadata` typed `unknown` because it is unchecked server JSON) plus `onFinished` / `onFailed`, and renders `VideoPlayer` (`expo-video`), `AudioPlayer` (`expo-audio`) or `PhotoPlayer` for it, or nothing for anything else. It is where server data enters playback, so it checks the metadata there; `isPlayable` says whether it will play an item. It builds the file URL (`/video|audio|photo/file?id=`), an audio item's title and cover, and a photo's duration. All three players start on their own, show no controls and work on Android and web. Each instance plays one source; give it a new `key` to play something else. `expo-audio` reports no load errors, so `AudioPlayer` treats a source that hasn't loaded within `AUDIO_LOAD_TIMEOUT_MS` as failed.
 
-`AudioPlayer` takes an optional `imageUri` (a song's album cover, or later a sender's photo) and falls back to a music note when it is missing or fails to load. The agenda reads it from an optional `cover_uri` field on audio metadata, a full URL or a path relative to `API_URL` (resolved by `src/api/resolveApiUri.ts`). The server doesn't send `cover_uri` yet; once it extracts embedded album art and returns that field, covers appear with no tablet change.
+Every player keeps the contract written on `PlayerProps` in `src/playback/types.ts`: it starts on its own, calls exactly one of `onFinished` or `onFailed` once, and reports nothing after it is taken off screen. A shared suite in `players.test.tsx` checks it against every kind; a new player gets a driver there.
 
-`agendaView.tsx` renders `Player` for `video` and `audio` items and advances on either callback. The `expo-audio` plugin in `app.json` has its microphone permissions switched off; keep them off, since the tablet never records.
+`PhotoPlayer` shows one photo whole (`contain`) for the required `durationSeconds`, counted from when the image loads, then reports finished. It reports failed on an image error or if the image hasn't loaded within `PHOTO_LOAD_TIMEOUT_MS`. It shows no caption.
+
+`AudioPlayer` takes an optional `coverUri` (a song's album cover, or later a sender's photo) and falls back to a music note when it is missing or fails to load. The agenda reads it from an optional `cover_uri` field on audio metadata, a full URL or a path relative to `API_URL` (resolved by `src/api/resolveApiUri.ts`). The server doesn't send `cover_uri` yet; once it extracts embedded album art and returns that field, covers appear with no tablet change.
+
+The server doesn't yet guarantee a duration above 0 (#344), so `MediaPlayer` shows photos for `DEFAULT_DURATION_SECONDS` (30) when it is missing or not positive; remove that once #344 lands. `agendaView.tsx` renders `MediaPlayer` for the current item and advances on either callback; items `isPlayable` rejects still advance on the agenda's own timer. `messages` items still use the old `photo.tsx` and `text.tsx`. The `expo-audio` plugin in `app.json` has its microphone permissions switched off; keep them off, since the tablet never records.
 
 Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`. Plain `http://` is allowed in Android builds only for an `http://` server address (see `app.config.ts`).
 

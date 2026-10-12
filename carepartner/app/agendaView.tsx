@@ -26,9 +26,7 @@ import TextViewerScreen from './text';
 import WidgetViewerScreen from './widget';
 import PhotoViewerScreen from './photo';
 import { useSchedule } from './ScheduleContext';
-import { API_URL } from '../src/api/config';
-import { resolveApiUri } from '../src/api/resolveApiUri';
-import Player from '../src/playback/Player';
+import MediaPlayer, { isPlayable } from '../src/playback/MediaPlayer';
 import React from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -221,7 +219,8 @@ export default function AgendaView(){
         if (!item) return;
         console.log('Displaying item:', item);
 
-        if (item.module_type === 'audio' || item.module_type === 'video') {
+        // Media advances when its player reports finished or failed
+        if (isPlayable(item)) {
             return;
         }
 
@@ -314,7 +313,7 @@ export default function AgendaView(){
 
             <View style={styles.container}>
                 {/* Render correct module type */}
-                {(currentItem.module_type === "photo" || currentItem.module_type === "messages") && (
+                {currentItem.module_type === "messages" && (
                     <PhotoViewerScreen configuration={currentItem} />
                 )}
 
@@ -329,18 +328,7 @@ export default function AgendaView(){
                 )}
 
                 {/* Keyed by item so each one gets a fresh player */}
-                {(currentItem.module_type === "video" || currentItem.module_type === "audio") &&
-                    currentItem.metadata && (
-                    <Player
-                        key={currentItem.id}
-                        kind={currentItem.module_type}
-                        uri={`${API_URL}/${currentItem.module_type}/file?id=${(currentItem.metadata as VideoMetadata | AudioMetadata).id}`}
-                        title={(currentItem.metadata as VideoMetadata | AudioMetadata).displayed_name}
-                        imageUri={resolveApiUri((currentItem.metadata as AudioMetadata).cover_uri)}
-                        onFinished={goToNextItem}
-                        onFailed={skipFailedItem}
-                    />
-                )}
+                <MediaPlayer key={currentItem.id} item={currentItem} onFinished={goToNextItem} onFailed={skipFailedItem} />
 
                 {/* Navigation arrows */}
                 <Pressable
