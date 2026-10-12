@@ -1,15 +1,15 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { colors } from "../theme/theme";
-import type { MediaPlayerProps } from "./types";
+import type { PlayerProps } from "./types";
 
 /**
  * Plays one video full size with no controls, starting on its own.
  * Remount it (change its `key`) to play a different video.
  */
-export default function VideoPlayer({ uri, onFinished, onFailed }: MediaPlayerProps) {
+export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
   });
@@ -20,9 +20,17 @@ export default function VideoPlayer({ uri, onFinished, onFailed }: MediaPlayerPr
     player.play();
   }, [player]);
 
-  useEventListener(player, "playToEnd", onFinished);
+  // Only the first report counts: an error can follow the end, or repeat.
+  const ended = useRef(false);
+  useEventListener(player, "playToEnd", () => {
+    if (ended.current) return;
+    ended.current = true;
+    onFinished();
+  });
   useEventListener(player, "statusChange", ({ status, error }) => {
-    if (status === "error") onFailed(error?.message ?? "Video could not be played");
+    if (status !== "error" || ended.current) return;
+    ended.current = true;
+    onFailed(error?.message ?? "Video could not be played");
   });
 
   return (
