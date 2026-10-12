@@ -12,7 +12,7 @@ import NavBar from "./NavBar";
 
 export default function AppShell() {
   return (
-    <div className="flex min-h-screen bg-[#FAF8F4] text-[#1E1A15] font-['Atkinson_Hyperlegible_Next','Atkinson_Hyperlegible',system-ui,sans-serif]">
+    <div className="flex min-h-screen bg-dawn-page text-dawn-ink font-dawn">
       <NavBar />
       <main className="grow min-w-0">
         <Outlet />
