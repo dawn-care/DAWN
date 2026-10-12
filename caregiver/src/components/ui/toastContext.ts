@@ -22,16 +22,18 @@ export interface ToastState extends ToastOptions {
 }
 
 export interface ToastApi {
+  /** Adds a toast. If one is already showing, it waits behind it in a stack */
   show: (text: string, options?: ToastOptions) => void;
+  /** Closes the toast on top; the next one in the stack moves up */
   dismiss: () => void;
 }
 
 // Stable functions for showing/dismissing; components that only call show()
-// don't re-render when the toast changes
+// don't re-render when the toasts change
 export const ToastContext = createContext<ToastApi | null>(null);
 
-// The toast currently on screen, read only by ToastViewport
-export const ToastStateContext = createContext<ToastState | null>(null);
+// The stack of toasts, first = on top. Read only by ToastViewport
+export const ToastStateContext = createContext<ToastState[]>([]);
 
 /**
  * Returns show(text, options) and dismiss(). Must be used under ToastProvider.

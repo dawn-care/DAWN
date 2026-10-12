@@ -5,7 +5,8 @@
  *
  * A row of selectable photo thumbnails ("Which photo"). Used by the photo
  * widget pop-up and the audio background form. Built on Radix RadioGroup,
- * so exactly one photo is chosen and arrow keys move between them.
+ * so exactly one photo is chosen and arrow keys move between them. A long
+ * list scrolls sideways instead of squeezing the thumbnails.
  */
 
 import * as RadixRadioGroup from "@radix-ui/react-radio-group";
@@ -27,23 +28,37 @@ interface PhotoPickerProps {
   onChange: (id: string) => void;
   /** Names the group for screen readers */
   label: string;
+  /** Shown instead of the row when there are no photos */
+  emptyText?: string;
 }
 
-export default function PhotoPicker({ photos, value, onChange, label }: PhotoPickerProps) {
+export default function PhotoPicker({
+  photos,
+  value,
+  onChange,
+  label,
+  emptyText = "No photos to choose from.",
+}: PhotoPickerProps) {
+  if (photos.length === 0) {
+    return <p className="m-0 text-base text-dawn-muted">{emptyText}</p>;
+  }
+
   return (
+    // p-1 leaves room for the focus ring, which the scroll container would otherwise clip
     <RadixRadioGroup.Root
       aria-label={label}
       value={value}
       onValueChange={onChange}
-      className="flex gap-2"
+      className="flex gap-2 p-1 -m-1 overflow-x-auto"
     >
       {photos.map((photo) => (
         <RadixRadioGroup.Item
           key={photo.id}
           value={photo.id}
           aria-label={photo.label}
-          className={`relative flex-1 h-[54px] p-0 overflow-hidden rounded-lg border-2 border-dawn-line-strong bg-dawn-avatar bg-cover bg-center cursor-pointer data-[state=checked]:border-[3px] data-[state=checked]:border-dawn-accent ${FOCUS_RING}`}
-          style={{ backgroundImage: `url(${photo.src})` }}
+          className={`relative flex-1 min-w-[72px] h-[54px] p-0 overflow-hidden rounded-lg border-2 border-dawn-line-strong bg-dawn-avatar bg-cover bg-center cursor-pointer data-[state=checked]:border-[3px] data-[state=checked]:border-dawn-accent ${FOCUS_RING}`}
+          // JSON.stringify quotes the URL so spaces and parentheses can't break the CSS
+          style={{ backgroundImage: `url(${JSON.stringify(photo.src)})` }}
         >
           <RadixRadioGroup.Indicator className="absolute right-[3px] bottom-[3px] w-5 h-5 rounded-full bg-dawn-accent text-white flex items-center justify-center">
             <Check size={12} strokeWidth={3.4} aria-hidden="true" />

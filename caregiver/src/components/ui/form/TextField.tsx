@@ -3,9 +3,9 @@
  *
  * User: Caregiver
  *
- * A labeled single-line text input. The label wraps the input so the two
- * are associated without needing ids; the optional hint is read as the
- * input's description.
+ * A labeled single-line text input. The label is linked to the input by
+ * id. The optional hint sits outside the label, so it is read once, as
+ * the input's description, and not as part of its name.
  */
 
 import { forwardRef, useId } from "react";
@@ -19,14 +19,19 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { label, hint, className = "", ...inputProps },
+  { label, hint, className = "", id, "aria-describedby": describedBy, ...inputProps },
   ref
 ) {
-  const hintId = useId();
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const hintId = `${inputId}-hint`;
+  const description = [hint ? hintId : undefined, describedBy].filter(Boolean).join(" ") || undefined;
 
   return (
-    <label className="flex flex-col gap-1.5 text-base font-bold text-dawn-ink">
-      {label}
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={inputId} className="text-base font-bold text-dawn-ink">
+        {label}
+      </label>
       {hint && (
         <span id={hintId} className="text-[15px] font-normal text-dawn-muted">
           {hint}
@@ -34,12 +39,13 @@ const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextFiel
       )}
       <input
         ref={ref}
+        id={inputId}
         type="text"
-        aria-describedby={hint ? hintId : undefined}
+        aria-describedby={description}
         className={`${FIELD_CLASSES} font-normal ${className}`}
         {...inputProps}
       />
-    </label>
+    </div>
   );
 });
 

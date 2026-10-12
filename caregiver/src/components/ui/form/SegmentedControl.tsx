@@ -4,11 +4,12 @@
  * User: Caregiver
  *
  * A row of equal-width buttons for switching between a few modes
- * (e.g. Video / Photo). Each segment is a ToggleButton, so the active
- * one is announced with aria-pressed.
+ * (e.g. Video / Photo). Exactly one segment is always chosen, so it is
+ * built on Radix RadioGroup like RadioGroup and PhotoPicker.
  */
 
-import ToggleButton from "./ToggleButton";
+import * as RadixRadioGroup from "@radix-ui/react-radio-group";
+import { FOCUS_RING } from "../styles";
 
 export interface Segment<T extends string> {
   value: T;
@@ -30,18 +31,21 @@ export default function SegmentedControl<T extends string>({
   label,
 }: SegmentedControlProps<T>) {
   return (
-    <div role="group" aria-label={label} className="flex gap-2">
+    <RadixRadioGroup.Root
+      aria-label={label}
+      value={value}
+      onValueChange={(next) => onChange(next as T)}
+      className="flex gap-2"
+    >
       {segments.map((segment) => (
-        <ToggleButton
+        <RadixRadioGroup.Item
           key={segment.value}
-          shape="square"
-          pressed={segment.value === value}
-          onClick={() => onChange(segment.value)}
-          className="flex-1"
+          value={segment.value}
+          className={`flex-1 h-11 px-3 rounded-[10px] border-2 text-base font-bold cursor-pointer bg-white text-dawn-ink border-dawn-control data-[state=checked]:bg-dawn-accent data-[state=checked]:text-white data-[state=checked]:border-dawn-accent ${FOCUS_RING}`}
         >
           {segment.label}
-        </ToggleButton>
+        </RadixRadioGroup.Item>
       ))}
-    </div>
+    </RadixRadioGroup.Root>
   );
 }

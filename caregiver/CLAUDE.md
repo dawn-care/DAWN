@@ -55,7 +55,7 @@ Shared UI pieces live in `src/components/ui/` (app-specific components such as `
 - `form/`: `RadioGroup`/`RadioOption`, `SegmentedControl`, `SelectField` (native `<select>`), `TextField`, `ToggleButton`
 - `styles.ts` holds the shared focus ring (`FOCUS_RING`) and field classes; use `FOCUS_RING` on any new interactive control.
 
-Toasts: `AppShell` mounts `ToastProvider` and a `ToastViewport` (top center of the page content). Call `useToast().show(text, { actionLabel, onAction })` from any page inside `AppShell`; pages outside it (login, settings, setup) have no toast. Use `aria-pressed` for on/off toggles and `RadioGroup` when exactly one option must be chosen.
+Toasts: `AppShell` mounts `ToastProvider` and a `ToastViewport` (top center of the page content). Call `useToast().show(text, { actionLabel, onAction })` from any page inside `AppShell`; pages outside it (login, settings, setup) have no toast. Toasts stack: a new one waits behind the one on top and its 12-second timer starts only when it reaches the top. Show a toast after a `Dialog` closes, not while it is open. Use `aria-pressed` for on/off toggles and a Radix radio group (`RadioGroup`, `SegmentedControl`, `PhotoPicker`) when exactly one option must be chosen.
 
 ### Docker
 

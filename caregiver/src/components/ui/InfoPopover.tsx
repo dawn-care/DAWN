@@ -10,7 +10,6 @@
 
 import * as Popover from "@radix-ui/react-popover";
 import { Info } from "lucide-react";
-import type { ReactNode } from "react";
 import IconButton from "./IconButton";
 import { FOCUS_RING } from "./styles";
 
@@ -18,7 +17,7 @@ interface InfoPopoverProps {
   /** Accessible name for the icon button, e.g. "About this page" */
   label: string;
   /** The explanation, one or two plain sentences */
-  children: ReactNode;
+  children: string;
 }
 
 export default function InfoPopover({ label, children }: InfoPopoverProps) {
