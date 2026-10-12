@@ -1,12 +1,14 @@
 import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { useTabletDisplay } from "../src/display/useTabletDisplay";
 import { useAppFonts } from "../src/theme/fonts";
 import { ScheduleProvider } from "./ScheduleContext";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useTabletDisplay();
   const [fontsLoaded, fontError] = useAppFonts();
   const ready = fontsLoaded || !!fontError;
 

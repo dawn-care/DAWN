@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -61,12 +60,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"golang.org/x/crypto/acme/autocert"
 
+	database "server/internal/db"
 	mw "server/internal/middleware"
 )
 
@@ -95,22 +94,12 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// DB setup
-	dbHost := getEnvOrDefault("DB_HOST", "localhost")
-	dbPort := getEnvOrDefault("DB_PORT", "5432")
-	dbUser := getEnvOrDefault("DB_USER", "myuser")
-	dbPassword := getEnvOrDefault("DB_PASSWORD", "mypassword")
-	dbName := getEnvOrDefault("DB_NAME", "mydb")
-
-	connStr := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		dbUser, dbPassword, dbHost, dbPort, dbName,
-	)
-
-	db, err := sql.Open("postgres", connStr)
+	// DB setup uses the same settings as database tooling.
+	db, err := database.Open(context.Background())
 	if err != nil {
-		log.Fatal("failed to connect to DB:", err)
+		log.Fatal("failed to connect to DB: ", err)
 	}
+	defer db.Close()
 
 	// MinIO setup
 	minioHost := getEnvOrDefault("MINIO_HOST", "localhost")

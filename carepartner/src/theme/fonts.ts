@@ -4,6 +4,7 @@ import {
   AtkinsonHyperlegibleNext_800ExtraBold,
   useFonts,
 } from "@expo-google-fonts/atkinson-hyperlegible-next";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 /**
  * Font family names for styles. On Android a custom font's weight comes from
@@ -23,7 +24,7 @@ export const fontFiles = {
   [fonts.heavy]: AtkinsonHyperlegibleNext_800ExtraBold,
 };
 
-/** Loads the app's fonts. Returns [loaded, error], as expo-font's useFonts does. */
+/** Loads the app's fonts, and the widget icons' font so icons never draw blank. Returns [loaded, error], as expo-font's useFonts does. */
 export function useAppFonts() {
-  return useFonts(fontFiles);
+  return useFonts({ ...fontFiles, ...MaterialCommunityIcons.font });
 }
