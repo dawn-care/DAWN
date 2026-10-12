@@ -15,6 +15,7 @@ import (
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
+	scheduledItemsCtrlr "server/internal/controllers/scheduled_items"
 	screenSettingsCtrlr "server/internal/controllers/screen_settings"
 	screenWidgetsCtrlr "server/internal/controllers/screen_widgets"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
@@ -27,6 +28,7 @@ import (
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
+	scheduledItemsRts "server/internal/routes/scheduled_items"
 	screenSettingsRts "server/internal/routes/screen_settings"
 	screenWidgetsRts "server/internal/routes/screen_widgets"
 	caregiverRts "server/internal/routes/user"
@@ -40,6 +42,7 @@ import (
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
+	scheduledItemsSvc "server/internal/services/scheduled_items"
 	screenSettingsSvc "server/internal/services/screen_settings"
 	screenWidgetsSvc "server/internal/services/screen_widgets"
 	caregiverSvc "server/internal/services/user/caregiver"
@@ -155,6 +158,7 @@ func main() {
 	// Screen
 	screenSettingsService := screenSettingsSvc.NewScreenSettingsService(db)
 	screenWidgetsService := screenWidgetsSvc.NewScreenWidgetService(db)
+	scheduledItemsService := scheduledItemsSvc.NewScheduledItemService(db)
 
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
@@ -192,6 +196,7 @@ func main() {
 	// Screen
 	screenSettingsCtrl := screenSettingsCtrlr.NewScreenSettingsController(screenSettingsService)
 	screenWidgetsCtrl := screenWidgetsCtrlr.NewScreenWidgetController(screenWidgetsService)
+	scheduledItemsCtrl := scheduledItemsCtrlr.NewScheduledItemController(scheduledItemsService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -247,6 +252,7 @@ func main() {
 	// Screen
 	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)
 	screenWidgetsRts.RegisterScreenWidgetRoutes(r, screenWidgetsCtrl)
+	scheduledItemsRts.RegisterScheduledItemRoutes(r, scheduledItemsCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
