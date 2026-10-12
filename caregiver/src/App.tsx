@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Calendar from "./pages/Calendar";
 import Media from "./pages/Media";
+import Family from "./pages/Family";
 import Preview from "./pages/Preview";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
@@ -24,6 +25,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/media" element={<Media />} />
+        {/* Future implementation: reachable by URL only, not linked in the nav bar */}
+        <Route path="/family" element={<Family />} />
       </Route>
 
       {/* Full screen, no nav bar. Future implementation: the button that opens it is added in a later ticket */}
