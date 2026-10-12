@@ -76,7 +76,7 @@ func TestCreateWidget_Photo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 9, w.ID)
-	assert.Equal(t, "/api/media/4/file", *w.PhotoURL)
+	assert.Equal(t, "/media/4/file", *w.PhotoURL)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -247,7 +247,7 @@ func TestListWidgets_OrderAndHidden(t *testing.T) {
 	}
 	assert.Equal(t, []int{1, 5, 4, 2, 3, 6}, ids, "photo frame, tiles 0 and 1, plate, then hidden")
 	assert.Equal(t, []bool{false, false, false, false, true, true}, hidden)
-	assert.Equal(t, "/api/media/4/file", *widgets[0].PhotoURL)
+	assert.Equal(t, "/media/4/file", *widgets[0].PhotoURL)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

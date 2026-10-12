@@ -34,7 +34,7 @@ type ScheduledItemServiceInterface interface {
 	CreateItem(in svc.ItemInput) (*model.ScheduledItem, error)
 	GetItem(id int) (*model.ScheduledItem, error)
 	ListItems(carepartnerID int) ([]model.ScheduledItem, error)
-	Calendar(carepartnerID int, from, to string) ([]svc.Occurrence, error)
+	Calendar(carepartnerID int, from, to string) ([]model.Occurrence, error)
 	UpdateItem(id int, in svc.ItemInput) (*model.ScheduledItem, error)
 	DeleteItem(id int, scope, date string) error
 }

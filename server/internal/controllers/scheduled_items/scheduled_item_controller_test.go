@@ -20,7 +20,7 @@ import (
 type mockItemService struct {
 	item        *model.ScheduledItem
 	items       []model.ScheduledItem
-	occurrences []svc.Occurrence
+	occurrences []model.Occurrence
 	err         error
 	input       *svc.ItemInput
 	gotID       int
@@ -40,7 +40,7 @@ func (m *mockItemService) ListItems(carepartnerID int) ([]model.ScheduledItem, e
 	m.gotID = carepartnerID
 	return m.items, m.err
 }
-func (m *mockItemService) Calendar(carepartnerID int, from, to string) ([]svc.Occurrence, error) {
+func (m *mockItemService) Calendar(carepartnerID int, from, to string) ([]model.Occurrence, error) {
 	m.gotID, m.from, m.to = carepartnerID, from, to
 	return m.occurrences, m.err
 }
@@ -161,7 +161,7 @@ func TestDeleteItemHandler(t *testing.T) {
 }
 
 func TestCalendarHandler(t *testing.T) {
-	m := &mockItemService{occurrences: []svc.Occurrence{{ScheduledItemID: 5, Date: "2026-10-12", Time: "10:00"}}}
+	m := &mockItemService{occurrences: []model.Occurrence{{ScheduledItemID: 5, Date: "2026-10-12", Time: "10:00"}}}
 	w := httptest.NewRecorder()
 	NewScheduledItemController(m).CalendarHandler(w, httptest.NewRequest(http.MethodGet, "/api/calendar?carepartner_id=1&from=2026-10-12&to=2026-10-18", nil))
 

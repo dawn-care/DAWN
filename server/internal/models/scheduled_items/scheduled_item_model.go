@@ -63,6 +63,20 @@ type ScheduledItem struct {
 	OutsideAwakeHours bool      `json:"outside_awake_hours"`
 }
 
+// Occurrence is one dated showing of a scheduled item, as the calendar lists it
+type Occurrence struct {
+	ScheduledItemID   int       `json:"scheduled_item_id"`
+	Date              string    `json:"date"`
+	Time              string    `json:"time"`
+	Repeat            string    `json:"repeat"`
+	Shape             string    `json:"shape"`
+	Media             MediaRef  `json:"media"`
+	BackgroundPhoto   *PhotoRef `json:"background_photo"`
+	DisplaySeconds    *int      `json:"display_seconds"`
+	DurationSeconds   int       `json:"duration_seconds"` // how long it stays on screen
+	OutsideAwakeHours bool      `json:"outside_awake_hours"`
+}
+
 // DurationSeconds is how long the item stays on screen: the media's length, or a photo's display time
 func (s *ScheduledItem) DurationSeconds() int {
 	if s.DisplaySeconds != nil {

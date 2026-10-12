@@ -16,6 +16,7 @@ import (
 	modulesCtrlr "server/internal/controllers/modules"
 	promptsCtrlr "server/internal/controllers/prompts"
 	scheduledItemsCtrlr "server/internal/controllers/scheduled_items"
+	screenCtrlr "server/internal/controllers/screen"
 	screenSettingsCtrlr "server/internal/controllers/screen_settings"
 	screenWidgetsCtrlr "server/internal/controllers/screen_widgets"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
@@ -29,6 +30,7 @@ import (
 	modulesRts "server/internal/routes/modules"
 	promptsRts "server/internal/routes/prompts"
 	scheduledItemsRts "server/internal/routes/scheduled_items"
+	screenRts "server/internal/routes/screen"
 	screenSettingsRts "server/internal/routes/screen_settings"
 	screenWidgetsRts "server/internal/routes/screen_widgets"
 	caregiverRts "server/internal/routes/user"
@@ -43,6 +45,7 @@ import (
 	modulesSvc "server/internal/services/modules"
 	promptsSvc "server/internal/services/prompts"
 	scheduledItemsSvc "server/internal/services/scheduled_items"
+	screenSvc "server/internal/services/screen"
 	screenSettingsSvc "server/internal/services/screen_settings"
 	screenWidgetsSvc "server/internal/services/screen_widgets"
 	caregiverSvc "server/internal/services/user/caregiver"
@@ -173,6 +176,9 @@ func main() {
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
 	weatherService := weatherSvc.NewWeatherService(db, openWeatherKey)
 
+	// Screen (the tablet's view; uses the widget and schedule services above)
+	screenService := screenSvc.NewScreenService(db, weatherService, sportsService, newsService, scheduledItemsService)
+
 	// Prompts
 	messageService := promptsSvc.NewMessageService(db)
 	eventsService := promptsSvc.NewEventService(db)
@@ -197,6 +203,7 @@ func main() {
 	screenSettingsCtrl := screenSettingsCtrlr.NewScreenSettingsController(screenSettingsService)
 	screenWidgetsCtrl := screenWidgetsCtrlr.NewScreenWidgetController(screenWidgetsService)
 	scheduledItemsCtrl := scheduledItemsCtrlr.NewScheduledItemController(scheduledItemsService)
+	screenCtrl := screenCtrlr.NewScreenController(screenService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -253,6 +260,7 @@ func main() {
 	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)
 	screenWidgetsRts.RegisterScreenWidgetRoutes(r, screenWidgetsCtrl)
 	scheduledItemsRts.RegisterScheduledItemRoutes(r, scheduledItemsCtrl)
+	screenRts.RegisterScreenRoutes(r, screenCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)

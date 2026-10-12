@@ -89,7 +89,7 @@ func TestCreateItem_AudioWithBackground(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "audio_with_background", item.Shape)
-	assert.Equal(t, "/api/media/4/file", item.BackgroundPhoto.URL)
+	assert.Equal(t, "/media/4/file", item.BackgroundPhoto.URL)
 	assert.Equal(t, 214, *item.Media.DurationSeconds)
 	assert.Equal(t, []string{}, item.SkipDates)
 	assert.False(t, item.OutsideAwakeHours)

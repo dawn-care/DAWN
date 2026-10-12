@@ -104,7 +104,7 @@ func TestUpload_Photo(t *testing.T) {
 	assert.Equal(t, "Beach", m.DisplayName)
 	assert.Nil(t, m.DurationSeconds)
 	assert.Equal(t, []string{}, m.Usage)
-	assert.Equal(t, "/api/media/7/file", m.URL)
+	assert.Equal(t, "/media/7/file", m.URL)
 	assert.Equal(t, 0, *probes, "photos are not probed")
 	assert.Regexp(t, `^carepartners/1/photo/[0-9a-f-]{36}\.png$`, store.putKey)
 	assert.Equal(t, store.putKey, m.ObjectKey)
@@ -208,7 +208,7 @@ func TestListMedia_Usage(t *testing.T) {
 	assert.Equal(t, []string{"scheduled"}, items[1].Usage)
 	assert.Equal(t, 214, *items[1].DurationSeconds)
 	assert.Equal(t, []string{}, items[2].Usage, "saved items have an empty usage list")
-	assert.Equal(t, "/api/media/3/file", items[2].URL)
+	assert.Equal(t, "/media/3/file", items[2].URL)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

@@ -87,9 +87,11 @@ func scanMedia(row scanner) (*Media, error) {
 	return m, nil
 }
 
-// FileURL is the API path that serves a media item's file
+// FileURL is the path that serves a media item's file, relative to the API base URL
+// (e.g. "/media/4/file" under "http://localhost:8080/api"), so clients can join it
+// to the base they already use
 func FileURL(id int) string {
-	return fmt.Sprintf("/api/media/%d/file", id)
+	return fmt.Sprintf("/media/%d/file", id)
 }
 
 // ─────────────────────────────────────────────

@@ -64,20 +64,6 @@ type ItemInput struct {
 	EndDate           *string `json:"end_date"`
 }
 
-// Occurrence is one dated showing of a scheduled item, as the calendar lists it
-type Occurrence struct {
-	ScheduledItemID   int             `json:"scheduled_item_id"`
-	Date              string          `json:"date"`
-	Time              string          `json:"time"`
-	Repeat            string          `json:"repeat"`
-	Shape             string          `json:"shape"`
-	Media             model.MediaRef  `json:"media"`
-	BackgroundPhoto   *model.PhotoRef `json:"background_photo"`
-	DisplaySeconds    *int            `json:"display_seconds"`
-	DurationSeconds   int             `json:"duration_seconds"` // how long it stays on screen
-	OutsideAwakeHours bool            `json:"outside_awake_hours"`
-}
-
 func wrap(base error, format string, args ...any) error {
 	return fmt.Errorf("%w: %s", base, fmt.Sprintf(format, args...))
 }
@@ -289,7 +275,7 @@ Calendar expands a carepartner's items into dated occurrences from from to to (i
 "YYYY-MM-DD"), leaving out skipped days. outside_awake_hours is computed against the
 current awake hours, so changing them never requires editing stored items.
 */
-func (s *ScheduledItemService) Calendar(carepartnerID int, from, to string) ([]Occurrence, error) {
+func (s *ScheduledItemService) Calendar(carepartnerID int, from, to string) ([]model.Occurrence, error) {
 	if carepartnerID <= 0 {
 		return nil, ErrInvalidCarepartner
 	}
@@ -307,7 +293,7 @@ func (s *ScheduledItemService) Calendar(carepartnerID int, from, to string) ([]O
 		return nil, fmt.Errorf("failed to list scheduled items: %w", err)
 	}
 
-	occurrences := []Occurrence{}
+	occurrences := []model.Occurrence{}
 	for _, item := range items {
 		start, err := parseDate(item.StartDate)
 		if err != nil {
@@ -324,7 +310,7 @@ func (s *ScheduledItemService) Calendar(carepartnerID int, from, to string) ([]O
 		duration := item.DurationSeconds()
 		outside := outsideAwakeHours(item.StartTime, duration, wake, bed)
 		for _, date := range OccurrenceDates(start, item.Repeat, end, item.SkipDates, fromDate, toDate) {
-			occurrences = append(occurrences, Occurrence{
+			occurrences = append(occurrences, model.Occurrence{
 				ScheduledItemID:   item.ID,
 				Date:              date,
 				Time:              item.StartTime,
