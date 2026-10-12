@@ -13,6 +13,7 @@ import (
 	exceptionCtrlr "server/internal/controllers/exceptions"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
+	playbackCtrlr "server/internal/controllers/playback"
 	promptsCtrlr "server/internal/controllers/prompts"
 	scheduledItemsCtrlr "server/internal/controllers/scheduled_items"
 	screenCtrlr "server/internal/controllers/screen"
@@ -27,6 +28,7 @@ import (
 	exceptionRts "server/internal/routes/exceptions"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
+	playbackRts "server/internal/routes/playback"
 	promptsRts "server/internal/routes/prompts"
 	scheduledItemsRts "server/internal/routes/scheduled_items"
 	screenRts "server/internal/routes/screen"
@@ -42,6 +44,7 @@ import (
 	exceptionSvc "server/internal/services/exceptions"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
+	playbackSvc "server/internal/services/playback"
 	promptsSvc "server/internal/services/prompts"
 	scheduledItemsSvc "server/internal/services/scheduled_items"
 	screenSvc "server/internal/services/screen"
@@ -146,6 +149,7 @@ func main() {
 	modulesService := modulesSvc.NewModuleService(db)
 	configurationService := configurationSvc.NewConfigurationService(db)
 	exceptionService := exceptionSvc.NewExceptionService(db)
+	playbackService := playbackSvc.NewPlaybackService(db)
 
 	// Screen
 	screenSettingsService := screenSettingsSvc.NewScreenSettingsService(db)
@@ -187,6 +191,7 @@ func main() {
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
+	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService)
 
 	// Screen
 	screenSettingsCtrl := screenSettingsCtrlr.NewScreenSettingsController(screenSettingsService)
@@ -244,6 +249,7 @@ func main() {
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
+	playbackRts.RegisterPlaybackRoutes(r, playbackCtrl)
 
 	// Screen
 	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)
