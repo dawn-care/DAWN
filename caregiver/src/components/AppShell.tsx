@@ -9,14 +9,19 @@
 
 import { Outlet } from "react-router-dom";
 import NavBar from "./NavBar";
+import { ToastProvider, ToastViewport } from "./ui/Toast";
 
 export default function AppShell() {
   return (
-    <div className="flex min-h-screen bg-dawn-page text-dawn-ink font-dawn">
-      <NavBar />
-      <main className="grow min-w-0">
-        <Outlet />
-      </main>
-    </div>
+    <ToastProvider>
+      <div className="flex min-h-screen bg-dawn-page text-dawn-ink font-dawn">
+        <NavBar />
+        <main className="grow min-w-0">
+          {/* Toasts show top center of the page content, beside the nav bar */}
+          <ToastViewport />
+          <Outlet />
+        </main>
+      </div>
+    </ToastProvider>
   );
 }

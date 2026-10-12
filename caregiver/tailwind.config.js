@@ -17,7 +17,8 @@ export default {
           "avatar-ink": "#6B5E4E",
           accent: "#9A3412",
           "accent-hover": "#7C2D12",
-          success: "#3F6B3A",
+          // Brighter than the mockup's #3F6B3A, which read as near-black; 5.3:1 on dawn-page
+          success: "#25772B",
           control: "#8A7F70",
         },
       },
@@ -26,6 +27,8 @@ export default {
       },
       boxShadow: {
         toast: "0 8px 24px rgba(30, 26, 21, 0.3)",
+        popover: "0 8px 24px rgba(30, 26, 21, 0.18)",
+        dialog: "0 12px 32px rgba(30, 26, 21, 0.25)",
       },
     },
   },
