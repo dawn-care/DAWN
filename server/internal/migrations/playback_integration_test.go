@@ -33,6 +33,7 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 			require.NoError(t, err)
 			defer db.Close()
 			var before map[string]string
+			var carepartnersBefore string
 			if legacy {
 				initial, err := files.ReadFile("sql/00001_initial_schema.sql")
 				require.NoError(t, err)
@@ -41,24 +42,40 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 				_, err = db.Exec(`INSERT INTO "Caregiver" (name) VALUES ('Existing user')`)
 				require.NoError(t, err)
 				before = snapshot(t, db, schema)
+				carepartnersBefore = carepartnerCore(t, db)
 				require.NoError(t, Baseline(ctx, db))
 			}
 			require.NoError(t, Up(ctx, db))
 			require.NoError(t, Up(ctx, db), "repeating migrations must be safe")
 			if legacy {
+				// Migration 3 drops the old content tables and reshapes Carepartner, so compare
+				// the tables it keeps as they are, and carepartners by identity, name and caregiver.
 				after := snapshot(t, db, schema)
-				delete(after, "Playback")
-				delete(after, "Playback_id_seq")
-				require.Equal(t, before, after, "existing rows and sequences must be preserved")
+				for _, kept := range []string{"Caregiver", "Caregiver_id_seq", "Carepartner_id_seq",
+					"Session", "Session_id_seq", "DevicePairing", "DevicePairing_id_seq"} {
+					require.Equal(t, before[kept], after[kept], "existing %s must be preserved", kept)
+				}
+				require.Equal(t, carepartnersBefore, carepartnerCore(t, db), "existing carepartners must be preserved")
 			}
 			var applied int
 			require.NoError(t, db.QueryRow(`SELECT count(*) FROM goose_db_version WHERE version_id = 2 AND is_applied`).Scan(&applied))
 			require.Equal(t, 1, applied)
-			var cp, module int
-			require.NoError(t, db.QueryRow(`SELECT carepartner_id, id FROM "Module" ORDER BY id LIMIT 1`).Scan(&cp, &module))
+			var cp, media, item int
+			require.NoError(t, db.QueryRow(`SELECT id FROM "Carepartner" ORDER BY id LIMIT 1`).Scan(&cp))
+			require.NoError(t, db.QueryRow(`INSERT INTO "Media" (carepartner_id, kind, display_name, object_key, mime_type, size_bytes, duration_seconds)
+				VALUES ($1, 'video', 'Clip', 'playback-test', 'video/mp4', 1, 60) RETURNING id`, cp).Scan(&media))
+			require.NoError(t, db.QueryRow(`INSERT INTO "ScheduledItem" (carepartner_id, media_id, start_date, start_time, repeat)
+				VALUES ($1, $2, CURRENT_DATE, '10:00', 'daily') RETURNING id`, cp, media).Scan(&item))
 			svc := playback.NewPlaybackService(db)
-			p, err := svc.CreatePlayback(ctx, cp, module, "tap", time.Now().Add(time.Hour))
+			scheduled, err := svc.CreatePlayback(ctx, cp, media, &item, "scheduled", time.Now().Add(time.Hour))
 			require.NoError(t, err)
+			require.Equal(t, item, *scheduled.ScheduledItemID)
+			_, err = svc.CreatePlayback(ctx, cp+1000, media, nil, "tap", time.Now().Add(time.Hour))
+			require.ErrorIs(t, err, playback.ErrInvalidInput, "media of another carepartner")
+			p, err := svc.CreatePlayback(ctx, cp, media, nil, "tap", time.Now().Add(time.Hour))
+			require.NoError(t, err)
+			require.Equal(t, media, p.MediaID)
+			require.Nil(t, p.ScheduledItemID)
 			require.Nil(t, p.Rating)
 			for _, status := range []string{"acknowledged", "started", "finished"} {
 				p, err = svc.UpdateStatus(ctx, p.ID, cp, status)
@@ -81,7 +98,7 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 				`UPDATE "Playback" SET source = 'notes'`,
 				`UPDATE "Playback" SET status = 'unknown'`,
 				`UPDATE "Playback" SET carepartner_id = -1`,
-				`UPDATE "Playback" SET module_id = -1`,
+				`UPDATE "Playback" SET media_id = -1`,
 				`UPDATE "Playback" SET expires_at = NULL`,
 			} {
 				_, err := db.Exec(query)
@@ -89,4 +106,13 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// carepartnerCore lists carepartners by the fields every migration keeps
+func carepartnerCore(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	var core string
+	require.NoError(t, db.QueryRow(`SELECT COALESCE(jsonb_agg(jsonb_build_array(id, name, NULLIF(caregiver_id, 0)) ORDER BY id), '[]')::text
+		FROM "Carepartner"`).Scan(&core))
+	return core
 }

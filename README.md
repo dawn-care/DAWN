@@ -240,7 +240,7 @@ docker compose exec server ./migrate
 
 Migrations run only when this command is invoked. SQL files are embedded in the
 executable. Add the next numbered file under `server/internal/migrations/sql/`
-(for example `00004_add_album_covers.sql`) with `-- +goose Up` and the forward
+(for example `00005_add_album_covers.sql`) with `-- +goose Up` and the forward
 SQL. Use Goose's `StatementBegin` / `StatementEnd` around procedure bodies.
 Do not edit already-applied migrations. The initial migration retains demo data;
 no rollback command is provided.

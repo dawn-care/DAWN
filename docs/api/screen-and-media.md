@@ -15,10 +15,11 @@ How the caregiver web app and the carepartner tablet talk to the new backend: th
 7. [Scheduled items](#scheduled-items)
 8. [Calendar](#calendar)
 9. [The tablet screen](#the-tablet-screen)
-10. [Carepartner changes](#carepartner-changes)
-11. [Error codes](#error-codes)
-12. [Migration checklist](#migration-checklist)
-13. [Where this lives in the server](#where-this-lives-in-the-server)
+10. [Playback](#playback)
+11. [Carepartner changes](#carepartner-changes)
+12. [Error codes](#error-codes)
+13. [Migration checklist](#migration-checklist)
+14. [Where this lives in the server](#where-this-lives-in-the-server)
 
 ## Basics
 
@@ -543,6 +544,63 @@ Poll `/screen` on a timer; there's no push yet. Every 5 minutes, as the tablet d
 - The part of the day ("Afternoon"): work it out on the tablet for now.
 - What the news tile shows long term.
 
+## Playback
+
+The tablet records each attempt to play something, so caregivers can later see what was played and how it went. Added in #346; since i332 a playback points at a **media item** (and, for scheduled plays, the scheduled item) instead of a module.
+
+### `POST /playbacks`
+
+Record that something is about to play. Returns `201` with the `Playback`.
+
+```jsonc
+{
+  "carepartner_id": 1,
+  "media_id": 9,
+  "scheduled_item_id": 7,             // required when source is "scheduled"; leave out otherwise
+  "source": "scheduled",              // scheduled | staff | tap
+  "expires_at": "2026-10-12T15:15:00Z" // RFC 3339; the deadline to start playing
+}
+```
+
+- For a scheduled play, take `media.id` and `scheduled_item_id` from the `/screen` schedule entry. For a tap or a staff-started play, send only `media_id`.
+- The media must belong to the carepartner, and a scheduled item must belong to them and play that media. Otherwise `400`.
+- `module_id` is no longer accepted (`400`). Unknown fields are rejected.
+
+### `PATCH /playbacks/{id}/status`
+
+Report progress: `{"carepartner_id": 1, "status": "started"}`. Statuses move forward only:
+
+| From | Allowed next |
+|---|---|
+| `requested` | `acknowledged`, `stopped`, `failed`, `expired` |
+| `acknowledged` | `started`, `stopped`, `failed`, `expired` |
+| `started` | `finished`, `stopped`, `failed` |
+
+Repeating the current status is harmless. Acknowledging or starting after `expires_at` records `expired` instead. An invalid move returns `409`.
+
+### Errors
+
+These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise. Deleting a media item deletes its playbacks; deleting a scheduled item keeps them and clears `scheduled_item_id`.
+
+```ts
+export type PlaybackSource = "scheduled" | "staff" | "tap";
+export type PlaybackStatus = "requested" | "acknowledged" | "started" | "finished" | "stopped" | "failed" | "expired";
+export interface Playback {
+  id: number;
+  carepartner_id: number;
+  media_id: number;
+  scheduled_item_id: number | null;
+  source: PlaybackSource;
+  status: PlaybackStatus;
+  requested_at: string;          // RFC 3339
+  acknowledged_at: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  expires_at: string;
+  rating: number | null;         // scale not decided yet
+}
+```
+
 ## Carepartner changes
 
 - `auto_start` is gone. The server no longer returns it and ignores it if sent. `wake_time` in screen settings replaces it.
@@ -614,4 +672,5 @@ If this guide and the server ever disagree, the server is right; please update t
 | Sports teams | `server/internal/routes/widgets/news/sports_news.go` | `server/internal/services/widgets/news/sports_teams.go` |
 | Scheduled items and calendar | `server/internal/routes/scheduled_items/` | `server/internal/models/scheduled_items/scheduled_item_model.go` (`ScheduledItem`, `Occurrence`), `server/internal/services/scheduled_items/` (`recurrence.go`, validation) |
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
-| Database | | `server/internal/migrations/sql/` (migration 2 creates these tables) |
+| Playback | `server/internal/routes/playback/playback.go` | `server/internal/models/playback/playback_model.go`, `server/internal/services/playback/playback_service.go` (source and status rules) |
+| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables) |
