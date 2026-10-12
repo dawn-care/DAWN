@@ -14,9 +14,9 @@
  * /family exists as a stub route but is intentionally not linked here yet.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Calendar, Image, Monitor, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -55,14 +55,15 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: ReactNode }[]
 
 /**
  * Builds avatar initials from a name: the first letter of up to
- * the first two words ("Jane Doe" → "JD")
+ * the first two words ("Jane Doe" → "JD"). Array.from keeps
+ * multi-code-unit characters (e.g. emoji) whole.
  */
 function getInitials(name: string): string {
   return name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
+    .map((part) => Array.from(part)[0].toUpperCase())
     .join("");
 }
 
@@ -85,6 +86,11 @@ export default function NavBar() {
   const API_URL = import.meta.env.VITE_API_URL;
 
   const { user, setUser, activeCarePartnerId } = useAuth();
+  const navigate = useNavigate();
+
+  // True once the /me request has settled, so names can show a
+  // placeholder while it is in flight instead of blank text
+  const [meSettled, setMeSettled] = useState(false);
 
   /* ============================
      Effects
@@ -92,7 +98,8 @@ export default function NavBar() {
 
   /**
    * Reload the caregiver after a page refresh, since the auth context
-   * only holds the user until the page reloads
+   * only holds the user until the page reloads. A 401 means the session
+   * has expired, so send the caregiver back to login.
    */
   useEffect(() => {
     if (user) return;
@@ -100,14 +107,20 @@ export default function NavBar() {
     const fetchCaregiver = async () => {
       try {
         const res = await fetch(`${API_URL}/me`, { credentials: "include" });
-        if (res.ok) setUser(await res.json());
+        if (res.ok) {
+          setUser(await res.json());
+        } else if (res.status === 401) {
+          navigate("/login", { replace: true });
+          return;
+        }
       } catch (err) {
         console.error("Error fetching caregiver:", err);
       }
+      setMeSettled(true);
     };
 
     fetchCaregiver();
-  }, [user, setUser, API_URL]);
+  }, [user, setUser, API_URL, navigate]);
 
   /* ============================
      Derived Values
@@ -115,6 +128,7 @@ export default function NavBar() {
 
   const carepartner = user?.carepartners?.find((cp) => cp.id === activeCarePartnerId);
   const carepartnerName = carepartner?.name ?? "";
+  const loading = !user && !meSettled;
 
   /* ============================
      Render
@@ -138,7 +152,11 @@ export default function NavBar() {
           {carepartnerName ? getInitials(carepartnerName) : <User size={24} />}
         </div>
         <div className="flex flex-col min-w-0">
-          <div className="text-[17px] font-bold truncate">{carepartnerName}</div>
+          {loading ? (
+            <div className="h-[22px] w-28 rounded bg-dawn-line animate-pulse" />
+          ) : (
+            <div className="text-[17px] font-bold truncate">{carepartnerName}</div>
+          )}
           <div className="text-base text-dawn-muted">{FACILITY}</div>
         </div>
       </div>
@@ -169,7 +187,11 @@ export default function NavBar() {
         className="flex items-center gap-2.5 h-12 px-2.5 rounded-[10px] text-base hover:bg-white/60"
       >
         <User size={22} aria-hidden="true" />
-        <span className="truncate">{user?.name}</span>
+        {loading ? (
+          <span className="h-5 w-24 rounded bg-dawn-line animate-pulse" />
+        ) : (
+          <span className="truncate">{user?.name}</span>
+        )}
       </Link>
     </nav>
   );
