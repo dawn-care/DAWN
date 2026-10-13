@@ -22,15 +22,19 @@ import (
 // mockService implements PlaybackServiceInterface.
 type mockService struct {
 	requestStaffPlay func(ctx context.Context, carepartnerID, moduleID int) (*model.Playback, error)
-	updateStatus     func(ctx context.Context, id, carepartnerID int, status string) (*model.Playback, error)
+	requestStop      func(ctx context.Context, id, carepartnerID int) (*model.Playback, service.StopOutcome, error)
 }
 
 func (m *mockService) CreatePlayback(context.Context, int, int, string, time.Time) (*model.Playback, error) {
 	panic("not used by command endpoints")
 }
 
-func (m *mockService) UpdateStatus(ctx context.Context, id, carepartnerID int, status string) (*model.Playback, error) {
-	return m.updateStatus(ctx, id, carepartnerID, status)
+func (m *mockService) UpdateStatus(context.Context, int, int, string) (*model.Playback, error) {
+	panic("not used by command endpoints")
+}
+
+func (m *mockService) RequestStop(ctx context.Context, id, carepartnerID int) (*model.Playback, service.StopOutcome, error) {
+	return m.requestStop(ctx, id, carepartnerID)
 }
 
 func (m *mockService) RequestStaffPlay(ctx context.Context, carepartnerID, moduleID int) (*model.Playback, error) {
@@ -135,25 +139,63 @@ func TestPlayRejectsClientChosenFields(t *testing.T) {
 	require.Empty(t, notifier.sent)
 }
 
-func TestStopPushesStopToTablet(t *testing.T) {
-	svc := &mockService{updateStatus: func(_ context.Context, id, cp int, status string) (*model.Playback, error) {
+// stopWith builds a service whose RequestStop returns the given playback status
+// and outcome, checking it was asked about playback 9 for carepartner 2.
+func stopWith(t *testing.T, status string, outcome service.StopOutcome) *mockService {
+	return &mockService{requestStop: func(_ context.Context, id, cp int) (*model.Playback, service.StopOutcome, error) {
 		require.Equal(t, 9, id)
 		require.Equal(t, 2, cp)
-		require.Equal(t, "stopped", status)
-		return &model.Playback{ID: id, CarepartnerID: cp, Status: "stopped"}, nil
+		return &model.Playback{ID: id, CarepartnerID: cp, Status: status}, outcome, nil
 	}}
-	notifier := &recordingNotifier{online: true}
+}
 
-	rec := post(commandRouter(svc, notifier), "/api/playbacks/9/stop", `{"carepartner_id":2}`)
+var stopMessage = sentMessage{2, realtime.Message{Type: realtime.TypeStop, PlaybackID: 9}}
+
+func TestStopCancelsCommandTabletHasNotAccepted(t *testing.T) {
+	notifier := &recordingNotifier{online: true}
+	rec := post(commandRouter(stopWith(t, "stopped", service.StopCancelled), notifier), "/api/playbacks/9/stop", `{"carepartner_id":2}`)
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	require.True(t, decode(t, rec).Delivered)
-	require.Equal(t, []sentMessage{{2, realtime.Message{Type: realtime.TypeStop, PlaybackID: 9}}}, notifier.sent)
+	resp := decode(t, rec)
+	require.Equal(t, "stopped", resp.Playback.Status)
+	require.True(t, resp.Delivered)
+	// Sent anyway, in case the command reached the tablet before its acknowledgement did.
+	require.Equal(t, []sentMessage{stopMessage}, notifier.sent)
+}
+
+func TestStopOfPlayingClipWaitsForTablet(t *testing.T) {
+	notifier := &recordingNotifier{online: true}
+	rec := post(commandRouter(stopWith(t, "started", service.StopForwarded), notifier), "/api/playbacks/9/stop", `{"carepartner_id":2}`)
+
+	// Accepted, not done: the record stays "started" until the tablet reports "stopped".
+	require.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
+	resp := decode(t, rec)
+	require.Equal(t, "started", resp.Playback.Status)
+	require.True(t, resp.Delivered)
+	require.Equal(t, []sentMessage{stopMessage}, notifier.sent)
+}
+
+func TestStopOfPlayingClipOnDisconnectedTabletChangesNothing(t *testing.T) {
+	notifier := &recordingNotifier{online: false}
+	rec := post(commandRouter(stopWith(t, "started", service.StopForwarded), notifier), "/api/playbacks/9/stop", `{"carepartner_id":2}`)
+
+	// The clip may still be playing, so the record must not say stopped.
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.JSONEq(t, `{"error":"tablet is not connected"}`, rec.Body.String())
+}
+
+func TestRepeatedStopSendsNothing(t *testing.T) {
+	notifier := &recordingNotifier{online: true}
+	rec := post(commandRouter(stopWith(t, "stopped", service.StopAlreadyStopped), notifier), "/api/playbacks/9/stop", `{"carepartner_id":2}`)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.False(t, decode(t, rec).Delivered)
+	require.Empty(t, notifier.sent)
 }
 
 func TestStopOfFinishedPlaybackSendsNothing(t *testing.T) {
-	svc := &mockService{updateStatus: func(context.Context, int, int, string) (*model.Playback, error) {
-		return nil, service.ErrInvalidTransition
+	svc := &mockService{requestStop: func(context.Context, int, int) (*model.Playback, service.StopOutcome, error) {
+		return nil, 0, service.ErrInvalidTransition
 	}}
 	notifier := &recordingNotifier{online: true}
 

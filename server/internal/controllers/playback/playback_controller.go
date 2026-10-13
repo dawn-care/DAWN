@@ -20,6 +20,7 @@ type PlaybackServiceInterface interface {
 	CreatePlayback(context.Context, int, int, string, time.Time) (*playback.Playback, error)
 	UpdateStatus(context.Context, int, int, string) (*playback.Playback, error)
 	RequestStaffPlay(context.Context, int, int) (*playback.Playback, error)
+	RequestStop(context.Context, int, int) (*playback.Playback, playbackSvc.StopOutcome, error)
 }
 
 // Notifier pushes a message to a carepartner's tablet, reporting whether it was

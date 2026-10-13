@@ -101,3 +101,64 @@ func (s *PlaybackService) RunExpirySweep(ctx context.Context, interval time.Dura
 		}
 	}
 }
+
+// StopOutcome says what a stop request did, so the caller knows whether the
+// playback is already settled or the tablet still has to act.
+type StopOutcome int
+
+const (
+	// StopCancelled: the tablet had not accepted the command yet, so nothing was
+	// playing. It is recorded as stopped now and will not be resent.
+	StopCancelled StopOutcome = iota
+	// StopForwarded: the tablet has accepted the command and may be playing. The
+	// record is left as it is; the tablet must stop and report "stopped" itself,
+	// so the record never says stopped while a clip is still playing.
+	StopForwarded
+	// StopAlreadyStopped: a repeated stop for a playback already stopped.
+	StopAlreadyStopped
+)
+
+// RequestStop handles a staff member stopping a playback. Only a command the
+// tablet has not yet accepted is recorded as stopped here; anything the tablet
+// may be playing waits for the tablet to confirm.
+func (s *PlaybackService) RequestStop(ctx context.Context, id, carepartnerID int) (*playback.Playback, StopOutcome, error) {
+	if id <= 0 || carepartnerID <= 0 {
+		return nil, 0, fmt.Errorf("%w: positive IDs are required", ErrInvalidInput)
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
+	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
+		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, ErrNotFound
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+
+	switch p.Status {
+	case playback.StatusRequested:
+		now := time.Now().UTC()
+		if _, err := tx.ExecContext(ctx, `UPDATE "Playback" SET status = $1, ended_at = $2
+			WHERE id = $3 AND carepartner_id = $4`,
+			playback.StatusStopped, now, id, carepartnerID); err != nil {
+			return nil, 0, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, 0, err
+		}
+		p.Status, p.EndedAt = playback.StatusStopped, &now
+		return p, StopCancelled, nil
+	case playback.StatusAcknowledged, playback.StatusStarted:
+		return p, StopForwarded, nil
+	case playback.StatusStopped:
+		return p, StopAlreadyStopped, nil
+	default:
+		// finished, failed or expired: there is nothing left to stop.
+		return nil, 0, ErrInvalidTransition
+	}
+}

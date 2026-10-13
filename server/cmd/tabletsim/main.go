@@ -136,13 +136,21 @@ func (t *tablet) play(msg realtime.Message) {
 	}()
 }
 
+// stop ends a playback and reports "stopped". The server records a stop only
+// once the tablet reports it, so the record never says stopped while a clip is
+// still playing.
 func (t *tablet) stop(playbackID int) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.playing == playbackID && t.cancel != nil {
+	wasPlaying := t.playing == playbackID && t.cancel != nil
+	if wasPlaying {
 		t.cancel()
 		t.playing = 0
+	}
+	t.mu.Unlock()
+
+	if wasPlaying {
 		log.Printf("   ■ stopped, back to the idle screen")
+		t.report(playbackID, "stopped")
 	}
 }
 

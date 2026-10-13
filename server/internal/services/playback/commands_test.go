@@ -2,6 +2,7 @@ package playback
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"testing"
@@ -122,4 +123,80 @@ func TestRunExpirySweepStopsWithContext(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("RunExpirySweep did not return after its context was cancelled")
 	}
+}
+
+func TestRequestStop(t *testing.T) {
+	for _, test := range []struct {
+		from       string
+		outcome    StopOutcome
+		wantStatus string
+		err        error
+	}{
+		// Not accepted by the tablet yet, so nothing is playing: cancel it now.
+		{from: "requested", outcome: StopCancelled, wantStatus: "stopped"},
+		// The tablet may be playing: leave the record for the tablet to update.
+		{from: "acknowledged", outcome: StopForwarded, wantStatus: "acknowledged"},
+		{from: "started", outcome: StopForwarded, wantStatus: "started"},
+		{from: "stopped", outcome: StopAlreadyStopped, wantStatus: "stopped"},
+		{from: "finished", err: ErrInvalidTransition},
+		{from: "failed", err: ErrInvalidTransition},
+		{from: "expired", err: ErrInvalidTransition},
+	} {
+		t.Run(test.from, func(t *testing.T) {
+			s, mock := setup(t)
+			mock.ExpectBegin()
+			mock.ExpectQuery(`SELECT .* FROM "Playback" WHERE id = \$1 AND carepartner_id = \$2 FOR UPDATE`).
+				WithArgs(1, 2).WillReturnRows(playbackRows(test.from, time.Now().Add(time.Minute)))
+			if test.outcome == StopCancelled && test.err == nil {
+				mock.ExpectExec(`UPDATE "Playback" SET status = \$1, ended_at = \$2`).
+					WithArgs("stopped", sqlmock.AnyArg(), 1, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit()
+			} else {
+				// Nothing is written, so the transaction is only rolled back.
+				mock.ExpectRollback()
+			}
+
+			p, outcome, err := s.RequestStop(context.Background(), 1, 2)
+			if test.err != nil {
+				require.ErrorIs(t, err, test.err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, test.outcome, outcome)
+			require.Equal(t, test.wantStatus, p.Status)
+			if test.outcome == StopCancelled {
+				require.NotNil(t, p.EndedAt)
+			}
+		})
+	}
+}
+
+func TestRequestStopErrors(t *testing.T) {
+	t.Run("invalid IDs are rejected without querying", func(t *testing.T) {
+		s, _ := setup(t)
+		_, _, err := s.RequestStop(context.Background(), 0, 2)
+		require.ErrorIs(t, err, ErrInvalidInput)
+	})
+
+	t.Run("unknown or another carepartner's playback is not found", func(t *testing.T) {
+		s, mock := setup(t)
+		mock.ExpectBegin()
+		mock.ExpectQuery(`SELECT .* FOR UPDATE`).WithArgs(1, 2).WillReturnError(sql.ErrNoRows)
+		mock.ExpectRollback()
+
+		_, _, err := s.RequestStop(context.Background(), 1, 2)
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("a failed write leaves the playback unstopped", func(t *testing.T) {
+		s, mock := setup(t)
+		cause := errors.New("database unavailable")
+		mock.ExpectBegin()
+		mock.ExpectQuery(`SELECT .* FOR UPDATE`).WithArgs(1, 2).WillReturnRows(playbackRows("requested", time.Now().Add(time.Minute)))
+		mock.ExpectExec(`UPDATE "Playback"`).WillReturnError(cause)
+		mock.ExpectRollback()
+
+		_, _, err := s.RequestStop(context.Background(), 1, 2)
+		require.ErrorIs(t, err, cause)
+	})
 }

@@ -6,6 +6,7 @@ import (
 
 	playback "server/internal/models/playback"
 	"server/internal/realtime"
+	playbackSvc "server/internal/services/playback"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -54,13 +55,16 @@ func (c *PlaybackController) PlayHandler(w http.ResponseWriter, r *http.Request)
 
 // StopHandler godoc
 // @Summary Stop a playback on a carepartner's tablet (staff)
-// @Description Marks the playback stopped and tells the tablet to return to its idle screen.
+// @Description A command the tablet has not accepted yet is cancelled and recorded as stopped (200).
+// @Description If the tablet may be playing, the stop is sent to it and the record changes only when the tablet reports "stopped" (202).
+// @Description If that tablet is not connected, nothing changes (409), so the record never says stopped while a clip still plays.
 // @Tags playback
 // @Accept json
 // @Produce json
 // @Param id path int true "Playback ID"
 // @Param stop body StopRequest true "Carepartner the playback belongs to"
 // @Success 200 {object} CommandResponse
+// @Success 202 {object} CommandResponse
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 409 {object} map[string]string
@@ -76,11 +80,28 @@ func (c *PlaybackController) StopHandler(w http.ResponseWriter, r *http.Request)
 	if !decodeRequest(w, r, &req) {
 		return
 	}
-	p, err := c.Service.UpdateStatus(r.Context(), id, req.CarepartnerID, playback.StatusStopped)
+	p, outcome, err := c.Service.RequestStop(r.Context(), id, req.CarepartnerID)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	delivered := c.Notifier.Send(p.CarepartnerID, realtime.Message{Type: realtime.TypeStop, PlaybackID: p.ID})
-	writeJSON(w, http.StatusOK, CommandResponse{Playback: p, Delivered: delivered})
+	stop := realtime.Message{Type: realtime.TypeStop, PlaybackID: p.ID}
+
+	switch outcome {
+	case playbackSvc.StopCancelled:
+		// Nothing was playing. Tell the tablet anyway, in case the command reached
+		// it but its acknowledgement has not arrived yet.
+		delivered := c.Notifier.Send(p.CarepartnerID, stop)
+		writeJSON(w, http.StatusOK, CommandResponse{Playback: p, Delivered: delivered})
+	case playbackSvc.StopForwarded:
+		// The tablet may be playing; only it can stop the clip, and it records
+		// "stopped" by reporting it. If it cannot be reached, change nothing.
+		if !c.Notifier.Send(p.CarepartnerID, stop) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "tablet is not connected"})
+			return
+		}
+		writeJSON(w, http.StatusAccepted, CommandResponse{Playback: p, Delivered: true})
+	default: // StopAlreadyStopped
+		writeJSON(w, http.StatusOK, CommandResponse{Playback: p, Delivered: false})
+	}
 }
