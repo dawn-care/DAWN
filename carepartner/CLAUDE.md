@@ -52,6 +52,7 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 
 - The Android build needs JDK 17 or 21 (set `JAVA_HOME`); the Gradle version in use does not run on JDK 25.
 - For Maestro, build with the emulator closed (`npm run build:emulator`, x86_64 only), then start the emulator and run `npm run e2e:install` and `npm run e2e`. Building and emulating at the same time needs a lot of memory. `android/` is generated and gitignored.
+- Framework-free rules that the caregiver app also needs live in the repo-root `shared/` folder and are imported as `@shared` (see "Shared code" below). `npm test` runs their tests too, because Jest's `roots` include `../shared`.
 - Test files live in a `__tests__/` folder inside each feature folder (`src/pairing/x.ts` → `src/pairing/__tests__/x.test.ts`), never in `app/` (where they would become routes). A test of a route file goes in the matching feature's `__tests__/`. React Native Testing Library is v14, where `render` is async (`await render(...)`).
 - `npm run lint` reports existing warnings in the old `app/screensaver.tsx`; it is due to be replaced (#316), so don't fix them in passing.
 - `npm run reset-project` is left over from the Expo template, and the `scripts/` directory it points to doesn't exist.
@@ -120,7 +121,17 @@ carepartner/
 - Inside a feature, keep logic files (plain functions and hooks, no layout) separate from visual files (take data in and draw it; no fetching, clock reads or timers).
 - Check the shape of server responses once where they enter the app, and drop malformed items there.
 - Read the time through `src/clock` so tests can control it.
+- Rules that the caregiver app must agree on, such as night hours, time of day and the grid's size, belong in `../shared`, not in a feature folder here. They take the time as an argument.
 - `android/` is generated and never edited by hand. Native code, such as kiosk mode, goes in an Expo module with a config plugin.
+
+### Shared code
+
+The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea` and `fitsGrid` (`widgets/grid.ts`). See `shared/README.md`.
+
+- Import from `@shared` only (`import { isNight } from "@shared"`). The path is set in `tsconfig.json`, Metro watches the folder through `metro.config.js`, and Jest maps it through `roots` and `moduleNameMapper` in `package.json`. Names are unchanged from when this code lived in `src/`.
+- Nothing in `shared/` may import React, React Native, Expo or a DOM API. Anything that needs the theme, fonts or screen size stays here: `src/widgets/layout.ts` keeps `cellRect` and builds the tablet's `GRID` from the shared one by adding padding and gap.
+- Tests for shared code live in `shared/<feature>/__tests__/` and run with `npm test` in this folder. `npm run typecheck:shared` at the repo root checks the framework-free rule.
+- An Android build on Windows can fail with "Filename longer than 260 characters" in the native C++ step because of the deep repo path. Build from a shorter path, for example `subst S: <repo root>` and then run Gradle from `S:\carepartnerndroid`.
 
 ### Styling
 
@@ -143,9 +154,9 @@ carepartner/
 - `src/theme/theme.ts` holds the palette, type sizes and spacing from the visual design. Its test enforces the contrast and text-size floors in the design rules.
 - `src/theme/fonts.ts` loads Atkinson Hyperlegible Next (regular, bold, extra bold) and exports `fonts`, the family names to use in styles. On Android a custom font's weight comes from its family name, so set `fontFamily: fonts.bold` and never `fontWeight`. `app/_layout.tsx` keeps the splash screen up until the fonts load, and carries on with the system font if they fail.
 - `src/clock/clock.ts` is the only source of the current time (`now()`). `EXPO_PUBLIC_FAKE_TIME` starts the clock at a given time for manual checks, and tests call `setClock`. Never call `new Date()` for the current time in app code.
-- `src/display/` keeps the screen on while the app runs (`expo-keep-awake`) and dims it at night. Night hours are part of the carepartner's schedule, set by the caregiver and stored on the server; the server doesn't send them yet, so `nightHours.ts` supplies a default (20:00 to 7:00). `useTabletDisplay(nightHours)`, called in `app/_layout.tsx`, sets the app window's brightness low at night and returns it to the system setting by day, on Android only. It sets the window brightness, not the system setting, so the `expo-brightness` config plugin (which only adds the `WRITE_SETTINGS` permission) is deliberately left out of `app.json`.
+- `src/display/` keeps the screen on while the app runs (`expo-keep-awake`) and dims it at night. Night hours are part of the carepartner's schedule, set by the caregiver and stored on the server; the server doesn't send them yet, so `shared/display/nightHours.ts` (imported from `@shared`) supplies a default (20:00 to 7:00). `useTabletDisplay(nightHours)`, called in `app/_layout.tsx`, sets the app window's brightness low at night and returns it to the system setting by day, on Android only. It sets the window brightness, not the system setting, so the `expo-brightness` config plugin (which only adds the `WRITE_SETTINGS` permission) is deliberately left out of `app.json`.
 - The app is locked to landscape in `app.json`. On the target tablet and the emulator it lays out at 1280 x 800 dp, the same size as the visual design.
-- `src/widgets/` is the always-on screen's grid. `Grid` places each widget from its column, row, width and height (`layout.ts`: a 4 x 3 grid with 48 dp padding and 32 dp gaps, sized from the screen) and skips widgets with an unknown renderer or that don't fit. `registry.ts` maps renderer names to components and says which sit in a tile frame (`WidgetFrame`). Renderers so far: `orientation` (day and time of day from the app clock), `photo` (family photo with a name caption, placeholder if missing) and `tile` (icon key, word, optional label; icon keys are ours, mapped in `renderers/icons.ts`). Types are in `types.ts`.
+- `src/widgets/` is the always-on screen's grid. `Grid` places each widget from its column, row, width and height (`layout.ts`: the shared 4 x 3 cell counts from `@shared` plus the tablet's 48 dp padding and 32 dp gaps, sized from the screen; `fitsGrid` and `GridArea` come from `@shared`) and skips widgets with an unknown renderer or that don't fit. `registry.ts` maps renderer names to components and says which sit in a tile frame (`WidgetFrame`). Renderers so far: `orientation` (day and time of day from the app clock, using `timeOfDay`, `dayName` and `dateLabel` from `@shared`), `photo` (family photo with a name caption, placeholder if missing) and `tile` (icon key, word, optional label; icon keys are ours, mapped in `renderers/icons.ts`). Types are in `types.ts`.
 - Text that must fit a fixed width uses `fitFontSize` (`src/widgets/fitText.ts`), which works on web too; React Native's `adjustsFontSizeToFit` is ignored by the web build. Never shrink below the legibility floors in `theme.ts`.
 - `app/preview.tsx` is a temporary route showing the grid on `sampleScreen` (`/preview` on web, `carepartner://preview` on Android). Delete it when the always-on screen becomes the home screen.
 
