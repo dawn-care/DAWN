@@ -163,7 +163,8 @@ func TestExpiryDeadline(t *testing.T) {
 		past           bool
 	}{
 		{"requested", "acknowledged", "expired", true},
-		{"acknowledged", "started", "expired", true},
+		// Acknowledged in time, so a late start is recorded as it happened.
+		{"acknowledged", "started", "started", true},
 		{"started", "finished", "finished", true},
 		{"requested", "expired", "", false},
 	} {
@@ -188,7 +189,12 @@ func TestExpiryDeadline(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, test.want, p.Status)
-			require.NotNil(t, p.EndedAt)
+			if test.want == "started" {
+				require.NotNil(t, p.StartedAt)
+				require.Nil(t, p.EndedAt)
+			} else {
+				require.NotNil(t, p.EndedAt)
+			}
 		})
 	}
 }
