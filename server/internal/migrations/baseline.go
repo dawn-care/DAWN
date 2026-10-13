@@ -34,18 +34,21 @@ func Baseline(ctx context.Context, db *sql.DB) error {
 }
 
 func validateBaseline(ctx context.Context, tx *sql.Tx) error {
-	initial, err := files.ReadFile("sql/00001_initial_schema.sql")
+	raw, err := files.ReadFile("sql/00001_initial_schema.sql")
 	if err != nil {
 		return err
 	}
+	// The migration file is committed with Windows line endings. Normalise them so
+	// the patterns below, which expect "\n", match regardless of how it was saved.
+	initial := strings.ReplaceAll(string(raw), "\r\n", "\n")
 	var schema string
 	if err := tx.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schema); err != nil {
 		return err
 	}
 	// This extracts only the fixed initial migration's CREATE TABLE statements,
 	// never its seed inserts. Temporary reference tables disappear on commit/rollback.
-	tables := regexp.MustCompile(`(?ms)^CREATE TABLE "([^"]+)" \(\n.*?^\);`).FindAllStringSubmatch(string(initial), -1)
-	procedures := regexp.MustCompile(`(?s)CREATE OR REPLACE PROCEDURE (\w+)\((.*?)\)\s*LANGUAGE plpgsql\s*AS \$\$(.*?)\$\$;`).FindAllStringSubmatch(string(initial), -1)
+	tables := regexp.MustCompile(`(?ms)^CREATE TABLE "([^"]+)" \(\n.*?^\);`).FindAllStringSubmatch(initial, -1)
+	procedures := regexp.MustCompile(`(?s)CREATE OR REPLACE PROCEDURE (\w+)\((.*?)\)\s*LANGUAGE plpgsql\s*AS \$\$(.*?)\$\$;`).FindAllStringSubmatch(initial, -1)
 	if len(tables) != 16 || len(procedures) != 2 {
 		return errors.New("cannot validate the initial schema: unexpected SQL format")
 	}
@@ -78,7 +81,9 @@ func validateBaseline(ctx context.Context, tx *sql.Tx) error {
 		}
 		signature := pq.QuoteIdentifier(schema) + "." + procedure[1] + "(" + strings.Join(types, ",") + ")"
 		var matches bool
-		err := tx.QueryRowContext(ctx, `SELECT prosrc = $2 AND proargnames = $3
+		// The stored body keeps whatever line endings it was created with; compare
+		// it normalised, like the file contents above.
+		err := tx.QueryRowContext(ctx, `SELECT replace(prosrc, E'\r\n', E'\n') = $2 AND proargnames = $3
 			AND prokind = 'p' AND NOT prosecdef AND proconfig IS NULL
 			AND prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')
 			FROM pg_proc WHERE oid = to_regprocedure($1)`, signature, procedure[3], pq.Array(names)).Scan(&matches)
