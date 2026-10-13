@@ -60,6 +60,19 @@ export function canPlay(state: PlaybackState, source: PlaySource): boolean {
   return source === "staff";
 }
 
+/**
+ * The next state after `event`, for `useReducer` in `PlaybackProvider`.
+ *
+ * - `pairingChecked`: records whether the tablet is paired. Losing pairing
+ *   also ends any play.
+ * - `nightChanged`: records whether it is night. A play in progress carries
+ *   on; `screenFor` shows the night screen once it ends.
+ * - `play`: starts the item with a new `playId` if `canPlay` allows it, and
+ *   is ignored otherwise.
+ * - `stop`: ends whatever is playing.
+ * - `ended`: ends the play only if `playId` is the one on screen, so a late
+ *   report from an earlier play is ignored.
+ */
 export function playbackReducer(state: PlaybackState, event: PlaybackEvent): PlaybackState {
   switch (event.type) {
     case "pairingChecked": {
