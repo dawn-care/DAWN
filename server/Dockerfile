@@ -3,7 +3,8 @@
 # ===============================
 FROM node:24.6-bookworm AS frontend-builder
 
-WORKDIR /frontend
+# The app sits in /frontend/caregiver so its "../shared" resolves to /frontend/shared.
+WORKDIR /frontend/caregiver
 
 ARG VITE_API_URL
 ARG VITE_GOOGLE_CLIENT_ID
@@ -13,6 +14,7 @@ ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 COPY caregiver/package*.json ./
 RUN npm install
 
+COPY shared/ /frontend/shared/
 COPY caregiver/ ./
 RUN npm run build
 
@@ -46,7 +48,7 @@ WORKDIR /app
 COPY --from=builder /app/main /app/migrate ./
 
 # Copy built frontend
-COPY --from=frontend-builder /frontend/dist /app/frontend
+COPY --from=frontend-builder /frontend/caregiver/dist /app/frontend
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
