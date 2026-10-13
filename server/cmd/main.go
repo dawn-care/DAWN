@@ -81,7 +81,6 @@ func main() {
 		AllowedOrigins: []string{
 			"http://localhost:5173",
 			"http://localhost:8081",
-			"http://localhost:8082",
 			"http://startup-da.gccis.rit.edu",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
