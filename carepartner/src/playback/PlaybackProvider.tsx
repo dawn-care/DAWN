@@ -46,8 +46,9 @@ export function usePlayback(): PlaybackContextValue {
 export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(playbackReducer, initialPlaybackState);
 
-  // A stored carepartner ID counts as paired for now, although the pair screen
-  // stores one before pairing completes (#343).
+  // Paired means a carepartner ID is stored; none stored (null) means unpaired.
+  // The pair screen stores the ID of a newly created carepartner before a
+  // caregiver has claimed it, so that also counts as paired for now (#343).
   const checkPairing = useCallback(async () => {
     const id = await getCarepartnerId();
     dispatch({ type: "pairingChecked", paired: id != null });
