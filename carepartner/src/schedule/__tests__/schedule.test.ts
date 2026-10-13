@@ -16,14 +16,33 @@ const timed = (id: number, time: string, overrides: Partial<ScheduleEntry> = {})
 const none = new Set<number>();
 
 describe("readEntries", () => {
-  it("keeps well-formed entries and drops malformed ones", () => {
-    const good = entry(1);
-    expect(readEntries([good, null, "x", { id: "2", module_type: "video", position: 1 }, { id: 3 }])).toEqual([good]);
+  let warn: jest.SpyInstance;
+  beforeEach(() => {
+    warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warn.mockRestore();
   });
 
-  it("treats anything but a list as no entries", () => {
+  it("keeps well-formed entries and drops malformed ones with a warning", () => {
+    const good = entry(1);
+    expect(readEntries([good, null, "x", { id: "2", module_type: "video", position: 1 }, { id: 3 }])).toEqual([good]);
+    expect(warn).toHaveBeenCalledWith("Dropped 4 malformed schedule entries");
+  });
+
+  it("doesn't warn when every entry is well formed", () => {
+    readEntries([entry(1), entry(2)]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("treats anything but a list as no entries, with a warning", () => {
     expect(readEntries({ error: "nope" })).toEqual([]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats null as an empty day without a warning", () => {
     expect(readEntries(null)).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

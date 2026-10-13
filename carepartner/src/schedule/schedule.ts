@@ -22,10 +22,18 @@ export type ScheduleEntry = MediaItem & {
   position: number;
 };
 
-/** Keeps the entries with the fields the schedule needs, dropping malformed ones. */
+/**
+ * Keeps the entries with the fields the schedule needs, dropping malformed
+ * ones with a warning. A null list is an empty day, since Go sends an empty
+ * list as null.
+ */
 export function readEntries(raw: unknown): ScheduleEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
+  if (raw === null) return [];
+  if (!Array.isArray(raw)) {
+    console.warn("Schedule response is not a list; treating it as empty");
+    return [];
+  }
+  const entries = raw.filter(
     (entry): entry is ScheduleEntry =>
       typeof entry === "object" &&
       entry !== null &&
@@ -33,6 +41,10 @@ export function readEntries(raw: unknown): ScheduleEntry[] {
       typeof entry.module_type === "string" &&
       typeof entry.position === "number",
   );
+  // Only the count: an entry can hold a caregiver's message text.
+  const dropped = raw.length - entries.length;
+  if (dropped > 0) console.warn(`Dropped ${dropped} malformed schedule entries`);
+  return entries;
 }
 
 /** "HH:MM" for a time of day, the form entry times and auto-start are matched in. */
