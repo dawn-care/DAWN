@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	authCtrlr "server/internal/controllers/auth"
 	configurationCtrlr "server/internal/controllers/configurations"
@@ -15,6 +16,7 @@ import (
 	modulesCtrlr "server/internal/controllers/modules"
 	playbackCtrlr "server/internal/controllers/playback"
 	promptsCtrlr "server/internal/controllers/prompts"
+	realtimeCtrlr "server/internal/controllers/realtime"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
 	newsCtrlr "server/internal/controllers/widgets/news"
@@ -26,6 +28,7 @@ import (
 	modulesRts "server/internal/routes/modules"
 	playbackRts "server/internal/routes/playback"
 	promptsRts "server/internal/routes/prompts"
+	realtimeRts "server/internal/routes/realtime"
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
@@ -58,6 +61,7 @@ import (
 
 	database "server/internal/db"
 	mw "server/internal/middleware"
+	"server/internal/realtime"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -139,6 +143,10 @@ func main() {
 	exceptionService := exceptionSvc.NewExceptionService(db)
 	playbackService := playbackSvc.NewPlaybackService(db)
 
+	// Realtime: one WebSocket per paired tablet, used to push staff commands.
+	tabletHub := realtime.NewHub()
+	go playbackService.RunExpirySweep(context.Background(), 5*time.Second)
+
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
@@ -170,7 +178,13 @@ func main() {
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
-	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService)
+	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService, tabletHub)
+	realtimeCtrl := realtimeCtrlr.NewRealtimeController(playbackService, carepartnerService, tabletHub, []string{
+		// Browser origins allowed to open a tablet WebSocket (the tablet's web build
+		// in development). The native Android app sends no Origin header.
+		"localhost:8081",
+		"startup-da.gccis.rit.edu",
+	})
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
@@ -222,6 +236,7 @@ func main() {
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
 	playbackRts.RegisterPlaybackRoutes(r, playbackCtrl)
+	realtimeRts.RegisterRealtimeRoutes(r, realtimeCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)

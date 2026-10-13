@@ -4,6 +4,7 @@ go 1.25.2
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/coder/websocket v1.8.15
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
