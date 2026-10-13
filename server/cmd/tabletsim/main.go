@@ -109,9 +109,14 @@ func (t *tablet) play(msg realtime.Message) {
 		log.Printf("   ignoring playback %d: expired at %s", msg.PlaybackID, msg.ExpiresAt.Local().Format(time.TimeOnly))
 		return
 	}
-	// A staff play pre-empts whatever is playing.
+	// A staff play pre-empts whatever is playing. The interrupted playback is
+	// reported "stopped", since the server waits for the tablet to say so.
 	if t.cancel != nil {
 		t.cancel()
+		if interrupted := t.playing; interrupted != 0 {
+			log.Printf("   ■ interrupting playback %d", interrupted)
+			go t.report(interrupted, "stopped") // report locks t.mu, which play holds
+		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel, t.playing = cancel, msg.PlaybackID
