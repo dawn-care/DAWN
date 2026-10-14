@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { dateLabel, dayName, timeOfDay } from "@shared";
 import { useNow } from "../../clock/useNow";
 import { fonts } from "../../theme/fonts";
 import { colors, fontSizes, legibility, space } from "../../theme/theme";
 import { fitFontSize } from "../fitText";
-import { dateLabel, dayName, timeOfDay } from "../timeOfDay";
 import type { OrientationData } from "../types";
 
 const LABELS = { morning: "Morning", afternoon: "Afternoon", evening: "Evening" } as const;

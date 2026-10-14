@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { LayoutChangeEvent, StyleSheet, View } from "react-native";
-import { cellRect, fitsGrid, type Size } from "./layout";
+import { fitsGrid } from "@shared";
+import { cellRect, type Size } from "./layout";
 import { lookupRenderer } from "./registry";
 import type { WidgetPlacement } from "./types";
 import WidgetFrame from "./WidgetFrame";
