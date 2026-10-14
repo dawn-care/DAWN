@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"server/internal/db"
 	"server/internal/models/media"
 )
 
@@ -26,24 +27,12 @@ type ScreenWidget struct {
 	Hidden        bool            `json:"hidden"`
 }
 
-type queryRower interface {
-	QueryRow(query string, args ...any) *sql.Row
-}
-
-type execer interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}
-
 const selectWidget = `
 	SELECT id, carepartner_id, type, spot, config, photo_media_id
 	FROM "ScreenWidget"
 `
 
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-func scanWidget(row scanner) (*ScreenWidget, error) {
+func scanWidget(row db.Scanner) (*ScreenWidget, error) {
 	w := &ScreenWidget{}
 	var config []byte
 	var photo sql.NullInt64
@@ -79,7 +68,7 @@ func nullableRow(w *ScreenWidget, err error) (*ScreenWidget, error) {
 // ─────────────────────────────────────────────
 
 // Create a widget; fills in ID and PhotoURL
-func CreateScreenWidget(exec queryRower, w *ScreenWidget) error {
+func CreateScreenWidget(exec db.QueryRower, w *ScreenWidget) error {
 	query := `
 		INSERT INTO "ScreenWidget" (carepartner_id, type, spot, config, photo_media_id)
 		VALUES ($1, $2, $3, $4, $5)
@@ -97,7 +86,7 @@ func CreateScreenWidget(exec queryRower, w *ScreenWidget) error {
 // ─────────────────────────────────────────────
 
 // Retrieve one widget, or nil if it doesn't exist
-func GetScreenWidgetByID(exec queryRower, id int) (*ScreenWidget, error) {
+func GetScreenWidgetByID(exec db.QueryRower, id int) (*ScreenWidget, error) {
 	return nullableRow(scanWidget(exec.QueryRow(selectWidget+` WHERE id = $1;`, id)))
 }
 
@@ -134,7 +123,7 @@ func ListScreenWidgets(db *sql.DB, carepartnerID int) ([]ScreenWidget, error) {
 }
 
 // Retrieve a media item for checking a widget's photo (its kind and owner), or nil
-func GetPhoto(exec queryRower, mediaID int) (*media.Media, error) {
+func GetPhoto(exec db.QueryRower, mediaID int) (*media.Media, error) {
 	return media.GetMediaByID(exec, mediaID)
 }
 
@@ -143,7 +132,7 @@ func GetPhoto(exec queryRower, mediaID int) (*media.Media, error) {
 // ─────────────────────────────────────────────
 
 // Replace a widget's settings and photo
-func UpdateScreenWidgetConfig(exec execer, w *ScreenWidget) error {
+func UpdateScreenWidgetConfig(exec db.Execer, w *ScreenWidget) error {
 	_, err := exec.Exec(
 		`UPDATE "ScreenWidget" SET config = $1, photo_media_id = $2 WHERE id = $3;`,
 		[]byte(w.Config), w.PhotoMediaID, w.ID,
@@ -156,7 +145,7 @@ func UpdateScreenWidgetConfig(exec execer, w *ScreenWidget) error {
 
 // Move a widget to another spot. The spot uniqueness check is deferred to commit,
 // so two widgets can be swapped inside one transaction.
-func MoveScreenWidget(exec execer, id int, spot int) error {
+func MoveScreenWidget(exec db.Execer, id int, spot int) error {
 	_, err := exec.Exec(`UPDATE "ScreenWidget" SET spot = $1 WHERE id = $2;`, spot, id)
 	return err
 }

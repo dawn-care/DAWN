@@ -2,6 +2,8 @@ package screen_settings
 
 import (
 	"database/sql"
+
+	"server/internal/db"
 )
 
 /*
@@ -16,20 +18,12 @@ type ScreenSettings struct {
 	BedTime       string `json:"bed_time"`
 }
 
-type execer interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}
-
-type queryRower interface {
-	QueryRow(query string, args ...any) *sql.Row
-}
-
 // ─────────────────────────────────────────────
 // CREATE
 // ─────────────────────────────────────────────
 
 // Create a carepartner's settings row with the database defaults (Balanced, 07:00 to 21:00)
-func CreateDefaultScreenSettings(exec execer, carepartnerID int) error {
+func CreateDefaultScreenSettings(exec db.Execer, carepartnerID int) error {
 	_, err := exec.Exec(`INSERT INTO "ScreenSettings" (carepartner_id) VALUES ($1);`, carepartnerID)
 	return err
 }
@@ -39,7 +33,7 @@ func CreateDefaultScreenSettings(exec execer, carepartnerID int) error {
 // ─────────────────────────────────────────────
 
 // Retrieve a carepartner's settings, or nil if they have none
-func GetScreenSettings(exec queryRower, carepartnerID int) (*ScreenSettings, error) {
+func GetScreenSettings(exec db.QueryRower, carepartnerID int) (*ScreenSettings, error) {
 	query := `
 		SELECT carepartner_id, layout_preset, to_char(wake_time, 'HH24:MI'), to_char(bed_time, 'HH24:MI')
 		FROM "ScreenSettings"
@@ -61,7 +55,7 @@ func GetScreenSettings(exec queryRower, carepartnerID int) (*ScreenSettings, err
 // ─────────────────────────────────────────────
 
 // Replace a carepartner's settings; returns false if they have no settings row
-func UpdateScreenSettings(exec queryRower, s *ScreenSettings) (bool, error) {
+func UpdateScreenSettings(exec db.QueryRower, s *ScreenSettings) (bool, error) {
 	query := `
 		UPDATE "ScreenSettings"
 		SET layout_preset = $1, wake_time = $2, bed_time = $3

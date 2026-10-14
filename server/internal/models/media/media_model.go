@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"server/internal/db"
 )
 
 const (
@@ -40,10 +42,6 @@ type Media struct {
 	URL             string    `json:"url"`
 }
 
-type queryRower interface {
-	QueryRow(query string, args ...any) *sql.Row
-}
-
 // selectMedia reads every column plus the derived usage flags
 const selectMedia = `
 	SELECT m.id, m.carepartner_id, m.kind, m.display_name, m.object_key, m.mime_type,
@@ -54,11 +52,7 @@ const selectMedia = `
 	FROM "Media" m
 `
 
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-func scanMedia(row scanner) (*Media, error) {
+func scanMedia(row db.Scanner) (*Media, error) {
 	m := &Media{}
 	var duration sql.NullInt64
 	var onScreen, audioBackground, scheduled bool
@@ -99,7 +93,7 @@ func FileURL(id int) string {
 // ─────────────────────────────────────────────
 
 // Create a media row; fills in ID and CreatedAt
-func CreateMediaTx(exec queryRower, m *Media) error {
+func CreateMediaTx(exec db.QueryRower, m *Media) error {
 	query := `
 		INSERT INTO "Media" (carepartner_id, kind, display_name, object_key, mime_type, size_bytes, duration_seconds)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -127,7 +121,7 @@ func CreateMediaTx(exec queryRower, m *Media) error {
 // ─────────────────────────────────────────────
 
 // Retrieve one media item, or nil if it doesn't exist
-func GetMediaByID(exec queryRower, id int) (*Media, error) {
+func GetMediaByID(exec db.QueryRower, id int) (*Media, error) {
 	m, err := scanMedia(exec.QueryRow(selectMedia+` WHERE m.id = $1;`, id))
 	if err == sql.ErrNoRows {
 		return nil, nil

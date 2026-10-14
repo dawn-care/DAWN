@@ -3,6 +3,8 @@ package carepartner
 import (
 	"database/sql"
 	"fmt"
+
+	"server/internal/db"
 )
 
 /*
@@ -17,10 +19,6 @@ type Carepartner struct {
 	Timezone    string `json:"timezone"`
 }
 
-type queryRower interface {
-	QueryRow(query string, args ...any) *sql.Row
-}
-
 // nullableID stores an unset (0) caregiver ID as NULL so it passes the foreign key
 func nullableID(id int) any {
 	if id <= 0 {
@@ -29,11 +27,7 @@ func nullableID(id int) any {
 	return id
 }
 
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-func scanCarepartner(row scanner) (*Carepartner, error) {
+func scanCarepartner(row db.Scanner) (*Carepartner, error) {
 	c := &Carepartner{}
 	var caregiverID sql.NullInt64
 	if err := row.Scan(&c.ID, &c.Name, &caregiverID, &c.Timezone); err != nil {
@@ -48,7 +42,7 @@ func scanCarepartner(row scanner) (*Carepartner, error) {
 // ─────────────────────────────────────────────
 
 // Create a carepartner; works with a *sql.DB or a *sql.Tx. Fills in ID and Timezone.
-func CreateCarepartner(exec queryRower, c *Carepartner) error {
+func CreateCarepartner(exec db.QueryRower, c *Carepartner) error {
 	query := `
 		INSERT INTO "Carepartner" (name, caregiver_id)
 		VALUES ($1, $2)

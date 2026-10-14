@@ -5,6 +5,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"server/internal/db"
 	"server/internal/models/media"
 )
 
@@ -88,14 +89,6 @@ func (s *ScheduledItem) DurationSeconds() int {
 	return 0
 }
 
-type queryRower interface {
-	QueryRow(query string, args ...any) *sql.Row
-}
-
-type execer interface {
-	Exec(query string, args ...any) (sql.Result, error)
-}
-
 const selectItem = `
 	SELECT s.id, s.carepartner_id, s.media_id, s.background_photo_id, s.display_seconds,
 	       to_char(s.start_date, 'YYYY-MM-DD'), to_char(s.start_time, 'HH24:MI'), s.repeat,
@@ -106,11 +99,7 @@ const selectItem = `
 	LEFT JOIN "Media" b ON b.id = s.background_photo_id
 `
 
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-func scanItem(row scanner) (*ScheduledItem, error) {
+func scanItem(row db.Scanner) (*ScheduledItem, error) {
 	s := &ScheduledItem{SkipDates: []string{}}
 	var background, display, duration sql.NullInt64
 	var endDate, backgroundName sql.NullString
@@ -161,7 +150,7 @@ func shapeOf(kind string, hasBackground bool) string {
 // ─────────────────────────────────────────────
 
 // Create a scheduled item; fills in ID
-func CreateScheduledItem(exec queryRower, s *ScheduledItem) error {
+func CreateScheduledItem(exec db.QueryRower, s *ScheduledItem) error {
 	query := `
 		INSERT INTO "ScheduledItem"
 			(carepartner_id, media_id, background_photo_id, display_seconds, start_date, start_time, repeat, end_date)
@@ -175,7 +164,7 @@ func CreateScheduledItem(exec queryRower, s *ScheduledItem) error {
 }
 
 // Skip one date of a repeating item ("delete just this day"); skipping twice is harmless
-func CreateSkip(exec execer, itemID int, date string) error {
+func CreateSkip(exec db.Execer, itemID int, date string) error {
 	_, err := exec.Exec(
 		`INSERT INTO "ScheduledItemSkip" (scheduled_item_id, skip_date) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
 		itemID, date,
@@ -280,7 +269,7 @@ func ListSkips(db *sql.DB, itemIDs []int) (map[int][]string, error) {
 // ─────────────────────────────────────────────
 
 // Replace an item's media, timing and repeat; returns false if no such item
-func UpdateScheduledItem(exec execer, s *ScheduledItem) (bool, error) {
+func UpdateScheduledItem(exec db.Execer, s *ScheduledItem) (bool, error) {
 	res, err := exec.Exec(`
 		UPDATE "ScheduledItem"
 		SET media_id = $1, background_photo_id = $2, display_seconds = $3,
@@ -295,7 +284,7 @@ func UpdateScheduledItem(exec execer, s *ScheduledItem) (bool, error) {
 }
 
 // Delete an item and its skip dates; returns false if no such item
-func DeleteScheduledItem(exec execer, id int) (bool, error) {
+func DeleteScheduledItem(exec db.Execer, id int) (bool, error) {
 	res, err := exec.Exec(`DELETE FROM "ScheduledItem" WHERE id = $1;`, id)
 	if err != nil {
 		return false, err

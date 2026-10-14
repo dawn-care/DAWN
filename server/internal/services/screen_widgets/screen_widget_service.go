@@ -8,6 +8,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"server/internal/db"
 	mediaModel "server/internal/models/media"
 	settingsModel "server/internal/models/screen_settings"
 	model "server/internal/models/screen_widgets"
@@ -64,9 +65,7 @@ func isSpotConflict(err error) bool {
 }
 
 // currentPreset returns the layout preset the carepartner's screen uses
-func currentPreset(exec interface {
-	QueryRow(query string, args ...any) *sql.Row
-}, carepartnerID int) (settings.Preset, error) {
+func currentPreset(exec db.QueryRower, carepartnerID int) (settings.Preset, error) {
 	s, err := settingsModel.GetScreenSettings(exec, carepartnerID)
 	if err != nil {
 		return settings.Preset{}, fmt.Errorf("failed to get screen settings: %w", err)
