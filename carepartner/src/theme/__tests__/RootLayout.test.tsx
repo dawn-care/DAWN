@@ -15,7 +15,10 @@ jest.mock("expo-router", () => {
   const { Text } = jest.requireActual("react-native");
   return { Stack: () => <Text>app content</Text> };
 });
-jest.mock("../../../app/ScheduleContext", () => ({
+jest.mock("../../playback/PlaybackProvider", () => ({
+  PlaybackProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+jest.mock("../../schedule/ScheduleProvider", () => ({
   ScheduleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

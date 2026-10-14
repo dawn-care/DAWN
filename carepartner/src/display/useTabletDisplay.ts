@@ -14,7 +14,7 @@ import { Platform } from "react-native";
 import * as Brightness from "expo-brightness";
 import { useKeepAwake } from "expo-keep-awake";
 import { now } from "../clock/clock";
-import { DEFAULT_NIGHT_HOURS, isNight, type NightHours } from "./nightHours";
+import { DEFAULT_NIGHT_HOURS, isNight, type NightHours } from "@shared";
 
 /** Window brightness at night, from 0 to 1. Low, but still readable. */
 export const NIGHT_BRIGHTNESS = 0.15;

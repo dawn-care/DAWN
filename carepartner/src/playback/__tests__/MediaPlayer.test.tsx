@@ -2,7 +2,8 @@ import React from "react";
 import { render } from "@testing-library/react-native";
 import { API_URL } from "../../api/config";
 import AudioPlayer from "../AudioPlayer";
-import MediaPlayer, { DEFAULT_DURATION_SECONDS, isPlayable, type MediaItem } from "../MediaPlayer";
+import { DEFAULT_DURATION_SECONDS, isPlayable, type MediaItem } from "../media";
+import MediaPlayer from "../MediaPlayer";
 import PhotoPlayer from "../PhotoPlayer";
 import VideoPlayer from "../VideoPlayer";
 
