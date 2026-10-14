@@ -4,6 +4,8 @@
  * renderer's data. The server decides placement; the tablet only draws it.
  */
 
+import type { GridArea } from "@shared";
+
 /** Day and time of day. The tablet works these out from its own clock. */
 export type OrientationData = {
   /** Also show the date, for example "October 5". */
@@ -22,14 +24,6 @@ export type TileData = {
   icon: string;
   word: string;
   label?: string | null;
-};
-
-/** A spot on the grid, in cells. Columns and rows count from 0. */
-export type GridArea = {
-  col: number;
-  row: number;
-  width: number;
-  height: number;
 };
 
 type Placed<R extends string, D> = GridArea & {

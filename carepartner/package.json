@@ -67,6 +67,13 @@
   },
   "private": true,
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "roots": [
+      "<rootDir>",
+      "<rootDir>/../shared"
+    ],
+    "moduleNameMapper": {
+      "^@shared$": "<rootDir>/../shared/index.ts"
+    }
   }
 }
