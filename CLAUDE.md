@@ -64,7 +64,7 @@ Carepartner tests live in a `__tests__/` folder inside each feature folder under
 
 ```bash
 cd carepartner && npm test      # runs the tests in shared/ too (Jest roots include ../shared)
-npm run typecheck:shared        # from the repo root: compiles shared/ with no DOM lib and no framework types
+npm run typecheck:shared        # from the repo root: compiles shared/ with no DOM lib and no framework types (run npm install in carepartner/ first)
 ```
 
 Tests sit in a `__tests__/` folder inside each feature folder of `shared/`, like the carepartner's. Only the carepartner runs them today; the caregiver is not wired up yet.
@@ -130,5 +130,5 @@ Expo Router app (file-based routing under `carepartner/app/`) targeting native (
 - Plain TypeScript only: no React, React Native, Expo or DOM imports, and no dependencies. Rules take the time and data as arguments and never read the clock themselves. `npm run typecheck:shared` fails on a DOM API or a React import with types.
 - Import from the barrel (`import { isNight } from "@shared"`), never a deep path, and re-export new modules from `shared/index.ts`.
 - Keep code in `shared/` only if both frontends use the same rule. Anything that depends on the React Native theme or screen size stays in the app (for example `cellRect` and the grid's padding and gap).
-- The carepartner reaches it through the `@shared` path in `tsconfig.json`, `watchFolders` in `metro.config.js` and the Jest `roots` and `moduleNameMapper` in `package.json`. The caregiver has no alias yet.
+- The carepartner reaches it through the `@shared` path in `tsconfig.json`, `watchFolders` in `metro.config.js` and the Jest `roots` and `moduleNameMapper` in `package.json`. The caregiver has no alias yet; wiring it up is deferred to a follow-up ticket (see #354).
 - Write shared code to compile under the strictest settings of both apps (`import type`, no file extensions in imports, no unused locals).
