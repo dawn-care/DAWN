@@ -74,6 +74,9 @@
     ],
     "moduleNameMapper": {
       "^@shared$": "<rootDir>/../shared/index.ts"
-    }
+    },
+    "modulePaths": [
+      "<rootDir>/node_modules"
+    ]
   }
 }
