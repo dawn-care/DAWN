@@ -8,19 +8,18 @@ import (
 )
 
 /*
-ScreenWidget is a widget placed in one slot of a layout preset's region.
-Region, Slot - where it sits, e.g. "tiles", 1 for the second tile
+ScreenWidget is a widget placed in one spot of a layout preset.
+Spot - where it sits: 0-based, The widgets follow reading order
 Config - settings for its type, validated by the screen widget service
 PhotoMediaID - the photo shown by a photo widget, or an optional photo on a message widget
 PhotoURL - derived: where the tablet can fetch that photo
-Hidden - derived: the current preset has no such region or slot, so the tablet doesn't show it
+Hidden - derived: the current preset has no such spot, so the tablet doesn't show it
 */
 type ScreenWidget struct {
 	ID            int             `json:"id"`
 	CarepartnerID int             `json:"carepartner_id"`
 	Type          string          `json:"type"`
-	Region        string          `json:"region"`
-	Slot          int             `json:"slot"`
+	Spot          int             `json:"spot"`
 	Config        json.RawMessage `json:"config" swaggertype:"object"`
 	PhotoMediaID  *int            `json:"photo_media_id"`
 	PhotoURL      *string         `json:"photo_url"`
@@ -36,7 +35,7 @@ type execer interface {
 }
 
 const selectWidget = `
-	SELECT id, carepartner_id, type, region, slot, config, photo_media_id
+	SELECT id, carepartner_id, type, spot, config, photo_media_id
 	FROM "ScreenWidget"
 `
 
@@ -48,7 +47,7 @@ func scanWidget(row scanner) (*ScreenWidget, error) {
 	w := &ScreenWidget{}
 	var config []byte
 	var photo sql.NullInt64
-	if err := row.Scan(&w.ID, &w.CarepartnerID, &w.Type, &w.Region, &w.Slot, &config, &photo); err != nil {
+	if err := row.Scan(&w.ID, &w.CarepartnerID, &w.Type, &w.Spot, &config, &photo); err != nil {
 		return nil, err
 	}
 	w.Config = json.RawMessage(config)
@@ -82,11 +81,11 @@ func nullableRow(w *ScreenWidget, err error) (*ScreenWidget, error) {
 // Create a widget; fills in ID and PhotoURL
 func CreateScreenWidget(exec queryRower, w *ScreenWidget) error {
 	query := `
-		INSERT INTO "ScreenWidget" (carepartner_id, type, region, slot, config, photo_media_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO "ScreenWidget" (carepartner_id, type, spot, config, photo_media_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id;
 	`
-	if err := exec.QueryRow(query, w.CarepartnerID, w.Type, w.Region, w.Slot, []byte(w.Config), w.PhotoMediaID).Scan(&w.ID); err != nil {
+	if err := exec.QueryRow(query, w.CarepartnerID, w.Type, w.Spot, []byte(w.Config), w.PhotoMediaID).Scan(&w.ID); err != nil {
 		return err
 	}
 	w.setPhotoURL()
@@ -107,17 +106,17 @@ func GetScreenWidgetForUpdate(tx *sql.Tx, id int) (*ScreenWidget, error) {
 	return nullableRow(scanWidget(tx.QueryRow(selectWidget+` WHERE id = $1 FOR UPDATE;`, id)))
 }
 
-// Retrieve and lock the widget in a slot, or nil if the slot is empty
-func GetScreenWidgetAt(tx *sql.Tx, carepartnerID int, region string, slot int) (*ScreenWidget, error) {
+// Retrieve and lock the widget in a spot, or nil if the spot is empty
+func GetScreenWidgetAt(tx *sql.Tx, carepartnerID int, spot int) (*ScreenWidget, error) {
 	return nullableRow(scanWidget(tx.QueryRow(
-		selectWidget+` WHERE carepartner_id = $1 AND region = $2 AND slot = $3 FOR UPDATE;`,
-		carepartnerID, region, slot,
+		selectWidget+` WHERE carepartner_id = $1 AND spot = $2 FOR UPDATE;`,
+		carepartnerID, spot,
 	)))
 }
 
-// List a carepartner's widgets ordered by region and slot
+// List a carepartner's widgets ordered by spot
 func ListScreenWidgets(db *sql.DB, carepartnerID int) ([]ScreenWidget, error) {
-	rows, err := db.Query(selectWidget+` WHERE carepartner_id = $1 ORDER BY region, slot, id;`, carepartnerID)
+	rows, err := db.Query(selectWidget+` WHERE carepartner_id = $1 ORDER BY spot, id;`, carepartnerID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,10 +154,10 @@ func UpdateScreenWidgetConfig(exec execer, w *ScreenWidget) error {
 	return err
 }
 
-// Move a widget to another region and slot. The slot uniqueness check is deferred
-// to commit, so two widgets can be swapped inside one transaction.
-func MoveScreenWidget(exec execer, id int, region string, slot int) error {
-	_, err := exec.Exec(`UPDATE "ScreenWidget" SET region = $1, slot = $2 WHERE id = $3;`, region, slot, id)
+// Move a widget to another spot. The spot uniqueness check is deferred to commit,
+// so two widgets can be swapped inside one transaction.
+func MoveScreenWidget(exec execer, id int, spot int) error {
+	_, err := exec.Exec(`UPDATE "ScreenWidget" SET spot = $1 WHERE id = $2;`, spot, id)
 	return err
 }
 

@@ -71,8 +71,8 @@ func (s *ScreenService) lookups() *lookupCache {
 }
 
 /*
-GetScreen assembles the carepartner's screen: the current preset's regions with each
-slot's widget and its data, awake hours, and today's and tomorrow's schedule.
+GetScreen assembles the carepartner's screen: the current preset's spots with each
+spot's widget and its data, awake hours, and today's and tomorrow's schedule.
 */
 func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 	if carepartnerID <= 0 {
@@ -108,7 +108,7 @@ func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list widgets: %w", err)
 	}
-	regions, err := s.fillRegions(preset, stored)
+	spots, err := s.fillSpots(preset, stored)
 	if err != nil {
 		return nil, err
 	}
@@ -132,52 +132,43 @@ func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 			Bed:        ss.BedTime,
 			IsAwakeNow: clock >= ss.WakeTime && clock < ss.BedTime,
 		},
-		Regions:  regions,
+		Spots:    spots,
 		Schedule: schedule,
 	}, nil
 }
 
 /*
-fillRegions puts each stored widget in its region and slot of the preset (leaving out
-widgets whose slot the preset doesn't have) and fills in their photos and data. Outside
-lookups run in parallel.
+fillSpots puts each stored widget in its spot of the preset (leaving out widgets whose
+spot the preset doesn't have) and fills in their photos and data. Outside lookups run
+in parallel.
 */
-func (s *ScreenService) fillRegions(preset settings.Preset, stored []widgetModel.ScreenWidget) ([]Region, error) {
-	at := map[string]widgetModel.ScreenWidget{}
-	for _, w := range stored {
-		at[fmt.Sprintf("%s/%d", w.Region, w.Slot)] = w
-	}
-
-	regions := make([]Region, len(preset.Regions))
+func (s *ScreenService) fillSpots(preset settings.Preset, stored []widgetModel.ScreenWidget) ([]*Widget, error) {
+	spots := make([]*Widget, preset.Spots)
 	var wg sync.WaitGroup
-	for i, r := range preset.Regions {
-		regions[i] = Region{Name: r.Name, Slots: make([]*Widget, r.Slots)}
-		for slot := 0; slot < r.Slots; slot++ {
-			w, ok := at[fmt.Sprintf("%s/%d", r.Name, slot)]
-			if !ok {
-				continue
-			}
-			out := &Widget{ID: w.ID, Type: w.Type, Config: w.Config}
-			if w.PhotoMediaID != nil {
-				photo, err := mediaModel.GetMediaByID(s.DB, *w.PhotoMediaID)
-				if err != nil {
-					return nil, fmt.Errorf("failed to get widget photo: %w", err)
-				}
-				if photo != nil {
-					out.Photo = &Photo{ID: photo.ID, DisplayName: photo.DisplayName, URL: photo.URL}
-				}
-			}
-			regions[i].Slots[slot] = out
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				s.fillData(out)
-			}()
+	for _, w := range stored {
+		if !preset.HasSpot(w.Spot) {
+			continue
 		}
+		out := &Widget{ID: w.ID, Type: w.Type, Config: w.Config}
+		if w.PhotoMediaID != nil {
+			photo, err := mediaModel.GetMediaByID(s.DB, *w.PhotoMediaID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get widget photo: %w", err)
+			}
+			if photo != nil {
+				out.Photo = &Photo{ID: photo.ID, DisplayName: photo.DisplayName, URL: photo.URL}
+			}
+		}
+		spots[w.Spot] = out
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.fillData(out)
+		}()
 	}
 	wg.Wait()
-	return regions, nil
+	return spots, nil
 }
 
 // fillData sets a widget's Data, or its Error if an outside lookup fails

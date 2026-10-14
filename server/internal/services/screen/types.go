@@ -11,9 +11,9 @@ import (
 Screen is everything the carepartner's tablet shows, as returned by GET /api/screen.
 It is the contract between the backend and the tablet (and the caregiver's preview).
 
-Times are in the carepartner's timezone. Regions are in the preset's order, and each
-region's slots array always has exactly as many entries as the preset has slots there;
-an empty slot is null. Widgets whose slot the current preset doesn't have are left out.
+Times are in the carepartner's timezone. Spots always has exactly as many entries as
+the preset has spots, in spot order (The widgets follow reading order); an empty spot
+is null. Widgets whose spot the current preset doesn't have are left out.
 */
 type Screen struct {
 	CarepartnerID int                          `json:"carepartner_id"`
@@ -22,7 +22,7 @@ type Screen struct {
 	Today         string                       `json:"today"` // "YYYY-MM-DD" in the carepartner's timezone
 	LayoutPreset  string                       `json:"layout_preset"`
 	AwakeHours    AwakeHours                   `json:"awake_hours"`
-	Regions       []Region                     `json:"regions"`
+	Spots         []*Widget                    `json:"spots"`    // null for an empty spot
 	Schedule      []scheduled_items.Occurrence `json:"schedule"` // today and tomorrow, so playback works across midnight
 }
 
@@ -33,14 +33,8 @@ type AwakeHours struct {
 	IsAwakeNow bool   `json:"is_awake_now"`
 }
 
-// Region is one area of the layout, e.g. the three tiles
-type Region struct {
-	Name  string    `json:"name"`
-	Slots []*Widget `json:"slots"` // null for an empty slot
-}
-
 /*
-Widget is a widget placed in a slot, with its data filled in.
+Widget is a widget placed in a spot, with its data filled in.
 Config is the widget's settings as stored (see the screen widget endpoints).
 Data depends on the type and is null for photo, message and reminder widgets,
 whose content is all in Config and Photo:

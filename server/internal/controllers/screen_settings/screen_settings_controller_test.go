@@ -125,11 +125,11 @@ func TestGetPresetsHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var presets []svc.Preset
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &presets))
-	require.Len(t, presets, 1)
-	assert.Equal(t, "balanced", presets[0].Name)
-	assert.Equal(t, []svc.Region{
-		{Name: "photo_frame", Slots: 1, Accepts: []string{"photo"}},
-		{Name: "tiles", Slots: 3, Accepts: []string{"reminder", "weather", "sports", "news"}},
-		{Name: "plate", Slots: 1, Accepts: []string{"message"}},
-	}, presets[0].Regions)
+	assert.Equal(t, []svc.Preset{
+		{Name: "simple", Spots: 2},
+		{Name: "balanced", Spots: 4},
+		{Name: "grid", Spots: 4},
+		{Name: "busier", Spots: 6},
+	}, presets)
+	assert.Contains(t, w.Body.String(), `{"name":"busier","spots":6}`)
 }

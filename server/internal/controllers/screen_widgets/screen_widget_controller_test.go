@@ -66,8 +66,8 @@ func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
 }
 
 func TestCreateWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 9, Type: "weather", Region: "tiles", Slot: 2, Config: json.RawMessage(`{"zip":"14617"}`)}}
-	body := `{"carepartner_id":1,"type":"weather","region":"tiles","slot":2,"config":{"zip":"14617"}}`
+	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 9, Type: "weather", Spot: 2, Config: json.RawMessage(`{"zip":"14617"}`)}}
+	body := `{"carepartner_id":1,"type":"weather","spot":2,"config":{"zip":"14617"}}`
 	w := httptest.NewRecorder()
 
 	NewScreenWidgetController(m).CreateWidgetHandler(w, httptest.NewRequest(http.MethodPost, "/api/screen-widgets", strings.NewReader(body)))
@@ -75,9 +75,9 @@ func TestCreateWidgetHandler(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	require.NotNil(t, m.created)
 	assert.Equal(t, 1, m.created.CarepartnerID)
-	assert.Equal(t, 2, *m.created.Slot)
+	assert.Equal(t, 2, *m.created.Spot)
 	assert.JSONEq(t, `{"zip":"14617"}`, string(m.created.Config))
-	assert.JSONEq(t, `{"id":9,"carepartner_id":0,"type":"weather","region":"tiles","slot":2,"config":{"zip":"14617"},"photo_media_id":null,"photo_url":null,"hidden":false}`, w.Body.String())
+	assert.JSONEq(t, `{"id":9,"carepartner_id":0,"type":"weather","spot":2,"config":{"zip":"14617"},"photo_media_id":null,"photo_url":null,"hidden":false}`, w.Body.String())
 }
 
 func TestCreateWidgetHandler_Errors(t *testing.T) {
@@ -89,9 +89,8 @@ func TestCreateWidgetHandler_Errors(t *testing.T) {
 		{svc.ErrInvalidType, http.StatusBadRequest, CodeInvalidType},
 		{svc.ErrInvalidConfig, http.StatusBadRequest, CodeInvalidConfig},
 		{svc.ErrInvalidPhoto, http.StatusBadRequest, CodeInvalidPhoto},
-		{svc.ErrUnknownSlot, http.StatusBadRequest, CodeUnknownSlot},
-		{svc.ErrTypeNotAllowed, http.StatusBadRequest, CodeTypeNotAllowed},
-		{svc.ErrSlotTaken, http.StatusConflict, CodeSlotTaken},
+		{svc.ErrUnknownSpot, http.StatusBadRequest, CodeUnknownSpot},
+		{svc.ErrSpotTaken, http.StatusConflict, CodeSpotTaken},
 		{svc.ErrCarepartnerMissing, http.StatusNotFound, CodeNotFound},
 		{svc.ErrInvalidCarepartner, http.StatusBadRequest, CodeInvalidRequest},
 		{errors.New("db down"), http.StatusInternalServerError, CodeInternal},
@@ -156,20 +155,19 @@ func TestUpdateWidgetHandler(t *testing.T) {
 }
 
 func TestMoveWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 4, Region: "tiles", Slot: 1}}
+	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 4, Spot: 1}}
 	w := httptest.NewRecorder()
 	NewScreenWidgetController(m).MoveWidgetHandler(w, withID(httptest.NewRequest(http.MethodPost, "/api/screen-widgets/4/move",
-		strings.NewReader(`{"region":"tiles","slot":1}`)), "4"))
+		strings.NewReader(`{"spot":1}`)), "4"))
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "tiles", m.moved.Region)
-	assert.Equal(t, 1, *m.moved.Slot)
+	assert.Equal(t, 1, *m.moved.Spot)
 
 	w = httptest.NewRecorder()
-	NewScreenWidgetController(&mockWidgetService{err: svc.ErrSlotTaken}).MoveWidgetHandler(w, withID(httptest.NewRequest(http.MethodPost, "/api/screen-widgets/4/move",
-		strings.NewReader(`{"region":"tiles","slot":1}`)), "4"))
+	NewScreenWidgetController(&mockWidgetService{err: svc.ErrSpotTaken}).MoveWidgetHandler(w, withID(httptest.NewRequest(http.MethodPost, "/api/screen-widgets/4/move",
+		strings.NewReader(`{"spot":1}`)), "4"))
 	assert.Equal(t, http.StatusConflict, w.Code)
-	assert.Equal(t, CodeSlotTaken, errorCode(t, w))
+	assert.Equal(t, CodeSpotTaken, errorCode(t, w))
 }
 
 func TestDeleteWidgetHandler(t *testing.T) {

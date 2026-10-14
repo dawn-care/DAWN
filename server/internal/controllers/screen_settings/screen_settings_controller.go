@@ -76,7 +76,7 @@ func carepartnerIDParam(r *http.Request) (int, bool) {
 
 // GetPresetsHandler godoc
 // @Summary List the layout presets
-// @Description Each preset is a set of regions with a fixed number of slots and the widget types each region accepts. Widgets are placed by region name and slot index (0-based).
+// @Description Each preset has a name and a number of widget spots. Widgets are placed by spot index (0-based); spot 0 is the main photo spot and the rest follow reading order. Any widget type can go in any spot.
 // @Tags screen-settings
 // @Produce json
 // @Success 200 {array} screen_settings.Preset

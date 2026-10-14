@@ -150,3 +150,34 @@ func TestUpdateScreenSettings_Bounds(t *testing.T) {
 	}
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestUpdateScreenSettings_EveryPreset(t *testing.T) {
+	db, mock := utils.SetupMockDB(t)
+	defer db.Close()
+	service := NewScreenSettingsService(db)
+
+	for _, preset := range []string{"simple", "balanced", "grid", "busier"} {
+		mock.ExpectQuery(updateSettings).
+			WithArgs(preset, "07:00", "21:00", 1).
+			WillReturnRows(sqlmock.NewRows([]string{"layout_preset", "wake_time", "bed_time"}).
+				AddRow(preset, "07:00", "21:00"))
+		s, err := service.UpdateScreenSettings(1, UpdateInput{LayoutPreset: preset, WakeTime: "07:00", BedTime: "21:00"})
+		require.NoError(t, err, preset)
+		assert.Equal(t, preset, s.LayoutPreset)
+	}
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPresetHasSpot(t *testing.T) {
+	balanced, ok := PresetByName("balanced")
+	require.True(t, ok)
+	assert.False(t, balanced.HasSpot(-1))
+	assert.True(t, balanced.HasSpot(0))
+	assert.True(t, balanced.HasSpot(3))
+	assert.False(t, balanced.HasSpot(4))
+
+	simple, _ := PresetByName("simple")
+	assert.False(t, simple.HasSpot(2))
+	busier, _ := PresetByName("busier")
+	assert.True(t, busier.HasSpot(5))
+}

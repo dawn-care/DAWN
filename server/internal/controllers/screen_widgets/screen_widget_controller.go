@@ -18,9 +18,8 @@ const (
 	CodeInvalidType    = "INVALID_TYPE"
 	CodeInvalidConfig  = "INVALID_CONFIG"
 	CodeInvalidPhoto   = "INVALID_PHOTO"
-	CodeUnknownSlot    = "UNKNOWN_SLOT"
-	CodeTypeNotAllowed = "TYPE_NOT_ALLOWED_IN_REGION"
-	CodeSlotTaken      = "SLOT_TAKEN"
+	CodeUnknownSpot    = "UNKNOWN_SPOT"
+	CodeSpotTaken      = "SPOT_TAKEN"
 	CodeNotFound       = "NOT_FOUND"
 	CodeInternal       = "INTERNAL_ERROR"
 )
@@ -72,12 +71,10 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, CodeInvalidConfig, err.Error())
 	case errors.Is(err, svc.ErrInvalidPhoto):
 		writeError(w, http.StatusBadRequest, CodeInvalidPhoto, err.Error())
-	case errors.Is(err, svc.ErrUnknownSlot):
-		writeError(w, http.StatusBadRequest, CodeUnknownSlot, err.Error())
-	case errors.Is(err, svc.ErrTypeNotAllowed):
-		writeError(w, http.StatusBadRequest, CodeTypeNotAllowed, err.Error())
-	case errors.Is(err, svc.ErrSlotTaken):
-		writeError(w, http.StatusConflict, CodeSlotTaken, err.Error())
+	case errors.Is(err, svc.ErrUnknownSpot):
+		writeError(w, http.StatusBadRequest, CodeUnknownSpot, err.Error())
+	case errors.Is(err, svc.ErrSpotTaken):
+		writeError(w, http.StatusConflict, CodeSpotTaken, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, CodeInternal, err.Error())
 	}
@@ -98,7 +95,7 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
 
 // ListWidgetsHandler godoc
 // @Summary List a carepartner's screen widgets
-// @Description Widgets in the current layout come first, in region and slot order. Widgets whose slot the current layout doesn't have are listed last with hidden: true; the tablet doesn't show them.
+// @Description Widgets in spot order. Widgets whose spot the current layout doesn't have come last with hidden: true; the tablet doesn't show them.
 // @Tags screen-widgets
 // @Produce json
 // @Param carepartner_id query int true "Carepartner ID"
@@ -124,8 +121,8 @@ func (c *ScreenWidgetController) ListWidgetsHandler(w http.ResponseWriter, r *ht
 }
 
 // CreateWidgetHandler godoc
-// @Summary Place a new widget in a slot
-// @Description The slot must exist in the carepartner's current layout (see GET /screen-settings/presets), accept the widget's type, and be empty. config is validated per type; photo widgets need photo_media_id.
+// @Summary Place a new widget in a spot
+// @Description The spot (0-based) must exist in the carepartner's current layout (see GET /screen-settings/presets) and be empty. Any widget type can go in any spot. config is validated per type; photo widgets need photo_media_id.
 // @Tags screen-widgets
 // @Accept json
 // @Produce json
@@ -178,7 +175,7 @@ func (c *ScreenWidgetController) GetWidgetHandler(w http.ResponseWriter, r *http
 
 // UpdateWidgetHandler godoc
 // @Summary Replace a widget's settings and photo
-// @Description The widget's type and slot don't change; use the move endpoint to change its slot.
+// @Description The widget's type and spot don't change; use the move endpoint to change its spot.
 // @Tags screen-widgets
 // @Accept json
 // @Produce json
@@ -210,13 +207,13 @@ func (c *ScreenWidgetController) UpdateWidgetHandler(w http.ResponseWriter, r *h
 }
 
 // MoveWidgetHandler godoc
-// @Summary Move a widget to another slot
-// @Description If the target slot has a widget, the two swap places when the other widget can go in this one's old slot; otherwise SLOT_TAKEN.
+// @Summary Move a widget to another spot
+// @Description The target spot must exist in the current layout. If it has a widget, the two swap places; the other widget takes this one's old spot, even if that spot is hidden in the current layout.
 // @Tags screen-widgets
 // @Accept json
 // @Produce json
 // @Param id path int true "Widget ID"
-// @Param body body screen_widgets.MoveInput true "Target slot"
+// @Param body body screen_widgets.MoveInput true "Target spot"
 // @Success 200 {object} screen_widgets.ScreenWidget
 // @Failure 400 {object} screen_widgets.ScreenWidgetError
 // @Failure 404 {object} screen_widgets.ScreenWidgetError

@@ -1,5 +1,5 @@
 -- Replaces the module/configuration content model with the i332 screen model:
--- one Media table, ScreenSettings, ScreenWidget (preset slots) and ScheduledItem.
+-- one Media table, ScreenSettings, ScreenWidget (preset spots) and ScheduledItem.
 -- Content in the old tables (media rows, widgets, prompts, agenda items) is dropped;
 -- caregivers, carepartners, sessions and device pairings are kept. Files already in
 -- MinIO are left in place. Every carepartner gets default screen settings.
@@ -67,16 +67,16 @@ CREATE TABLE "ScreenSettings" (
   "bed_time" time NOT NULL DEFAULT '21:00' CHECK ("bed_time" BETWEEN '19:00' AND '22:00')
 );
 
--- Widgets placed in the slots of a layout preset's regions (e.g. the second of
--- Balanced's three tiles is region 'tiles', slot 1). Region names and sizes are
--- defined per preset in Go. A widget whose slot doesn't exist in the current
--- preset is kept but hidden, and reappears if the caregiver switches back.
+-- Widgets placed in the spots of a layout preset. A spot is a 0-based index shared
+-- by every preset: The widgets follow reading order,
+-- so a widget keeps its place when the preset changes. Each preset's spot count is
+-- defined in Go. A widget whose spot the current preset doesn't have is kept but
+-- hidden, and reappears if the caregiver switches to a preset with more spots.
 CREATE TABLE "ScreenWidget" (
   "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "carepartner_id" integer NOT NULL REFERENCES "Carepartner"("id") ON DELETE CASCADE,
   "type" text NOT NULL CHECK ("type" IN ('photo', 'message', 'reminder', 'weather', 'sports', 'news')),
-  "region" text NOT NULL CHECK ("region" <> ''),
-  "slot" integer NOT NULL CHECK ("slot" >= 0),
+  "spot" integer NOT NULL CHECK ("spot" >= 0),
   -- Validated per type in Go
   "config" jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof("config") = 'object'),
   -- SET NULL clears a message widget's photo. Photo widgets must be deleted by the
@@ -88,8 +88,8 @@ CREATE TABLE "ScreenWidget" (
     WHEN 'message' THEN TRUE
     ELSE "photo_media_id" IS NULL
   END),
-  -- One widget per slot; deferred so two widgets can swap slots in one transaction
-  UNIQUE ("carepartner_id", "region", "slot") DEFERRABLE INITIALLY DEFERRED
+  -- One widget per spot; deferred so two widgets can swap spots in one transaction
+  UNIQUE ("carepartner_id", "spot") DEFERRABLE INITIALLY DEFERRED
 );
 
 CREATE INDEX "ScreenWidget_photo_media_idx" ON "ScreenWidget" ("photo_media_id");
