@@ -2,8 +2,9 @@ import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useTabletDisplay } from "../src/display/useTabletDisplay";
+import { PlaybackProvider } from "../src/playback/PlaybackProvider";
+import { ScheduleProvider } from "../src/schedule/ScheduleProvider";
 import { useAppFonts } from "../src/theme/fonts";
-import { ScheduleProvider } from "./ScheduleContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -22,8 +23,10 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <ScheduleProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </ScheduleProvider>
+    <PlaybackProvider>
+      <ScheduleProvider>
+        <Stack screenOptions={{ headerShown: false, animation: "none" }} />
+      </ScheduleProvider>
+    </PlaybackProvider>
   );
 }

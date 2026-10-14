@@ -54,7 +54,7 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 - For Maestro, build with the emulator closed (`npm run build:emulator`, x86_64 only), then start the emulator and run `npm run e2e:install` and `npm run e2e`. Building and emulating at the same time needs a lot of memory. `android/` is generated and gitignored.
 - Framework-free rules that the caregiver app also needs live in the repo-root `shared/` folder and are imported as `@shared` (see "Shared code" below). `npm test` runs their tests too, because Jest's `roots` include `../shared`.
 - Test files live in a `__tests__/` folder inside each feature folder (`src/pairing/x.ts` → `src/pairing/__tests__/x.test.ts`), never in `app/` (where they would become routes). A test of a route file goes in the matching feature's `__tests__/`. React Native Testing Library is v14, where `render` is async (`await render(...)`).
-- `npm run lint` reports existing problems in the old `app/` screens (one error in `photo.tsx`); those files are due to be deleted, so don't fix them in passing.
+- `npm run lint` reports existing warnings in the old `app/screensaver.tsx`; it is due to be replaced (#316), so don't fix them in passing.
 - `npm run reset-project` is left over from the Expo template, and the `scripts/` directory it points to doesn't exist.
 
 ## Redesign
@@ -161,42 +161,44 @@ The repo-root `shared/` folder holds plain TypeScript rules used by this app and
 
 Every screen imports `API_URL` and calls `fetch` inline. There is no shared API client yet.
 
-### The old screens still live in `app/`, so each is a route
+### Routes in `app/`
 
-Expo Router treats each file in `app/` as a route, including the non-screen module `ScheduleContext.tsx`. The content screens (`photo.tsx`, `text.tsx`, `widget.tsx`) are also routes, but they are really child components: `agendaView.tsx` imports and renders them directly with a `configuration` prop. They aren't navigated to.
+Expo Router treats each file in `app/` as a route. `index.tsx` and `pair.tsx` are the redesign's two routes. `screensaver.tsx` (the old home screen, still shown as the always-on screen until #316) and `terms.tsx` (a stub) are left over.
 
-### Flow and global scheduling (`app/ScheduleContext.tsx`)
+### Playback state machine (`src/playback/machine.ts`, `PlaybackProvider.tsx`)
 
-`_layout.tsx` wraps the whole `Stack` in `ScheduleProvider`. This is the app's central state and scheduler:
-- It fetches `/users/carepartner/:id` (for `auto_start`) and `/configurations/day?carepartner_id&day&month&day_of_week&date` (today's resolved agenda). It refetches on mount and every 5 minutes.
-- It navigates to `/agendaView` on its own, from two 15s-interval checks:
-  - `auto_start` time → `trigger=auto_start`, but only if there are unplayed non-timed items.
-  - Each `timed` item's `time` → `trigger=scheduled`.
-- It tracks `playedIds` (reset at midnight) so items don't replay.
+One state machine decides what the screen shows. Its state is three facts: `pairing` (`checking`, `paired` or `unpaired`), `night`, and `playing` (the current play: a `playId`, the `MediaItem` and its `source`, or null). `screenFor` turns that into one screen: `starting` (nothing), `unpaired`, `playing`, `night` or `alwaysOn`. Playing wins over night, so a clip that runs past the start of night finishes first.
 
-`/` renders `screensaver.tsx`, the idle home screen. From there the carepartner can manually enter the agenda (`trigger=manual`), sync, or go to `/pair`.
+- Playback starts only through `usePlayback().play(item, source)`, never by navigating, so there is no player route and no back stack. `canPlay` holds the rules: nothing plays until paired; a `staff` play pre-empts anything (the newest wins); a `scheduled` or `tap` play starts only when nothing is playing, so it never interrupts a staff clip.
+- When the player reports finished or failed, `ended(playId)` returns the screen to idle with no animation. A report whose `playId` isn't the current play is ignored, so a replaced player can't end the new one.
+- `PlaybackProvider` (in `_layout.tsx`) reads pairing at startup and checks night once a minute through `src/clock`. A stored carepartner ID counts as paired for now, though the pair screen stores one before pairing completes (#343). After pairing succeeds, `pair.tsx` calls `checkPairing()` and returns to `/`.
+- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `MediaPlayer` keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (a plain dark placeholder until #314), and `alwaysOn` renders `screensaver.tsx`.
 
-`agendaView.tsx` builds its play queue **once** per mount:
-- `scheduled` trigger → timed items due now or earlier that haven't played, sorted by time.
-- Any other trigger → all non-timed items.
+### Schedule (`src/schedule/`)
 
-The queue is deliberately not rebuilt on later refreshes, to avoid replay loops. Video, audio and photo items advance when their player reports finished or failed. Everything else advances after `duration` seconds (default 10). When the queue ends or errors, the app returns to `/`.
+`ScheduleProvider` (inside `PlaybackProvider`) asks the machine to play each due entry, one at a time, with source `scheduled`:
+- Once paired, it fetches `/users/carepartner/:id` (for `auto_start`) and `/configurations/day?carepartner_id&day&month&day_of_week&date`, and again every 5 minutes and on Sync. `readEntries` drops malformed entries.
+- Every 15 seconds it marks timed entries due at their minute (`HH:MM` match) and starts the untimed routine at the `auto_start` minute. A timed entry that comes due during another play waits, and plays next.
+- Whenever `canPlay(state, "scheduled")`, it plays `nextEntry`: due timed entries first (earliest first), then, while the routine is running, the routine in `position` order. Entries `isPlayable` rejects (weather, news, messages, events) are skipped. An entry counts as played when it starts, so a failed one doesn't loop.
+- On a new day (checked through `src/clock`) it forgets what played and fetches the new schedule.
+
+The pure decisions are in `schedule.ts`. Played state lives in memory for now; it moves to the server's `Playback` records (#299), and the exact-minute match becomes a grace window (#298).
 
 ### Types mirror the backend by hand
 
-`ConfigurationWithMetadata` and the per-type metadata types are defined in `agendaView.tsx`. They mirror the Go `ConfigurationWithMetadata` struct returned by `GetConfigurationsByDayAndCarepartner`, and other files import them from there. Casing is inconsistent: weather and news metadata use upper-case keys (`ID`, `ZIPCODE`). Match whatever the backend actually serializes. The `module_type` → screen mapping lives in `AgendaView`'s render; `messages` renders both the photo and text viewers.
+`ScheduleEntry` (`src/schedule/schedule.ts`) is the part of the Go `ConfigurationWithMetadata` struct returned by `GetConfigurationsByDayAndCarepartner` that the tablet uses, and `MediaItem` (`src/playback/media.ts`) is its media part. Media metadata is checked in `readMetadata`, not typed, because the server's per-type metadata shapes differ (weather and news use upper-case keys such as `ID`).
 
 ### Media playback (`src/playback/`)
 
-`MediaPlayer` takes a media item (`MediaItem`: `module_type`, optional `duration`, and `metadata` typed `unknown` because it is unchecked server JSON) plus `onFinished` / `onFailed`, and renders `VideoPlayer` (`expo-video`), `AudioPlayer` (`expo-audio`) or `PhotoPlayer` for it, or nothing for anything else. It is where server data enters playback, so it checks the metadata there; `isPlayable` says whether it will play an item. It builds the file URL (`/video|audio|photo/file?id=`), an audio item's title and cover, and a photo's duration. All three players start on their own, show no controls and work on Android and web. Each instance plays one source; give it a new `key` to play something else. `expo-audio` reports no load errors, so `AudioPlayer` treats a source that hasn't loaded within `AUDIO_LOAD_TIMEOUT_MS` as failed.
+`MediaPlayer` takes a media item (`MediaItem`: `module_type`, optional `duration`, and `metadata` typed `unknown` because it is unchecked server JSON) plus `onFinished` / `onFailed`, and renders `VideoPlayer` (`expo-video`), `AudioPlayer` (`expo-audio`) or `PhotoPlayer` for it, or nothing for anything else. Server data enters playback in `src/playback/media.ts` (logic only, so the schedule can use it without loading the players): `readMetadata` checks an item's metadata and `isPlayable` says whether it will play. `MediaPlayer` builds the file URL (`/video|audio|photo/file?id=`), an audio item's title and cover, and a photo's duration. All three players start on their own, show no controls and work on Android and web. Each instance plays one source; give it a new `key` to play something else. `expo-audio` reports no load errors, so `AudioPlayer` treats a source that hasn't loaded within `AUDIO_LOAD_TIMEOUT_MS` as failed.
 
 Every player keeps the contract written on `PlayerProps` in `src/playback/types.ts`: it starts on its own, calls exactly one of `onFinished` or `onFailed` once, and reports nothing after it is taken off screen. A shared suite in `players.test.tsx` checks it against every kind; a new player gets a driver there.
 
 `PhotoPlayer` shows one photo whole (`contain`) for the required `durationSeconds`, counted from when the image loads, then reports finished. It reports failed on an image error or if the image hasn't loaded within `PHOTO_LOAD_TIMEOUT_MS`. It shows no caption.
 
-`AudioPlayer` takes an optional `coverUri` (a song's album cover, or later a sender's photo) and falls back to a music note when it is missing or fails to load. The agenda reads it from an optional `cover_uri` field on audio metadata, a full URL or a path relative to `API_URL` (resolved by `src/api/resolveApiUri.ts`). The server doesn't send `cover_uri` yet; once it extracts embedded album art and returns that field, covers appear with no tablet change.
+`AudioPlayer` takes an optional `coverUri` (a song's album cover, or later a sender's photo) and falls back to a music note when it is missing or fails to load. `MediaPlayer` reads it from an optional `cover_uri` field on audio metadata, a full URL or a path relative to `API_URL` (resolved by `src/api/resolveApiUri.ts`). The server doesn't send `cover_uri` yet; once it extracts embedded album art and returns that field, covers appear with no tablet change.
 
-The server doesn't yet guarantee a duration above 0 (#344), so `MediaPlayer` shows photos for `DEFAULT_DURATION_SECONDS` (30) when it is missing or not positive; remove that once #344 lands. `agendaView.tsx` renders `MediaPlayer` for the current item and advances on either callback; items `isPlayable` rejects still advance on the agenda's own timer. `messages` items still use the old `photo.tsx` and `text.tsx`. The `expo-audio` plugin in `app.json` has its microphone permissions switched off; keep them off, since the tablet never records.
+The server doesn't yet guarantee a duration above 0 (#344), so photos show for `DEFAULT_DURATION_SECONDS` (30, in `media.ts`) when it is missing or not positive; remove that once #344 lands. The `expo-audio` plugin in `app.json` has its microphone permissions switched off; keep them off, since the tablet never records.
 
 Media is streamed from the backend (`/photo|audio|video/file?id=`). Relative `image_uri` values are prefixed with `API_URL`. Plain `http://` is allowed in Android builds only for an `http://` server address (see `app.config.ts`).
 
@@ -209,6 +211,6 @@ There is no login. On the pair screen, the device:
 
 The ID is stored under the key `carepartnerID`, via `carepartnerId.ts` (`localStorage` on web, `expo-secure-store` on native). `terms.tsx` is still a stub.
 
-The home screen is shown whether or not the tablet is paired; pairing is reached only through its Pair Device button. If the stored ID is lost, the tablet creates a new carepartner row instead of reattaching to the existing one.
+A tablet without a stored ID is sent to the pair screen by `index.tsx`; one with an ID counts as paired, even if pairing never completed (#343). Verifying succeeds whenever the status request does, even if the server reports `paired: false`. The home screen's Pair Device button also still opens it. If the stored ID is lost, the tablet creates a new carepartner row instead of reattaching to the existing one.
 
 Nothing authenticates the device: the carepartner ID is its only credential, and it is a guessable integer. The intended fix is a device record with a secret token issued at pairing, which the tablet presents on every request and on its socket. That should be in place before tablets are deployed in residents' rooms.
