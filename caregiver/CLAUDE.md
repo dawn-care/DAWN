@@ -45,6 +45,10 @@ Key pages by role:
 
 These page components are intentionally large and self-contained (state, API calls, and form UI together) — that's the established pattern here, not something to refactor apart unless asked.
 
+### Shared rules (`../shared`)
+
+Rules the tablet must agree with (awake hours, what is playing, layouts and their spots, widget names, the weather word) live in the repo-root `shared/` folder, not here. Import them with `import { ... } from "@shared"`; the alias is in `vite.config.ts` and `tsconfig.app.json`, and the Docker build copies `shared/` beside this folder. Their tests run from `carepartner/` (`npm test`), since this package has no test runner. See `shared/README.md`.
+
 ### Styling
 
 Tailwind CSS (`tailwind.config.js` scans `index.html` and `src/**/*.{js,ts,jsx,tsx}`), no component library on top of it.

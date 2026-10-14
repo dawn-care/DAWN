@@ -67,7 +67,7 @@ cd carepartner && npm test      # runs the tests in shared/ too (Jest roots incl
 npm run typecheck:shared        # from the repo root: compiles shared/ with no DOM lib and no framework types (run npm install in carepartner/ first)
 ```
 
-Tests sit in a `__tests__/` folder inside each feature folder of `shared/`, like the carepartner's. Only the carepartner runs them today; the caregiver is not wired up yet.
+Tests sit in a `__tests__/` folder inside each feature folder of `shared/`, like the carepartner's. Only the carepartner runs them today; the caregiver imports `@shared` but has no test runner.
 
 ### Full stack via Docker
 
@@ -125,10 +125,10 @@ Expo Router app (file-based routing under `carepartner/app/`) targeting native (
 
 ### Shared code (`shared/`)
 
-`shared/` holds framework-free rules that the caregiver preview and the tablet must agree on. It currently has night hours (`display/nightHours.ts`), time of day and date labels (`widgets/timeOfDay.ts`), and the always-on grid's size and `fitsGrid` (`widgets/grid.ts`).
+`shared/` holds framework-free rules that the caregiver preview and the tablet must agree on. It currently has awake hours (`display/awakeHours.ts`), what is playing at a given time (`playback/currentlyPlaying.ts`), the layouts and their spots (`widgets/layoutPresets.ts`), widget names and which widgets a layout hides (`widgets/screenWidgets.ts`), the weather word (`widgets/weather.ts`), the tablet's current night hours (`display/nightHours.ts`), time of day and date labels (`widgets/timeOfDay.ts`), and the old always-on grid's size and `fitsGrid` (`widgets/grid.ts`). `shared/README.md` lists what each file decides.
 
 - Plain TypeScript only: no React, React Native, Expo or DOM imports, and no dependencies. Rules take the time and data as arguments and never read the clock themselves. `npm run typecheck:shared` fails on a DOM API or a React import with types.
-- Import from the barrel (`import { isNight } from "@shared"`), never a deep path, and re-export new modules from `shared/index.ts`.
+- Import from the barrel (`import { currentlyPlaying } from "@shared"`), never a deep path, and re-export new modules from `shared/index.ts`.
 - Keep code in `shared/` only if both frontends use the same rule. Anything that depends on the React Native theme or screen size stays in the app (for example `cellRect` and the grid's padding and gap).
-- The carepartner reaches it through the `@shared` path in `tsconfig.json`, `watchFolders` in `metro.config.js` and the Jest `roots` and `moduleNameMapper` in `package.json`. The caregiver has no alias yet; wiring it up is deferred to a follow-up ticket (see #354).
+- The carepartner reaches it through the `@shared` path in `tsconfig.json`, `watchFolders` in `metro.config.js` and the Jest `roots` and `moduleNameMapper` in `package.json`. The caregiver uses the `@shared` alias in `vite.config.ts` and `paths` and `include` in `tsconfig.app.json`.
 - Write shared code to compile under the strictest settings of both apps (`import type`, no file extensions in imports, no unused locals).
