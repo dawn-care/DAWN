@@ -8,7 +8,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from "react";
 import { now } from "../clock/clock";
-import { isNight } from "../display/nightHours";
+import { isNight } from "@shared";
 import { getCarepartnerId } from "../pairing/carepartnerId";
 import type { MediaItem } from "./media";
 import {
