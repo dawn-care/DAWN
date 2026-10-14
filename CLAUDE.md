@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-StartUp is a dementia-assistance product for SUDA (SUDA-Start-Up-Dementia-Assistance). A caregiver creates content (media, prompts, widgets) and schedules it into a daily agenda; a carepartner (the person with dementia) views that agenda on a paired device. The repo is a monorepo with three independently-run pieces:
+StartUp is a dementia-assistance product for SUDA (SUDA-Start-Up-Dementia-Assistance). A caregiver creates content (media, prompts, widgets) and schedules it into a daily agenda; a carepartner (the person with dementia) views that agenda on a paired device. The repo is a monorepo with three independently-run pieces and a folder of code they share:
 
 - `server/` — Go backend (chi router), the only piece talking to Postgres/MinIO/external APIs.
 - `caregiver/` — React + TypeScript + Vite web app used by caregivers to manage content.
 - `carepartner/` — Expo/React Native app that displays the agenda to the carepartner. The deployment target is a React Native app on an **Android tablet**; the web build is used for local development.
+- `shared/` — plain TypeScript rules used by both frontends, so the caregiver's preview matches what the tablet shows. Not an app: it has no `package.json` and nothing runs it on its own. See "Shared code" below.
 
 ## Commands
 
@@ -59,13 +60,22 @@ npm run e2e                 # end-to-end flows (Maestro), against the app instal
 
 Carepartner tests live in a `__tests__/` folder inside each feature folder under `carepartner/src/`, never in `carepartner/app/` (files there become routes). End-to-end flows are in `carepartner/.maestro/`. See `carepartner/CLAUDE.md` for details.
 
+### Shared code (`shared/`)
+
+```bash
+cd carepartner && npm test      # runs the tests in shared/ too (Jest roots include ../shared)
+npm run typecheck:shared        # from the repo root: compiles shared/ with no DOM lib and no framework types (run npm install in carepartner/ first)
+```
+
+Tests sit in a `__tests__/` folder inside each feature folder of `shared/`, like the carepartner's. Only the carepartner runs them today; the caregiver is not wired up yet.
+
 ### Full stack via Docker
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The carepartner app is never bundled into this image; it ships separately as an Android app.
+`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The image build also copies `shared/` next to `caregiver/` (as `/frontend/shared`, so a `../shared` import from the caregiver resolves). The carepartner app is never bundled into this image; it ships separately as an Android app.
 
 ## Backend architecture (`server/internal/`)
 
@@ -112,3 +122,13 @@ Standard Vite + React Router SPA (`src/App.tsx`). `AuthContext` (`src/context/Au
 ### Carepartner (`carepartner/`)
 
 Expo Router app (file-based routing under `carepartner/app/`) targeting native (Android tablet is the deployment target) and web (used for development). `app/` holds routes only; everything else lives in feature folders under `src/`. `src/api/config.ts` exports `API_URL`, read from `EXPO_PUBLIC_API_URL` and defaulting to the local dev backend. `app/pair.tsx` handles the device-pairing UI; `src/pairing/carepartnerId.ts` is the cross-platform (web localStorage vs. `expo-secure-store`) storage shim for the paired ID, used throughout instead of talking to `AuthContext`-style state. An earlier Electron/Raspberry Pi kiosk build was dropped in favor of the Android tablet target — don't reintroduce Electron-specific code.
+
+### Shared code (`shared/`)
+
+`shared/` holds framework-free rules that the caregiver preview and the tablet must agree on. It currently has night hours (`display/nightHours.ts`), time of day and date labels (`widgets/timeOfDay.ts`), and the always-on grid's size and `fitsGrid` (`widgets/grid.ts`).
+
+- Plain TypeScript only: no React, React Native, Expo or DOM imports, and no dependencies. Rules take the time and data as arguments and never read the clock themselves. `npm run typecheck:shared` fails on a DOM API or a React import with types.
+- Import from the barrel (`import { isNight } from "@shared"`), never a deep path, and re-export new modules from `shared/index.ts`.
+- Keep code in `shared/` only if both frontends use the same rule. Anything that depends on the React Native theme or screen size stays in the app (for example `cellRect` and the grid's padding and gap).
+- The carepartner reaches it through the `@shared` path in `tsconfig.json`, `watchFolders` in `metro.config.js` and the Jest `roots` and `moduleNameMapper` in `package.json`. The caregiver has no alias yet; wiring it up is deferred to a follow-up ticket (see #354).
+- Write shared code to compile under the strictest settings of both apps (`import type`, no file extensions in imports, no unused locals).
