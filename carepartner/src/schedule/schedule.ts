@@ -24,8 +24,8 @@ export type ScheduleEntry = MediaItem & {
 
 /**
  * Keeps the entries with the fields the schedule needs, dropping malformed
- * ones with a warning. A null list is an empty day, since Go sends an empty
- * list as null.
+ * ones with a warning, and warns about entries the tablet can't play. A null
+ * list is an empty day, since Go sends an empty list as null.
  */
 export function readEntries(raw: unknown): ScheduleEntry[] {
   if (raw === null) return [];
@@ -44,6 +44,10 @@ export function readEntries(raw: unknown): ScheduleEntry[] {
   // Only the count: an entry can hold a caregiver's message text.
   const dropped = raw.length - entries.length;
   if (dropped > 0) console.warn(`Dropped ${dropped} malformed schedule entries`);
+  // Kept, since `nextEntry` skips them; warned here once per fetch rather than
+  // on every pass of `nextEntry`.
+  const unplayable = entries.filter((entry) => !isPlayable(entry)).map((entry) => entry.id);
+  if (unplayable.length) console.warn(`Skipping schedule entries the tablet can't play: ${unplayable.join(", ")}`);
   return entries;
 }
 

@@ -30,7 +30,14 @@ describe("readEntries", () => {
     expect(warn).toHaveBeenCalledWith("Dropped 4 malformed schedule entries");
   });
 
-  it("doesn't warn when every entry is well formed", () => {
+  it("keeps entries the tablet can't play, with a warning naming them", () => {
+    const weather = entry(2, { module_type: "weather" });
+    const noMedia = entry(3, { metadata: null });
+    expect(readEntries([entry(1), weather, noMedia])).toEqual([entry(1), weather, noMedia]);
+    expect(warn).toHaveBeenCalledWith("Skipping schedule entries the tablet can't play: 2, 3");
+  });
+
+  it("doesn't warn when every entry is well formed and playable", () => {
     readEntries([entry(1), entry(2)]);
     expect(warn).not.toHaveBeenCalled();
   });

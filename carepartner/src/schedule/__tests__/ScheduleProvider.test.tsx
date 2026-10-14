@@ -67,6 +67,8 @@ describe("ScheduleProvider", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.mocked(getCarepartnerId).mockResolvedValue(7);
+    // The sample schedule has a weather card, which the tablet warns it can't play.
+    jest.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -74,6 +76,7 @@ describe("ScheduleProvider", () => {
     setClock(null);
     jest.useRealTimers();
     jest.clearAllMocks();
+    jest.mocked(console.warn).mockRestore();
   });
 
   it("plays nothing before auto-start", async () => {
