@@ -19,13 +19,28 @@ export interface ToastOptions {
 export interface ToastState extends ToastOptions {
   id: number;
   text: string;
+  /** What had focus when the toast was shown; focus returns here when the user closes it */
+  returnFocus: HTMLElement | null;
 }
 
 export interface ToastApi {
-  /** Adds a toast. If one is already showing, it waits behind it in a stack */
-  show: (text: string, options?: ToastOptions) => void;
-  /** Closes the toast on top; the next one in the stack moves up */
-  dismiss: () => void;
+  /**
+   * Adds a toast and returns its id. If one is already showing, it waits
+   * behind it in a stack.
+   */
+  show: (text: string, options?: ToastOptions) => number;
+  /**
+   * Closes the toast with this id, wherever it is in the stack. With no id,
+   * closes the toast on top. Does nothing if that toast is already gone.
+   */
+  dismiss: (id?: number) => void;
+}
+
+// What ToastViewport needs beyond the API: the stack to draw, and a way to
+// pause the top toast's timer while someone is hovering or focused on it
+export interface ToastViewportState {
+  toasts: ToastState[];
+  setPaused: (paused: boolean) => void;
 }
 
 // Stable functions for showing/dismissing; components that only call show()
@@ -33,10 +48,13 @@ export interface ToastApi {
 export const ToastContext = createContext<ToastApi | null>(null);
 
 // The stack of toasts, first = on top. Read only by ToastViewport
-export const ToastStateContext = createContext<ToastState[]>([]);
+export const ToastStateContext = createContext<ToastViewportState>({
+  toasts: [],
+  setPaused: () => {},
+});
 
 /**
- * Returns show(text, options) and dismiss(). Must be used under ToastProvider.
+ * Returns show(text, options) and dismiss(id). Must be used under ToastProvider.
  */
 export function useToast(): ToastApi {
   const api = useContext(ToastContext);

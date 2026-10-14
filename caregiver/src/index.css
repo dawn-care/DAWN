@@ -10,6 +10,6 @@ html, body, #root {
   height: auto;
   background-color: #ffffff;
   color: #000000;
-  /* Atkinson Hyperlegible, matching the font-dawn family in tailwind.config.js */
-  font-family: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  /* Atkinson Hyperlegible: the font-dawn family from tailwind.config.js */
+  font-family: theme("fontFamily.dawn");
 }

@@ -10,6 +10,7 @@ import AccountSetupPage from "./pages/AccountSetup";
 import SelectCarepartner from "./pages/SelectCarepartner";
 import RequireCarePartner from "./components/RequireCarepartner";
 import AppShell from "./components/AppShell";
+import ToastLayout from "./components/ToastLayout";
 
 function App() {
   return (
@@ -29,20 +30,23 @@ function App() {
         <Route path="/family" element={<Family />} />
       </Route>
 
-      {/* Full screen, no nav bar. Future implementation: the button that opens it is added in a later ticket */}
-      <Route
-        path="/preview"
-        element={
-          <RequireCarePartner>
-            <Preview />
-          </RequireCarePartner>
-        }
-      />
+      {/* Pages without the nav bar; ToastLayout gives them a toast viewport */}
+      <Route element={<ToastLayout />}>
+        {/* Full screen, no nav bar. Future implementation: the button that opens it is added in a later ticket */}
+        <Route
+          path="/preview"
+          element={
+            <RequireCarePartner>
+              <Preview />
+            </RequireCarePartner>
+          }
+        />
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/setup" element={<AccountSetupPage />} />
-      <Route path="/select-carepartner" element={<SelectCarepartner />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/setup" element={<AccountSetupPage />} />
+        <Route path="/select-carepartner" element={<SelectCarepartner />} />
+      </Route>
     </Routes>
   );
 }
