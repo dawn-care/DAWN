@@ -1,12 +1,16 @@
 import React from "react";
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
+import { router } from "expo-router";
 import PairScreen from "../../../app/pair";
+import { usePlayback } from "../../playback/PlaybackProvider";
 import { getCarepartnerId, storeCarepartnerId } from "../carepartnerId";
 
 jest.mock("expo-router", () => ({
   Stack: { Screen: () => null },
   router: { push: jest.fn(), replace: jest.fn() },
 }));
+
+jest.mock("../../playback/PlaybackProvider", () => ({ usePlayback: jest.fn() }));
 
 jest.mock("../carepartnerId", () => ({
   getCarepartnerId: jest.fn(),
@@ -27,6 +31,11 @@ function mockBackend(routes: Record<string, { status?: number; body: unknown }>)
 
 describe("PairScreen", () => {
   const realFetch = globalThis.fetch;
+  const checkPairing = jest.fn(async () => {});
+
+  beforeEach(() => {
+    jest.mocked(usePlayback).mockReturnValue({ checkPairing } as unknown as ReturnType<typeof usePlayback>);
+  });
 
   afterEach(() => {
     globalThis.fetch = realFetch;
@@ -74,5 +83,22 @@ describe("PairScreen", () => {
     await render(<PairScreen />);
 
     expect(await screen.findByText("Code service unavailable")).toBeTruthy();
+  });
+
+  it("tells playback the tablet is paired and goes home once pairing is verified", async () => {
+    jest.mocked(getCarepartnerId).mockResolvedValue(12);
+    mockBackend({
+      "/users/carepartner/12": { body: { id: 12 } },
+      "/users/device-pairing/code": { body: { pairing_code: "K7M4QP", expires_in_sec: 600 } },
+      "/users/device-pairing/status": { body: { paired: true } },
+    });
+    await render(<PairScreen />);
+    await screen.findByText("K7M4QP");
+
+    // The instructions also say "Verify"; the button is the last one.
+    await fireEvent.press(screen.getAllByText("Verify").at(-1)!);
+
+    expect(checkPairing).toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith("/");
   });
 });
