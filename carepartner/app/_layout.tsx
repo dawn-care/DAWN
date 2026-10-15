@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useTabletDisplay } from "../src/display/useTabletDisplay";
 import { PlaybackProvider } from "../src/playback/PlaybackProvider";
+import StaffCommands from "../src/playback/StaffCommands";
 import { ScheduleProvider } from "../src/schedule/ScheduleProvider";
 import { useAppFonts } from "../src/theme/fonts";
 
@@ -25,6 +26,7 @@ export default function RootLayout() {
   return (
     <PlaybackProvider>
       <ScheduleProvider>
+        <StaffCommands />
         <Stack screenOptions={{ headerShown: false, animation: "none" }} />
       </ScheduleProvider>
     </PlaybackProvider>

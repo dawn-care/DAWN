@@ -70,7 +70,7 @@ describe("index route", () => {
 
     await act(async () => props.onFinished());
     await act(async () => props.onFailed("404"));
-    expect(ended).toHaveBeenNthCalledWith(1, 3);
-    expect(ended).toHaveBeenNthCalledWith(2, 3);
+    expect(ended).toHaveBeenNthCalledWith(1, 3, "finished");
+    expect(ended).toHaveBeenNthCalledWith(2, 3, "failed");
   });
 });
