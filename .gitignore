@@ -4,3 +4,6 @@ dist
 .expo
 tsconfig.json
 out
+
+# Local Documents
+localdocs/*

@@ -25,7 +25,7 @@ func TestRequestStaffPlaySetsServerDeadline(t *testing.T) {
 	s, mock := setup(t)
 	before := time.Now().UTC()
 	mock.ExpectQuery(`INSERT INTO "Playback".*WHERE m.id = \$2 AND m.carepartner_id = \$1`).
-		WithArgs(2, 3, "staff", sqlmock.AnyArg(),
+		WithArgs(2, 3, nil, "staff", sqlmock.AnyArg(),
 			timeBetween{before.Add(StaffCommandTTL), time.Now().UTC().Add(StaffCommandTTL + time.Second)}).
 		WillReturnRows(playbackRows("requested", before.Add(StaffCommandTTL)))
 
@@ -43,7 +43,7 @@ func TestRequestStaffPlayRejectsInvalidIDs(t *testing.T) {
 func TestLiveCommand(t *testing.T) {
 	t.Run("returns the most recent unexpired staff command", func(t *testing.T) {
 		s, mock := setup(t)
-		mock.ExpectQuery(`SELECT .* FROM "Playback".*source = \$2 AND status IN \(\$3, \$4\) AND expires_at > \$5.*ORDER BY requested_at DESC`).
+		mock.ExpectQuery(`SELECT .* FROM "Playback".*source = \$2 AND status IN \(\$3, \$4\) AND expires_at > \$5\s+AND media_id IS NOT NULL\s+ORDER BY requested_at DESC`).
 			WithArgs(2, "staff", "requested", "acknowledged", sqlmock.AnyArg()).
 			WillReturnRows(playbackRows("requested", time.Now().Add(time.Minute)))
 

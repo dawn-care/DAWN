@@ -79,8 +79,8 @@ func (c *RealtimeController) ConnectHandler(w http.ResponseWriter, r *http.Reque
 	var initial []hub.Message
 	if live, err := c.Playback.LiveCommand(r.Context(), carepartnerID); err != nil {
 		log.Printf("realtime: live command lookup for carepartner %d: %v", carepartnerID, err)
-	} else if live != nil {
-		initial = append(initial, hub.PlayCommand(live.ID, live.ModuleID, live.ExpiresAt))
+	} else if live != nil && live.MediaID != nil {
+		initial = append(initial, hub.PlayCommand(live.ID, *live.MediaID, live.ExpiresAt))
 	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: c.OriginPatterns})

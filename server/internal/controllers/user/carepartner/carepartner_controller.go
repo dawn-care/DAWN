@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	model "server/internal/models/user/carepartner"
 
@@ -29,14 +28,15 @@ func NewCarepartnerController(service CarepartnerServiceInterface) *CarepartnerC
 }
 
 type CarepartnerResponse struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	AutoStart string `json:"auto_start"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Timezone string `json:"timezone"`
 }
 
+// CreateCarepartnerRequest creates a carepartner with no caregiver yet; one is linked
+// when a caregiver pairs with the device. Wake and bed times live in screen settings.
 type CreateCarepartnerRequest struct {
-	Name      string `json:"name"`
-	AutoStart string `json:"auto_start"` // "HH:MM:SS"
+	Name string `json:"name"`
 }
 
 // ─────────────────────────────────────────────
@@ -80,35 +80,17 @@ func (cc *CarepartnerController) CreateCarepartner(w http.ResponseWriter, r *htt
 		req.Name = "Placeholder Name"
 	}
 
-	// Parse time (HH:MM:SS)
-	var autoStart time.Time
-	var err error
-
-	if req.AutoStart == "" {
-		// default to 08:00:00
-		autoStart, _ = time.Parse("15:04:05", "08:00:00")
-	} else {
-		autoStart, err = time.Parse("15:04:05", req.AutoStart)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid auto_start format (use HH:MM:SS)")
-			return
-		}
-	}
-
 	c := &model.Carepartner{
-		Name:      req.Name,
-		AutoStart: autoStart,
+		Name: req.Name,
 	}
 
-	err = cc.Service.CreateCarepartner(c)
-	if err != nil {
+	if err := cc.Service.CreateCarepartner(c); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"carepartner_id": c.ID,
-		"auto_start":     c.AutoStart.Format("15:04:05"),
 	})
 }
 
@@ -116,9 +98,8 @@ func (cc *CarepartnerController) UpdateCarepartner(w http.ResponseWriter, r *htt
 	defer r.Body.Close()
 
 	var req struct {
-		ID        int    `json:"id"`
-		Name      string `json:"name"`
-		AutoStart string `json:"auto_start"`
+		ID   int    `json:"id"`
+		Name string `json:"name"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -141,18 +122,10 @@ func (cc *CarepartnerController) UpdateCarepartner(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Parse time
-	autoStart, err := time.Parse("15:04:05", req.AutoStart)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid auto_start format")
-		return
-	}
-
 	c := &model.Carepartner{
 		ID:          req.ID,
 		Name:        existingCarepartner.Name,
 		CaregiverID: existingCarepartner.CaregiverID,
-		AutoStart:   autoStart,
 	}
 
 	if req.Name != "" {
@@ -192,9 +165,9 @@ func (cc *CarepartnerController) GetCarepartnerByID(w http.ResponseWriter, r *ht
 	}
 
 	resp := CarepartnerResponse{
-		ID:        c.ID,
-		Name:      c.Name,
-		AutoStart: c.AutoStart.Format("15:04:05"),
+		ID:       c.ID,
+		Name:     c.Name,
+		Timezone: c.Timezone,
 	}
 
 	writeJSON(w, http.StatusOK, resp)
@@ -210,9 +183,9 @@ func (cc *CarepartnerController) GetAllCarepartners(w http.ResponseWriter, r *ht
 	var resp []CarepartnerResponse
 	for _, c := range list {
 		resp = append(resp, CarepartnerResponse{
-			ID:        c.ID,
-			Name:      c.Name,
-			AutoStart: c.AutoStart.Format("15:04:05"),
+			ID:       c.ID,
+			Name:     c.Name,
+			Timezone: c.Timezone,
 		})
 	}
 
