@@ -8,8 +8,8 @@ require (
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
-	github.com/pressly/goose/v3 v3.27.0
 	github.com/minio/minio-go/v7 v7.0.97
+	github.com/pressly/goose/v3 v3.27.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.265.0
 )
@@ -57,7 +57,7 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.3 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.3 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.3 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/minio/crc64nvme v1.1.0 // indirect

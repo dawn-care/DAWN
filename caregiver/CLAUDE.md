@@ -51,7 +51,15 @@ Rules the tablet must agree with (awake hours, what is playing, layouts and thei
 
 ### Styling
 
-Tailwind CSS (`tailwind.config.js` scans `index.html` and `src/**/*.{js,ts,jsx,tsx}`), no component library on top of it.
+Tailwind CSS (`tailwind.config.js` scans `index.html` and `src/**/*.{js,ts,jsx,tsx}`). The palette (`dawn-*` colors, including `dawn-accent`, `dawn-success`, `dawn-control`), the Atkinson Hyperlegible font (`font-dawn`, also set on `body`) and the popover/dialog/toast shadows are tokens in that config. Prefer them over raw hex values. If a new token doesn't show up in `npm run dev`, restart the dev server.
+
+Shared UI pieces live in `src/components/ui/` (app-specific components such as `NavBar` stay directly in `src/components/`). They are Tailwind-styled React components, with [Radix UI](https://www.radix-ui.com/) (`@radix-ui/react-popover`, `-radio-group`, `-dialog`) supplying focus, keyboard and ARIA behavior and `lucide-react` supplying icons. Gluestack is not used here: it only installs into Expo/React Native projects, not this Vite app.
+
+- `Badge`, `Dialog`, `IconButton`, `InfoPopover`, `PhotoPicker`, `SaveIndicator`, `Toast`
+- `form/`: `RadioGroup`/`RadioOption`, `SegmentedControl`, `SelectField` (native `<select>`), `TextField`, `ToggleButton`
+- `styles.ts` holds the shared focus ring (`FOCUS_RING`) and field classes; use `FOCUS_RING` on any new interactive control.
+
+Toasts: `ToastProvider` is mounted once in `main.tsx`, so any page can call `useToast()`. Each layout draws the toasts with a `ToastViewport` (top center of the page content): `AppShell` for pages with the nav bar, `ToastLayout` for the rest (login, settings, setup, preview). A new layout route needs one of the two. `show(text, { actionLabel, onAction })` returns an id; `dismiss(id)` closes that toast wherever it is in the stack (no id closes the top one). Toasts stack: a new one waits behind the one on top and its 12-second timer starts only when it reaches the top. The timer pauses while the pointer is over the toast or focus is inside it. Closing a toast with its X or action button returns focus to what had it when the toast was shown. Show a toast after a `Dialog` closes, not while it is open. Use `aria-pressed` for on/off toggles and a Radix radio group (`RadioGroup`, `SegmentedControl`, `PhotoPicker`) when exactly one option must be chosen.
 
 ### Docker
 

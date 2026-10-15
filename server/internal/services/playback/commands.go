@@ -23,16 +23,17 @@ const (
 	AcknowledgedGrace = 2 * time.Minute
 )
 
-// RequestStaffPlay records a staff member's request to play a module on a
+// RequestStaffPlay records a staff member's request to play a media item on a
 // carepartner's tablet, with a server-set deadline.
-func (s *PlaybackService) RequestStaffPlay(ctx context.Context, carepartnerID, moduleID int) (*playback.Playback, error) {
-	return s.CreatePlayback(ctx, carepartnerID, moduleID, playback.SourceStaff, time.Now().UTC().Add(StaffCommandTTL))
+func (s *PlaybackService) RequestStaffPlay(ctx context.Context, carepartnerID, mediaID int) (*playback.Playback, error) {
+	return s.CreatePlayback(ctx, carepartnerID, mediaID, nil, playback.SourceStaff, time.Now().UTC().Add(StaffCommandTTL))
 }
 
 // LiveCommand returns the most recent staff command a tablet should still act
 // on, or nil if there is none. It is resent when a tablet reconnects, so a
 // command issued during a brief network drop is not lost. Tablets must ignore a
-// command whose playback ID they have already handled.
+// command whose playback ID they have already handled. A command whose media was
+// deleted since is not resent; it expires like any other unanswered command.
 func (s *PlaybackService) LiveCommand(ctx context.Context, carepartnerID int) (*playback.Playback, error) {
 	if carepartnerID <= 0 {
 		return nil, fmt.Errorf("%w: positive IDs are required", ErrInvalidInput)
@@ -40,6 +41,7 @@ func (s *PlaybackService) LiveCommand(ctx context.Context, carepartnerID int) (*
 	p, err := scanPlayback(s.DB.QueryRowContext(ctx, `SELECT `+columns+`
 		FROM "Playback"
 		WHERE carepartner_id = $1 AND source = $2 AND status IN ($3, $4) AND expires_at > $5
+		  AND media_id IS NOT NULL
 		ORDER BY requested_at DESC, id DESC
 		LIMIT 1`,
 		carepartnerID, playback.SourceStaff, playback.StatusRequested, playback.StatusAcknowledged, time.Now().UTC()))

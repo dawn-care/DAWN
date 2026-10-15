@@ -33,17 +33,24 @@ func playbackRows(status string, expiry time.Time) *sqlmock.Rows {
 	if status == "finished" || status == "stopped" || status == "failed" || status == "expired" {
 		ended = start.Add(3 * time.Second)
 	}
-	return sqlmock.NewRows(strings.Fields(strings.ReplaceAll(columns, ",", ""))).AddRow(1, 2, 3, "tap", status, start, ack, began, ended, expiry, nil)
+	return sqlmock.NewRows(strings.Fields(strings.ReplaceAll(columns, ",", ""))).AddRow(1, 2, 3, "video", "Clip", nil, "tap", status, start, ack, began, ended, expiry, nil)
 }
+
+func intp(i int) *int { return &i }
 
 func TestCreatePlayback(t *testing.T) {
 	for _, source := range []string{"scheduled", "staff", "tap"} {
 		t.Run(source, func(t *testing.T) {
 			s, mock := setup(t)
 			expiry := time.Now().UTC().Add(time.Hour)
-			mock.ExpectQuery(`INSERT INTO "Playback".*WHERE m.id = \$2 AND m.carepartner_id = \$1`).
-				WithArgs(2, 3, source, sqlmock.AnyArg(), expiry).WillReturnRows(playbackRows("requested", expiry))
-			p, err := s.CreatePlayback(context.Background(), 2, 3, source, expiry)
+			// Only scheduled plays name a scheduled item
+			var item *int
+			if source == "scheduled" {
+				item = intp(5)
+			}
+			mock.ExpectQuery(`INSERT INTO "Playback".*FROM "Media" m.*WHERE m.id = \$2 AND m.carepartner_id = \$1.*"ScheduledItem"`).
+				WithArgs(2, 3, item, source, sqlmock.AnyArg(), expiry).WillReturnRows(playbackRows("requested", expiry))
+			p, err := s.CreatePlayback(context.Background(), 2, 3, item, source, expiry)
 			require.NoError(t, err)
 			require.Equal(t, "requested", p.Status)
 			require.Nil(t, p.AcknowledgedAt)
@@ -56,16 +63,20 @@ func TestCreatePlayback(t *testing.T) {
 
 func TestCreateRejectsInvalidInput(t *testing.T) {
 	for _, test := range []struct {
-		cp, module int
-		source     string
-		expiry     time.Time
+		cp, media int
+		item      *int
+		source    string
+		expiry    time.Time
 	}{
-		{0, 3, "tap", time.Now().Add(time.Hour)}, {2, 0, "tap", time.Now().Add(time.Hour)},
-		{2, 3, "arbitrary text", time.Now().Add(time.Hour)}, {2, 3, "tap", time.Time{}},
-		{2, 3, "tap", time.Now().Add(-time.Hour)},
+		{0, 3, nil, "tap", time.Now().Add(time.Hour)}, {2, 0, nil, "tap", time.Now().Add(time.Hour)},
+		{2, 3, nil, "arbitrary text", time.Now().Add(time.Hour)}, {2, 3, nil, "tap", time.Time{}},
+		{2, 3, nil, "tap", time.Now().Add(-time.Hour)},
+		// scheduled plays need their scheduled item; tap and staff plays can't have one
+		{2, 3, nil, "scheduled", time.Now().Add(time.Hour)}, {2, 3, intp(0), "scheduled", time.Now().Add(time.Hour)},
+		{2, 3, intp(5), "tap", time.Now().Add(time.Hour)}, {2, 3, intp(5), "staff", time.Now().Add(time.Hour)},
 	} {
 		s, _ := setup(t)
-		_, err := s.CreatePlayback(context.Background(), test.cp, test.module, test.source, test.expiry)
+		_, err := s.CreatePlayback(context.Background(), test.cp, test.media, test.item, test.source, test.expiry)
 		require.ErrorIs(t, err, ErrInvalidInput)
 	}
 }
@@ -74,7 +85,7 @@ func TestCreateDatabaseErrors(t *testing.T) {
 	for _, cause := range []error{sql.ErrNoRows, errors.New("database unavailable")} {
 		s, mock := setup(t)
 		mock.ExpectQuery(`INSERT INTO "Playback"`).WillReturnError(cause)
-		p, err := s.CreatePlayback(context.Background(), 2, 3, "tap", time.Now().Add(time.Hour))
+		p, err := s.CreatePlayback(context.Background(), 2, 3, nil, "tap", time.Now().Add(time.Hour))
 		require.Nil(t, p)
 		if errors.Is(cause, sql.ErrNoRows) {
 			require.ErrorIs(t, err, ErrInvalidInput)
