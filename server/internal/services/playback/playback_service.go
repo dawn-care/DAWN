@@ -115,8 +115,15 @@ func (s *PlaybackService) UpdateStatus(ctx context.Context, id, carepartnerID in
 	if status == playback.StatusExpired && now.Before(p.ExpiresAt) {
 		return nil, fmt.Errorf("%w: expiry deadline has not passed", ErrInvalidTransition)
 	}
-	// Expiry is a deadline to start, not a limit on the length of a playing clip.
-	if (status == playback.StatusAcknowledged || status == playback.StatusStarted) && !now.Before(p.ExpiresAt) {
+	// Expiry is a deadline for the tablet to accept a command, not a limit on how
+	// long a clip may take to start or play. Acknowledging only moves a playback to
+	// "acknowledged"; it does not mark it finished. A tablet that acknowledges in
+	// time has committed to playing, so a later "started" (for example after a slow
+	// video buffers) is recorded as it happened rather than rewritten to "expired".
+	// If the tablet then fails to play, it reports "failed"; if it never reports
+	// anything, ExpireStale (commands.go) marks it "failed" AcknowledgedGrace after
+	// the deadline, so an acknowledged playback cannot stay looking healthy.
+	if status == playback.StatusAcknowledged && !now.Before(p.ExpiresAt) {
 		status = playback.StatusExpired
 	}
 	p.Status = status

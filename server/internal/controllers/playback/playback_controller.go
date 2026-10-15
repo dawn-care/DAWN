@@ -10,6 +10,7 @@ import (
 	"time"
 
 	playback "server/internal/models/playback"
+	"server/internal/realtime"
 	playbackSvc "server/internal/services/playback"
 
 	"github.com/go-chi/chi/v5"
@@ -18,14 +19,23 @@ import (
 type PlaybackServiceInterface interface {
 	CreatePlayback(context.Context, int, int, *int, string, time.Time) (*playback.Playback, error)
 	UpdateStatus(context.Context, int, int, string) (*playback.Playback, error)
+	RequestStaffPlay(context.Context, int, int) (*playback.Playback, error)
+	RequestStop(context.Context, int, int) (*playback.Playback, playbackSvc.StopOutcome, error)
+}
+
+// Notifier pushes a message to a carepartner's tablet, reporting whether it was
+// delivered to an open connection. Implemented by realtime.Hub.
+type Notifier interface {
+	Send(carepartnerID int, msg realtime.Message) bool
 }
 
 type PlaybackController struct {
-	Service PlaybackServiceInterface
+	Service  PlaybackServiceInterface
+	Notifier Notifier
 }
 
-func NewPlaybackController(service PlaybackServiceInterface) *PlaybackController {
-	return &PlaybackController{Service: service}
+func NewPlaybackController(service PlaybackServiceInterface, notifier Notifier) *PlaybackController {
+	return &PlaybackController{Service: service, Notifier: notifier}
 }
 
 // CreatePlaybackRequest names the media to play. scheduled_item_id is required when

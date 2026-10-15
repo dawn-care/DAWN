@@ -2,8 +2,9 @@ import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useVideoPlayer } from "expo-video";
-import { AUDIO_LOAD_TIMEOUT_MS, AUDIO_STALL_TIMEOUT_MS } from "../AudioPlayer";
-import Player from "../Player";
+import AudioPlayer, { AUDIO_LOAD_TIMEOUT_MS, AUDIO_STALL_TIMEOUT_MS } from "../AudioPlayer";
+import PhotoPlayer, { PHOTO_LOAD_TIMEOUT_MS } from "../PhotoPlayer";
+import VideoPlayer from "../VideoPlayer";
 
 jest.mock("expo-video", () => {
   const { View } = jest.requireActual("react-native");
@@ -40,7 +41,7 @@ function fakeVideoPlayer() {
 const audioStatus = (overrides: { isLoaded?: boolean; didJustFinish?: boolean; currentTime?: number } = {}) =>
   ({ isLoaded: false, didJustFinish: false, currentTime: 0, ...overrides }) as ReturnType<typeof useAudioPlayerStatus>;
 
-describe("Player", () => {
+describe("players", () => {
   const onFinished = jest.fn();
   const onFailed = jest.fn();
 
@@ -66,7 +67,7 @@ describe("Player", () => {
     });
 
     const renderVideo = () =>
-      render(<Player kind="video" uri="http://server/video/file?id=5" onFinished={onFinished} onFailed={onFailed} />);
+      render(<VideoPlayer uri="http://server/video/file?id=5" onFinished={onFinished} onFailed={onFailed} />);
 
     it("starts the given video on its own, once, with no controls", async () => {
       await renderVideo();
@@ -114,8 +115,7 @@ describe("Player", () => {
 
     // A fresh element each time, so rerender() actually renders again.
     const audioElement = () => (
-      <Player
-        kind="audio"
+      <AudioPlayer
         uri="http://server/audio/file?id=9"
         title="Moon River"
         onFinished={onFinished}
@@ -142,10 +142,9 @@ describe("Player", () => {
 
     it("shows the given image, and falls back to the music note if it fails to load", async () => {
       const element = (
-        <Player
-          kind="audio"
+        <AudioPlayer
           uri="http://server/audio/file?id=9"
-          imageUri="http://server/audio/cover?id=9"
+          coverUri="http://server/audio/cover?id=9"
           onFinished={onFinished}
           onFailed={onFailed}
         />
@@ -236,6 +235,183 @@ describe("Player", () => {
 
       expect(onFinished).toHaveBeenCalledTimes(1);
       expect(onFailed).not.toHaveBeenCalled();
+    });
+  });
+  describe("photo", () => {
+    const photoElement = (durationSeconds: number) => (
+      <PhotoPlayer
+        uri="http://server/photo/file?id=4"
+        durationSeconds={durationSeconds}
+        onFinished={onFinished}
+        onFailed={onFailed}
+      />
+    );
+    const image = () => screen.getByTestId("photo-player-image");
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    it("shows the given photo whole, with nothing else on screen", async () => {
+      await render(photoElement(5));
+
+      expect(image().props.source).toEqual({ uri: "http://server/photo/file?id=4" });
+      expect(image().props.resizeMode).toBe("contain");
+      expect(screen.queryByTestId("video-view")).toBeNull();
+    });
+
+    it("reports finished once the photo has been up for its duration", async () => {
+      await render(photoElement(5));
+      await act(async () => fireEvent(image(), "load"));
+
+      await act(async () => jest.advanceTimersByTime(4999));
+      expect(onFinished).not.toHaveBeenCalled();
+
+      await act(async () => jest.advanceTimersByTime(1));
+      expect(onFinished).toHaveBeenCalledTimes(1);
+      expect(onFailed).not.toHaveBeenCalled();
+    });
+
+    it("starts counting only once the photo has loaded", async () => {
+      await render(photoElement(5));
+
+      await act(async () => jest.advanceTimersByTime(8000));
+      await act(async () => fireEvent(image(), "load"));
+      await act(async () => jest.advanceTimersByTime(4999));
+
+      expect(onFinished).not.toHaveBeenCalled();
+    });
+
+    it("reports failed if the photo can't be loaded", async () => {
+      await render(photoElement(5));
+
+      await act(async () => fireEvent(image(), "error"));
+
+      expect(onFailed).toHaveBeenCalledWith("Photo could not be loaded");
+    });
+
+    it("reports failed if the photo neither loads nor fails", async () => {
+      await render(photoElement(5));
+
+      await act(async () => jest.advanceTimersByTime(PHOTO_LOAD_TIMEOUT_MS - 1));
+      expect(onFailed).not.toHaveBeenCalled();
+
+      await act(async () => jest.advanceTimersByTime(1));
+      expect(onFailed).toHaveBeenCalledWith("Photo did not load");
+    });
+
+    it("keeps its time when the parent passes new callbacks", async () => {
+      const view = await render(photoElement(5));
+      await act(async () => fireEvent(image(), "load"));
+      await act(async () => jest.advanceTimersByTime(3000));
+
+      const latest = jest.fn();
+      await view.rerender(
+        <PhotoPlayer uri="http://server/photo/file?id=4" durationSeconds={5} onFinished={latest} onFailed={onFailed} />,
+      );
+      await act(async () => jest.advanceTimersByTime(2000));
+
+      expect(latest).toHaveBeenCalledTimes(1);
+      expect(onFinished).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The contract in types.ts, checked against every kind. Each driver renders
+   * one player and makes it end the way that kind's media does.
+   */
+  describe("contract shared by every player", () => {
+    type Driver = {
+      render: () => Promise<{ unmount: () => Promise<void> | void; rerender: (el: React.ReactElement) => Promise<void> | void }>;
+      finish: (view: Awaited<ReturnType<Driver["render"]>>) => Promise<void>;
+      /** Must also work after the player is off screen. */
+      fail: () => Promise<void>;
+    };
+
+    let video: ReturnType<typeof fakeVideoPlayer>;
+    const audio = { play: jest.fn(), pause: jest.fn() };
+    const audioElement = () => (
+      <AudioPlayer uri="http://server/audio/file?id=9" onFinished={onFinished} onFailed={onFailed} />
+    );
+
+    const drivers: Record<"video" | "audio" | "photo", Driver> = {
+      video: {
+        render: () =>
+          render(<VideoPlayer uri="http://server/video/file?id=5" onFinished={onFinished} onFailed={onFailed} />),
+        finish: async () => act(async () => video.emit("playToEnd")),
+        fail: async () => act(async () => video.emit("statusChange", { status: "error", error: { message: "404" } })),
+      },
+      audio: {
+        render: () => render(audioElement()),
+        finish: async (view) => {
+          jest.mocked(useAudioPlayerStatus).mockReturnValue(audioStatus({ isLoaded: true, didJustFinish: true }));
+          await view.rerender(audioElement());
+        },
+        fail: async () => act(async () => jest.advanceTimersByTime(AUDIO_LOAD_TIMEOUT_MS)),
+      },
+      photo: {
+        render: () =>
+          render(<PhotoPlayer uri="http://server/photo/file?id=4" durationSeconds={2} onFinished={onFinished} onFailed={onFailed} />),
+        finish: async () => {
+          await act(async () => fireEvent(screen.getByTestId("photo-player-image"), "load"));
+          await act(async () => jest.advanceTimersByTime(2000));
+        },
+        fail: async () => act(async () => jest.advanceTimersByTime(PHOTO_LOAD_TIMEOUT_MS)),
+      },
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      video = fakeVideoPlayer();
+      jest.mocked(useVideoPlayer).mockImplementation((_source, setup) => {
+        setup?.(video as never);
+        return video as never;
+      });
+      jest.mocked(useAudioPlayer).mockReturnValue(audio as never);
+      jest.mocked(useAudioPlayerStatus).mockReturnValue(audioStatus());
+    });
+
+    describe.each(Object.keys(drivers) as (keyof typeof drivers)[])("%s", (kind) => {
+      const driver = drivers[kind];
+
+      it("reports nothing until its media ends", async () => {
+        await driver.render();
+
+        expect(onFinished).not.toHaveBeenCalled();
+        expect(onFailed).not.toHaveBeenCalled();
+      });
+
+      it("reports finished once, and nothing after", async () => {
+        const view = await driver.render();
+
+        await driver.finish(view);
+        await driver.fail();
+
+        expect(onFinished).toHaveBeenCalledTimes(1);
+        expect(onFailed).not.toHaveBeenCalled();
+      });
+
+      it("reports failed once with a reason, and nothing after", async () => {
+        const view = await driver.render();
+
+        await driver.fail();
+        await driver.fail();
+        await driver.finish(view);
+
+        expect(onFailed).toHaveBeenCalledTimes(1);
+        expect(onFailed).toHaveBeenCalledWith(expect.any(String));
+        expect(onFinished).not.toHaveBeenCalled();
+      });
+
+      it("reports nothing once taken off screen", async () => {
+        const view = await driver.render();
+
+        await view.unmount();
+        await driver.fail();
+
+        expect(onFinished).not.toHaveBeenCalled();
+        expect(onFailed).not.toHaveBeenCalled();
+      });
     });
   });
 });

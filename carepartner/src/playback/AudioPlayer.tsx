@@ -3,7 +3,7 @@ import { Image, StyleSheet, Text, View } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { fonts } from "../theme/fonts";
 import { colors, fontSizes, radii, space } from "../theme/theme";
-import type { MediaPlayerProps } from "./types";
+import type { PlayerProps } from "./types";
 
 /**
  * expo-audio reports no playback errors, so these timeouts stand in for them:
@@ -13,14 +13,14 @@ import type { MediaPlayerProps } from "./types";
 export const AUDIO_LOAD_TIMEOUT_MS = 15_000;
 export const AUDIO_STALL_TIMEOUT_MS = 20_000;
 
-type AudioPlayerProps = MediaPlayerProps & {
+type AudioPlayerProps = PlayerProps & {
   /** Shown under the image while the audio plays. */
   title?: string;
   /**
    * Shown while the audio plays, such as a song's album cover or the sender's
    * photo. Falls back to a music note if missing or if it fails to load.
    */
-  imageUri?: string;
+  coverUri?: string;
 };
 
 const FALLBACK_IMAGE = require("../../assets/images/music-note.jpg");
@@ -29,7 +29,7 @@ const FALLBACK_IMAGE = require("../../assets/images/music-note.jpg");
  * Plays one audio file over a still screen, starting on its own.
  * Remount it (change its `key`) to play a different file.
  */
-export default function AudioPlayer({ uri, title, imageUri, onFinished, onFailed }: AudioPlayerProps) {
+export default function AudioPlayer({ uri, title, coverUri, onFinished, onFailed }: AudioPlayerProps) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
   const ended = useRef(false);
@@ -70,7 +70,7 @@ export default function AudioPlayer({ uri, title, imageUri, onFinished, onFailed
     <View style={styles.root}>
       <Image
         testID="audio-image"
-        source={imageUri && !imageFailed ? { uri: imageUri } : FALLBACK_IMAGE}
+        source={coverUri && !imageFailed ? { uri: coverUri } : FALLBACK_IMAGE}
         onError={() => setImageFailed(true)}
         style={styles.cover}
         resizeMode="cover"

@@ -13,9 +13,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 	controller "server/internal/controllers/playback"
+	"server/internal/realtime"
 	routes "server/internal/routes/playback"
 	service "server/internal/services/playback"
 )
+
+// noopNotifier stands in for the tablet hub in tests that do not push commands.
+type noopNotifier struct{}
+
+func (noopNotifier) Send(int, realtime.Message) bool { return false }
 
 func setup(t *testing.T) (http.Handler, sqlmock.Sqlmock) {
 	t.Helper()
@@ -23,7 +29,7 @@ func setup(t *testing.T) (http.Handler, sqlmock.Sqlmock) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, mock.ExpectationsWereMet()); db.Close() })
 	r := chi.NewRouter()
-	routes.RegisterPlaybackRoutes(r, controller.NewPlaybackController(service.NewPlaybackService(db)))
+	routes.RegisterPlaybackRoutes(r, controller.NewPlaybackController(service.NewPlaybackService(db), noopNotifier{}))
 	return r, mock
 }
 

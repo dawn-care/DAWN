@@ -1,10 +1,9 @@
+import { GRID as SHARED_GRID, type GridArea } from "@shared";
 import { space } from "../theme/theme";
-import type { GridArea } from "./types";
 
-/** The always-on screen's grid. */
+/** The always-on screen's grid: the shared cell counts plus the tablet's padding and gap. */
 export const GRID = {
-  columns: 4,
-  rows: 3,
+  ...SHARED_GRID,
   gap: space.md,
   padding: space.lg,
 } as const;
@@ -12,20 +11,6 @@ export const GRID = {
 export type GridSpec = { columns: number; rows: number; gap: number; padding: number };
 export type Size = { width: number; height: number };
 export type Rect = { left: number; top: number; width: number; height: number };
-
-/** Whether an area fits on the grid; anything else is dropped rather than drawn off-screen. */
-export function fitsGrid(area: GridArea, spec: GridSpec = GRID): boolean {
-  const whole = [area.col, area.row, area.width, area.height].every(Number.isInteger);
-  return (
-    whole &&
-    area.col >= 0 &&
-    area.row >= 0 &&
-    area.width >= 1 &&
-    area.height >= 1 &&
-    area.col + area.width <= spec.columns &&
-    area.row + area.height <= spec.rows
-  );
-}
 
 /**
  * Where a grid area sits on a screen of the given size, in layout units.
