@@ -13,7 +13,7 @@ import (
 
 type PlayRequest struct {
 	CarepartnerID int `json:"carepartner_id"`
-	ModuleID      int `json:"module_id"`
+	MediaID       int `json:"media_id"`
 }
 
 type StopRequest struct {
@@ -29,12 +29,12 @@ type CommandResponse struct {
 }
 
 // PlayHandler godoc
-// @Summary Play a module on a carepartner's tablet (staff)
+// @Summary Play a media item on a carepartner's tablet (staff)
 // @Description Records a staff playback with a server-set 30 second deadline and pushes it to the tablet.
 // @Tags playback
 // @Accept json
 // @Produce json
-// @Param play body PlayRequest true "Carepartner and module to play"
+// @Param play body PlayRequest true "Carepartner and media item to play"
 // @Success 201 {object} CommandResponse
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
@@ -44,12 +44,12 @@ func (c *PlaybackController) PlayHandler(w http.ResponseWriter, r *http.Request)
 	if !decodeRequest(w, r, &req) {
 		return
 	}
-	p, err := c.Service.RequestStaffPlay(r.Context(), req.CarepartnerID, req.ModuleID)
+	p, err := c.Service.RequestStaffPlay(r.Context(), req.CarepartnerID, req.MediaID)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
-	delivered := c.Notifier.Send(p.CarepartnerID, realtime.PlayCommand(p.ID, p.ModuleID, p.ExpiresAt))
+	delivered := c.Notifier.Send(p.CarepartnerID, realtime.PlayCommand(p.ID, req.MediaID, p.ExpiresAt))
 	writeJSON(w, http.StatusCreated, CommandResponse{Playback: p, Delivered: delivered})
 }
 

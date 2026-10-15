@@ -12,12 +12,17 @@ import (
 	"io"
 	"net/http"
 	models "server/internal/models/widgets/news"
+	"time"
 )
 
+// NewsAPIBaseURL is where News API lives; tests point a service elsewhere
+const NewsAPIBaseURL = "https://newsapi.org"
+
 type NewsWidgetService struct {
-	db     *sql.DB
-	apiKey string
-	client *http.Client
+	db      *sql.DB
+	apiKey  string
+	client  *http.Client
+	baseURL string
 }
 
 type NewsAPIResponse struct {
@@ -30,9 +35,10 @@ type NewsAPIResponse struct {
 
 func NewNewsWidgetService(db *sql.DB, apiKey string) *NewsWidgetService {
 	return &NewsWidgetService{
-		db:     db,
-		apiKey: apiKey,
-		client: &http.Client{},
+		db:      db,
+		apiKey:  apiKey,
+		client:  &http.Client{Timeout: 10 * time.Second},
+		baseURL: NewsAPIBaseURL,
 	}
 }
 
@@ -120,10 +126,11 @@ func (s *NewsWidgetService) GetNewsWidgetStats() (int, error) {
 }
 
 /*
-Uses News API to search for reacent stories from goodnewsnetwork.org
+Uses News API to search for reacent stories from goodnewsnetwork.org.
+A news screen widget has no settings, so every news widget uses this as is.
 */
 func (s *NewsWidgetService) GetGoodNews() (*NewsAPIResponse, error) {
-	url := "https://newsapi.org/v2/everything?domains=goodnewsnetwork.org"
+	url := s.baseURL + "/v2/everything?domains=goodnewsnetwork.org"
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating http request: %v", err)

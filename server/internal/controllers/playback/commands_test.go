@@ -21,11 +21,11 @@ import (
 
 // mockService implements PlaybackServiceInterface.
 type mockService struct {
-	requestStaffPlay func(ctx context.Context, carepartnerID, moduleID int) (*model.Playback, error)
+	requestStaffPlay func(ctx context.Context, carepartnerID, mediaID int) (*model.Playback, error)
 	requestStop      func(ctx context.Context, id, carepartnerID int) (*model.Playback, service.StopOutcome, error)
 }
 
-func (m *mockService) CreatePlayback(context.Context, int, int, string, time.Time) (*model.Playback, error) {
+func (m *mockService) CreatePlayback(context.Context, int, int, *int, string, time.Time) (*model.Playback, error) {
 	panic("not used by command endpoints")
 }
 
@@ -37,8 +37,8 @@ func (m *mockService) RequestStop(ctx context.Context, id, carepartnerID int) (*
 	return m.requestStop(ctx, id, carepartnerID)
 }
 
-func (m *mockService) RequestStaffPlay(ctx context.Context, carepartnerID, moduleID int) (*model.Playback, error) {
-	return m.requestStaffPlay(ctx, carepartnerID, moduleID)
+func (m *mockService) RequestStaffPlay(ctx context.Context, carepartnerID, mediaID int) (*model.Playback, error) {
+	return m.requestStaffPlay(ctx, carepartnerID, mediaID)
 }
 
 // recordingNotifier stands in for the tablet hub and records what was pushed.
@@ -80,14 +80,14 @@ func decode(t *testing.T, rec *httptest.ResponseRecorder) controller.CommandResp
 
 func TestPlayPushesCommandToTablet(t *testing.T) {
 	expires := time.Now().UTC().Add(30 * time.Second).Truncate(time.Second)
-	svc := &mockService{requestStaffPlay: func(_ context.Context, cp, module int) (*model.Playback, error) {
+	svc := &mockService{requestStaffPlay: func(_ context.Context, cp, media int) (*model.Playback, error) {
 		require.Equal(t, 2, cp)
-		require.Equal(t, 3, module)
-		return &model.Playback{ID: 9, CarepartnerID: cp, ModuleID: module, Source: "staff", Status: "requested", ExpiresAt: expires}, nil
+		require.Equal(t, 3, media)
+		return &model.Playback{ID: 9, CarepartnerID: cp, MediaID: &media, Source: "staff", Status: "requested", ExpiresAt: expires}, nil
 	}}
 	notifier := &recordingNotifier{online: true}
 
-	rec := post(commandRouter(svc, notifier), "/api/playbacks/play", `{"carepartner_id":2,"module_id":3}`)
+	rec := post(commandRouter(svc, notifier), "/api/playbacks/play", `{"carepartner_id":2,"media_id":3}`)
 
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 	resp := decode(t, rec)
@@ -100,12 +100,12 @@ func TestPlayPushesCommandToTablet(t *testing.T) {
 }
 
 func TestPlayWithTabletOfflineStillRecordsCommand(t *testing.T) {
-	svc := &mockService{requestStaffPlay: func(_ context.Context, cp, module int) (*model.Playback, error) {
-		return &model.Playback{ID: 9, CarepartnerID: cp, ModuleID: module, Status: "requested", ExpiresAt: time.Now().Add(30 * time.Second)}, nil
+	svc := &mockService{requestStaffPlay: func(_ context.Context, cp, media int) (*model.Playback, error) {
+		return &model.Playback{ID: 9, CarepartnerID: cp, MediaID: &media, Status: "requested", ExpiresAt: time.Now().Add(30 * time.Second)}, nil
 	}}
 	notifier := &recordingNotifier{online: false}
 
-	rec := post(commandRouter(svc, notifier), "/api/playbacks/play", `{"carepartner_id":2,"module_id":3}`)
+	rec := post(commandRouter(svc, notifier), "/api/playbacks/play", `{"carepartner_id":2,"media_id":3}`)
 
 	// The row exists, so the command is resent if the tablet reconnects in time.
 	require.Equal(t, http.StatusCreated, rec.Code)
@@ -114,11 +114,11 @@ func TestPlayWithTabletOfflineStillRecordsCommand(t *testing.T) {
 
 func TestPlayRejectedByServiceSendsNothing(t *testing.T) {
 	svc := &mockService{requestStaffPlay: func(context.Context, int, int) (*model.Playback, error) {
-		return nil, service.ErrInvalidInput // e.g. the module belongs to another carepartner
+		return nil, service.ErrInvalidInput // e.g. the media belongs to another carepartner
 	}}
 	notifier := &recordingNotifier{online: true}
 
-	rec := post(commandRouter(svc, notifier), "/api/playbacks/play", `{"carepartner_id":2,"module_id":99}`)
+	rec := post(commandRouter(svc, notifier), "/api/playbacks/play", `{"carepartner_id":2,"media_id":99}`)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.Empty(t, notifier.sent)
@@ -130,8 +130,8 @@ func TestPlayRejectsClientChosenFields(t *testing.T) {
 
 	// The deadline and source are the server's to set.
 	for _, body := range []string{
-		`{"carepartner_id":2,"module_id":3,"expires_at":"2099-01-01T00:00:00Z"}`,
-		`{"carepartner_id":2,"module_id":3,"source":"tap"}`,
+		`{"carepartner_id":2,"media_id":3,"expires_at":"2099-01-01T00:00:00Z"}`,
+		`{"carepartner_id":2,"media_id":3,"source":"tap"}`,
 		`not json`,
 	} {
 		require.Equal(t, http.StatusBadRequest, post(r, "/api/playbacks/play", body).Code, body)

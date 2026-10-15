@@ -24,12 +24,13 @@ func NewPlaybackService(db *sql.DB) *PlaybackService {
 	return &PlaybackService{DB: db}
 }
 
-const columns = `id, carepartner_id, module_id, source, status, requested_at,
-	acknowledged_at, started_at, ended_at, expires_at, rating`
+const columns = `id, carepartner_id, media_id, media_kind, media_display_name, scheduled_item_id,
+	source, status, requested_at, acknowledged_at, started_at, ended_at, expires_at, rating`
 
 func scanPlayback(row *sql.Row) (*playback.Playback, error) {
 	p := &playback.Playback{}
-	err := row.Scan(&p.ID, &p.CarepartnerID, &p.ModuleID, &p.Source, &p.Status,
+	err := row.Scan(&p.ID, &p.CarepartnerID, &p.MediaID, &p.MediaKind, &p.MediaDisplayName,
+		&p.ScheduledItemID, &p.Source, &p.Status,
 		&p.RequestedAt, &p.AcknowledgedAt, &p.StartedAt, &p.EndedAt, &p.ExpiresAt, &p.Rating)
 	if err != nil {
 		return nil, err
@@ -38,26 +39,40 @@ func scanPlayback(row *sql.Row) (*playback.Playback, error) {
 }
 
 // CreatePlayback is shared by scheduled, staff-requested and tablet-initiated plays.
+// A scheduled play names its scheduled item; tap and staff plays don't have one.
 // The caller must supply an expiry deadline; no arbitrary default is assumed.
-func (s *PlaybackService) CreatePlayback(ctx context.Context, carepartnerID, moduleID int, source string, expiresAt time.Time) (*playback.Playback, error) {
+func (s *PlaybackService) CreatePlayback(ctx context.Context, carepartnerID, mediaID int, scheduledItemID *int, source string, expiresAt time.Time) (*playback.Playback, error) {
 	now := time.Now().UTC()
-	if carepartnerID <= 0 || moduleID <= 0 || !expiresAt.After(now) {
+	if carepartnerID <= 0 || mediaID <= 0 || !expiresAt.After(now) {
 		return nil, fmt.Errorf("%w: positive IDs and a future expiry are required", ErrInvalidInput)
 	}
 	switch source {
-	case playback.SourceScheduled, playback.SourceStaff, playback.SourceTap:
+	case playback.SourceScheduled:
+		if scheduledItemID == nil || *scheduledItemID <= 0 {
+			return nil, fmt.Errorf("%w: scheduled plays need a scheduled_item_id", ErrInvalidInput)
+		}
+	case playback.SourceStaff, playback.SourceTap:
+		if scheduledItemID != nil {
+			return nil, fmt.Errorf("%w: only scheduled plays have a scheduled_item_id", ErrInvalidInput)
+		}
 	default:
 		return nil, fmt.Errorf("%w: unknown source", ErrInvalidInput)
 	}
 
-	// Check the module's carepartner in the INSERT rather than trusting the request.
+	// Check in the INSERT, rather than trusting the request, that the media belongs to the
+	// carepartner and that a scheduled item belongs to them and plays this media.
+	// The media's kind and name are copied so the record outlives the media.
 	p, err := scanPlayback(s.DB.QueryRowContext(ctx, `
-		INSERT INTO "Playback" (carepartner_id, module_id, source, requested_at, expires_at)
-		SELECT $1, m.id, $3, $4, $5 FROM "Module" m
+		INSERT INTO "Playback" (carepartner_id, media_id, media_kind, media_display_name,
+		                        scheduled_item_id, source, requested_at, expires_at)
+		SELECT $1, m.id, m.kind, m.display_name, $3::int, $4, $5, $6 FROM "Media" m
 		WHERE m.id = $2 AND m.carepartner_id = $1
-		RETURNING `+columns, carepartnerID, moduleID, source, now, expiresAt.UTC()))
+		  AND ($3::int IS NULL OR EXISTS (
+		    SELECT 1 FROM "ScheduledItem" si
+		    WHERE si.id = $3::int AND si.carepartner_id = $1 AND si.media_id = $2))
+		RETURNING `+columns, carepartnerID, mediaID, scheduledItemID, source, now, expiresAt.UTC()))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: module does not belong to this carepartner", ErrInvalidInput)
+		return nil, fmt.Errorf("%w: media or scheduled item does not belong to this carepartner", ErrInvalidInput)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("create playback: %w", err)

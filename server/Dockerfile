@@ -50,7 +50,8 @@ COPY --from=builder /app/main /app/migrate ./
 # Copy built frontend
 COPY --from=frontend-builder /frontend/caregiver/dist /app/frontend
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# ffmpeg provides ffprobe, which reads video and audio durations on upload
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 80 443
 
