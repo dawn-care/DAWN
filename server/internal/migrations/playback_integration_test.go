@@ -74,7 +74,9 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 			require.ErrorIs(t, err, playback.ErrInvalidInput, "media of another carepartner")
 			p, err := svc.CreatePlayback(ctx, cp, media, nil, "tap", time.Now().Add(time.Hour))
 			require.NoError(t, err)
-			require.Equal(t, media, p.MediaID)
+			require.Equal(t, media, *p.MediaID)
+			require.Equal(t, "video", p.MediaKind)
+			require.Equal(t, "Clip", p.MediaDisplayName)
 			require.Nil(t, p.ScheduledItemID)
 			require.Nil(t, p.Rating)
 			for _, status := range []string{"acknowledged", "started", "finished"} {
@@ -104,6 +106,16 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 				_, err := db.Exec(query)
 				require.Error(t, err, query)
 			}
+			// Deleting the media keeps its playbacks and what they played. It also deletes
+			// the scheduled item that played it, which clears the scheduled play's link.
+			_, err = db.Exec(`DELETE FROM "Media" WHERE id = $1`, media)
+			require.NoError(t, err)
+			var kept, unlinked int
+			require.NoError(t, db.QueryRow(`SELECT count(*), count(*) FILTER (WHERE media_id IS NULL AND scheduled_item_id IS NULL
+				AND media_kind = 'video' AND media_display_name = 'Clip') FROM "Playback" WHERE id IN ($1, $2)`,
+				p.ID, scheduled.ID).Scan(&kept, &unlinked))
+			require.Equal(t, 2, kept)
+			require.Equal(t, 2, unlinked)
 		})
 	}
 }

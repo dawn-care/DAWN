@@ -33,7 +33,7 @@ func playbackRows(status string, expiry time.Time) *sqlmock.Rows {
 	if status == "finished" || status == "stopped" || status == "failed" || status == "expired" {
 		ended = start.Add(3 * time.Second)
 	}
-	return sqlmock.NewRows(strings.Fields(strings.ReplaceAll(columns, ",", ""))).AddRow(1, 2, 3, nil, "tap", status, start, ack, began, ended, expiry, nil)
+	return sqlmock.NewRows(strings.Fields(strings.ReplaceAll(columns, ",", ""))).AddRow(1, 2, 3, "video", "Clip", nil, "tap", status, start, ack, began, ended, expiry, nil)
 }
 
 func intp(i int) *int { return &i }

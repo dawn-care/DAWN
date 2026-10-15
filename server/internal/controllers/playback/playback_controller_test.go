@@ -42,8 +42,8 @@ func call(r http.Handler, method, path, body string) *httptest.ResponseRecorder 
 }
 
 func rows(status string) *sqlmock.Rows {
-	return sqlmock.NewRows([]string{"id", "carepartner_id", "media_id", "scheduled_item_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
-		AddRow(1, 2, 3, nil, "tap", status, time.Now().UTC(), nil, nil, nil, time.Now().Add(time.Hour), nil)
+	return sqlmock.NewRows([]string{"id", "carepartner_id", "media_id", "media_kind", "media_display_name", "scheduled_item_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
+		AddRow(1, 2, 3, "video", "Clip", nil, "tap", status, time.Now().UTC(), nil, nil, nil, time.Now().Add(time.Hour), nil)
 }
 
 func TestCreatePlaybackEndpoint(t *testing.T) {
@@ -56,6 +56,8 @@ func TestCreatePlaybackEndpoint(t *testing.T) {
 	require.Contains(t, response.Body.String(), `"status":"requested"`)
 	require.Contains(t, response.Body.String(), `"rating":null`)
 	require.Contains(t, response.Body.String(), `"media_id":3`)
+	require.Contains(t, response.Body.String(), `"media_kind":"video"`)
+	require.Contains(t, response.Body.String(), `"media_display_name":"Clip"`)
 }
 
 func TestCreateScheduledPlaybackEndpoint(t *testing.T) {

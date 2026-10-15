@@ -570,9 +570,15 @@ Report progress: `{"carepartner_id": 1, "status": "started"}`. Statuses move for
 
 Repeating the current status is harmless. Acknowledging or starting after `expires_at` records `expired` instead. An invalid move returns `409`.
 
+### Staff play and stop
+
+`POST /playbacks/play` with `{"carepartner_id": 1, "media_id": 9}` records a `staff` playback with a 30 second deadline and pushes it to the tablet over the WebSocket at `/realtime/tablet?carepartner_id=1`. `POST /playbacks/{id}/stop` with `{"carepartner_id": 1}` stops one. `module_id` is no longer accepted (`400`).
+
+The tablet receives `{"type":"play","playback_id":12,"media_id":9,"expires_at":"..."}` (this field was `module_id`) and reports progress on the same socket with `{"type":"status","playback_id":12,"status":"acknowledged"}`. Look the media up with `GET /media/{id}`. A missed play command is resent when the tablet reconnects before it expires, unless the media was deleted in the meantime.
+
 ### Errors
 
-These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise. Deleting a media item deletes its playbacks; deleting a scheduled item keeps them and clears `scheduled_item_id`.
+These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise. Deleting a media item keeps its playbacks and clears `media_id`; `media_kind` and `media_display_name` still say what played (the name as it was when it played). Deleting a scheduled item likewise keeps them and clears `scheduled_item_id`.
 
 ```ts
 export type PlaybackSource = "scheduled" | "staff" | "tap";
@@ -580,7 +586,9 @@ export type PlaybackStatus = "requested" | "acknowledged" | "started" | "finishe
 export interface Playback {
   id: number;
   carepartner_id: number;
-  media_id: number;
+  media_id: number | null;       // null once the media is deleted
+  media_kind: "photo" | "video" | "audio";
+  media_display_name: string;    // copied when the playback is created
   scheduled_item_id: number | null;
   source: PlaybackSource;
   status: PlaybackStatus;
