@@ -120,8 +120,9 @@ func TestConnectUnknownCarepartner(t *testing.T) {
 func TestTabletRoundTrip(t *testing.T) {
 	expires := time.Now().UTC().Add(20 * time.Second).Truncate(time.Second)
 	var reported []string
+	mediaID := 4
 	playbacks := &mockPlaybacks{
-		live: &model.Playback{ID: 11, CarepartnerID: 5, ModuleID: 4, Status: "requested", ExpiresAt: expires},
+		live: &model.Playback{ID: 11, CarepartnerID: 5, MediaID: &mediaID, Status: "requested", ExpiresAt: expires},
 		updateStatus: func(_ context.Context, id, cp int, status string) (*model.Playback, error) {
 			require.Equal(t, 11, id)
 			require.Equal(t, 5, cp, "status reports are scoped to the connected tablet")

@@ -3,6 +3,8 @@ package caregiver
 import (
 	"database/sql"
 	"fmt"
+
+	"server/internal/db"
 )
 
 // Caregiver represents a caregiver "user"
@@ -220,10 +222,11 @@ func UpdateCaregiver(db *sql.DB, c *Caregiver) error {
 // DELETE
 // ─────────────────────────────────────────────
 
-func DeleteCaregiver(db *sql.DB, id int) error {
+// Delete a caregiver; works with a *sql.DB or a *sql.Tx
+func DeleteCaregiver(exec db.Execer, id int) error {
 	query := `DELETE FROM "Caregiver" WHERE id = $1;`
 
-	res, err := db.Exec(query, id)
+	res, err := exec.Exec(query, id)
 	if err != nil {
 		return err
 	}

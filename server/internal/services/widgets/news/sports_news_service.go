@@ -12,10 +12,14 @@ import (
 	models "server/internal/models/widgets/news"
 )
 
+// ESPNBaseURL is where the ESPN site API lives; tests point a service elsewhere
+const ESPNBaseURL = "http://site.api.espn.com"
+
 // Service sturct (ESPN API does not require key)
 type SportsNewsWidgetService struct {
-	db     *sql.DB
-	client *http.Client
+	db      *sql.DB
+	client  *http.Client
+	baseURL string
 }
 
 // Struct to parse response from ESPN Sports API for team schedule
@@ -44,12 +48,21 @@ type Team struct {
 	Score    float64
 }
 
+// Results of a team's last game, for short labels like "Yankees Won"
+const (
+	ResultWon      = "won"
+	ResultLost     = "lost"
+	ResultTied     = "tied"
+	ResultUpcoming = "upcoming" // no game played yet this season
+)
+
 // Struct to represent the game summary information to be sent to the frontend for display in the sports news widget
 type GameSummaryResponse struct {
 	UserTeamName     string `json:"user_team_name"`
 	OpponentTeamName string `json:"opponent_team_name"`
 	UserScore        int    `json:"user_score"`
 	OpponentScore    int    `json:"opponent_score"`
+	Result           string `json:"result"`
 	Message          string `json:"message"`
 }
 
@@ -57,8 +70,9 @@ var SPORTS_LEAGUES_MAP = map[string]string{"nfl": "football", "nba": "basketball
 
 func NewSportsNewsWidgetService(db *sql.DB) *SportsNewsWidgetService {
 	return &SportsNewsWidgetService{
-		db:     db,
-		client: &http.Client{},
+		db:      db,
+		client:  &http.Client{Timeout: 10 * time.Second},
+		baseURL: ESPNBaseURL,
 	}
 }
 
@@ -204,24 +218,40 @@ func (s *SportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
 // EXTERNAL API CALLS
 
 /*
-Gets the the schedule for a team then calls the helper function to parse that data into a game summary
-sports_news_widget - sports news widget containing the league and team information
+Gets the last game for an old NewsWidget row (used by /api/sports/team-game), where
+COUNTRY holds the league and LANGUAGE holds the team as "Team Name (ABBR)"
 */
 func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWidget) (*GameSummaryResponse, error) {
 	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
 		return nil, errors.New("league and team cannot be empty")
 	}
-	sport := SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY]
 	re := regexp.MustCompile(`\(([^)]+)\)$`)
 	match := re.FindStringSubmatch(sports_news_widget.LANGUAGE)
 	teamAbbr := ""
 	if len(match) > 1 {
 		teamAbbr = match[1]
 	}
+	return s.GetTeamGameFor(sports_news_widget.COUNTRY, teamAbbr)
+}
+
+/*
+Gets the schedule for a team then calls the helper function to parse that data into a game
+summary. Used with a sports screen widget's config.league and config.team.
+league - nfl, nba, mlb or nhl
+team - the team abbreviation, as listed by GET /api/widgets/sports/teams
+*/
+func (s *SportsNewsWidgetService) GetTeamGameFor(league, team string) (*GameSummaryResponse, error) {
+	sport, ok := SPORTS_LEAGUES_MAP[league]
+	if !ok {
+		return nil, fmt.Errorf("unknown league %q", league)
+	}
+	if team == "" {
+		return nil, errors.New("team cannot be empty")
+	}
 
 	url := fmt.Sprintf(
-		"http://site.api.espn.com/apis/site/v2/sports/%s/%s/teams/%s/schedule",
-		sport, sports_news_widget.COUNTRY, teamAbbr,
+		"%s/apis/site/v2/sports/%s/%s/teams/%s/schedule",
+		s.baseURL, sport, league, team,
 	)
 	resp, err := s.client.Get(url)
 	if err != nil {
@@ -236,7 +266,7 @@ func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWid
 		return nil, fmt.Errorf("failed to parse team schedule response: %v", err)
 	}
 
-	game_summary, err := CreateGameSummary(&apiResponse, teamAbbr)
+	game_summary, err := CreateGameSummary(&apiResponse, team)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create game summary: %v", err)
 	}
@@ -245,18 +275,25 @@ func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWid
 }
 
 /*
-Parses the API response into a structured GameSummaryResponse
+Parses the API response into a structured GameSummaryResponse for the team's most recent
+game that has already started. If none has (e.g. before the season), Result is "upcoming".
 apiResponse - the response from the ESPN Sports API containing the team schedule and game information
 team - the team abbreviation to identify the user's team in the API response
 */
 func CreateGameSummary(apiResponse *SportAPIResponse, team string) (*GameSummaryResponse, error) {
+	return createGameSummaryAt(apiResponse, team, time.Now().UTC())
+}
+
+func createGameSummaryAt(apiResponse *SportAPIResponse, team string, now time.Time) (*GameSummaryResponse, error) {
 	if apiResponse == nil || len(apiResponse.Events) == 0 {
-		return &GameSummaryResponse{Message: "No upcoming games found."}, nil
+		return &GameSummaryResponse{Result: ResultUpcoming, Message: "No upcoming games found."}, nil
 	}
 
-	game_index := 0
-	now := time.Now().UTC()
+	game_index := -1
 	for i := len(apiResponse.Events) - 1; i >= 0; i-- {
+		if len(apiResponse.Events[i].Competitions) == 0 {
+			continue
+		}
 		date, err := time.Parse("2006-01-02T15:04Z", apiResponse.Events[i].Competitions[0].Date)
 		if err != nil {
 			return nil, err
@@ -265,6 +302,9 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (*GameSummary
 			game_index = i
 			break
 		}
+	}
+	if game_index == -1 {
+		return &GameSummaryResponse{Result: ResultUpcoming, Message: "Your team hasn't played yet this season."}, nil
 	}
 
 	var user_team, opponent_team Team
@@ -285,16 +325,18 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (*GameSummary
 		}
 	}
 
-	var message string
-	result := "won"
-	if user_team.Score <= opponent_team.Score {
-		result = "lost"
+	result := ResultWon
+	switch {
+	case user_team.Score < opponent_team.Score:
+		result = ResultLost
+	case user_team.Score == opponent_team.Score:
+		result = ResultTied
 	}
 	location := "away"
 	if user_team.HomeAway == "home" {
 		location = "at home"
 	}
-	message = fmt.Sprintf("In the last game, your team the %s %s against the %s %s, with a score of %d to %d.",
+	message := fmt.Sprintf("In the last game, your team the %s %s against the %s %s, with a score of %d to %d.",
 		user_team.Name, result, opponent_team.Name, location, int(user_team.Score), int(opponent_team.Score))
 
 	return &GameSummaryResponse{
@@ -302,6 +344,7 @@ func CreateGameSummary(apiResponse *SportAPIResponse, team string) (*GameSummary
 		OpponentTeamName: opponent_team.Name,
 		UserScore:        int(user_team.Score),
 		OpponentScore:    int(opponent_team.Score),
+		Result:           result,
 		Message:          message,
 	}, nil
 }
