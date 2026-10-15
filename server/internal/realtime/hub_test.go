@@ -75,7 +75,7 @@ func TestSendReachesConnectedTablet(t *testing.T) {
 	msg := read(t, conn)
 	require.Equal(t, TypePlay, msg.Type)
 	require.Equal(t, 12, msg.PlaybackID)
-	require.Equal(t, 3, msg.ModuleID)
+	require.Equal(t, 3, msg.MediaID)
 	require.True(t, expires.Equal(*msg.ExpiresAt))
 }
 

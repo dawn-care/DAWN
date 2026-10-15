@@ -5,18 +5,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
+	neturl "net/url"
 	"regexp"
+	"time"
 
 	widgets "server/internal/models/widgets/weather"
 )
 
+// OpenWeatherBaseURL is where the OpenWeather API lives; tests point a service elsewhere
+const OpenWeatherBaseURL = "https://api.openweathermap.org"
+
 // Service struct
 type WeatherService struct {
-	db     *sql.DB
-	apiKey string
-	client *http.Client
+	db      *sql.DB
+	apiKey  string
+	client  *http.Client
+	baseURL string
 }
 
 // Struct to represent the geocoding response from OpenWeather API
@@ -72,9 +79,10 @@ type WeatherOverviewResponse struct {
 
 func NewWeatherService(db *sql.DB, apiKey string) *WeatherService {
 	return &WeatherService{
-		db:     db,
-		apiKey: apiKey,
-		client: &http.Client{},
+		db:      db,
+		apiKey:  apiKey,
+		client:  &http.Client{Timeout: 10 * time.Second},
+		baseURL: OpenWeatherBaseURL,
 	}
 }
 
@@ -208,14 +216,30 @@ func (s *WeatherService) GetWeatherWidgetStats() (int, error) {
 // EXTERNAL API CALLS
 
 /*
-Uses OpenWeather API to get coordinates from zipcode, then fetches current weather and the overview for the day
+Gets the weather overview for an old WeatherWidget row (used by /api/weather/overview)
 weather_widget - weather widget containing the zipcode information
 */
 func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (*WeatherOverviewResponse, error) {
+	return s.GetWeatherForZip(weather_widget.ZIPCODE)
+}
+
+/*
+Uses OpenWeather API to get coordinates from a US zip code, then fetches current weather
+and the overview for the day. Used with a weather screen widget's config.zip.
+The day's overview text is optional: if that request fails (it needs a One Call 3.0
+subscription), the current weather is still returned with an empty Message.
+zip - 5 digit US zip code
+*/
+func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse, error) {
+	if zip == "" {
+		return nil, errors.New("zip cannot be empty")
+	}
+
 	// 1. Geocode zipcode to coordinates
 	url := fmt.Sprintf(
-		"https://api.openweathermap.org/geo/1.0/zip?zip=%s,US&appid=%s",
-		weather_widget.ZIPCODE,
+		"%s/geo/1.0/zip?zip=%s,US&appid=%s",
+		s.baseURL,
+		neturl.QueryEscape(zip),
 		s.apiKey,
 	)
 
@@ -238,8 +262,8 @@ func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidge
 
 	// 2. Fetch current weather (temp, conditions, etc.)
 	currentURL := fmt.Sprintf(
-		"https://api.openweathermap.org/data/2.5/weather?lat=%f&lon=%f&units=%s&appid=%s",
-		coordinate_response.Lat, coordinate_response.Lon, unitsParam, s.apiKey,
+		"%s/data/2.5/weather?lat=%f&lon=%f&units=%s&appid=%s",
+		s.baseURL, coordinate_response.Lat, coordinate_response.Lon, unitsParam, s.apiKey,
 	)
 
 	currentResp, err := s.client.Get(currentURL)
@@ -257,25 +281,15 @@ func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidge
 		return nil, fmt.Errorf("failed parsing current weather response: %v", err)
 	}
 
-	// 3. Fetch overview text
+	// 3. Fetch overview text (optional; the widget still works without it)
 	overviewURL := fmt.Sprintf(
-		"https://api.openweathermap.org/data/3.0/onecall/overview?lon=%f&lat=%f&units=%s&appid=%s",
-		coordinate_response.Lon, coordinate_response.Lat, unitsParam, s.apiKey,
+		"%s/data/3.0/onecall/overview?lon=%f&lat=%f&units=%s&appid=%s",
+		s.baseURL, coordinate_response.Lon, coordinate_response.Lat, unitsParam, s.apiKey,
 	)
-
-	overviewResp, err := s.client.Get(overviewURL)
+	oneCallResponse, err := s.getOverview(overviewURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed overview request: %v", err)
-	}
-	defer overviewResp.Body.Close()
-
-	if overviewResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("overview API returned status %d", overviewResp.StatusCode)
-	}
-
-	var oneCallResponse OneCallOverviewResponse
-	if err := json.NewDecoder(overviewResp.Body).Decode(&oneCallResponse); err != nil {
-		return nil, fmt.Errorf("failed parsing overview response: %v", err)
+		log.Printf("weather: no daily overview for %s: %v", zip, err)
+		oneCallResponse = &OneCallOverviewResponse{}
 	}
 
 	// 4. Build structured response
@@ -303,4 +317,23 @@ func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidge
 		Description: description,
 		Message:     oneCallResponse.WeatherOverview,
 	}, nil
+}
+
+// getOverview fetches the day's weather overview text
+func (s *WeatherService) getOverview(url string) (*OneCallOverviewResponse, error) {
+	resp, err := s.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed overview request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("overview API returned status %d", resp.StatusCode)
+	}
+
+	var oneCallResponse OneCallOverviewResponse
+	if err := json.NewDecoder(resp.Body).Decode(&oneCallResponse); err != nil {
+		return nil, fmt.Errorf("failed parsing overview response: %v", err)
+	}
+	return &oneCallResponse, nil
 }

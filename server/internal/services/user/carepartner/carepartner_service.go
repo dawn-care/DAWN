@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"server/internal/models/screen_settings"
 	"server/internal/models/user/carepartner"
 )
 
@@ -19,12 +20,26 @@ func NewCarepartnerService(db *sql.DB) *CarepartnerService {
 // CREATE
 // ─────────────────────────────────────────────
 
+// CreateCarepartner creates the carepartner and their default screen settings together
 func (s *CarepartnerService) CreateCarepartner(c *carepartner.Carepartner) error {
 	if c == nil {
 		return errors.New("carepartner is nil")
 	}
 
-	return carepartner.CreateCarepartner(s.DB, c)
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := carepartner.CreateCarepartner(tx, c); err != nil {
+		return err
+	}
+	if err := screen_settings.CreateDefaultScreenSettings(tx, c.ID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // ─────────────────────────────────────────────
