@@ -121,6 +121,14 @@ func UpdateCarepartner(db *sql.DB, c *Carepartner) error {
 	return nil
 }
 
+// Unpair every carepartner paired with a caregiver; works with a *sql.DB or a *sql.Tx
+func UnpairCarepartnersFromCaregiver(exec db.Execer, caregiverID int) error {
+	query := `UPDATE "Carepartner" SET caregiver_id = NULL WHERE caregiver_id = $1;`
+
+	_, err := exec.Exec(query, caregiverID)
+	return err
+}
+
 // ─────────────────────────────────────────────
 // DELETE
 // ─────────────────────────────────────────────
