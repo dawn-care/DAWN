@@ -177,13 +177,6 @@ This starts Postgres, MinIO, and the Go server, which also serves the built care
 | MinIO console (`localuser` / `localpass123`) | http://localhost:9001 |
 
 Code changes need a rebuild (`up --build` again). On startup, the API applies pending Goose migrations and seeds a fresh database. Existing databases created by `init/database.sql` need the one-time baseline step below before the API can start.
-The database starts empty the first time its volume is created. Once the stack is up, create the tables and demo data (a demo caregiver and carepartner) by running the migrations from the repo root:
-
-```bash
-docker compose exec server ./migrate
-```
-
-Code changes need a rebuild (`up --build` again); run `./migrate` again after pulling new migrations. To reset the database, run the command above with `down -v` in place of `up --build`, start again, and run `./migrate`.
 
 #### Option B: backend and frontend on your machine (hot reload)
 
@@ -200,13 +193,6 @@ docker compose up -d minio minio-init
 ```bash
 psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
 psql -c "CREATE DATABASE mydb OWNER myuser;"
-```
-
-Then create the tables and demo data by running the migrations (from `server/`; they connect with the same `DB_*` defaults as the API):
-
-```bash
-cd server
-go run ./cmd/migrate
 ```
 
 The API creates the schema and demo data through Goose on its first startup.
@@ -250,10 +236,7 @@ SQL files are embedded in the executable: rebuild it or the Docker image after
 adding migrations, then restart/recreate the server. Startup also applies
 destructive SQL, so review pending migrations before deployment.
 Add the next numbered file under `server/internal/migrations/sql/`
-(for example `00002_add_album_covers.sql`) with `-- +goose Up` and the forward
-Migrations run only when this command is invoked. SQL files are embedded in the
-executable. Add the next numbered file under `server/internal/migrations/sql/`
-(for example `00005_add_album_covers.sql`) with `-- +goose Up` and the forward
+(for example `00006_add_album_covers.sql`) with `-- +goose Up` and the forward
 SQL. Use Goose's `StatementBegin` / `StatementEnd` around procedure bodies.
 Do not edit already-applied migrations. The initial migration retains demo data;
 no rollback command is provided.
