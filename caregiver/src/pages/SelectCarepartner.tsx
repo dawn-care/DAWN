@@ -9,7 +9,7 @@
  *  - Display list of available carepartners from authenticated user
  *  - Allow user to select one carepartner
  *  - Store selection in AuthContext (and persisted storage)
- *  - Redirect user to Library after selection
+ *  - Redirect user to the home page (`/`) after selection
  */
 
 import { useState } from "react";
