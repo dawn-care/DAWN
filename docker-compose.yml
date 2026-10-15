@@ -45,7 +45,6 @@ services:
       POSTGRES_DB: mydb
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./init:/docker-entrypoint-initdb.d/:ro
     networks:
       - app-network
     healthcheck:

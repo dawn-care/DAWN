@@ -176,7 +176,7 @@ This starts Postgres, MinIO, and the Go server, which also serves the built care
 | API docs (Swagger) | http://localhost:8080/swagger/ |
 | MinIO console (`localuser` / `localpass123`) | http://localhost:9001 |
 
-Code changes need a rebuild (`up --build` again). The database is seeded from `init/database.sql` only the first time its volume is created; to reset it, run the command above with `down -v` in place of `up --build`, then start again.
+Code changes need a rebuild (`up --build` again). On startup, the API applies pending Goose migrations and seeds a fresh database. Existing databases created by `init/database.sql` need the one-time baseline step below before the API can start.
 
 #### Option B: backend and frontend on your machine (hot reload)
 
@@ -193,8 +193,9 @@ docker compose up -d minio minio-init
 ```bash
 psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
 psql -c "CREATE DATABASE mydb OWNER myuser;"
-psql -h localhost -U myuser -d mydb -f init/database.sql
 ```
+
+The API creates the schema and demo data through Goose on its first startup.
 
 **Backend** — the Go server does not read `.env` itself, so load it into your shell first. `RUN_MODE=dev` is required; without it the server starts in production mode and tries to bind ports 80/443.
 
@@ -218,16 +219,23 @@ Open http://localhost:5173. Its settings (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID
 
 #### Database migrations
 
-Apply pending migrations with `go run ./cmd/migrate` from `server/`, using the
-same `DB_*` environment variables as the API. For Docker, rebuild the image
-and recreate the server container after adding migrations, then run:
+The API automatically applies pending Goose migrations after connecting to the
+database and before accepting requests, locally and in Docker. An up-to-date
+database is unchanged; a migration failure stops startup. Fresh databases get
+their schema and demo data from Goose rather than Docker's init script.
+
+The manual command remains available: `go run ./cmd/migrate` from `server/`,
+using the same `DB_*` environment variables as the API. In Docker, with the
+database running and the server image built:
 
 ```bash
-docker compose exec server ./migrate
+docker compose run --rm --no-deps server ./migrate
 ```
 
-Migrations run only when this command is invoked. SQL files are embedded in the
-executable. Add the next numbered file under `server/internal/migrations/sql/`
+SQL files are embedded in the executable: rebuild it or the Docker image after
+adding migrations, then restart/recreate the server. Startup also applies
+destructive SQL, so review pending migrations before deployment.
+Add the next numbered file under `server/internal/migrations/sql/`
 (for example `00002_add_album_covers.sql`) with `-- +goose Up` and the forward
 SQL. Use Goose's `StatementBegin` / `StatementEnd` around procedure bodies.
 Do not edit already-applied migrations. The initial migration retains demo data;
@@ -239,11 +247,12 @@ without replaying the schema or demo inserts:
 ```bash
 # Local (from server/)
 go run ./cmd/migrate baseline
-# Docker (from the repo root, after rebuilding/recreating the server)
-docker compose exec server ./migrate baseline
+# Docker (from the repo root, with the database running and server image built)
+docker compose run --rm --no-deps server ./migrate baseline
 ```
 
-Then run the normal migration command above to apply future migrations.
+Then restart the API to apply pending migrations. Baselining is never automatic;
+the one-off Docker command works even when the API cannot start yet.
 Baselining checks the original tables' columns, defaults, identity modes,
 constraints and stored procedures. It uses temporary reference tables that are
 removed automatically, and records version 1 only if validation succeeds.

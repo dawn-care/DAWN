@@ -3,10 +3,15 @@
 The API and migration command share `internal/db.Open` and its `DB_*`
 environment variables. Neither loads `.env` automatically.
 
-Locally, run `go run ./cmd/migrate` from `server/`.
-In Docker, run `docker compose exec server ./migrate` from the repo root
-against a running server container. Rebuild the image and recreate the server
-container after adding migrations; SQL files are embedded in the executable.
+The API runs `migrations.Up` after connecting to the database and before serving
+requests, locally and in Docker. Only pending migrations run; a failure stops
+startup. Fresh databases receive the initial schema and demo data through Goose.
+Rebuild the executable or Docker image after adding migrations because SQL files
+are embedded. Review destructive SQL before deploying: startup applies it too.
+
+Manual commands remain available: `go run ./cmd/migrate` from `server/`, or
+`docker compose run --rm --no-deps server ./migrate` from the repo root with the
+database running and the server image built.
 
 Add the next numbered SQL file to `internal/migrations/sql/`, starting with
 `-- +goose Up`. Wrap procedure bodies in Goose `StatementBegin` / `StatementEnd`
@@ -14,8 +19,9 @@ annotations. Do not edit applied migrations. Keep the initial demo data.
 
 For databases created by `init/database.sql`, first run the same command with
 `baseline` appended. This validates migration 1 using temporary reference tables
-and records it without replaying seeds. Then run the normal command for future
-migrations. Do not bypass failed schema checks or delete volumes.
+and records it without replaying seeds. Then restart the API to apply pending
+migrations. The Docker command above works even when the API cannot start because
+baselining is required. Do not bypass failed schema checks or delete volumes.
 
 Safety tests: `go test -race ./internal/db ./internal/migrations`.
 
