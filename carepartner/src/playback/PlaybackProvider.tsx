@@ -16,6 +16,7 @@ import {
   playbackReducer,
   screenFor,
   type PlaybackState,
+  type PlayerOutcome,
   type PlaySource,
   type Screen,
 } from "./machine";
@@ -26,11 +27,15 @@ export const NIGHT_CHECK_MS = 60_000;
 type PlaybackContextValue = {
   state: PlaybackState;
   screen: Screen;
-  /** Asks to play an item; the machine decides whether it starts (see `canPlay`). */
-  play: (item: MediaItem, source: PlaySource) => void;
-  stop: () => void;
+  /**
+   * Asks to play an item; the machine decides whether it starts (see `canPlay`).
+   * `playbackId` is the server's Playback record for it, if it has one.
+   */
+  play: (item: MediaItem, source: PlaySource, playbackId?: number) => void;
+  /** Stops the current play, or with `playbackId`, only the play with that record. */
+  stop: (playbackId?: number) => void;
   /** The player for `playId` reported finished or failed. */
-  ended: (playId: number) => void;
+  ended: (playId: number, reason: PlayerOutcome) => void;
   /** Reads the stored pairing again, for example after pairing completes. */
   checkPairing: () => Promise<void>;
 };
@@ -49,9 +54,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   // Paired means a carepartner ID is stored; none stored (null) means unpaired.
   // The pair screen stores the ID of a newly created carepartner before a
   // caregiver has claimed it, so that also counts as paired for now (#343).
+  // The machine keeps the ID, so nothing else reads it from storage.
   const checkPairing = useCallback(async () => {
-    const id = await getCarepartnerId();
-    dispatch({ type: "pairingChecked", paired: id != null });
+    dispatch({ type: "pairingChecked", carepartnerId: await getCarepartnerId() });
   }, []);
 
   useEffect(() => {
@@ -69,9 +74,9 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       screen: screenFor(state),
-      play: (item, source) => dispatch({ type: "play", item, source }),
-      stop: () => dispatch({ type: "stop" }),
-      ended: (playId) => dispatch({ type: "ended", playId }),
+      play: (item, source, playbackId) => dispatch({ type: "play", item, source, playbackId }),
+      stop: (playbackId) => dispatch({ type: "stop", playbackId }),
+      ended: (playId, reason) => dispatch({ type: "ended", playId, reason }),
       checkPairing,
     }),
     [state, checkPairing],

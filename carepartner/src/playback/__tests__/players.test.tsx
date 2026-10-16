@@ -198,6 +198,21 @@ describe("players", () => {
       expect(onFailed).toHaveBeenCalledWith("Audio did not load");
     });
 
+    it("keeps its load timer when the parent passes new callbacks", async () => {
+      jest.useFakeTimers();
+      const view = await render(audioElement());
+      await act(async () => jest.advanceTimersByTime(AUDIO_LOAD_TIMEOUT_MS - 1000));
+
+      const latest = jest.fn();
+      await view.rerender(
+        <AudioPlayer uri="http://server/audio/file?id=9" title="Moon River" onFinished={onFinished} onFailed={latest} />,
+      );
+      await act(async () => jest.advanceTimersByTime(1000));
+
+      expect(latest).toHaveBeenCalledWith("Audio did not load");
+      expect(onFailed).not.toHaveBeenCalled();
+    });
+
     it("does not report failed while loaded audio keeps moving", async () => {
       jest.useFakeTimers();
       const view = await render(audioElement());

@@ -40,12 +40,15 @@ export function isPlayable(item: MediaItem): boolean {
 }
 
 /** The media metadata fields playback uses, or null if there's no usable id. */
-export function readMetadata(value: unknown): { id: number; displayedName?: string; coverUri?: string } | null {
+export function readMetadata(
+  value: unknown,
+): { id: number; url?: string; displayedName?: string; coverUri?: string } | null {
   if (typeof value !== "object" || value === null) return null;
-  const { id, displayed_name, cover_uri } = value as Record<string, unknown>;
+  const { id, url, displayed_name, cover_uri } = value as Record<string, unknown>;
   if (typeof id !== "number") return null;
   return {
     id,
+    url: typeof url === "string" ? url : undefined,
     displayedName: typeof displayed_name === "string" ? displayed_name : undefined,
     coverUri: typeof cover_uri === "string" ? cover_uri : undefined,
   };

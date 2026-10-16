@@ -40,6 +40,7 @@ describe("PlaybackProvider", () => {
   it("counts a tablet with a stored carepartner as paired", async () => {
     await start();
     expect(playback.screen).toBe("alwaysOn");
+    expect(playback.state.carepartnerId).toBe(7);
   });
 
   it("shows pairing when no carepartner is stored", async () => {
@@ -79,7 +80,7 @@ describe("PlaybackProvider", () => {
     expect(playback.screen).toBe("playing");
     expect(playback.state.playing).toMatchObject({ item: song, source: "scheduled" });
 
-    await act(async () => playback.ended(playback.state.playing!.playId));
+    await act(async () => playback.ended(playback.state.playing!.playId, "finished"));
     expect(playback.screen).toBe("alwaysOn");
 
     await act(async () => playback.play(song, "staff"));

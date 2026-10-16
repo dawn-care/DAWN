@@ -17,7 +17,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { API_URL } from "../api/config";
 import { now } from "../clock/clock";
-import { getCarepartnerId } from "../pairing/carepartnerId";
 import { canPlay } from "../playback/machine";
 import { usePlayback } from "../playback/PlaybackProvider";
 import {
@@ -67,11 +66,11 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   /** The day `played` and `due` belong to. */
   const [day, setDay] = useState(() => dayOf(now()));
 
+  // An unpaired tablet has no schedule, so fetching starts once it is paired.
+  const id = playback.state.carepartnerId;
   const refresh = useCallback(async () => {
+    if (id == null) return;
     try {
-      const id = await getCarepartnerId();
-      if (id == null) return;
-
       const carepartnerRes = await fetch(`${API_URL}/users/carepartner/${id}`);
       if (carepartnerRes.ok) setCarepartner(await carepartnerRes.json());
 
@@ -90,16 +89,14 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
       // Keep the last schedule; the next refresh tries again.
       console.warn("Couldn't refresh the schedule", error);
     }
-  }, []);
+  }, [id]);
 
-  // An unpaired tablet has no schedule, so fetching starts once it is paired.
-  const paired = playback.state.pairing === "paired";
   useEffect(() => {
-    if (!paired) return;
+    if (id == null) return;
     refresh();
     const timer = setInterval(refresh, SCHEDULE_REFRESH_MS);
     return () => clearInterval(timer);
-  }, [paired, refresh]);
+  }, [id, refresh]);
 
   useEffect(() => {
     const check = () => {

@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { colors } from "../theme/theme";
 import type { PlayerProps } from "./types";
+import { useReportOnce } from "./useReportOnce";
 
 /**
  * Plays one video full size with no controls, starting on its own.
@@ -20,17 +21,10 @@ export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) 
     player.play();
   }, [player]);
 
-  // Only the first report counts: an error can follow the end, or repeat.
-  const ended = useRef(false);
-  useEventListener(player, "playToEnd", () => {
-    if (ended.current) return;
-    ended.current = true;
-    onFinished();
-  });
+  const report = useReportOnce({ onFinished, onFailed });
+  useEventListener(player, "playToEnd", report.finished);
   useEventListener(player, "statusChange", ({ status, error }) => {
-    if (status !== "error" || ended.current) return;
-    ended.current = true;
-    onFailed(error?.message ?? "Video could not be played");
+    if (status === "error") report.failed(error?.message ?? "Video could not be played");
   });
 
   return (

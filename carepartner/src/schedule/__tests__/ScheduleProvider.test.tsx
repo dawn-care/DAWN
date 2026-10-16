@@ -46,7 +46,7 @@ function mockBackend(entries: ScheduleEntry[] = schedule) {
 const flush = () => act(async () => {});
 const tick = (ms = SCHEDULE_CHECK_MS) => act(async () => jest.advanceTimersByTime(ms));
 const playingId = () => (playback.state.playing?.item as ScheduleEntry | undefined)?.id ?? null;
-const endPlay = () => act(async () => playback.ended(playback.state.playing!.playId));
+const endPlay = () => act(async () => playback.ended(playback.state.playing!.playId, "finished"));
 
 async function start(time: string) {
   setClock(new Date(time));

@@ -21,6 +21,7 @@ jest.mock("../../playback/PlaybackProvider", () => ({
 jest.mock("../../schedule/ScheduleProvider", () => ({
   ScheduleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: () => null }));
 
 describe("RootLayout", () => {
   beforeEach(() => {
