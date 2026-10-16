@@ -3,18 +3,24 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	authCtrlr "server/internal/controllers/auth"
 	configurationCtrlr "server/internal/controllers/configurations"
 	exceptionCtrlr "server/internal/controllers/exceptions"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
+	playbackCtrlr "server/internal/controllers/playback"
 	promptsCtrlr "server/internal/controllers/prompts"
+	realtimeCtrlr "server/internal/controllers/realtime"
+	scheduledItemsCtrlr "server/internal/controllers/scheduled_items"
+	screenCtrlr "server/internal/controllers/screen"
+	screenSettingsCtrlr "server/internal/controllers/screen_settings"
+	screenWidgetsCtrlr "server/internal/controllers/screen_widgets"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
 	newsCtrlr "server/internal/controllers/widgets/news"
@@ -24,7 +30,13 @@ import (
 	exceptionRts "server/internal/routes/exceptions"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
+	playbackRts "server/internal/routes/playback"
 	promptsRts "server/internal/routes/prompts"
+	realtimeRts "server/internal/routes/realtime"
+	scheduledItemsRts "server/internal/routes/scheduled_items"
+	screenRts "server/internal/routes/screen"
+	screenSettingsRts "server/internal/routes/screen_settings"
+	screenWidgetsRts "server/internal/routes/screen_widgets"
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
@@ -35,7 +47,12 @@ import (
 	exceptionSvc "server/internal/services/exceptions"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
+	playbackSvc "server/internal/services/playback"
 	promptsSvc "server/internal/services/prompts"
+	scheduledItemsSvc "server/internal/services/scheduled_items"
+	screenSvc "server/internal/services/screen"
+	screenSettingsSvc "server/internal/services/screen_settings"
+	screenWidgetsSvc "server/internal/services/screen_widgets"
 	caregiverSvc "server/internal/services/user/caregiver"
 	pairingSvc "server/internal/services/user/device_pairing"
 	newsSvc "server/internal/services/widgets/news"
@@ -49,13 +66,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"golang.org/x/crypto/acme/autocert"
 
+	database "server/internal/db"
 	mw "server/internal/middleware"
+	"server/internal/realtime"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -77,28 +95,18 @@ func main() {
 			"http://localhost:8081",
 			"http://startup-da.gccis.rit.edu",
 		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
-	// DB setup
-	dbHost := getEnvOrDefault("DB_HOST", "localhost")
-	dbPort := getEnvOrDefault("DB_PORT", "5432")
-	dbUser := getEnvOrDefault("DB_USER", "myuser")
-	dbPassword := getEnvOrDefault("DB_PASSWORD", "mypassword")
-	dbName := getEnvOrDefault("DB_NAME", "mydb")
-
-	connStr := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		dbUser, dbPassword, dbHost, dbPort, dbName,
-	)
-
-	db, err := sql.Open("postgres", connStr)
+	// DB setup uses the same settings as database tooling.
+	db, err := database.Open(context.Background())
 	if err != nil {
-		log.Fatal("failed to connect to DB:", err)
+		log.Fatal("failed to connect to DB: ", err)
 	}
+	defer db.Close()
 
 	// MinIO setup
 	minioHost := getEnvOrDefault("MINIO_HOST", "localhost")
@@ -145,11 +153,21 @@ func main() {
 	modulesService := modulesSvc.NewModuleService(db)
 	configurationService := configurationSvc.NewConfigurationService(db)
 	exceptionService := exceptionSvc.NewExceptionService(db)
+	playbackService := playbackSvc.NewPlaybackService(db)
+
+	// Screen
+	screenSettingsService := screenSettingsSvc.NewScreenSettingsService(db)
+	screenWidgetsService := screenWidgetsSvc.NewScreenWidgetService(db)
+	scheduledItemsService := scheduledItemsSvc.NewScheduledItemService(db)
+	// Realtime: one WebSocket per paired tablet, used to push staff commands.
+	tabletHub := realtime.NewHub()
+	go playbackService.RunExpirySweep(context.Background(), 5*time.Second)
 
 	// Media
 	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
+	mediaService := mediaSvc.NewMediaService(db, minioClient, "media")
 
 	// Widgets
 	openWeatherKey := getEnvOrDefault("OPENWEATHER_API_KEY", "")
@@ -157,6 +175,9 @@ func main() {
 	newsService := newsSvc.NewNewsWidgetService(db, newsAPIKey)
 	sportsService := newsSvc.NewSportsNewsWidgetService(db)
 	weatherService := weatherSvc.NewWeatherService(db, openWeatherKey)
+
+	// Screen (the tablet's view; uses the widget and schedule services above)
+	screenService := screenSvc.NewScreenService(db, weatherService, sportsService, newsService, scheduledItemsService)
 
 	// Prompts
 	messageService := promptsSvc.NewMessageService(db)
@@ -177,11 +198,25 @@ func main() {
 	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
+	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService, tabletHub)
+	realtimeCtrl := realtimeCtrlr.NewRealtimeController(playbackService, carepartnerService, tabletHub, []string{
+		// Browser origins allowed to open a tablet WebSocket (the tablet's web build
+		// in development). The native Android app sends no Origin header.
+		"localhost:8081",
+		"startup-da.gccis.rit.edu",
+	})
+
+	// Screen
+	screenSettingsCtrl := screenSettingsCtrlr.NewScreenSettingsController(screenSettingsService)
+	screenWidgetsCtrl := screenWidgetsCtrlr.NewScreenWidgetController(screenWidgetsService)
+	scheduledItemsCtrl := scheduledItemsCtrlr.NewScheduledItemController(scheduledItemsService)
+	screenCtrl := screenCtrlr.NewScreenController(screenService)
 
 	// Media
 	audioCtrl := mediaCtrlr.NewAudioController(audioService)
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
+	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
 
 	// Widgets
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
@@ -227,15 +262,25 @@ func main() {
 	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
 	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
 	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
+	playbackRts.RegisterPlaybackRoutes(r, playbackCtrl)
+	realtimeRts.RegisterRealtimeRoutes(r, realtimeCtrl)
+
+	// Screen
+	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)
+	screenWidgetsRts.RegisterScreenWidgetRoutes(r, screenWidgetsCtrl)
+	scheduledItemsRts.RegisterScheduledItemRoutes(r, scheduledItemsCtrl)
+	screenRts.RegisterScreenRoutes(r, screenCtrl)
 
 	// Media
 	mediaRts.RegisterAudioRoutes(r, audioCtrl)
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
+	mediaRts.RegisterMediaRoutes(r, mediaCtrl)
 
 	// Widgets
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
 	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
+	newsRts.RegisterSportsTeamsRoutes(r)
 	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
 	// Prompts

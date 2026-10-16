@@ -5,7 +5,7 @@
  * 
  * This component handles the final onboarding step for caregivers.
  * It allows users to:
- *  - Enter a care partner name (for first-time setup)
+ *  - Enter a care partner name
  *  - Enter a pairing code
  *  - Accept a consent statement
  * 
@@ -154,11 +154,10 @@ export default function AccountSetupPage() {
       <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow">
 
         {/* ============================
-            Care Partner Name (First-time only)
+            Care Partner Name
         ============================ */}
-        {(user?.carepartners?.length ?? 0) === 0 && (
-          <div className="mb-6">
-            <label className="text-lg font-medium">Who is this for?</label>
+        <div className="mb-6">
+          <label className="text-lg font-medium">Who is this for?</label>
 
           <input
             type="text"
@@ -168,20 +167,19 @@ export default function AccountSetupPage() {
             placeholder="Enter name"
           />
 
-            {/* Suggestions */}
-            <div className="flex gap-2 mt-2 flex-wrap">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setCarePartnerName(s)}
-                  className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm hover:bg-gray-300"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+          {/* Suggestions */}
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setCarePartnerName(s)}
+                className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm hover:bg-gray-300"
+              >
+                {s}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* ============================
             Pairing Code

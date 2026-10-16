@@ -17,7 +17,7 @@
  *  2. A pairing code is generated via backend
  *  3. Caregiver enters this code on their web app
  *  4. Carepartner device checks pairing status
- *  5. If paired → user proceeds to terms screen
+ *  5. If paired → playback re-checks pairing and the app returns home
  * 
  * API interactions:
  *  - POST /carepartner/create-carepartner → create new carepartner
@@ -41,8 +41,9 @@ import {
   View,
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
-import { API_URL } from "./config";
-import { getCarepartnerId, storeCarepartnerId } from "./carepartnerId";
+import { API_URL } from "../src/api/config";
+import { getCarepartnerId, storeCarepartnerId } from "../src/pairing/carepartnerId";
+import { usePlayback } from "../src/playback/PlaybackProvider";
 
 /* ============================
    Type Definitions
@@ -185,6 +186,7 @@ export default function PairScreen() {
      State
   ============================ */
   const { height, width } = useWindowDimensions();
+  const { checkPairing } = usePlayback();
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [expiresInSec, setExpiresInSec] = useState<number | null>(null);
   const [carepartnerID, setCarepartnerID] = useState<number | null>(null);
@@ -301,8 +303,9 @@ export default function PairScreen() {
       // TODO: store deviceId if needed
       // await SecureStore.setItemAsync("deviceId", result.deviceId)
 
-      // Success → navigate to terms screen
-      router.push("/terms" as Href);
+      // Success → let playback know the tablet is paired, then go home
+      await checkPairing();
+      router.replace("/" as Href);
     } catch {
       setError("Something went wrong. Please check your connection and try again.");
     } finally {

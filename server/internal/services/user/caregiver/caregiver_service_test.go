@@ -337,25 +337,23 @@ func TestUpdateCaregiver_EmptyName(t *testing.T) {
    DELETE
 ------------------------------------------------------- */
 
-func TestDeleteCaregiver_Success(t *testing.T) {
+var (
+	deletePairingsSQL  = regexp.QuoteMeta(`DELETE FROM "DevicePairing"`)
+	unpairSQL          = regexp.QuoteMeta(`UPDATE "Carepartner" SET caregiver_id = NULL WHERE caregiver_id = $1;`)
+	deleteCaregiverSQL = regexp.QuoteMeta(`DELETE FROM "Caregiver" WHERE id = $1;`)
+)
+
+func TestDeleteCaregiver_UnpairsCarepartnersFirst(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
 
 	svc := NewCaregiverService(db)
 
-	// First the module check
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COUNT(*) 
-		FROM "Module"
-		WHERE caregiver_id = $1;
-	`)).
-		WithArgs(5).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-
-	// Then deletion
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Caregiver" WHERE id = $1;`)).
-		WithArgs(5).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectBegin()
+	mock.ExpectExec(deletePairingsSQL).WithArgs(5).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(unpairSQL).WithArgs(5).WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(deleteCaregiverSQL).WithArgs(5).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := svc.DeleteCaregiver(5)
 	assert.NoError(t, err)
@@ -373,73 +371,37 @@ func TestDeleteCaregiver_InvalidID(t *testing.T) {
 	assert.Equal(t, "invalid ID", err.Error())
 }
 
-func TestDeleteCaregiver_HasModules_Fails(t *testing.T) {
+func TestDeleteCaregiver_UnpairError_DoesNotDelete(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
 
 	svc := NewCaregiverService(db)
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COUNT(*) 
-		FROM "Module"
-		WHERE caregiver_id = $1;
-	`)).
-		WithArgs(10).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+	mock.ExpectBegin()
+	mock.ExpectExec(deletePairingsSQL).WithArgs(10).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(unpairSQL).WithArgs(10).WillReturnError(sqlmock.ErrCancelled)
+	mock.ExpectRollback()
 
 	err := svc.DeleteCaregiver(10)
-	assert.EqualError(t, err, "cannot delete caregiver 10; they still have 2 module(s)")
-
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestDeleteCaregiver_DBDeleteError(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
-
-	svc := NewCaregiverService(db)
-
-	// Dependency check OK
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COUNT(*) 
-		FROM "Module"
-		WHERE caregiver_id = $1;
-	`)).
-		WithArgs(7).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-
-	// Delete fails
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Caregiver" WHERE id = $1;`)).
-		WithArgs(7).
-		WillReturnError(sqlmock.ErrCancelled)
-
-	err := svc.DeleteCaregiver(7)
 	assert.Equal(t, sqlmock.ErrCancelled, err)
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-/* -------------------------------------------------------
-   COUNT MODULES
-------------------------------------------------------- */
-
-func TestCountModulesForCaregiver(t *testing.T) {
+func TestDeleteCaregiver_DBDeleteError_RollsBackUnpair(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
 
 	svc := NewCaregiverService(db)
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT COUNT(*) 
-		FROM "Module"
-		WHERE caregiver_id = $1;
-	`)).
-		WithArgs(3).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
+	mock.ExpectBegin()
+	mock.ExpectExec(deletePairingsSQL).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(unpairSQL).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(deleteCaregiverSQL).WithArgs(7).WillReturnError(sqlmock.ErrCancelled)
+	mock.ExpectRollback()
 
-	count, err := svc.CountModulesForCaregiver(3)
-	assert.NoError(t, err)
-	assert.Equal(t, 5, count)
+	err := svc.DeleteCaregiver(7)
+	assert.Equal(t, sqlmock.ErrCancelled, err)
 
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

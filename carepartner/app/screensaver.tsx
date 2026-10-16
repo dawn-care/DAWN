@@ -7,12 +7,10 @@
  * 
  * Responsibilities:
  * - Display Start-Up branding and auto-start time
- * - Allow manual entry into the daily routine
  * - Provide access to syncing schedule/content
  * - Provide access to device pairing
  * 
  * Navigation:
- * - On "Enter Start-Up" → redirects to `/agendaView`
  * - On "Pair Device" → redirects to `/pair`
  * 
  * Notes:
@@ -33,8 +31,8 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Image } from "react-native";
-import { getCarepartnerId } from "./carepartnerId";
-import { useSchedule } from "./ScheduleContext";
+import { getCarepartnerId } from "../src/pairing/carepartnerId";
+import { useSchedule } from "../src/schedule/ScheduleProvider";
 
 /* ============================
    Helpers
@@ -66,7 +64,6 @@ function formatTime(timeString: string) {
  * 
  * Handles:
  *  - Home screen UI
- *  - Navigation to schedule
  *  - Sync trigger
  *  - Pairing navigation
  */
@@ -112,13 +109,6 @@ export default function Screensaver() {
   /* ============================
      Handlers
   ============================ */
-
-  /**
-   * Handles navigation to manually start daily agenda
-   */
-  const handlePrimaryAction = () => {
-    router.push({ pathname: "/agendaView", params: { trigger: 'manual' } } as any);
-  };
 
   /**
    * Handles navigation to device pairing screen
@@ -191,23 +181,6 @@ export default function Screensaver() {
                 </View>
             </View>
 
-            {/* BOTTOM */}
-            <View style={styles.bottomArea}>
-              {/* Manual Start Button */}
-              <Pressable
-                onPress={handlePrimaryAction}
-                  style={({ pressed }) => [
-                      styles.arrowButton,
-                      pressed && { transform: [{ scale: 0.98 }] },
-                  ]}
-              >
-              <Text style={styles.arrowText}>›</Text>
-                </Pressable>
-
-                <View style={styles.enterPill}>
-              <Text style={styles.enterText}>Enter Start-Up</Text>
-                </View>
-            </View>
             </View>
         </SafeAreaView>
         </ImageBackground>

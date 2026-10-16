@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"encoding/json"
 	"testing"
-	"time"
 
 	model "server/internal/models/user/carepartner"
 
@@ -46,13 +46,48 @@ func (m *mockCarepartnerService) DeleteCarepartner(id int) error {
 ----------------------------------------------------- */
 
 func TestCreateCarepartner_Success(t *testing.T) {
+	var created *model.Carepartner
+	mockService := &mockCarepartnerService{
+		CreateCarepartnerFunc: func(c *model.Carepartner) error {
+			c.ID = 7
+			created = c
+			return nil
+		},
+	}
+
+	controller := NewCarepartnerController(mockService)
+
+	body := []byte(`{"name":"Ray"}`)
+	req := httptest.NewRequest("POST", "/carepartners", bytes.NewBuffer(body))
+	w := httptest.NewRecorder()
+
+	controller.CreateCarepartner(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", w.Code)
+	}
+	if created.Name != "Ray" || created.CaregiverID != 0 {
+		t.Errorf("unexpected carepartner %+v", created)
+	}
+	var resp map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp["carepartner_id"] != float64(7) {
+		t.Errorf("expected carepartner_id 7, got %v", resp["carepartner_id"])
+	}
+	if _, ok := resp["auto_start"]; ok {
+		t.Error("auto_start should no longer be returned")
+	}
+}
+
+// The tablet's pairing screen still sends AutoStart; it must be ignored, not rejected
+func TestCreateCarepartner_IgnoresLegacyAutoStart(t *testing.T) {
 	mockService := &mockCarepartnerService{
 		CreateCarepartnerFunc: func(c *model.Carepartner) error { return nil },
 	}
 
 	controller := NewCarepartnerController(mockService)
 
-	body := []byte(`{"name":"Ray","auto_start":"08:00:00"}`)
+	body := []byte(`{"Name":"PlaceHolder Name","AutoStart":"08:00:00"}`)
 	req := httptest.NewRequest("POST", "/carepartners", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -76,20 +111,6 @@ func TestCreateCarepartner_InvalidBody(t *testing.T) {
 	}
 }
 
-func TestCreateCarepartner_InvalidTime(t *testing.T) {
-	controller := NewCarepartnerController(&mockCarepartnerService{})
-
-	body := []byte(`{"name":"Ray","auto_start":"bad-time"}`)
-	req := httptest.NewRequest("POST", "/carepartners", bytes.NewBuffer(body))
-	w := httptest.NewRecorder()
-
-	controller.CreateCarepartner(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", w.Code)
-	}
-}
-
 func TestCreateCarepartner_ServiceError(t *testing.T) {
 	mockService := &mockCarepartnerService{
 		CreateCarepartnerFunc: func(c *model.Carepartner) error {
@@ -99,7 +120,7 @@ func TestCreateCarepartner_ServiceError(t *testing.T) {
 
 	controller := NewCarepartnerController(mockService)
 
-	body := []byte(`{"name":"Ray","auto_start":"08:00:00"}`)
+	body := []byte(`{"name":"Ray"}`)
 	req := httptest.NewRequest("POST", "/carepartners", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -115,13 +136,20 @@ func TestCreateCarepartner_ServiceError(t *testing.T) {
 ----------------------------------------------------- */
 
 func TestUpdateCarepartner_Success(t *testing.T) {
+	var updated *model.Carepartner
 	mockService := &mockCarepartnerService{
-		UpdateCarepartnerFunc: func(c *model.Carepartner) error { return nil },
+		GetCarepartnerByIDFunc: func(id int) (*model.Carepartner, error) {
+			return &model.Carepartner{ID: id, Name: "Old", CaregiverID: 2}, nil
+		},
+		UpdateCarepartnerFunc: func(c *model.Carepartner) error {
+			updated = c
+			return nil
+		},
 	}
 
 	controller := NewCarepartnerController(mockService)
 
-	body := []byte(`{"id":1,"name":"Updated","auto_start":"09:00:00"}`)
+	body := []byte(`{"id":1,"name":"Updated"}`)
 	req := httptest.NewRequest("PUT", "/carepartners", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -129,6 +157,9 @@ func TestUpdateCarepartner_Success(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if updated.Name != "Updated" || updated.CaregiverID != 2 {
+		t.Errorf("expected new name and kept caregiver, got %+v", updated)
 	}
 }
 
@@ -148,21 +179,7 @@ func TestUpdateCarepartner_InvalidBody(t *testing.T) {
 func TestUpdateCarepartner_MissingID(t *testing.T) {
 	controller := NewCarepartnerController(&mockCarepartnerService{})
 
-	body := []byte(`{"name":"NoID","auto_start":"08:00:00"}`)
-	req := httptest.NewRequest("PUT", "/carepartners", bytes.NewBuffer(body))
-	w := httptest.NewRecorder()
-
-	controller.UpdateCarepartner(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestUpdateCarepartner_InvalidTime(t *testing.T) {
-	controller := NewCarepartnerController(&mockCarepartnerService{})
-
-	body := []byte(`{"id":1,"name":"BadTime","auto_start":"not-a-time"}`)
+	body := []byte(`{"name":"NoID"}`)
 	req := httptest.NewRequest("PUT", "/carepartners", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -175,6 +192,9 @@ func TestUpdateCarepartner_InvalidTime(t *testing.T) {
 
 func TestUpdateCarepartner_ServiceError(t *testing.T) {
 	mockService := &mockCarepartnerService{
+		GetCarepartnerByIDFunc: func(id int) (*model.Carepartner, error) {
+			return &model.Carepartner{ID: id, Name: "Old", CaregiverID: 2}, nil
+		},
 		UpdateCarepartnerFunc: func(c *model.Carepartner) error {
 			return errors.New("update failed")
 		},
@@ -182,7 +202,7 @@ func TestUpdateCarepartner_ServiceError(t *testing.T) {
 
 	controller := NewCarepartnerController(mockService)
 
-	body := []byte(`{"id":1,"name":"Fail","auto_start":"08:00:00"}`)
+	body := []byte(`{"id":1,"name":"Fail"}`)
 	req := httptest.NewRequest("PUT", "/carepartners", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
@@ -201,9 +221,9 @@ func TestGetCarepartnerByID_Success(t *testing.T) {
 	mockService := &mockCarepartnerService{
 		GetCarepartnerByIDFunc: func(id int) (*model.Carepartner, error) {
 			return &model.Carepartner{
-				ID:        id,
-				Name:      "Ray",
-				AutoStart: time.Date(0, 1, 1, 8, 0, 0, 0, time.UTC),
+				ID:       id,
+				Name:     "Ray",
+				Timezone: "America/New_York",
 			}, nil
 		},
 	}

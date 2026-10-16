@@ -1,0 +1,6 @@
+# Smoke test: the app starts, and with no stored pairing it opens the pair screen by itself.
+appId: com.anonymous.carepartner
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Pair Device"

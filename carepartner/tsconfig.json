@@ -3,14 +3,19 @@
   "compilerOptions": {
     "jsx": "react",
     "strict": true,
+    "types": ["jest"],
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@shared": [
+        "../shared/index.ts"
       ]
     }
   },
   "include": [
     "**/*.ts",
+    "../shared/**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"

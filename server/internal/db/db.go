@@ -1,38 +1,57 @@
 package db
 
 import (
+	"context"
 	"database/sql"
-	"log"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
-	_ "github.com/lib/pq" // or your database driver
+	_ "github.com/lib/pq"
 )
 
-var database *sql.DB
+// Open connects using the shared DB_* environment settings and verifies that
+// PostgreSQL is reachable. The caller owns the returned pool and must close it.
+// It does not run migrations or modify the schema.
+func Open(ctx context.Context) (*sql.DB, error) {
+	return open(ctx, connectionString(), sql.Open)
+}
 
-// Initialize connects to the database and stores the handle
-func Initialize(connStr string) {
-	var err error
-	database, err = sql.Open("postgres", connStr)
+func connectionString() string {
+	settings := []struct {
+		key, env, fallback string
+	}{
+		{"host", "DB_HOST", "localhost"},
+		{"port", "DB_PORT", "5432"},
+		{"user", "DB_USER", "myuser"},
+		{"password", "DB_PASSWORD", "mypassword"},
+		{"dbname", "DB_NAME", "mydb"},
+	}
+	parts := make([]string, 0, len(settings)+1)
+	for _, setting := range settings {
+		value := os.Getenv(setting.env)
+		if value == "" {
+			value = setting.fallback
+		}
+		// lib/pq keyword values escape backslashes and single quotes.
+		value = strings.NewReplacer(`\`, `\\`, "'", `\'`).Replace(value)
+		parts = append(parts, setting.key+"='"+value+"'")
+	}
+	return strings.Join(parts, " ") + " sslmode=disable"
+}
+
+func open(ctx context.Context, dsn string, openDB func(string, string) (*sql.DB, error)) (*sql.DB, error) {
+	database, err := openDB("postgres", dsn)
 	if err != nil {
-		log.Fatalf("failed to open database: %v", err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	if err := database.Ping(); err != nil {
-		log.Fatalf("failed to ping database: %v", err)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := database.PingContext(ctx); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
 	}
-}
-
-// GetDB returns the singleton *sql.DB
-func GetDB() *sql.DB {
-	if database == nil {
-		log.Fatal("database not initialized. Call db.Initialize() first")
-	}
-	return database
-}
-
-// Close closes the database connection
-func Close() {
-	if database != nil {
-		database.Close()
-	}
+	return database, nil
 }

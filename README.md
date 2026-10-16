@@ -176,7 +176,13 @@ This starts Postgres, MinIO, and the Go server, which also serves the built care
 | API docs (Swagger) | http://localhost:8080/swagger/ |
 | MinIO console (`localuser` / `localpass123`) | http://localhost:9001 |
 
-Code changes need a rebuild (`up --build` again). The database is seeded from `init/database.sql` only the first time its volume is created; to reset it, run the command above with `down -v` in place of `up --build`, then start again.
+The database starts empty the first time its volume is created. Once the stack is up, create the tables and demo data (a demo caregiver and carepartner) by running the migrations from the repo root:
+
+```bash
+docker compose exec server ./migrate
+```
+
+Code changes need a rebuild (`up --build` again); run `./migrate` again after pulling new migrations. To reset the database, run the command above with `down -v` in place of `up --build`, start again, and run `./migrate`.
 
 #### Option B: backend and frontend on your machine (hot reload)
 
@@ -193,7 +199,13 @@ docker compose up -d minio minio-init
 ```bash
 psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
 psql -c "CREATE DATABASE mydb OWNER myuser;"
-psql -h localhost -U myuser -d mydb -f init/database.sql
+```
+
+Then create the tables and demo data by running the migrations (from `server/`; they connect with the same `DB_*` defaults as the API):
+
+```bash
+cd server
+go run ./cmd/migrate
 ```
 
 **Backend** — the Go server does not read `.env` itself, so load it into your shell first. `RUN_MODE=dev` is required; without it the server starts in production mode and tries to bind ports 80/443.
@@ -215,6 +227,43 @@ npm run dev
 ```
 
 Open http://localhost:5173. Its settings (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`) come from `caregiver/.env.development`, which is committed.
+
+#### Database migrations
+
+Apply pending migrations with `go run ./cmd/migrate` from `server/`, using the
+same `DB_*` environment variables as the API. For Docker, rebuild the image
+and recreate the server container after adding migrations, then run:
+
+```bash
+docker compose exec server ./migrate
+```
+
+Migrations run only when this command is invoked. SQL files are embedded in the
+executable. Add the next numbered file under `server/internal/migrations/sql/`
+(for example `00005_add_album_covers.sql`) with `-- +goose Up` and the forward
+SQL. Use Goose's `StatementBegin` / `StatementEnd` around procedure bodies.
+Do not edit already-applied migrations. The initial migration retains demo data;
+no rollback command is provided.
+
+**Existing databases:** a database created by the old `init/database.sql`, before
+migrations existed, must be registered once, without replaying the schema or demo
+inserts:
+
+```bash
+# Local (from server/)
+go run ./cmd/migrate baseline
+# Docker (from the repo root, after rebuilding/recreating the server)
+docker compose exec server ./migrate baseline
+```
+
+Then run the normal migration command above to apply future migrations.
+Baselining checks the original tables' columns, defaults, identity modes,
+constraints and stored procedures. It uses temporary reference tables that are
+removed automatically, and records version 1 only if validation succeeds.
+Application rows and sequence counters are untouched. Repeating a successful
+baseline is safe. A failed check may leave an empty Goose tracking table, but
+never marks migration 1 applied. Resolve reported schema differences before
+retrying; do not delete your database volume.
 
 #### Carepartner app
 
