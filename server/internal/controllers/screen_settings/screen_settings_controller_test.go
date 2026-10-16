@@ -23,8 +23,6 @@ type mockScreenSettingsService struct {
 	updateCalled bool
 }
 
-func (m *mockScreenSettingsService) GetPresets() []svc.Preset { return svc.Presets }
-
 func (m *mockScreenSettingsService) GetScreenSettings(carepartnerID int) (*model.ScreenSettings, error) {
 	m.gotID = carepartnerID
 	return m.settings, m.err
@@ -41,7 +39,7 @@ func decodeError(t *testing.T, w *httptest.ResponseRecorder) ScreenSettingsError
 	return e
 }
 
-var defaults = &model.ScreenSettings{CarepartnerID: 1, LayoutPreset: "balanced", WakeTime: "07:00", BedTime: "21:00"}
+var defaults = &model.ScreenSettings{CarepartnerID: 1, WakeTime: "07:00", BedTime: "21:00"}
 
 func TestGetScreenSettingsHandler(t *testing.T) {
 	m := &mockScreenSettingsService{settings: defaults}
@@ -51,7 +49,7 @@ func TestGetScreenSettingsHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, 1, m.gotID)
-	assert.JSONEq(t, `{"carepartner_id":1,"layout_preset":"balanced","wake_time":"07:00","bed_time":"21:00"}`, w.Body.String())
+	assert.JSONEq(t, `{"carepartner_id":1,"wake_time":"07:00","bed_time":"21:00"}`, w.Body.String())
 }
 
 func TestGetScreenSettingsHandler_Errors(t *testing.T) {
@@ -72,6 +70,7 @@ func TestGetScreenSettingsHandler_Errors(t *testing.T) {
 
 func TestUpdateScreenSettingsHandler(t *testing.T) {
 	m := &mockScreenSettingsService{settings: defaults}
+	// layout_preset is gone; a client that still sends it isn't rejected
 	body := `{"layout_preset":"balanced","wake_time":"07:00","bed_time":"21:00"}`
 	w := httptest.NewRecorder()
 
@@ -79,7 +78,8 @@ func TestUpdateScreenSettingsHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, 1, m.gotID)
-	assert.Equal(t, svc.UpdateInput{LayoutPreset: "balanced", WakeTime: "07:00", BedTime: "21:00"}, m.gotUpdate)
+	assert.Equal(t, svc.UpdateInput{WakeTime: "07:00", BedTime: "21:00"}, m.gotUpdate)
+	assert.NotContains(t, w.Body.String(), "layout_preset")
 }
 
 func TestUpdateScreenSettingsHandler_Errors(t *testing.T) {
@@ -89,7 +89,6 @@ func TestUpdateScreenSettingsHandler_Errors(t *testing.T) {
 		status int
 		code   string
 	}{
-		{"bad preset", svc.ErrInvalidPreset, http.StatusBadRequest, CodeInvalidPreset},
 		{"bad wake", svc.ErrInvalidWakeTime, http.StatusBadRequest, CodeInvalidWakeTime},
 		{"bad bed", svc.ErrInvalidBedTime, http.StatusBadRequest, CodeInvalidBedTime},
 		{"missing", svc.ErrNotFound, http.StatusNotFound, CodeNotFound},
@@ -116,20 +115,4 @@ func TestUpdateScreenSettingsHandler_Errors(t *testing.T) {
 		httptest.NewRequest(http.MethodPut, "/api/screen-settings", strings.NewReader(`{}`)))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.False(t, m.updateCalled)
-}
-
-func TestGetPresetsHandler(t *testing.T) {
-	w := httptest.NewRecorder()
-	NewScreenSettingsController(&mockScreenSettingsService{}).GetPresetsHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-settings/presets", nil))
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	var presets []svc.Preset
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &presets))
-	assert.Equal(t, []svc.Preset{
-		{Name: "simple", Spots: 2},
-		{Name: "balanced", Spots: 4},
-		{Name: "grid", Spots: 4},
-		{Name: "busier", Spots: 6},
-	}, presets)
-	assert.Contains(t, w.Body.String(), `{"name":"busier","spots":6}`)
 }

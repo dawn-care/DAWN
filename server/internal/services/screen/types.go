@@ -20,7 +20,6 @@ type Screen struct {
 	GeneratedAt   string                       `json:"generated_at"` // RFC 3339 with the carepartner's UTC offset
 	Timezone      string                       `json:"timezone"`
 	Today         string                       `json:"today"` // "YYYY-MM-DD" in the carepartner's timezone
-	LayoutPreset  string                       `json:"layout_preset"`
 	AwakeHours    AwakeHours                   `json:"awake_hours"`
 	Widgets       []*Widget                    `json:"widgets"`
 	Schedule      []scheduled_items.Occurrence `json:"schedule"` // today and tomorrow, so playback works across midnight

@@ -120,7 +120,6 @@ func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 		GeneratedAt:   now.Format(time.RFC3339),
 		Timezone:      cp.Timezone,
 		Today:         today,
-		LayoutPreset:  ss.LayoutPreset,
 		AwakeHours: AwakeHours{
 			Wake:       ss.WakeTime,
 			Bed:        ss.BedTime,

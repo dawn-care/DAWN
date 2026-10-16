@@ -94,7 +94,7 @@ func expectBasics(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
 	mock.ExpectQuery(qCarepartner).WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "caregiver_id", "timezone"}).AddRow(1, "John", 1, "America/New_York"))
 	mock.ExpectQuery(qSettings).WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).AddRow(1, "balanced", "07:00", "21:00"))
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}).AddRow(1, "07:00", "21:00"))
 	mock.ExpectQuery(qWidgets).WithArgs(1).WillReturnRows(rows)
 }
 

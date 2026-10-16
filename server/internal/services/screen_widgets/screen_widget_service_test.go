@@ -81,8 +81,8 @@ func layout(widgets ...model.WidgetInput) model.LayoutInput {
 func TestGetLayout(t *testing.T) {
 	s, mock := newService(t)
 	mock.ExpectQuery(qSettings).WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).
-			AddRow(1, "balanced", "07:00", "21:00"))
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}).
+			AddRow(1, "07:00", "21:00"))
 	mock.ExpectQuery(qList).WithArgs(1).WillReturnRows(storedRows())
 
 	l, err := s.GetLayout(1)
@@ -106,7 +106,7 @@ func TestGetLayout_Errors(t *testing.T) {
 	_, err := s.GetLayout(0)
 	assert.ErrorIs(t, err, ErrInvalidCarepartner)
 
-	mock.ExpectQuery(qSettings).WithArgs(9).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}))
+	mock.ExpectQuery(qSettings).WithArgs(9).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}))
 	_, err = s.GetLayout(9)
 	assert.ErrorIs(t, err, ErrCarepartnerMissing)
 	assert.NoError(t, mock.ExpectationsWereMet())
