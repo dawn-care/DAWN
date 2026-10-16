@@ -21,7 +21,7 @@ jest.mock("../../../app/screensaver", () => {
 });
 
 const ended = jest.fn();
-const item = { module_type: "video", metadata: { id: 5 } };
+const item = { kind: "video" as const, url: "/media/5/file" };
 
 function showing(screenName: Screen) {
   jest.mocked(usePlayback).mockReturnValue({

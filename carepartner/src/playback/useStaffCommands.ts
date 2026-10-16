@@ -20,9 +20,9 @@
  */
 
 import { useEffect, useRef } from "react";
-import { useSchedule } from "../schedule/ScheduleProvider";
+import { useScreen } from "../screen/ScreenProvider";
 import type { EndReason } from "./machine";
-import { isPlayable, type MediaItem } from "./media";
+import type { MediaItem } from "./media";
 import { usePlayback } from "./PlaybackProvider";
 import { connectTablet, tabletSocketUrl, type TabletConnection } from "./socket";
 import { statusMessage, type PlaybackStatus, type ServerMessage } from "./socketMessages";
@@ -49,7 +49,7 @@ type Pending = {
 
 export function useStaffCommands(): void {
   const { state, play, stop } = usePlayback();
-  const { refresh } = useSchedule();
+  const { refresh } = useScreen();
   const carepartnerId = state.carepartnerId;
 
   const connection = useRef<TabletConnection | null>(null);
@@ -94,7 +94,7 @@ export function useStaffCommands(): void {
         const command = pending.current.get(playbackId);
         // Gone if it was stopped, replaced or refused while looking it up.
         if (!command) return;
-        if (!item || !isPlayable(item)) {
+        if (!item) {
           pending.current.delete(playbackId);
           report(playbackId, "failed");
           return;

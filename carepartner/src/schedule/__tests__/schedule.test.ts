@@ -1,137 +1,59 @@
-import { dayOf, minuteOf, nextEntry, readEntries, routineStartsAt, timedEntriesDueAt, type ScheduleEntry } from "../schedule";
+import type { ScheduledPlay } from "../../screen/screen";
+import { duePlay, GRACE_MS, playKey, startOf } from "../schedule";
 
-const entry = (id: number, overrides: Partial<ScheduleEntry> = {}): ScheduleEntry => ({
-  id,
-  module_type: "video",
-  metadata: { id },
-  duration: 30,
-  timed: false,
-  time: null,
-  position: id,
+const play = (scheduledItemId: number, time: string, overrides: Partial<ScheduledPlay> = {}): ScheduledPlay => ({
+  scheduledItemId,
+  date: "2026-10-12",
+  time,
+  outsideAwakeHours: false,
+  item: { kind: "video", url: `/media/${scheduledItemId}/file` },
   ...overrides,
 });
-const timed = (id: number, time: string, overrides: Partial<ScheduleEntry> = {}) =>
-  entry(id, { timed: true, time, ...overrides });
 
-const none = new Set<number>();
+const at = (time: string) => new Date(`2026-10-12T${time}:00`);
 
-describe("readEntries", () => {
-  let warn: jest.SpyInstance;
-  beforeEach(() => {
-    warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-  });
-  afterEach(() => {
-    warn.mockRestore();
+describe("schedule", () => {
+  it("starts a play at its local date and time", () => {
+    expect(startOf(play(1, "08:15"))).toEqual(new Date(2026, 9, 12, 8, 15));
   });
 
-  it("keeps well-formed entries and drops malformed ones with a warning", () => {
-    const good = entry(1);
-    expect(readEntries([good, null, "x", { id: "2", module_type: "video", position: 1 }, { id: 3 }])).toEqual([good]);
-    expect(warn).toHaveBeenCalledWith("Dropped 4 malformed schedule entries");
+  it("tells one day's play of an item from another day's", () => {
+    expect(playKey(play(1, "08:00"))).toBe("1@2026-10-12");
+    expect(playKey(play(1, "08:00", { date: "2026-10-13" }))).toBe("1@2026-10-13");
   });
 
-  it("keeps entries the tablet can't play, with a warning naming them", () => {
-    const weather = entry(2, { module_type: "weather" });
-    const noMedia = entry(3, { metadata: null });
-    expect(readEntries([entry(1), weather, noMedia])).toEqual([entry(1), weather, noMedia]);
-    expect(warn).toHaveBeenCalledWith("Skipping schedule entries the tablet can't play: 2, 3");
-  });
+  describe("duePlay", () => {
+    const schedule = [play(1, "08:00"), play(2, "10:00")];
 
-  it("doesn't warn when every entry is well formed and playable", () => {
-    readEntries([entry(1), entry(2)]);
-    expect(warn).not.toHaveBeenCalled();
-  });
+    it("has nothing due before a play's time", () => {
+      expect(duePlay(schedule, at("07:59"), new Set())).toBeNull();
+    });
 
-  it("treats anything but a list as no entries, with a warning", () => {
-    expect(readEntries({ error: "nope" })).toEqual([]);
-    expect(warn).toHaveBeenCalledTimes(1);
-  });
+    it("is due from its time until the grace window ends", () => {
+      expect(duePlay(schedule, at("08:00"), new Set())?.scheduledItemId).toBe(1);
+      expect(duePlay(schedule, at("08:09"), new Set())?.scheduledItemId).toBe(1);
+      expect(duePlay(schedule, new Date(at("08:00").getTime() + GRACE_MS), new Set())).toBeNull();
+    });
 
-  it("treats null as an empty day without a warning", () => {
-    expect(readEntries(null)).toEqual([]);
-    expect(warn).not.toHaveBeenCalled();
-  });
-});
+    it("isn't due once played", () => {
+      expect(duePlay(schedule, at("08:01"), new Set(["1@2026-10-12"]))).toBeNull();
+    });
 
-describe("minuteOf and dayOf", () => {
-  it("formats the local minute and day", () => {
-    const time = new Date("2026-03-04T07:05:59");
-    expect(minuteOf(time)).toBe("07:05");
-    expect(dayOf(time)).toBe("2026-03-04");
-  });
-});
+    it("is due again on another day", () => {
+      const tomorrow = play(1, "08:00", { date: "2026-10-13" });
 
-describe("timedEntriesDueAt", () => {
-  const entries = [timed(1, "08:00:00"), timed(2, "08:00:00"), timed(3, "09:00:00"), entry(4)];
+      expect(duePlay([tomorrow], new Date("2026-10-13T08:01:00"), new Set(["1@2026-10-12"]))).toBe(tomorrow);
+    });
 
-  it("finds the timed entries at this minute", () => {
-    expect(timedEntriesDueAt(entries, "08:00", none)).toEqual([1, 2]);
-  });
+    it("picks the earliest of several due plays", () => {
+      const both = [play(2, "08:15"), play(1, "08:10")];
 
-  it("leaves out entries that have played", () => {
-    expect(timedEntriesDueAt(entries, "08:00", new Set([1]))).toEqual([2]);
-  });
+      expect(duePlay(both, at("08:16"), new Set())?.scheduledItemId).toBe(1);
+      expect(duePlay(both, at("08:16"), new Set(["1@2026-10-12"]))?.scheduledItemId).toBe(2);
+    });
 
-  it("finds nothing at other minutes", () => {
-    expect(timedEntriesDueAt(entries, "08:01", none)).toEqual([]);
-  });
-});
-
-describe("routineStartsAt", () => {
-  const routine = [entry(1), entry(2)];
-
-  it("starts at the auto-start minute when something in the routine hasn't played", () => {
-    expect(routineStartsAt("08:00:00", "08:00", routine, new Set([1]))).toBe(true);
-  });
-
-  it("doesn't start at other minutes", () => {
-    expect(routineStartsAt("08:00:00", "08:01", routine, none)).toBe(false);
-  });
-
-  it("doesn't start when the whole routine has played", () => {
-    expect(routineStartsAt("08:00:00", "08:00", routine, new Set([1, 2]))).toBe(false);
-  });
-
-  it("doesn't start when nothing in it can play", () => {
-    expect(routineStartsAt("08:00:00", "08:00", [entry(1, { module_type: "weather" })], none)).toBe(false);
-  });
-
-  it("doesn't start without an auto-start time", () => {
-    expect(routineStartsAt(undefined, "08:00", routine, none)).toBe(false);
-  });
-});
-
-describe("nextEntry", () => {
-  it("plays nothing when nothing is due and the routine isn't running", () => {
-    expect(nextEntry([entry(1), timed(2, "08:00:00")], { played: none, due: none, routineRunning: false })).toBeNull();
-  });
-
-  it("plays the routine in position order", () => {
-    const entries = [entry(1, { position: 3 }), entry(2, { position: 1 }), entry(3, { position: 2 })];
-    expect(nextEntry(entries, { played: none, due: none, routineRunning: true })?.id).toBe(2);
-    expect(nextEntry(entries, { played: new Set([2]), due: none, routineRunning: true })?.id).toBe(3);
-  });
-
-  it("plays due timed entries before the routine, earliest first", () => {
-    const entries = [entry(1), timed(2, "09:00:00"), timed(3, "08:00:00")];
-    expect(nextEntry(entries, { played: none, due: new Set([2, 3]), routineRunning: true })?.id).toBe(3);
-  });
-
-  it("doesn't play timed entries that aren't due yet", () => {
-    expect(nextEntry([timed(1, "09:00:00")], { played: none, due: none, routineRunning: true })).toBeNull();
-  });
-
-  it("skips entries that have played", () => {
-    expect(nextEntry([timed(1, "08:00:00")], { played: new Set([1]), due: new Set([1]), routineRunning: false })).toBeNull();
-  });
-
-  it("skips entries the tablet can't play", () => {
-    const entries = [entry(1, { module_type: "weather" }), entry(2, { module_type: "messages" }), entry(3, { metadata: null }), entry(4)];
-    expect(nextEntry(entries, { played: none, due: none, routineRunning: true })?.id).toBe(4);
-  });
-
-  it("finishes the routine once everything playable has played", () => {
-    const entries = [entry(1), entry(2, { module_type: "news" })];
-    expect(nextEntry(entries, { played: new Set([1]), due: none, routineRunning: true })).toBeNull();
+    it("skips plays outside the carepartner's awake hours", () => {
+      expect(duePlay([play(1, "08:00", { outsideAwakeHours: true })], at("08:01"), new Set())).toBeNull();
+    });
   });
 });

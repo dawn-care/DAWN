@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { colors } from "../theme/theme";
@@ -19,6 +19,15 @@ export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) 
   // reaches video elements that are already mounted, and VideoView mounts first.
   useEffect(() => {
     player.play();
+  }, [player]);
+
+  // Android pauses the video when the app goes to the background and doesn't
+  // resume it, which would leave a frozen frame that never finishes.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") player.play();
+    });
+    return () => subscription.remove();
   }, [player]);
 
   const report = useReportOnce({ onFinished, onFailed });

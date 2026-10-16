@@ -13,11 +13,11 @@ jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() })
 jest.mock("../staffItem", () => ({ fetchMediaItem: jest.fn() }));
 jest.mock("../socket", () => ({ ...jest.requireActual("../socket"), connectTablet: jest.fn() }));
 const mockRefresh = jest.fn();
-jest.mock("../../schedule/ScheduleProvider", () => ({ useSchedule: () => ({ refresh: mockRefresh }) }));
+jest.mock("../../screen/ScreenProvider", () => ({ useScreen: () => ({ refresh: mockRefresh }) }));
 
 const NOW = new Date("2026-10-14T10:00:00");
-const video: MediaItem = { module_type: "video", metadata: { id: 12 } };
-const song: MediaItem = { module_type: "audio", metadata: { id: 3 } };
+const video: MediaItem = { kind: "video", url: "/media/12/file" };
+const song: MediaItem = { kind: "audio", url: "/media/3/file" };
 
 let playback: ReturnType<typeof usePlayback>;
 function Probe() {
@@ -161,14 +161,10 @@ describe("useStaffCommands", () => {
     await start();
     jest.mocked(fetchMediaItem).mockResolvedValueOnce(null);
     await playAccepted(40);
-    jest.mocked(fetchMediaItem).mockResolvedValueOnce({ module_type: "weather", metadata: { id: 1 } });
-    await playAccepted(41);
 
     expect(reports()).toEqual([
       [40, "acknowledged"],
       [40, "failed"],
-      [41, "acknowledged"],
-      [41, "failed"],
     ]);
     expect(playback.state.playing).toBeNull();
   });
