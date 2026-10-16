@@ -36,6 +36,12 @@ describe("MediaPlayer", () => {
     expect(VideoPlayer).toHaveBeenCalledWith({ uri: `${API_URL}/video/file?id=5`, ...callbacks }, undefined);
   });
 
+  it("plays media from the file url the server gives", async () => {
+    await play(item("video", { id: 9, url: "/media/9/file" }));
+
+    expect(VideoPlayer).toHaveBeenCalledWith({ uri: `${API_URL}/media/9/file`, ...callbacks }, undefined);
+  });
+
   it("plays audio with its name as the title and its cover", async () => {
     await play(item("audio", { id: 9, displayed_name: "Moon River", cover_uri: "/audio/cover?id=9" }));
 

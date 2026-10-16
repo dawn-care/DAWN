@@ -1,7 +1,7 @@
 import { API_URL } from "../../api/config";
-import { fetchModuleItem } from "../staffItem";
+import { fetchMediaItem, MEDIA_LOOKUP_TIMEOUT_MS } from "../staffItem";
 
-describe("fetchModuleItem", () => {
+describe("fetchMediaItem", () => {
   const realFetch = globalThis.fetch;
   let warn: jest.SpyInstance;
 
@@ -16,19 +16,23 @@ describe("fetchModuleItem", () => {
   afterEach(() => {
     globalThis.fetch = realFetch;
     warn.mockRestore();
+    jest.useRealTimers();
   });
 
-  it("looks up the module and returns the media it plays", async () => {
-    respond({ id: 7, module_type: "video", caregiver_id: 2, carepartner_id: 2, metadata_id: 12 });
+  it("looks up the media and returns it with its file", async () => {
+    respond({ id: 9, carepartner_id: 2, kind: "video", display_name: "Birthday", url: "/media/9/file" });
 
-    await expect(fetchModuleItem(7)).resolves.toEqual({ module_type: "video", metadata: { id: 12 } });
-    expect(globalThis.fetch).toHaveBeenCalledWith(`${API_URL}/modules/7`);
+    await expect(fetchMediaItem(9)).resolves.toEqual({
+      module_type: "video",
+      metadata: { id: 9, url: "/media/9/file", displayed_name: "Birthday" },
+    });
+    expect(jest.mocked(globalThis.fetch).mock.calls[0][0]).toBe(`${API_URL}/media/9`);
   });
 
   it.each([
-    ["an error response", () => respond("server error", false)],
-    ["no media id", () => respond({ id: 7, module_type: "video" })],
-    ["no type", () => respond({ id: 7, metadata_id: 12 })],
+    ["an error response", () => respond({ code: "NOT_FOUND" }, false)],
+    ["no file", () => respond({ id: 9, kind: "video" })],
+    ["no kind", () => respond({ id: 9, url: "/media/9/file" })],
     ["null", () => respond(null)],
     [
       "a network failure",
@@ -41,7 +45,20 @@ describe("fetchModuleItem", () => {
   ])("returns null with a warning for %s", async (_name, setUp) => {
     setUp();
 
-    await expect(fetchModuleItem(7)).resolves.toBeNull();
+    await expect(fetchMediaItem(9)).resolves.toBeNull();
     expect(warn).toHaveBeenCalled();
+  });
+
+  it("gives up on a lookup that takes too long", async () => {
+    jest.useFakeTimers();
+    globalThis.fetch = jest.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => init.signal!.addEventListener("abort", () => reject(new Error("aborted")))),
+    ) as unknown as typeof fetch;
+
+    const result = fetchMediaItem(9);
+    jest.advanceTimersByTime(MEDIA_LOOKUP_TIMEOUT_MS);
+
+    await expect(result).resolves.toBeNull();
   });
 });

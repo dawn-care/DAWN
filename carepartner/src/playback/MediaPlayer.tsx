@@ -29,7 +29,10 @@ type MediaPlayerProps = {
 export default function MediaPlayer({ item, onFinished, onFailed }: MediaPlayerProps) {
   const metadata = readMetadata(item.metadata);
   if (!metadata) return null;
-  const uri = `${API_URL}/${item.module_type}/file?id=${metadata.id}`;
+  // Media from the new server model carries its file's `url` (`/media/{id}/file`).
+  // Scheduled entries still use the old per-type endpoint until the schedule
+  // moves to `/screen` (#298).
+  const uri = resolveApiUri(metadata.url) ?? `${API_URL}/${item.module_type}/file?id=${metadata.id}`;
 
   switch (item.module_type) {
     case "video":

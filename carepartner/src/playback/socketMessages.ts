@@ -12,8 +12,8 @@
 export type PlaybackStatus = "acknowledged" | "started" | "finished" | "stopped" | "failed" | "expired";
 
 export type ServerMessage =
-  /** Play a module now. It must not start after `expiresAt`. */
-  | { type: "play"; playbackId: number; moduleId: number; expiresAt: Date }
+  /** Play a media item now. The server decides whether it is still in time (see `useStaffCommands`). */
+  | { type: "play"; playbackId: number; mediaId: number; expiresAt: Date }
   /** Stop the play with this record. */
   | { type: "stop"; playbackId: number }
   /** Fetch the schedule again. */
@@ -38,10 +38,10 @@ export function readServerMessage(raw: string): ServerMessage | null {
   switch (message.type) {
     case "play": {
       const expiresAt = typeof message.expires_at === "string" ? new Date(message.expires_at) : null;
-      if (!isId(message.playback_id) || !isId(message.module_id) || !expiresAt || isNaN(expiresAt.getTime())) {
+      if (!isId(message.playback_id) || !isId(message.media_id) || !expiresAt || isNaN(expiresAt.getTime())) {
         return null;
       }
-      return { type: "play", playbackId: message.playback_id, moduleId: message.module_id, expiresAt };
+      return { type: "play", playbackId: message.playback_id, mediaId: message.media_id, expiresAt };
     }
     case "stop":
       return isId(message.playback_id) ? { type: "stop", playbackId: message.playback_id } : null;

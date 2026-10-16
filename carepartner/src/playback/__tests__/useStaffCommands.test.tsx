@@ -7,10 +7,10 @@ import { PlaybackProvider, usePlayback } from "../PlaybackProvider";
 import { connectTablet, type TabletConnection } from "../socket";
 import type { ServerMessage } from "../socketMessages";
 import StaffCommands from "../StaffCommands";
-import { fetchModuleItem } from "../staffItem";
+import { fetchMediaItem } from "../staffItem";
 
 jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
-jest.mock("../staffItem", () => ({ fetchModuleItem: jest.fn() }));
+jest.mock("../staffItem", () => ({ fetchMediaItem: jest.fn() }));
 jest.mock("../socket", () => ({ ...jest.requireActual("../socket"), connectTablet: jest.fn() }));
 const mockRefresh = jest.fn();
 jest.mock("../../schedule/ScheduleProvider", () => ({ useSchedule: () => ({ refresh: mockRefresh }) }));
@@ -31,9 +31,16 @@ let connection: { send: jest.Mock; close: jest.Mock; url: string; receive: (mess
 const playCommand = (playbackId: number, secondsLeft = 30): ServerMessage => ({
   type: "play",
   playbackId,
-  moduleId: 7,
+  mediaId: 9,
   expiresAt: new Date(NOW.getTime() + secondsLeft * 1000),
 });
+/** The server's answer to the tablet's acknowledgement. */
+const answer = (playbackId: number, status = "acknowledged"): ServerMessage => ({ type: "status_result", playbackId, status });
+/** A play command the server accepts as soon as the tablet acknowledges it. */
+async function playAccepted(playbackId: number) {
+  await connection.receive(playCommand(playbackId));
+  await connection.receive(answer(playbackId));
+}
 /** The statuses reported so far, as [playback id, status]. */
 const reports = () =>
   connection.send.mock.calls.map(([text]) => {
@@ -59,7 +66,7 @@ describe("useStaffCommands", () => {
     setClock(NOW);
     warn = jest.spyOn(console, "warn").mockImplementation(() => {});
     jest.mocked(getCarepartnerId).mockResolvedValue(7);
-    jest.mocked(fetchModuleItem).mockResolvedValue(video);
+    jest.mocked(fetchMediaItem).mockResolvedValue(video);
     jest.mocked(connectTablet).mockImplementation(({ url, onMessage }) => {
       const send = jest.fn();
       const close = jest.fn();
@@ -102,11 +109,11 @@ describe("useStaffCommands", () => {
     expect(connection.close).toHaveBeenCalled();
   });
 
-  it("acknowledges a play, plays it as staff and reports it started, then finished", async () => {
+  it("acknowledges a play, plays it as staff once the server accepts, and reports it started, then finished", async () => {
     await start();
-    await connection.receive(playCommand(40));
+    await playAccepted(40);
 
-    expect(fetchModuleItem).toHaveBeenCalledWith(7);
+    expect(fetchMediaItem).toHaveBeenCalledWith(9);
     expect(playback.state.playing).toMatchObject({ item: video, source: "staff", playbackId: 40 });
     expect(reports()).toEqual([
       [40, "acknowledged"],
@@ -119,30 +126,43 @@ describe("useStaffCommands", () => {
     expect(reports()).toContainEqual([40, "finished"]);
   });
 
-  it("reports failed when the player fails", async () => {
+  it("waits for the server to accept the acknowledgement before playing", async () => {
     await start();
     await connection.receive(playCommand(40));
 
-    await act(async () => playback.ended(playback.state.playing!.playId, "failed"));
-
-    expect(reports()).toContainEqual([40, "failed"]);
-  });
-
-  it("reports a command that arrived too late as expired, and plays nothing", async () => {
-    await start();
-    await connection.receive(playCommand(40, 0));
-
-    expect(reports()).toEqual([[40, "expired"]]);
-    expect(fetchModuleItem).not.toHaveBeenCalled();
     expect(playback.state.playing).toBeNull();
+
+    await connection.receive(answer(40));
+    expect(playback.state.playing?.playbackId).toBe(40);
   });
 
-  it("reports failed when the module can't be looked up or played", async () => {
+  it("leaves expiry to the server, not the tablet's clock", async () => {
     await start();
-    jest.mocked(fetchModuleItem).mockResolvedValueOnce(null);
+    // Already past its deadline by the tablet's clock, which may be wrong.
+    await connection.receive(playCommand(40, -60));
+    await connection.receive(answer(40));
+
+    expect(playback.state.playing?.playbackId).toBe(40);
+  });
+
+  it.each(["expired", undefined])("plays nothing when the server answers %s", async (status) => {
+    await start();
     await connection.receive(playCommand(40));
-    jest.mocked(fetchModuleItem).mockResolvedValueOnce({ module_type: "weather", metadata: { id: 1 } });
-    await connection.receive(playCommand(41));
+
+    await connection.receive({ type: "status_result", playbackId: 40, status, error: status ? undefined : "invalid" });
+    // A later stray answer doesn't revive it.
+    await connection.receive(answer(40));
+
+    expect(playback.state.playing).toBeNull();
+    expect(reports()).toEqual([[40, "acknowledged"]]);
+  });
+
+  it("reports failed when the media can't be looked up or played", async () => {
+    await start();
+    jest.mocked(fetchMediaItem).mockResolvedValueOnce(null);
+    await playAccepted(40);
+    jest.mocked(fetchMediaItem).mockResolvedValueOnce({ module_type: "weather", metadata: { id: 1 } });
+    await playAccepted(41);
 
     expect(reports()).toEqual([
       [40, "acknowledged"],
@@ -155,26 +175,41 @@ describe("useStaffCommands", () => {
 
   it("ignores a command it has already handled, as the server resends it on reconnect", async () => {
     await start();
+    await playAccepted(40);
+    await connection.receive(playCommand(40));
+
+    expect(fetchMediaItem).toHaveBeenCalledTimes(1);
+    expect(reports().filter(([, status]) => status === "acknowledged")).toHaveLength(1);
+  });
+
+  it("acknowledges a resent command again if the server's answer never came", async () => {
+    await start();
     await connection.receive(playCommand(40));
     await connection.receive(playCommand(40));
 
-    expect(fetchModuleItem).toHaveBeenCalledTimes(1);
-    expect(reports().filter(([, status]) => status === "acknowledged")).toHaveLength(1);
+    expect(fetchMediaItem).toHaveBeenCalledTimes(1);
+    expect(reports()).toEqual([
+      [40, "acknowledged"],
+      [40, "acknowledged"],
+    ]);
+
+    await connection.receive(answer(40));
+    expect(playback.state.playing?.playbackId).toBe(40);
   });
 
   it("interrupts a scheduled play", async () => {
     await start();
     await act(async () => playback.play(song, "scheduled"));
 
-    await connection.receive(playCommand(40));
+    await playAccepted(40);
 
     expect(playback.state.playing).toMatchObject({ source: "staff", playbackId: 40 });
   });
 
   it("reports the earlier clip stopped when another staff play replaces it", async () => {
     await start();
-    await connection.receive(playCommand(40));
-    await connection.receive(playCommand(41));
+    await playAccepted(40);
+    await playAccepted(41);
 
     expect(playback.state.playing?.playbackId).toBe(41);
     expect(reports()).toEqual(
@@ -187,7 +222,7 @@ describe("useStaffCommands", () => {
 
   it("stops the clip on screen and reports it stopped", async () => {
     await start();
-    await connection.receive(playCommand(40));
+    await playAccepted(40);
 
     await connection.receive({ type: "stop", playbackId: 40 });
 
@@ -197,7 +232,7 @@ describe("useStaffCommands", () => {
 
   it("ignores a stop for a clip that isn't on screen", async () => {
     await start();
-    await connection.receive(playCommand(41));
+    await playAccepted(41);
 
     await connection.receive({ type: "stop", playbackId: 40 });
 
@@ -205,22 +240,23 @@ describe("useStaffCommands", () => {
   });
 
   describe("while a command is being looked up", () => {
-    let finishLookup: (item: MediaItem | null) => void;
+    const lookups = new Map<number, (item: MediaItem | null) => void>();
     beforeEach(() => {
-      jest.mocked(fetchModuleItem).mockImplementation(
-        () =>
+      lookups.clear();
+      jest.mocked(fetchMediaItem).mockImplementation(
+        (mediaId) =>
           new Promise((resolve) => {
-            finishLookup = resolve;
+            lookups.set(mediaId, resolve);
           }),
       );
     });
 
     it("cancels it on a stop, reports it stopped and never plays it", async () => {
       await start();
-      await connection.receive(playCommand(40));
+      await playAccepted(40);
 
       await connection.receive({ type: "stop", playbackId: 40 });
-      await act(async () => finishLookup(video));
+      await act(async () => lookups.get(9)!(video));
 
       expect(reports()).toEqual([
         [40, "acknowledged"],
@@ -229,28 +265,34 @@ describe("useStaffCommands", () => {
       expect(playback.state.playing).toBeNull();
     });
 
-    it("doesn't play it if the server says it expired", async () => {
+    it("cancels it when a newer command arrives, so the older one can't take over", async () => {
       await start();
-      await connection.receive(playCommand(40));
+      await playAccepted(40);
+      await connection.receive({ ...playCommand(41), mediaId: 10 } as ServerMessage);
+      await connection.receive(answer(41));
 
-      await connection.receive({ type: "status_result", playbackId: 40, status: "expired" });
-      await act(async () => finishLookup(video));
+      // The newer lookup finishes first, then the older one.
+      await act(async () => lookups.get(10)!(song));
+      await act(async () => lookups.get(9)!(video));
 
-      expect(playback.state.playing).toBeNull();
-    });
-
-    it("reports it expired if its deadline passes first", async () => {
-      await start();
-      await connection.receive(playCommand(40));
-
-      setClock(new Date(NOW.getTime() + 31_000));
-      await act(async () => finishLookup(video));
-
+      expect(playback.state.playing).toMatchObject({ item: song, playbackId: 41 });
       expect(reports()).toEqual([
         [40, "acknowledged"],
-        [40, "expired"],
+        [40, "stopped"],
+        [41, "acknowledged"],
+        [41, "started"],
       ]);
+    });
+
+    it("plays it once both the lookup and the server's answer are in, in either order", async () => {
+      await start();
+      await connection.receive(playCommand(40));
+      await act(async () => lookups.get(9)!(video));
+
       expect(playback.state.playing).toBeNull();
+
+      await connection.receive(answer(40));
+      expect(playback.state.playing?.playbackId).toBe(40);
     });
   });
 

@@ -4,21 +4,21 @@ const read = (value: unknown) => readServerMessage(JSON.stringify(value));
 
 describe("readServerMessage", () => {
   it("reads a play command", () => {
-    expect(read({ type: "play", playback_id: 12, module_id: 3, expires_at: "2026-10-12T20:00:30Z" })).toEqual({
+    expect(read({ type: "play", playback_id: 12, media_id: 3, expires_at: "2026-10-12T20:00:30Z" })).toEqual({
       type: "play",
       playbackId: 12,
-      moduleId: 3,
+      mediaId: 3,
       expiresAt: new Date("2026-10-12T20:00:30Z"),
     });
   });
 
   it.each([
-    ["no playback id", { type: "play", module_id: 3, expires_at: "2026-10-12T20:00:30Z" }],
-    ["no module id", { type: "play", playback_id: 12, expires_at: "2026-10-12T20:00:30Z" }],
-    ["a text id", { type: "play", playback_id: "12", module_id: 3, expires_at: "2026-10-12T20:00:30Z" }],
-    ["a zero id", { type: "play", playback_id: 0, module_id: 3, expires_at: "2026-10-12T20:00:30Z" }],
-    ["no deadline", { type: "play", playback_id: 12, module_id: 3 }],
-    ["an unreadable deadline", { type: "play", playback_id: 12, module_id: 3, expires_at: "soon" }],
+    ["no playback id", { type: "play", media_id: 3, expires_at: "2026-10-12T20:00:30Z" }],
+    ["no media id", { type: "play", playback_id: 12, expires_at: "2026-10-12T20:00:30Z" }],
+    ["a text id", { type: "play", playback_id: "12", media_id: 3, expires_at: "2026-10-12T20:00:30Z" }],
+    ["a zero id", { type: "play", playback_id: 0, media_id: 3, expires_at: "2026-10-12T20:00:30Z" }],
+    ["no deadline", { type: "play", playback_id: 12, media_id: 3 }],
+    ["an unreadable deadline", { type: "play", playback_id: 12, media_id: 3, expires_at: "soon" }],
   ])("drops a play command with %s", (_name, message) => {
     expect(read(message)).toBeNull();
   });
