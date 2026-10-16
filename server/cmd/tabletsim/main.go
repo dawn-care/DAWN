@@ -128,7 +128,7 @@ func (t *tablet) play(msg realtime.Message) {
 		}
 		t.report(id, "acknowledged")
 		t.report(id, "started")
-		log.Printf("   ▶ playing module %d for %s", msg.ModuleID, t.clip)
+		log.Printf("   ▶ playing media %d for %s", msg.MediaID, t.clip)
 		if !sleep(ctx, t.clip) {
 			return
 		}
@@ -189,8 +189,8 @@ func describe(m realtime.Message) string {
 	if m.PlaybackID != 0 {
 		s += " playback=" + strconv.Itoa(m.PlaybackID)
 	}
-	if m.ModuleID != 0 {
-		s += " module=" + strconv.Itoa(m.ModuleID)
+	if m.MediaID != 0 {
+		s += " media=" + strconv.Itoa(m.MediaID)
 	}
 	if m.Status != "" {
 		s += " status=" + m.Status

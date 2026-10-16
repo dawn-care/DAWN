@@ -3,8 +3,9 @@ package caregiver
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"server/internal/models/user/caregiver"
+	"server/internal/models/user/carepartner"
+	"server/internal/models/user/device_pairing"
 	"server/internal/services/user"
 )
 
@@ -104,28 +105,25 @@ func (s *CaregiverService) DeleteCaregiver(id int) error {
 		return errors.New("invalid ID")
 	}
 
-	// Optional: prevent deleting caregivers who still have modules
-	modules, err := s.CountModulesForCaregiver(id)
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
-	if modules > 0 {
-		return fmt.Errorf("cannot delete caregiver %d; they still have %d module(s)", id, modules)
+	defer tx.Rollback()
+
+	// Unpair the caregiver's carepartners first; the carepartner foreign key
+	// blocks deleting a caregiver who is still paired
+	if err := device_pairing.DeletePairingsForCaregiver(tx, id); err != nil {
+		return err
+	}
+	if err := carepartner.UnpairCarepartnersFromCaregiver(tx, id); err != nil {
+		return err
+	}
+	if err := caregiver.DeleteCaregiver(tx, id); err != nil {
+		return err
 	}
 
-	return caregiver.DeleteCaregiver(s.DB, id)
-}
-
-// CountModulesForCaregiver checks dependency before deletion
-func (s *CaregiverService) CountModulesForCaregiver(caregiverID int) (int, error) {
-	query := `
-		SELECT COUNT(*) 
-		FROM "Module"
-		WHERE caregiver_id = $1;
-	`
-	var count int
-	err := s.DB.QueryRow(query, caregiverID).Scan(&count)
-	return count, err
+	return tx.Commit()
 }
 
 func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (*caregiver.Caregiver, error) {

@@ -42,19 +42,38 @@ func call(r http.Handler, method, path, body string) *httptest.ResponseRecorder 
 }
 
 func rows(status string) *sqlmock.Rows {
-	return sqlmock.NewRows([]string{"id", "carepartner_id", "module_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
-		AddRow(1, 2, 3, "tap", status, time.Now().UTC(), nil, nil, nil, time.Now().Add(time.Hour), nil)
+	return sqlmock.NewRows([]string{"id", "carepartner_id", "media_id", "media_kind", "media_display_name", "scheduled_item_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
+		AddRow(1, 2, 3, "video", "Clip", nil, "tap", status, time.Now().UTC(), nil, nil, nil, time.Now().Add(time.Hour), nil)
 }
 
 func TestCreatePlaybackEndpoint(t *testing.T) {
 	r, mock := setup(t)
 	expiry := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
-	mock.ExpectQuery(`INSERT INTO "Playback"`).WithArgs(2, 3, "tap", sqlmock.AnyArg(), expiry).WillReturnRows(rows("requested"))
-	response := call(r, "POST", "/api/playbacks", `{"carepartner_id":2,"module_id":3,"source":"tap","expires_at":"`+expiry.Format(time.RFC3339)+`"}`)
+	mock.ExpectQuery(`INSERT INTO "Playback"`).WithArgs(2, 3, nil, "tap", sqlmock.AnyArg(), expiry).WillReturnRows(rows("requested"))
+	response := call(r, "POST", "/api/playbacks", `{"carepartner_id":2,"media_id":3,"source":"tap","expires_at":"`+expiry.Format(time.RFC3339)+`"}`)
 	require.Equal(t, 201, response.Code, response.Body.String())
 	require.Equal(t, "application/json", response.Header().Get("Content-Type"))
 	require.Contains(t, response.Body.String(), `"status":"requested"`)
 	require.Contains(t, response.Body.String(), `"rating":null`)
+	require.Contains(t, response.Body.String(), `"media_id":3`)
+	require.Contains(t, response.Body.String(), `"media_kind":"video"`)
+	require.Contains(t, response.Body.String(), `"media_display_name":"Clip"`)
+}
+
+func TestCreateScheduledPlaybackEndpoint(t *testing.T) {
+	r, mock := setup(t)
+	expiry := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+	mock.ExpectQuery(`INSERT INTO "Playback"`).WithArgs(2, 3, 5, "scheduled", sqlmock.AnyArg(), expiry).WillReturnRows(rows("requested"))
+	response := call(r, "POST", "/api/playbacks", `{"carepartner_id":2,"media_id":3,"scheduled_item_id":5,"source":"scheduled","expires_at":"`+expiry.Format(time.RFC3339)+`"}`)
+	require.Equal(t, 201, response.Code, response.Body.String())
+}
+
+// Clients built against the old model send module_id; it's rejected before any query
+func TestCreateRejectsModuleID(t *testing.T) {
+	r, _ := setup(t)
+	expiry := time.Now().UTC().Add(time.Hour).Format(time.RFC3339)
+	response := call(r, "POST", "/api/playbacks", `{"carepartner_id":2,"module_id":3,"source":"tap","expires_at":"`+expiry+`"}`)
+	require.Equal(t, 400, response.Code)
 }
 
 func TestStatusEndpoint(t *testing.T) {
@@ -117,7 +136,7 @@ func TestCreateErrorResponses(t *testing.T) {
 	}{{sql.ErrNoRows, 400}, {errors.New("sensitive database detail"), 500}} {
 		r, mock := setup(t)
 		mock.ExpectQuery(`INSERT INTO "Playback"`).WillReturnError(test.cause)
-		response := call(r, "POST", "/api/playbacks", `{"carepartner_id":2,"module_id":3,"source":"scheduled","expires_at":"`+time.Now().Add(time.Hour).UTC().Format(time.RFC3339)+`"}`)
+		response := call(r, "POST", "/api/playbacks", `{"carepartner_id":2,"media_id":3,"scheduled_item_id":5,"source":"scheduled","expires_at":"`+time.Now().Add(time.Hour).UTC().Format(time.RFC3339)+`"}`)
 		require.Equal(t, test.code, response.Code)
 		require.NotContains(t, response.Body.String(), "sensitive")
 	}

@@ -115,11 +115,12 @@ func TestDeleteNewsWidget(t *testing.T) {
 func TestGetGoodNews(t *testing.T) {
 	db, _ := utils.SetupMockDB(t)
 	defer db.Close()
-	err := godotenv.Load("../../../../../.env")
-	if err != nil {
-		assert.NoError(t, err)
-	}
+	// Live check against the real API; runs only when a key is available
+	_ = godotenv.Load("../../../../../.env")
 	apiKey := os.Getenv("NEWS_API_KEY")
+	if apiKey == "" {
+		t.Skip("NEWS_API_KEY not set; the fake-server tests cover this offline")
+	}
 
 	sports_news_service := NewNewsWidgetService(db, apiKey)
 

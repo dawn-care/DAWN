@@ -17,7 +17,7 @@ import (
 )
 
 type PlaybackServiceInterface interface {
-	CreatePlayback(context.Context, int, int, string, time.Time) (*playback.Playback, error)
+	CreatePlayback(context.Context, int, int, *int, string, time.Time) (*playback.Playback, error)
 	UpdateStatus(context.Context, int, int, string) (*playback.Playback, error)
 	RequestStaffPlay(context.Context, int, int) (*playback.Playback, error)
 	RequestStop(context.Context, int, int) (*playback.Playback, playbackSvc.StopOutcome, error)
@@ -38,11 +38,14 @@ func NewPlaybackController(service PlaybackServiceInterface, notifier Notifier) 
 	return &PlaybackController{Service: service, Notifier: notifier}
 }
 
+// CreatePlaybackRequest names the media to play. scheduled_item_id is required when
+// source is "scheduled" and must be left out otherwise.
 type CreatePlaybackRequest struct {
-	CarepartnerID int       `json:"carepartner_id"`
-	ModuleID      int       `json:"module_id"`
-	Source        string    `json:"source"`
-	ExpiresAt     time.Time `json:"expires_at"`
+	CarepartnerID   int       `json:"carepartner_id"`
+	MediaID         int       `json:"media_id"`
+	ScheduledItemID *int      `json:"scheduled_item_id"`
+	Source          string    `json:"source"`
+	ExpiresAt       time.Time `json:"expires_at"`
 }
 
 type UpdateStatusRequest struct {
@@ -65,7 +68,7 @@ func (c *PlaybackController) CreatePlaybackHandler(w http.ResponseWriter, r *htt
 	if !decodeRequest(w, r, &req) {
 		return
 	}
-	p, err := c.Service.CreatePlayback(r.Context(), req.CarepartnerID, req.ModuleID, req.Source, req.ExpiresAt)
+	p, err := c.Service.CreatePlayback(r.Context(), req.CarepartnerID, req.MediaID, req.ScheduledItemID, req.Source, req.ExpiresAt)
 	if err != nil {
 		writeServiceError(w, err)
 		return
