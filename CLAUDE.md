@@ -125,7 +125,7 @@ Expo Router app (file-based routing under `carepartner/app/`) targeting native (
 
 ### Shared code (`shared/`)
 
-`shared/` holds framework-free rules that the caregiver preview and the tablet must agree on. It currently has awake hours (`display/awakeHours.ts`), what is playing at a given time (`playback/currentlyPlaying.ts`), the layouts and their spots (`widgets/layoutPresets.ts`), widget names and which widgets a layout hides (`widgets/screenWidgets.ts`), the weather word (`widgets/weather.ts`), the tablet's current night hours (`display/nightHours.ts`), time of day and date labels (`widgets/timeOfDay.ts`), and the old always-on grid's size and `fitsGrid` (`widgets/grid.ts`). `shared/README.md` lists what each file decides.
+`shared/` holds framework-free rules that the caregiver preview and the tablet must agree on. It currently has awake hours (`display/awakeHours.ts`), what is playing at a given time (`playback/currentlyPlaying.ts`), where widgets can be placed on the 4 x 3 grid (`widgets/gridPlacement.ts`), widget names (`widgets/screenWidgets.ts`), the weather word (`widgets/weather.ts`), the tablet's current night hours (`display/nightHours.ts`), time of day and date labels (`widgets/timeOfDay.ts`), and the grid's size and `fitsGrid` (`widgets/grid.ts`). `shared/README.md` lists what each file decides.
 
 - Plain TypeScript only: no React, React Native, Expo or DOM imports, and no dependencies. Rules take the time and data as arguments and never read the clock themselves. `npm run typecheck:shared` fails on a DOM API or a React import with types.
 - Import from the barrel (`import { currentlyPlaying } from "@shared"`), never a deep path, and re-export new modules from `shared/index.ts`.

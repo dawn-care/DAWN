@@ -9,11 +9,11 @@ Rules used by both the caregiver app and the carepartner tablet, so the caregive
 | `display/awakeHours.ts` | When the carepartner is awake. `isAwake`, `isStartAllowed` (an item must start between wake up and bed, on a 15 minute step, but may run past bed), `snapToStep`, `startTimeOptions` for the time picker, `itemsOutsideHours` for the warning before new hours are saved, `isValidAwakeHours`, and `parseClock` / `formatClock` for the server's time text. Default 8 am to 10 pm. |
 | `display/nightHours.ts` | The tablet's current night hours. Stays until the night hours ticket moves the tablet to `awakeHours`. |
 | `playback/currentlyPlaying.ts` | What the screen shows at a given time: her usual screen, the night screen, or a video, audio (over her usual screen or one photo) or timed photo that is playing. An item that starts outside the awake hours never plays. |
-| `widgets/layoutPresets.ts` | The layouts (Simple, Balanced, Grid, Busier): each spot's place on the grid, `firstEmptySpot`, and `isSpotInLayout`. The server stores only a widget's `spot` number and how many spots a layout has. |
-| `widgets/screenWidgets.ts` | Widget types and names, `shownWidgets` / `hiddenWidgets` for a layout, and the "doesn't fit" note. Widgets are never deleted when a smaller layout is chosen. |
+| `widgets/gridPlacement.ts` | Where widgets can go on the 4 x 3 grid. Each widget type has a fixed size (`WIDGET_SIZES`) and is stored as a type plus the `col` and `row` of its top left cell, counted from 0 at the top left. `openCells` lists the cells to highlight for the widget being placed, `canPlace` and `hasRoom` check one cell or the whole grid, and `isValidPlacement` checks the full list before it is saved. The sizes are provisional. |
+| `widgets/screenWidgets.ts` | Widget types and what to call them (`widgetName`). |
 | `widgets/weather.ts` | The weather tile's word ("Chilly", "Sunny"...). Takes the weather widget's data as it is. The words and temperature lines are provisional. |
 | `widgets/timeOfDay.ts` | Morning, afternoon or evening, the day name and the date label. |
-| `widgets/grid.ts` | The tablet's current 4 x 3 grid. Goes when the tablet moves from the old grid to layout spots. |
+| `widgets/grid.ts` | The screen's 4 x 3 grid: its size, `GridArea` and `fitsGrid`. |
 
 ## What belongs here
 
