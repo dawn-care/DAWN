@@ -45,8 +45,13 @@ export function parseClock(text: string): number | null {
   return hours * 60 + minutes;
 }
 
-/** The server's time text for a minute after midnight: two digit hours, a colon, two digit minutes. */
-export function formatClock(minute: number): string {
+/**
+ * The server's time text for a minute after midnight: two digit hours, a colon,
+ * two digit minutes. Null unless the minute is a whole number from 0 to 1439,
+ * the same range `parseClock` accepts.
+ */
+export function formatClock(minute: number): string | null {
+  if (!Number.isInteger(minute) || minute < 0 || minute > 1439) return null;
   const hours = Math.floor(minute / 60);
   const minutes = minute % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;

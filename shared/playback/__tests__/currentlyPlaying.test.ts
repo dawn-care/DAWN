@@ -1,4 +1,4 @@
-import { currentlyPlaying } from "../currentlyPlaying";
+import { currentlyPlaying, overlappingItems } from "../currentlyPlaying";
 import type { PlayableItem } from "../currentlyPlaying";
 
 const minute = (hours: number, minutes = 0) => hours * 60 + minutes;
@@ -197,8 +197,10 @@ describe("items that start outside the awake hours", () => {
   });
 });
 
+// The caregiver refuses to schedule overlapping items (see overlappingItems), so this is a
+// fallback for a schedule that has one anyway. The tablet instead finishes the item it is on.
 describe("more than one item under way", () => {
-  it("shows the one that started most recently", () => {
+  it("falls back to the one that started most recently", () => {
     const first: PlayableItem = { ...video, startMinute: minute(10), durationSeconds: 600 };
     const second: PlayableItem = { ...audio, startMinute: minute(10, 5), durationSeconds: 600 };
     expect(currentlyPlaying(at("10:06:00"), [first, second])).toMatchObject({ kind: "audio" });
@@ -252,5 +254,53 @@ describe("time is only read from its arguments", () => {
     const rich = { ...video, id: 7, title: "Good morning, Mom", url: "/media/2/file" };
     const result = currentlyPlaying(at("10:00:30"), [rich]);
     expect(result.kind === "video" && result.item.title).toBe("Good morning, Mom");
+  });
+});
+
+describe("overlappingItems", () => {
+  // The video above runs 10:00:00 to 10:02:00.
+  const candidate = (startMinute: number, durationSeconds: number): PlayableItem => ({
+    ...audio,
+    startMinute,
+    durationSeconds,
+  });
+
+  it("finds an item that starts while another is playing", () => {
+    expect(overlappingItems(candidate(minute(10, 1), 60), [video, photo])).toEqual([video]);
+  });
+
+  it("finds an item that starts before another and runs into it", () => {
+    expect(overlappingItems(candidate(minute(9, 59), 180), [video])).toEqual([video]);
+  });
+
+  it("finds an item that sits entirely inside another", () => {
+    expect(overlappingItems(candidate(minute(10, 1), 30), [video])).toEqual([video]);
+  });
+
+  it("does not count an item that starts the moment another ends", () => {
+    expect(overlappingItems(candidate(minute(10, 2), 60), [video])).toEqual([]);
+  });
+
+  it("does not count an item that ends the moment another starts", () => {
+    expect(overlappingItems(candidate(minute(9, 58), 120), [video])).toEqual([]);
+  });
+
+  it("does not count an item on another day", () => {
+    expect(overlappingItems(candidate(minute(10, 1), 60), [{ ...video, date: "2026-10-13" }])).toEqual([]);
+  });
+
+  it("finds every item in the way", () => {
+    const other: PlayableItem = { ...photo, startMinute: minute(10, 1), durationSeconds: 30 };
+    expect(overlappingItems(candidate(minute(10, 1), 60), [video, other, photo])).toEqual([video, other]);
+  });
+
+  it("finds nothing for a candidate that would never play", () => {
+    const early = candidate(minute(7), 600);
+    expect(overlappingItems(early, [{ ...video, startMinute: minute(7), durationSeconds: 3600 }])).toEqual([]);
+  });
+
+  it("ignores scheduled items that would never play", () => {
+    const unusable: PlayableItem = { ...video, durationSeconds: 0 };
+    expect(overlappingItems(candidate(minute(10), 60), [unusable])).toEqual([]);
   });
 });

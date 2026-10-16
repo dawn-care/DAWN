@@ -11,6 +11,14 @@
  * carepartner's. An item only has to START in the awake hours. Once it is
  * playing it finishes, even past bedtime. An item that starts outside the awake
  * hours never plays.
+ *
+ * Where this differs from the tablet today (carepartner/src/playback): the
+ * tablet never interrupts an item that is playing, only starts a timed item in
+ * its exact minute, and plays untimed routine entries in order. Here, asking for
+ * any moment finds the item under way at it. The caregiver avoids the first
+ * difference by refusing to schedule overlapping items (`overlappingItems`), so
+ * the preview and the tablet never disagree about which item wins. The other two
+ * stay until the tablet adopts this file.
  */
 
 import { DEFAULT_AWAKE_HOURS, isAwakeAt, minuteOfDay } from "../display/awakeHours";
@@ -82,10 +90,43 @@ function startSeconds(item: PlayableItem): number | null {
 }
 
 /**
+ * When an item is on screen, in wall clock seconds from its start up to but not
+ * including its end. Null for an item that never plays: one that starts outside
+ * the awake hours, has no length, or has a date or start that can't be used.
+ */
+function playWindow(item: PlayableItem, awakeHours: AwakeHours): { start: number; end: number } | null {
+  if (!isAwakeAt(item.startMinute, awakeHours)) return null;
+  if (!(item.durationSeconds > 0)) return null;
+  const start = startSeconds(item);
+  if (start === null) return null;
+  return { start, end: start + item.durationSeconds };
+}
+
+/**
+ * The scheduled items that would be on screen at the same time as `candidate`.
+ * Two items overlap when one starts before the other ends; an item that starts
+ * the moment another ends does not overlap it. The caregiver uses this to refuse
+ * a new item that would play over another. Items that never play are ignored.
+ */
+export function overlappingItems<T extends PlayableItem>(
+  candidate: PlayableItem,
+  schedule: readonly T[],
+  awakeHours: AwakeHours = DEFAULT_AWAKE_HOURS,
+): T[] {
+  const mine = playWindow(candidate, awakeHours);
+  if (mine === null) return [];
+  return schedule.filter((item) => {
+    const theirs = playWindow(item, awakeHours);
+    return theirs !== null && mine.start < theirs.end && theirs.start < mine.end;
+  });
+}
+
+/**
  * What should be on screen at `now`.
  *
- * Playing items come first: the one that started most recently if more than one
- * is under way. With nothing playing, it is the night screen outside the awake
+ * Playing items come first. If more than one is under way, which the caregiver
+ * prevents by scheduling (`overlappingItems`), the one that started most
+ * recently wins. With nothing playing, it is the night screen outside the awake
  * hours and her usual screen inside them.
  */
 export function currentlyPlaying<T extends PlayableItem>(
@@ -102,12 +143,10 @@ export function currentlyPlaying<T extends PlayableItem>(
 
   let current: { item: T; start: number } | null = null;
   for (const item of schedule) {
-    if (!isAwakeAt(item.startMinute, awakeHours)) continue;
-    if (!(item.durationSeconds > 0)) continue;
-    const start = startSeconds(item);
-    if (start === null) continue;
-    if (nowSeconds < start || nowSeconds >= start + item.durationSeconds) continue;
-    if (current === null || start > current.start) current = { item, start };
+    const window = playWindow(item, awakeHours);
+    if (window === null) continue;
+    if (nowSeconds < window.start || nowSeconds >= window.end) continue;
+    if (current === null || window.start > current.start) current = { item, start: window.start };
   }
 
   if (current !== null) {

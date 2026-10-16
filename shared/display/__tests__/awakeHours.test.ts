@@ -15,7 +15,6 @@ import {
 
 const hours = { wakeMinute: 7 * 60, bedMinute: 21 * 60 };
 
-
 describe("minuteOfDay", () => {
   it("counts minutes after midnight", () => {
     expect(minuteOfDay(new Date("2026-10-03T00:00:00"))).toBe(0);
@@ -46,8 +45,18 @@ describe("parseClock and formatClock", () => {
     expect(formatClock(0)).toBe("00:00");
   });
 
+  it("writes the last minute of the day", () => {
+    expect(formatClock(1439)).toBe("23:59");
+  });
+
+  it.each([450.5, 1440, -1, NaN, Infinity])("refuses %s", (minute) => {
+    expect(formatClock(minute)).toBeNull();
+  });
+
   it("round trips", () => {
-    expect(parseClock(formatClock(1005))).toBe(1005);
+    const text = formatClock(1005);
+    expect(text).not.toBeNull();
+    expect(parseClock(text as string)).toBe(1005);
   });
 });
 
