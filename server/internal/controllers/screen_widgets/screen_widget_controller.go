@@ -6,32 +6,26 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	model "server/internal/models/screen_widgets"
 	svc "server/internal/services/screen_widgets"
 )
 
 // Error codes returned in the "code" field of error responses
 const (
-	CodeInvalidRequest = "INVALID_REQUEST"
-	CodeInvalidType    = "INVALID_TYPE"
-	CodeInvalidConfig  = "INVALID_CONFIG"
-	CodeInvalidPhoto   = "INVALID_PHOTO"
-	CodeUnknownSpot    = "UNKNOWN_SPOT"
-	CodeSpotTaken      = "SPOT_TAKEN"
-	CodeNotFound       = "NOT_FOUND"
-	CodeInternal       = "INTERNAL_ERROR"
+	CodeInvalidRequest  = "INVALID_REQUEST"
+	CodeInvalidType     = "INVALID_TYPE"
+	CodeInvalidConfig   = "INVALID_CONFIG"
+	CodeInvalidPhoto    = "INVALID_PHOTO"
+	CodeInvalidPosition = "INVALID_POSITION"
+	CodeOverlap         = "WIDGETS_OVERLAP"
+	CodeNotFound        = "NOT_FOUND"
+	CodeInternal        = "INTERNAL_ERROR"
 )
 
 // ---- Interface ----
 type ScreenWidgetServiceInterface interface {
-	CreateWidget(in svc.CreateInput) (*model.ScreenWidget, error)
-	ListWidgets(carepartnerID int) ([]model.ScreenWidget, error)
-	GetWidget(id int) (*model.ScreenWidget, error)
-	UpdateWidget(id int, in svc.UpdateInput) (*model.ScreenWidget, error)
-	MoveWidget(id int, in svc.MoveInput) (*model.ScreenWidget, error)
-	DeleteWidget(id int) error
+	GetLayout(carepartnerID int) (*model.Layout, error)
+	SaveLayout(carepartnerID int, in model.LayoutInput) (*model.Layout, error)
 }
 
 // ---- Controller ----
@@ -59,206 +53,96 @@ func writeError(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, ScreenWidgetError{Code: code, Error: msg})
 }
 
+var errorCodes = []struct {
+	err    error
+	status int
+	code   string
+}{
+	{svc.ErrNotFound, http.StatusNotFound, CodeNotFound},
+	{svc.ErrCarepartnerMissing, http.StatusNotFound, CodeNotFound},
+	{svc.ErrInvalidCarepartner, http.StatusBadRequest, CodeInvalidRequest},
+	{svc.ErrInvalidRequest, http.StatusBadRequest, CodeInvalidRequest},
+	{svc.ErrInvalidType, http.StatusBadRequest, CodeInvalidType},
+	{svc.ErrInvalidPosition, http.StatusBadRequest, CodeInvalidPosition},
+	{svc.ErrInvalidConfig, http.StatusBadRequest, CodeInvalidConfig},
+	{svc.ErrInvalidPhoto, http.StatusBadRequest, CodeInvalidPhoto},
+	{svc.ErrOverlap, http.StatusBadRequest, CodeOverlap},
+}
+
 func writeServiceError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, svc.ErrNotFound), errors.Is(err, svc.ErrCarepartnerMissing):
-		writeError(w, http.StatusNotFound, CodeNotFound, err.Error())
-	case errors.Is(err, svc.ErrInvalidCarepartner):
-		writeError(w, http.StatusBadRequest, CodeInvalidRequest, err.Error())
-	case errors.Is(err, svc.ErrInvalidType):
-		writeError(w, http.StatusBadRequest, CodeInvalidType, err.Error())
-	case errors.Is(err, svc.ErrInvalidConfig):
-		writeError(w, http.StatusBadRequest, CodeInvalidConfig, err.Error())
-	case errors.Is(err, svc.ErrInvalidPhoto):
-		writeError(w, http.StatusBadRequest, CodeInvalidPhoto, err.Error())
-	case errors.Is(err, svc.ErrUnknownSpot):
-		writeError(w, http.StatusBadRequest, CodeUnknownSpot, err.Error())
-	case errors.Is(err, svc.ErrSpotTaken):
-		writeError(w, http.StatusConflict, CodeSpotTaken, err.Error())
-	default:
-		writeError(w, http.StatusInternalServerError, CodeInternal, err.Error())
+	for _, e := range errorCodes {
+		if errors.Is(err, e.err) {
+			writeError(w, e.status, e.code, err.Error())
+			return
+		}
 	}
+	writeError(w, http.StatusInternalServerError, CodeInternal, err.Error())
 }
 
-func widgetIDParam(r *http.Request) (int, bool) {
-	id, err := strconv.Atoi(chi.URLParam(r, "id"))
-	return id, err == nil && id > 0
-}
-
-func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, CodeInvalidRequest, "invalid request body")
-		return false
+func carepartnerParam(w http.ResponseWriter, r *http.Request) (int, bool) {
+	id, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, CodeInvalidRequest, svc.ErrInvalidCarepartner.Error())
+		return 0, false
 	}
-	return true
+	return id, true
 }
 
-// ListWidgetsHandler godoc
-// @Summary List a carepartner's screen widgets
-// @Description Widgets in spot order. Widgets whose spot the current layout doesn't have come last with hidden: true; the tablet doesn't show them.
-// @Tags screen-widgets
+// GetLayoutHandler godoc
+// @Summary Get a carepartner's screen layout
+// @Description Every widget on the carepartner's screen, in reading order (top row first, then left to right). top_left and bottom_right are the cells at the widget's corners, both inclusive, on the 4x3 grid (columns 0-3, rows 0-2).
+// @Tags screen-layout
 // @Produce json
 // @Param carepartner_id query int true "Carepartner ID"
-// @Success 200 {array} screen_widgets.ScreenWidget
+// @Success 200 {object} screen_widgets.Layout
 // @Failure 400 {object} screen_widgets.ScreenWidgetError
 // @Failure 404 {object} screen_widgets.ScreenWidgetError
 // @Failure 500 {object} screen_widgets.ScreenWidgetError
-// @Router /screen-widgets [get]
-func (c *ScreenWidgetController) ListWidgetsHandler(w http.ResponseWriter, r *http.Request) {
-	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
-	if err != nil || carepartnerID <= 0 {
-		writeError(w, http.StatusBadRequest, CodeInvalidRequest, svc.ErrInvalidCarepartner.Error())
+// @Router /screen-layout [get]
+func (c *ScreenWidgetController) GetLayoutHandler(w http.ResponseWriter, r *http.Request) {
+	carepartnerID, ok := carepartnerParam(w, r)
+	if !ok {
 		return
 	}
 
-	widgets, err := c.Service.ListWidgets(carepartnerID)
+	layout, err := c.Service.GetLayout(carepartnerID)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, widgets)
+	writeJSON(w, http.StatusOK, layout)
 }
 
-// CreateWidgetHandler godoc
-// @Summary Place a new widget in a spot
-// @Description The spot (0-based) must exist in the carepartner's current layout (see GET /screen-settings/presets) and be empty. Any widget type can go in any spot. config is validated per type; photo widgets need photo_media_id.
-// @Tags screen-widgets
+// SaveLayoutHandler godoc
+// @Summary Replace a carepartner's screen layout
+// @Description Send every widget on the screen. A widget with an id updates that widget (its type can't change); one without an id is created; the carepartner's other widgets are deleted. widgets is required: send [] to clear the screen. Every widget must lie inside the 4x3 grid and no two may share a cell. Nothing is saved if any widget is invalid; errors name the widget by its index, e.g. "widgets[2]". The saved widgets come back in the order they were sent.
+// @Tags screen-layout
 // @Accept json
 // @Produce json
-// @Param body body screen_widgets.CreateInput true "New widget"
-// @Success 201 {object} screen_widgets.ScreenWidget
-// @Failure 400 {object} screen_widgets.ScreenWidgetError
-// @Failure 404 {object} screen_widgets.ScreenWidgetError
-// @Failure 409 {object} screen_widgets.ScreenWidgetError
-// @Failure 500 {object} screen_widgets.ScreenWidgetError
-// @Router /screen-widgets [post]
-func (c *ScreenWidgetController) CreateWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	var in svc.CreateInput
-	if !decodeBody(w, r, &in) {
-		return
-	}
-
-	widget, err := c.Service.CreateWidget(in)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, widget)
-}
-
-// GetWidgetHandler godoc
-// @Summary Get one screen widget
-// @Tags screen-widgets
-// @Produce json
-// @Param id path int true "Widget ID"
-// @Success 200 {object} screen_widgets.ScreenWidget
-// @Failure 404 {object} screen_widgets.ScreenWidgetError
-// @Failure 500 {object} screen_widgets.ScreenWidgetError
-// @Router /screen-widgets/{id} [get]
-func (c *ScreenWidgetController) GetWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := widgetIDParam(r)
-	if !ok {
-		writeError(w, http.StatusNotFound, CodeNotFound, svc.ErrNotFound.Error())
-		return
-	}
-
-	widget, err := c.Service.GetWidget(id)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, widget)
-}
-
-// UpdateWidgetHandler godoc
-// @Summary Replace a widget's settings and photo
-// @Description The widget's type and spot don't change; use the move endpoint to change its spot.
-// @Tags screen-widgets
-// @Accept json
-// @Produce json
-// @Param id path int true "Widget ID"
-// @Param body body screen_widgets.UpdateInput true "New settings"
-// @Success 200 {object} screen_widgets.ScreenWidget
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param body body screen_widgets.LayoutInput true "Every widget on the screen"
+// @Success 200 {object} screen_widgets.Layout
 // @Failure 400 {object} screen_widgets.ScreenWidgetError
 // @Failure 404 {object} screen_widgets.ScreenWidgetError
 // @Failure 500 {object} screen_widgets.ScreenWidgetError
-// @Router /screen-widgets/{id} [put]
-func (c *ScreenWidgetController) UpdateWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := widgetIDParam(r)
+// @Router /screen-layout [put]
+func (c *ScreenWidgetController) SaveLayoutHandler(w http.ResponseWriter, r *http.Request) {
+	carepartnerID, ok := carepartnerParam(w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, CodeNotFound, svc.ErrNotFound.Error())
 		return
 	}
-	var in svc.UpdateInput
-	if !decodeBody(w, r, &in) {
+	var in model.LayoutInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, CodeInvalidRequest, "invalid request body")
 		return
 	}
 
-	widget, err := c.Service.UpdateWidget(id, in)
+	layout, err := c.Service.SaveLayout(carepartnerID, in)
 	if err != nil {
 		writeServiceError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, widget)
-}
-
-// MoveWidgetHandler godoc
-// @Summary Move a widget to another spot
-// @Description The target spot must exist in the current layout. If it has a widget, the two swap places; the other widget takes this one's old spot, even if that spot is hidden in the current layout.
-// @Tags screen-widgets
-// @Accept json
-// @Produce json
-// @Param id path int true "Widget ID"
-// @Param body body screen_widgets.MoveInput true "Target spot"
-// @Success 200 {object} screen_widgets.ScreenWidget
-// @Failure 400 {object} screen_widgets.ScreenWidgetError
-// @Failure 404 {object} screen_widgets.ScreenWidgetError
-// @Failure 409 {object} screen_widgets.ScreenWidgetError
-// @Failure 500 {object} screen_widgets.ScreenWidgetError
-// @Router /screen-widgets/{id}/move [post]
-func (c *ScreenWidgetController) MoveWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := widgetIDParam(r)
-	if !ok {
-		writeError(w, http.StatusNotFound, CodeNotFound, svc.ErrNotFound.Error())
-		return
-	}
-	var in svc.MoveInput
-	if !decodeBody(w, r, &in) {
-		return
-	}
-
-	widget, err := c.Service.MoveWidget(id, in)
-	if err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, widget)
-}
-
-// DeleteWidgetHandler godoc
-// @Summary Remove a widget from the screen
-// @Tags screen-widgets
-// @Param id path int true "Widget ID"
-// @Success 204 {string} string "No Content"
-// @Failure 404 {object} screen_widgets.ScreenWidgetError
-// @Failure 500 {object} screen_widgets.ScreenWidgetError
-// @Router /screen-widgets/{id} [delete]
-func (c *ScreenWidgetController) DeleteWidgetHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := widgetIDParam(r)
-	if !ok {
-		writeError(w, http.StatusNotFound, CodeNotFound, svc.ErrNotFound.Error())
-		return
-	}
-
-	if err := c.Service.DeleteWidget(id); err != nil {
-		writeServiceError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, layout)
 }

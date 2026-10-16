@@ -16,3 +16,8 @@ type Execer interface {
 type Scanner interface {
 	Scan(dest ...any) error
 }
+
+// Querier runs a query that returns rows; *sql.DB and *sql.Tx both satisfy it
+type Querier interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}

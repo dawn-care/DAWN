@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	scheduledModel "server/internal/models/scheduled_items"
+	widgetModel "server/internal/models/screen_widgets"
 	newsSvc "server/internal/services/widgets/news"
 	"server/internal/services/widgets/weather"
 	"server/internal/utils"
@@ -71,7 +72,7 @@ var (
 	qSettings    = regexp.QuoteMeta(`FROM "ScreenSettings"`)
 	qWidgets     = regexp.QuoteMeta(`FROM "ScreenWidget"`)
 	qMedia       = regexp.QuoteMeta(`FROM "Media" m`)
-	widgetCols   = []string{"id", "carepartner_id", "type", "spot", "config", "photo_media_id"}
+	widgetCols   = []string{"id", "carepartner_id", "type", "col_start", "row_start", "col_end", "row_end", "config", "photo_media_id"}
 	mediaCols    = []string{"id", "carepartner_id", "kind", "display_name", "object_key", "mime_type",
 		"size_bytes", "duration_seconds", "created_at", "on_screen", "audio_background", "scheduled"}
 )
@@ -89,26 +90,27 @@ func newService(t *testing.T, now time.Time) (*ScreenService, sqlmock.Sqlmock, *
 	return s, mock, w, cal
 }
 
-func expectBasicsWith(mock sqlmock.Sqlmock, preset string, rows *sqlmock.Rows) {
+func expectBasics(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
 	mock.ExpectQuery(qCarepartner).WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "caregiver_id", "timezone"}).AddRow(1, "John", 1, "America/New_York"))
 	mock.ExpectQuery(qSettings).WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).AddRow(1, preset, "07:00", "21:00"))
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).AddRow(1, "balanced", "07:00", "21:00"))
 	mock.ExpectQuery(qWidgets).WithArgs(1).WillReturnRows(rows)
 }
 
-// Balanced has 4 spots, 0 to 3
-func expectBasics(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
-	expectBasicsWith(mock, "balanced", rows)
-}
+/*
+mockupWidgets fills the 4x3 grid, in reading order:
 
+	photo   photo   message message
+	photo   photo   weather  (empty)
+	news    news    news    news
+*/
 func mockupWidgets() *sqlmock.Rows {
 	return sqlmock.NewRows(widgetCols).
-		AddRow(1, 1, "photo", 0, []byte(`{}`), 4).
-		AddRow(2, 1, "message", 1, []byte(`{"text":"Ana","label":"Nurse"}`), nil).
-		AddRow(5, 1, "weather", 2, []byte(`{"zip":"14617"}`), nil).
-		// spot 3 is empty
-		AddRow(3, 1, "news", 4, []byte(`{}`), nil) // hidden: Balanced has no spot 4
+		AddRow(1, 1, "photo", 0, 0, 1, 1, []byte(`{}`), 4).
+		AddRow(2, 1, "message", 2, 0, 3, 0, []byte(`{"text":"Ana","label":"Nurse"}`), nil).
+		AddRow(5, 1, "weather", 2, 1, 2, 1, []byte(`{"zip":"14617"}`), nil).
+		AddRow(3, 1, "news", 0, 2, 3, 2, []byte(`{}`), nil)
 }
 
 func expectPhoto(mock sqlmock.Sqlmock) {
@@ -133,29 +135,28 @@ func TestGetScreen_Mockup(t *testing.T) {
 	assert.Equal(t, "2026-10-13", cal.to, "schedule covers today and tomorrow")
 	require.Len(t, screen.Schedule, 1)
 
-	assert.Equal(t, "balanced", screen.LayoutPreset)
-	require.Len(t, screen.Spots, 4, "one entry per spot of the preset")
-	assert.Equal(t, PhotoData{Caption: "Sarah"}, screen.Spots[0].Data, "caption falls back to the photo's name")
-	assert.Equal(t, "/media/4/file", screen.Spots[0].Photo.URL)
-	assert.Equal(t, "Nurse", jsonField(t, screen.Spots[1].Config, "label"))
-	assert.Nil(t, screen.Spots[1].Data, "messages are all config")
-	assert.Equal(t, 48, screen.Spots[2].Data.(*weather.WeatherOverviewResponse).Temp)
-	assert.Nil(t, screen.Spots[3], "empty spot")
-
-	// The hidden news widget isn't anywhere
-	for _, w := range screen.Spots {
-		if w != nil {
-			assert.NotEqual(t, 3, w.ID)
-		}
-	}
+	require.Len(t, screen.Widgets, 4, "every stored widget, in reading order")
+	photo, message, weatherTile, news := screen.Widgets[0], screen.Widgets[1], screen.Widgets[2], screen.Widgets[3]
+	assert.Equal(t, widgetModel.GridArea{Col: 0, Row: 0, Width: 2, Height: 2}, areaOf(photo))
+	assert.Equal(t, PhotoData{Caption: "Sarah"}, photo.Data, "caption falls back to the photo's name")
+	assert.Equal(t, "/media/4/file", photo.Photo.URL)
+	assert.Equal(t, widgetModel.GridArea{Col: 2, Row: 0, Width: 2, Height: 1}, areaOf(message))
+	assert.Equal(t, "Nurse", jsonField(t, message.Config, "label"))
+	assert.Nil(t, message.Data, "messages are all config")
+	assert.Equal(t, widgetModel.GridArea{Col: 2, Row: 1, Width: 1, Height: 1}, areaOf(weatherTile))
+	assert.Equal(t, 48, weatherTile.Data.(*weather.WeatherOverviewResponse).Temp)
+	assert.Equal(t, widgetModel.GridArea{Col: 0, Row: 2, Width: 4, Height: 1}, areaOf(news))
 	assert.NoError(t, mock.ExpectationsWereMet())
 
-	// The JSON a tablet receives
+	// The JSON a tablet receives: each widget's area in the shape of GridArea in shared/
 	raw, err := json.Marshal(screen)
 	require.NoError(t, err)
-	assert.Contains(t, string(raw), `"spots":[{"id":1,"type":"photo"`)
-	assert.Contains(t, string(raw), `null]`, "empty spot is null")
-	assert.NotContains(t, string(raw), `"regions"`)
+	assert.Contains(t, string(raw), `"widgets":[{"id":1,"type":"photo","col":0,"row":0,"width":2,"height":2,`)
+	assert.NotContains(t, string(raw), `"spots"`)
+}
+
+func areaOf(w *Widget) widgetModel.GridArea {
+	return widgetModel.GridArea{Col: w.Col, Row: w.Row, Width: w.Width, Height: w.Height}
 }
 
 func jsonField(t *testing.T, raw json.RawMessage, key string) any {
@@ -167,49 +168,22 @@ func jsonField(t *testing.T, raw json.RawMessage, key string) any {
 func TestGetScreen_SportsAndNews(t *testing.T) {
 	s, mock, _, _ := newService(t, afternoon)
 	expectBasics(mock, sqlmock.NewRows(widgetCols).
-		AddRow(3, 1, "photo", 0, []byte(`{"caption":"Grandkids"}`), 4).
-		AddRow(1, 1, "sports", 1, []byte(`{"league":"mlb","team":"NYY"}`), nil).
-		AddRow(2, 1, "news", 2, []byte(`{}`), nil).
-		AddRow(4, 1, "reminder", 3, []byte(`{"items":[{"time":"12:00","text":"Lunch","icon":"meal"}]}`), nil))
+		AddRow(3, 1, "photo", 0, 0, 1, 1, []byte(`{"caption":"Grandkids"}`), 4).
+		AddRow(1, 1, "sports", 2, 0, 2, 0, []byte(`{"league":"mlb","team":"NYY"}`), nil).
+		AddRow(2, 1, "news", 3, 0, 3, 1, []byte(`{}`), nil).
+		AddRow(4, 1, "reminder", 0, 2, 0, 2, []byte(`{"items":[{"time":"12:00","text":"Lunch","icon":"meal"}]}`), nil))
 	expectPhoto(mock)
 
 	screen, err := s.GetScreen(1)
 
 	require.NoError(t, err)
-	assert.Equal(t, PhotoData{Caption: "Grandkids"}, screen.Spots[0].Data, "caption wins over the photo's name")
+	assert.Equal(t, PhotoData{Caption: "Grandkids"}, screen.Widgets[0].Data, "caption wins over the photo's name")
 	assert.Equal(t, SportsData{League: "mlb", TeamName: "New York Yankees", Result: "won",
-		OpponentTeamName: "Boston Red Sox", TeamScore: 5, OpponentScore: 3, Message: "won"}, screen.Spots[1].Data)
-	assert.Len(t, screen.Spots[2].Data.(NewsData).Articles, MaxNewsArticles)
-	assert.Equal(t, "reminder", screen.Spots[3].Type)
-	assert.Nil(t, screen.Spots[3].Data, "reminders are all config")
-}
-
-func TestGetScreen_OtherPresetsKeepSpots(t *testing.T) {
-	// The same stored widgets on Simple (2 spots) and Busier (6 spots)
-	s, mock, _, _ := newService(t, afternoon)
-	expectBasicsWith(mock, "simple", mockupWidgets())
-	expectPhoto(mock)
-
-	screen, err := s.GetScreen(1)
-
-	require.NoError(t, err)
-	assert.Equal(t, "simple", screen.LayoutPreset)
-	require.Len(t, screen.Spots, 2)
-	assert.Equal(t, 1, screen.Spots[0].ID)
-	assert.Equal(t, 2, screen.Spots[1].ID)
-
-	expectBasicsWith(mock, "busier", mockupWidgets())
-	expectPhoto(mock)
-
-	screen, err = s.GetScreen(1)
-
-	require.NoError(t, err)
-	require.Len(t, screen.Spots, 6)
-	assert.Equal(t, 5, screen.Spots[2].ID, "widgets stay in their spot")
-	assert.Nil(t, screen.Spots[3])
-	assert.Equal(t, 3, screen.Spots[4].ID, "hidden on Balanced, shown on Busier")
-	assert.Nil(t, screen.Spots[5])
-	assert.NoError(t, mock.ExpectationsWereMet())
+		OpponentTeamName: "Boston Red Sox", TeamScore: 5, OpponentScore: 3, Message: "won"}, screen.Widgets[1].Data)
+	assert.Len(t, screen.Widgets[2].Data.(NewsData).Articles, MaxNewsArticles)
+	assert.Equal(t, widgetModel.GridArea{Col: 3, Row: 0, Width: 1, Height: 2}, areaOf(screen.Widgets[2]))
+	assert.Equal(t, "reminder", screen.Widgets[3].Type)
+	assert.Nil(t, screen.Widgets[3].Data, "reminders are all config")
 }
 
 func TestGetScreen_UpstreamFailureOnlyAffectsThatWidget(t *testing.T) {
@@ -221,11 +195,11 @@ func TestGetScreen_UpstreamFailureOnlyAffectsThatWidget(t *testing.T) {
 	screen, err := s.GetScreen(1)
 
 	require.NoError(t, err)
-	weatherTile := screen.Spots[2]
+	weatherTile := screen.Widgets[2]
 	assert.Nil(t, weatherTile.Data)
 	require.NotNil(t, weatherTile.Error)
 	assert.Equal(t, ErrorUpstreamUnavailable, *weatherTile.Error)
-	assert.NotNil(t, screen.Spots[0].Data, "other widgets still filled in")
+	assert.NotNil(t, screen.Widgets[0].Data, "other widgets still filled in")
 }
 
 func TestGetScreen_CachesLookups(t *testing.T) {
@@ -262,7 +236,7 @@ func TestGetScreen_FailuresAreNotCached(t *testing.T) {
 	expectPhoto(mock)
 	screen, err := s.GetScreen(1)
 	require.NoError(t, err)
-	assert.NotNil(t, screen.Spots[2].Data, "recovers on the next request")
+	assert.NotNil(t, screen.Widgets[2].Data, "recovers on the next request")
 	assert.Equal(t, 2, w.calls)
 }
 
@@ -278,10 +252,10 @@ func TestGetScreen_UsesCarepartnerTimezone(t *testing.T) {
 	assert.Equal(t, "2026-10-12", cal.from)
 	assert.False(t, screen.AwakeHours.IsAwakeNow)
 	assert.Equal(t, "2026-10-12T22:30:00-04:00", screen.GeneratedAt)
-	require.Len(t, screen.Spots, 4)
-	for _, w := range screen.Spots {
-		assert.Nil(t, w, "a new carepartner has an empty screen")
-	}
+	assert.Empty(t, screen.Widgets, "a new carepartner has an empty screen")
+	raw, err := json.Marshal(screen)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"widgets":[]`, "an empty list, not null")
 }
 
 func TestGetScreen_Errors(t *testing.T) {

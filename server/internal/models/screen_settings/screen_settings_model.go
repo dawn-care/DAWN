@@ -50,6 +50,17 @@ func GetScreenSettings(exec db.QueryRower, carepartnerID int) (*ScreenSettings, 
 	return s, nil
 }
 
+// Lock a carepartner's settings row for the rest of the transaction, so changes to
+// their screen happen one at a time; returns false if they have no settings row
+func LockScreenSettings(tx *sql.Tx, carepartnerID int) (bool, error) {
+	var id int
+	err := tx.QueryRow(`SELECT carepartner_id FROM "ScreenSettings" WHERE carepartner_id = $1 FOR UPDATE;`, carepartnerID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // ─────────────────────────────────────────────
 // UPDATE
 // ─────────────────────────────────────────────
