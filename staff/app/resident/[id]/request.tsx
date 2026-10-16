@@ -11,7 +11,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getResident } from '../../../data/mock';
+import { getResident } from '../../../data/server';
 import type { Resident } from '../../../data/types';
 import { logEvent } from '../../../lib/log';
 

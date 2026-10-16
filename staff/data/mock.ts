@@ -1,20 +1,13 @@
 /**
- * Mock data + a thin async layer standing in for the backend.
+ * Fake data for the parts of the staff app with no backend yet: family folders
+ * and guidance notes, sleeping hours, ratings and requests to the caregiver.
+ * Residents and clips are real (data/server.ts).
  *
- * Every function here returns a Promise so that swapping these for real HTTP
- * calls later is a change to this file only — screens do not know the
- * difference. See the implementation plan: the staff app frontend is built
- * before any backend work.
+ * Every function returns a Promise, so replacing one with a real call later
+ * doesn't change the screens.
  */
 
-import type {
-  Clip,
-  FamilyFolder,
-  Rating,
-  Resident,
-  Situation,
-  SituationId,
-} from './types';
+import type { FamilyFolder, Rating, Situation, SleepingHours } from './types';
 
 export const SITUATIONS: Situation[] = [
   {
@@ -55,188 +48,43 @@ export const SITUATIONS: Situation[] = [
   },
 ];
 
-const RESIDENTS: Resident[] = [
-  {
-    id: 1,
-    name: 'Margaret Doyle',
-    room: '210',
-    hasNewContent: false,
-    sleepingHours: { start: '20:00', end: '07:00' },
-    lastPlayed: {
-      title: 'Morning message',
-      fromName: 'Claire',
-      at: '8:12 am',
-      rating: 'helped',
-    },
-  },
-  {
-    id: 2,
-    name: 'Arthur Pennington',
-    room: '212',
-    hasNewContent: false,
-    sleepingHours: { start: '21:00', end: '06:30' },
-  },
-  {
-    id: 3,
-    name: 'Rosa Alvarez',
-    room: '214',
-    hasNewContent: true,
-    sleepingHours: { start: '20:30', end: '07:00' },
-    lastPlayed: {
-      title: "I'll see you Sunday",
-      fromName: 'Elena',
-      at: '8:12 am',
-      rating: 'helped',
-    },
-  },
-  {
-    id: 4,
-    name: 'Henry Osei',
-    room: '216',
-    hasNewContent: false,
-    sleepingHours: { start: '20:00', end: '07:30' },
-  },
-  {
-    id: 5,
-    name: 'Dorothy Kaminski',
-    room: '218',
-    hasNewContent: false,
-    sleepingHours: { start: '19:30', end: '06:00' },
-    lastPlayed: {
-      title: 'Garden in summer',
-      fromName: 'Peter',
-      at: '2:40 pm',
-      rating: 'no_change',
-    },
-  },
-];
-
+/** The same fake family for every resident, until family folders exist on the server. */
 const FAMILY_FOLDERS: FamilyFolder[] = [
-  {
-    id: 1,
-    residentId: 3,
-    name: 'Elena',
-    relationship: 'Daughter',
-    clipCount: 4,
-  },
-  { id: 2, residentId: 3, name: 'Marco', relationship: 'Son', clipCount: 2 },
-  {
-    id: 3,
-    residentId: 3,
-    name: 'Sofia',
-    relationship: 'Granddaughter',
-    clipCount: 1,
-  },
+  { id: 1, name: 'Elena', relationship: 'Daughter' },
+  { id: 2, name: 'Marco', relationship: 'Son' },
+  { id: 3, name: 'Sofia', relationship: 'Granddaughter' },
   {
     id: 4,
-    residentId: 3,
     name: 'Daniel',
     relationship: 'Husband',
-    clipCount: 0,
     guidanceNote:
       "He passed away in 2023. Please don't tell her again. Reassure her and talk about her garden.",
   },
 ];
 
-const CLIPS: Clip[] = [
-  {
-    id: 1,
-    residentId: 3,
-    familyFolderId: 1,
-    title: "I'll see you Sunday",
-    fromName: 'Elena',
-    duration: 45,
-    recordedOn: 'Sep 27',
-    situations: ['asking_for_someone', 'anxious_or_upset'],
-    playCount: 3,
-    helpedCount: 2,
-    familyNote: 'Works best if you sit with her.',
-  },
-  {
-    id: 2,
-    residentId: 3,
-    familyFolderId: 1,
-    title: "You're safe, Mom",
-    fromName: 'Elena',
-    duration: 30,
-    recordedOn: 'Sep 14',
-    situations: ['anxious_or_upset', 'doesnt_know_where'],
-    playCount: 1,
-    helpedCount: 1,
-  },
-  {
-    id: 3,
-    residentId: 3,
-    familyFolderId: 2,
-    title: 'Grandkids at the lake',
-    fromName: 'Marco',
-    duration: 52,
-    recordedOn: 'Aug 30',
-    situations: ['asking_for_someone', 'starting_the_day'],
-    playCount: 2,
-    helpedCount: 1,
-  },
-  {
-    id: 4,
-    residentId: 3,
-    familyFolderId: null,
-    title: 'This is your home now',
-    fromName: "St. Ann's staff",
-    duration: 30,
-    recordedOn: 'Jun 02',
-    situations: ['wants_to_go_home', 'doesnt_know_where'],
-    playCount: 8,
-    helpedCount: 5,
-    isFacilityContent: true,
-  },
-];
+/** Matches the server's default awake hours (wake 07:00, bed 21:00). */
+const DEFAULT_SLEEPING_HOURS: SleepingHours = { start: '21:00', end: '07:00' };
 
-/** Simulated network latency so loading states are visible during development. */
-const delay = <T>(value: T, ms = 220): Promise<T> =>
+/** Edits made in the app this session. Not saved anywhere yet. */
+const sleepingHours = new Map<number, SleepingHours>();
+
+/** Simulated latency so loading states are visible during development. */
+const delay = <T>(value: T, ms = 150): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
-export const getResidents = () => delay([...RESIDENTS]);
-
-export const getResident = (id: number) =>
-  delay(RESIDENTS.find((r) => r.id === id));
-
-export const getFamilyFolders = (residentId: number) =>
-  delay(FAMILY_FOLDERS.filter((f) => f.residentId === residentId));
+export const getFamilyFolders = () => delay([...FAMILY_FOLDERS]);
 
 export const getFamilyFolder = (folderId: number) =>
   delay(FAMILY_FOLDERS.find((f) => f.id === folderId));
 
-export const getClip = (clipId: number) =>
-  delay(CLIPS.find((c) => c.id === clipId));
+export const getSleepingHours = (residentId: number) =>
+  delay(sleepingHours.get(residentId) ?? DEFAULT_SLEEPING_HOURS);
 
-export const getClipsForFamilyFolder = (folderId: number) =>
-  delay(CLIPS.filter((c) => c.familyFolderId === folderId));
-
-export const getClipsForSituation = (
-  residentId: number,
-  situation: SituationId
-) =>
-  delay(
-    CLIPS.filter(
-      (c) => c.residentId === residentId && c.situations.includes(situation)
-    )
-  );
-
-/** Updates sleeping hours locally. Staff and caregivers may both edit these. */
-export const setSleepingHours = (
-  residentId: number,
-  hours: { start: string; end: string }
-) => {
-  const resident = RESIDENTS.find((r) => r.id === residentId);
-  if (resident) resident.sleepingHours = hours;
-  return delay(resident);
+/** Staff and caregivers may both edit these. Kept in memory only for now. */
+export const setSleepingHours = (residentId: number, hours: SleepingHours) => {
+  sleepingHours.set(residentId, hours);
+  return delay(hours);
 };
 
-export const rateClip = (clipId: number, rating: Rating) => {
-  const clip = CLIPS.find((c) => c.id === clipId);
-  if (clip) {
-    clip.playCount += 1;
-    if (rating === 'helped') clip.helpedCount += 1;
-  }
-  return delay(clip);
-};
+/** Ratings aren't saved yet; the screen still behaves as if they were. */
+export const rateClip = (_playbackId: number, _rating: Rating) => delay(undefined);

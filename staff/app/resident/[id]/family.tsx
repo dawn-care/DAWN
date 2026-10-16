@@ -26,8 +26,8 @@ export default function FamilyScreen() {
   const [folders, setFolders] = useState<FamilyFolder[] | null>(null);
 
   useEffect(() => {
-    getFamilyFolders(residentId).then(setFolders);
-  }, [residentId]);
+    getFamilyFolders().then(setFolders);
+  }, []);
 
   const openFolder = (folder: FamilyFolder) => {
     logEvent({
@@ -66,10 +66,7 @@ export default function FamilyScreen() {
                       {folder.name}
                     </Text>
                     <Text className="text-base text-status-yellow-text">
-                      {folder.relationship} ·{' '}
-                      {folder.clipCount === 0
-                        ? 'no videos'
-                        : `${folder.clipCount} video${folder.clipCount === 1 ? '' : 's'}`}
+                      {folder.relationship}
                     </Text>
                   </View>
                 </View>
@@ -93,10 +90,7 @@ export default function FamilyScreen() {
                     {folder.name}
                   </Text>
                   <Text className="text-base text-ink-muted">
-                    {folder.relationship} ·{' '}
-                    {folder.clipCount === 1
-                      ? '1 video'
-                      : `${folder.clipCount} videos`}
+                    {folder.relationship}
                   </Text>
                 </View>
                 <Ionicons

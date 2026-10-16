@@ -1,11 +1,11 @@
 /**
  * S1 · Pick resident
  *
- * Staff see every resident (no floor scoping, no QR scan — both were cut from
- * the MVP). A "New video" badge marks residents whose family has added content.
+ * Staff see every resident on the server: for the demo, every resident is
+ * linked to every staff member, with no floor scoping and no QR scan.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,7 +16,8 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getResidents } from '../data/mock';
+import LoadError from '../components/LoadError';
+import { getResidents } from '../data/server';
 import type { Resident } from '../data/types';
 import { logEvent } from '../lib/log';
 
@@ -25,10 +26,17 @@ const STAFF_NAME = 'Sam';
 
 export default function ResidentsScreen() {
   const [residents, setResidents] = useState<Resident[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    getResidents().then(setResidents);
+  const load = useCallback(() => {
+    setFailed(false);
+    setResidents(null);
+    getResidents()
+      .then(setResidents)
+      .catch(() => setFailed(true));
   }, []);
+
+  useEffect(load, [load]);
 
   const openResident = (resident: Resident) => {
     logEvent({ type: 'resident_opened', residentId: resident.id });
@@ -43,8 +51,12 @@ export default function ResidentsScreen() {
       <Text className="text-base text-ink-muted">Hi, {STAFF_NAME}</Text>
       <Text className="mb-6 text-3xl font-bold text-ink">Residents</Text>
 
-      {residents === null ? (
+      {failed ? (
+        <LoadError onRetry={load} />
+      ) : residents === null ? (
         <ActivityIndicator className="mt-8" />
+      ) : residents.length === 0 ? (
+        <Text className="text-base text-ink-muted">No residents yet.</Text>
       ) : (
         residents.map((resident) => (
           <Pressable
@@ -55,23 +67,10 @@ export default function ResidentsScreen() {
             <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-page">
               <Ionicons name="person" size={24} color="rgb(91 96 145)" />
             </View>
-
-            <View className="flex-1">
-              <Text className="text-lg font-semibold text-ink">
-                {resident.name}
-              </Text>
-              <Text className="text-base text-ink-muted">
-                Room {resident.room}
-              </Text>
-            </View>
-
-            {resident.hasNewContent && (
-              <View className="rounded-full bg-status-blue-bg px-3 py-1.5">
-                <Text className="text-sm font-semibold text-status-blue-text">
-                  New video
-                </Text>
-              </View>
-            )}
+            <Text className="flex-1 text-lg font-semibold text-ink">
+              {resident.name}
+            </Text>
+            <Ionicons name="chevron-forward" size={22} color="rgb(91 96 145)" />
           </Pressable>
         ))
       )}

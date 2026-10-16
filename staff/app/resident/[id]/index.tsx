@@ -9,7 +9,7 @@
  * can still browse content — only the play action is disabled (on S4).
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -21,33 +21,48 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { SITUATIONS, getResident, setSleepingHours } from '../../../data/mock';
-import type { Resident, Situation } from '../../../data/types';
-import { describeWindow, isAsleep } from '../../../lib/sleepingHours';
+import LoadError from '../../../components/LoadError';
+import { SITUATIONS, getSleepingHours, setSleepingHours } from '../../../data/mock';
+import { getResident } from '../../../data/server';
+import type { Resident, Situation, SleepingHours } from '../../../data/types';
+import { describeWindow, formatTime, isAsleep } from '../../../lib/sleepingHours';
 import { logEvent } from '../../../lib/log';
-
-const RATING_LABEL: Record<string, string> = {
-  helped: 'Helped',
-  no_change: 'No change',
-  worse: 'Made it worse',
-};
 
 export default function ResidentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const residentId = Number(id);
 
   const [resident, setResident] = useState<Resident | null>(null);
+  // Sleeping hours are fake for now: edits last until the app reloads.
+  const [hours, setHours] = useState<SleepingHours | null>(null);
+  const [failed, setFailed] = useState(false);
   const [editingHours, setEditingHours] = useState(false);
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
 
-  useEffect(() => {
-    getResident(residentId).then((r) => setResident(r ?? null));
+  const load = useCallback(() => {
+    setFailed(false);
+    Promise.all([getResident(residentId), getSleepingHours(residentId)])
+      .then(([r, h]) => {
+        if (!r) throw new Error('resident not found');
+        setResident(r);
+        setHours(h);
+      })
+      .catch(() => setFailed(true));
   }, [residentId]);
 
-  if (!resident) return <ActivityIndicator className="mt-10" />;
+  useEffect(load, [load]);
 
-  const asleep = isAsleep(resident.sleepingHours);
+  if (failed) {
+    return (
+      <View className="flex-1 bg-page p-4">
+        <LoadError onRetry={load} />
+      </View>
+    );
+  }
+  if (!resident || !hours) return <ActivityIndicator className="mt-10" />;
+
+  const asleep = isAsleep(hours);
 
   const chooseSituation = (situation: Situation) => {
     logEvent({
@@ -60,8 +75,8 @@ export default function ResidentScreen() {
   };
 
   const startEditing = () => {
-    setDraftStart(resident.sleepingHours.start);
-    setDraftEnd(resident.sleepingHours.end);
+    setDraftStart(hours.start);
+    setDraftEnd(hours.end);
     setEditingHours(true);
   };
 
@@ -76,10 +91,7 @@ export default function ResidentScreen() {
       start: draftStart,
       end: draftEnd,
     });
-    setResident({
-      ...resident,
-      sleepingHours: { start: draftStart, end: draftEnd },
-    });
+    setHours({ start: draftStart, end: draftEnd });
     setEditingHours(false);
   };
 
@@ -97,7 +109,6 @@ export default function ResidentScreen() {
           <Text className="text-xl font-semibold text-ink">
             {resident.name}
           </Text>
-          <Text className="text-base text-ink-muted">Room {resident.room}</Text>
         </View>
       </View>
 
@@ -111,9 +122,8 @@ export default function ResidentScreen() {
             </Text>
           </View>
           <Text className="text-base text-status-purple-text">
-            Playing is paused until {describeWindow(resident.sleepingHours)}
-            {'. '}
-            You can still look through their videos.
+            Playing is paused until {formatTime(hours.end)}. You can still
+            look through their videos.
           </Text>
         </View>
       )}
@@ -149,7 +159,7 @@ export default function ResidentScreen() {
               Sleeping hours
             </Text>
             <Text className="text-base text-ink-muted">
-              {describeWindow(resident.sleepingHours)}
+              {describeWindow(hours)}
             </Text>
           </View>
           {!editingHours && (
@@ -208,19 +218,13 @@ export default function ResidentScreen() {
         )}
       </View>
 
-      {/* Last played */}
-      {resident.lastPlayed && (
-        <View className="mt-3 rounded-2xl bg-surface-raised p-4">
-          <Text className="text-base text-ink-muted">
-            <Text className="font-semibold text-ink">Last played: </Text>
-            {resident.lastPlayed.title} from {resident.lastPlayed.fromName} ·{' '}
-            {resident.lastPlayed.at}
-            {resident.lastPlayed.rating
-              ? ` · rated ${RATING_LABEL[resident.lastPlayed.rating]}`
-              : ''}
-          </Text>
-        </View>
-      )}
+      {/* Last played: placeholder until the server can report it */}
+      <View className="mt-3 rounded-2xl bg-surface-raised p-4">
+        <Text className="text-base text-ink-muted">
+          <Text className="font-semibold text-ink">Last played: </Text>
+          not available yet
+        </Text>
+      </View>
     </ScrollView>
   );
 }

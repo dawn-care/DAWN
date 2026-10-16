@@ -1,8 +1,8 @@
 /**
  * Domain types for the staff app.
  *
- * These mirror the shapes the backend is expected to return once Phase 1 of the
- * implementation plan lands. Until then they are served from data/mock.ts.
+ * Residents and clips come from the server (data/server.ts). Family folders,
+ * sleeping hours and ratings have no backend yet and come from data/mock.ts.
  */
 
 /** The six situations a staff member can report from the resident screen. */
@@ -27,49 +27,33 @@ export interface Situation {
 export interface Resident {
   id: number;
   name: string;
-  room: string;
-  /** True when family has uploaded content the staff haven't seen yet. */
-  hasNewContent: boolean;
-  /** Local times, "HH:MM". Staff cannot play media between these. */
-  sleepingHours: { start: string; end: string };
-  lastPlayed?: LastPlayed;
 }
 
-export interface LastPlayed {
-  title: string;
-  fromName: string;
-  /** "8:12 am" */
-  at: string;
-  rating?: Rating;
+/** Local times, "HH:MM". Staff cannot play media between these. */
+export interface SleepingHours {
+  start: string;
+  end: string;
 }
 
-/** Family members are folders for grouping clips, not accounts. */
+/** Family members are folders for grouping clips, not accounts. Fake for now. */
 export interface FamilyFolder {
   id: number;
-  residentId: number;
   name: string;
   relationship: string;
-  clipCount: number;
   /** Caregiver-authored. Only caregivers may edit this. */
   guidanceNote?: string;
 }
 
+/** A video or audio clip from the resident's media library on the server. */
 export interface Clip {
+  /** The server's media ID, which is what the play command sends. */
   id: number;
-  residentId: number;
-  familyFolderId: number | null;
+  kind: 'video' | 'audio';
   title: string;
-  fromName: string;
-  /** Seconds. */
-  duration: number;
-  recordedOn: string;
-  situations: SituationId[];
-  playCount: number;
-  helpedCount: number;
-  /** Caregiver-authored note shown to staff before playing. */
-  familyNote?: string;
-  /** True for generic facility content rather than family content. */
-  isFacilityContent?: boolean;
+  /** Seconds, or null if the server hasn't measured it. */
+  duration: number | null;
+  /** RFC 3339, when it was uploaded. */
+  addedAt: string;
 }
 
 export type Rating = 'helped' | 'no_change' | 'worse';
