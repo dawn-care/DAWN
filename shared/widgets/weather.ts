@@ -22,8 +22,8 @@ export type WeatherReading = {
   temp: number;
   /** What it feels like, which already counts wind and humidity. Used in place of `temp` when present. */
   feels_like?: number;
-  /** The main condition, such as "Clouds", "Rain" or "Clear". Case does not matter. */
-  condition: string;
+  /** The main condition, such as "Clouds", "Rain" or "Clear". Case does not matter. May be missing. */
+  condition?: string | null;
 };
 
 const STORM = ["thunderstorm", "squall", "tornado"];
@@ -36,7 +36,7 @@ const CLEAR = ["clear"];
  * warm by how it feels outside, then the sky. Null when there is nothing to go on.
  */
 export function weatherWord(reading: WeatherReading): WeatherWord | null {
-  const condition = reading.condition.trim().toLowerCase();
+  const condition = (reading.condition ?? "").trim().toLowerCase();
   if (STORM.includes(condition)) return "Stormy";
   if (RAIN.includes(condition)) return "Rainy";
   if (SNOW.includes(condition)) return "Snowy";

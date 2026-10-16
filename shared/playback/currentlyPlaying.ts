@@ -107,15 +107,19 @@ function playWindow(item: PlayableItem, awakeHours: AwakeHours): { start: number
  * Two items overlap when one starts before the other ends; an item that starts
  * the moment another ends does not overlap it. The caregiver uses this to refuse
  * a new item that would play over another. Items that never play are ignored.
+ * When editing an item, pass its id as `ignoreId` so the schedule's old copy of
+ * it doesn't count as overlapping itself.
  */
-export function overlappingItems<T extends PlayableItem>(
+export function overlappingItems<T extends PlayableItem & { id?: string | number }>(
   candidate: PlayableItem,
   schedule: readonly T[],
+  ignoreId?: string | number,
   awakeHours: AwakeHours = DEFAULT_AWAKE_HOURS,
 ): T[] {
   const mine = playWindow(candidate, awakeHours);
   if (mine === null) return [];
   return schedule.filter((item) => {
+    if (ignoreId !== undefined && item.id === ignoreId) return false;
     const theirs = playWindow(item, awakeHours);
     return theirs !== null && mine.start < theirs.end && theirs.start < mine.end;
   });

@@ -9,6 +9,7 @@ import {
   widgetArea,
 } from "../gridPlacement";
 import type { PlacedWidget } from "../gridPlacement";
+import { splitKnownWidgets } from "../screenWidgets";
 import type { ScreenWidgetType } from "../screenWidgets";
 
 const types = Object.keys(WIDGET_SIZES) as ScreenWidgetType[];
@@ -134,5 +135,23 @@ describe("isValidPlacement", () => {
 
   it("rejects a widget off the grid", () => {
     expect(isValidPlacement([{ id: 9, type: "message", col: 3, row: 0 }])).toBe(false);
+  });
+});
+
+describe("widgets from the server with an unknown type", () => {
+  const fromServer = [
+    { id: 1, type: "photo", col: 0, row: 0 },
+    { id: 2, type: "clock", col: 2, row: 0 },
+    { id: 3, type: "weather", col: 3, row: 2 },
+  ];
+
+  it("fail the whole check if passed in as they are", () => {
+    expect(isValidPlacement(fromServer as unknown as PlacedWidget[])).toBe(false);
+  });
+
+  it("are checked and placed around once split off", () => {
+    const { known } = splitKnownWidgets(fromServer);
+    expect(isValidPlacement(known)).toBe(true);
+    expect(canPlace(known, "weather", { col: 2, row: 0 })).toBe(true);
   });
 });

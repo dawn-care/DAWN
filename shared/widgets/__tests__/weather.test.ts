@@ -108,3 +108,14 @@ describe("weatherWord", () => {
     expect(weatherWord({ temp: 65, condition: "" })).toBeNull();
   });
 });
+
+describe("weatherWord with a missing condition", () => {
+  it("falls back to the temperature instead of throwing", () => {
+    expect(weatherWord({ temp: 40 })).toBe("Chilly");
+    expect(weatherWord({ temp: 80, condition: null })).toBe("Warm");
+  });
+
+  it("is null when there is nothing to go on", () => {
+    expect(weatherWord({ temp: 65 })).toBeNull();
+  });
+});

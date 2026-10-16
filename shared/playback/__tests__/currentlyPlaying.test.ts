@@ -304,3 +304,32 @@ describe("overlappingItems", () => {
     expect(overlappingItems(candidate(minute(10), 60), [unusable])).toEqual([]);
   });
 });
+
+describe("overlappingItems when editing an item", () => {
+  const saved = [
+    { ...video, id: 1 },
+    { ...photo, id: 2 },
+  ];
+
+  it("counts the schedule's old copy of the item as overlapping without an id", () => {
+    const edited = { ...video, startMinute: minute(10, 1) };
+    expect(overlappingItems(edited, saved)).toEqual([saved[0]]);
+  });
+
+  it("skips the item being edited when given its id", () => {
+    const edited = { ...video, startMinute: minute(10, 1) };
+    expect(overlappingItems(edited, saved, 1)).toEqual([]);
+  });
+
+  it("still finds other items it overlaps", () => {
+    const edited = { ...video, startMinute: minute(12) };
+    expect(overlappingItems(edited, saved, 1)).toEqual([saved[1]]);
+  });
+
+  it("accepts the awake hours after the id", () => {
+    const edited = { ...video, startMinute: minute(7), durationSeconds: 600 };
+    const early = [{ ...video, id: 3, startMinute: minute(7), durationSeconds: 600 }];
+    expect(overlappingItems(edited, early, undefined, { wakeMinute: minute(6), bedMinute: minute(21) })).toEqual(early);
+    expect(overlappingItems(edited, early)).toEqual([]);
+  });
+});
