@@ -1,7 +1,7 @@
 import React from "react";
 import { act, render } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
-import { getCarepartnerId } from "../../pairing/carepartnerId";
+import { readPairedId } from "../../pairing/pairingState";
 import * as playbackProvider from "../../playback/PlaybackProvider";
 import { PlaybackProvider, usePlayback } from "../../playback/PlaybackProvider";
 import type { ScheduledPlay } from "../../screen/screen";
@@ -9,7 +9,7 @@ import { useScreen } from "../../screen/ScreenProvider";
 import { loadPlayed, savePlayed } from "../playedStore";
 import SchedulePlayer, { SCHEDULE_CHECK_MS } from "../SchedulePlayer";
 
-jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
+jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 jest.mock("../../screen/ScreenProvider", () => ({ useScreen: jest.fn() }));
 jest.mock("../playedStore", () => ({ loadPlayed: jest.fn(), savePlayed: jest.fn() }));
 
@@ -51,7 +51,7 @@ async function start(time: string, played: string[] = []) {
 describe("SchedulePlayer", () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    jest.mocked(getCarepartnerId).mockResolvedValue(7);
+    jest.mocked(readPairedId).mockResolvedValue(7);
     jest.mocked(useScreen).mockReturnValue({ screen: { schedule } as never, refresh: jest.fn() });
   });
 

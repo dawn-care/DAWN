@@ -1,11 +1,11 @@
 import React from "react";
 import { act, render } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
-import { getCarepartnerId } from "../../pairing/carepartnerId";
+import { readPairedId } from "../../pairing/pairingState";
 import type { MediaItem } from "../media";
-import { NIGHT_CHECK_MS, PlaybackProvider, usePlayback } from "../PlaybackProvider";
+import { PlaybackProvider, usePlayback } from "../PlaybackProvider";
 
-jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
+jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 
 const song: MediaItem = { kind: "audio", url: "/media/1/file" };
 
@@ -28,7 +28,7 @@ async function start(time = "2026-10-12T12:00:00") {
 describe("PlaybackProvider", () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    jest.mocked(getCarepartnerId).mockResolvedValue(7);
+    jest.mocked(readPairedId).mockResolvedValue(7);
   });
 
   afterEach(() => {
@@ -37,40 +37,37 @@ describe("PlaybackProvider", () => {
     jest.clearAllMocks();
   });
 
-  it("counts a tablet with a stored carepartner as paired", async () => {
+  it("counts a paired tablet as paired, with its carepartner", async () => {
     await start();
     expect(playback.screen).toBe("alwaysOn");
     expect(playback.state.carepartnerId).toBe(7);
   });
 
-  it("shows pairing when no carepartner is stored", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(null);
+  it("shows pairing when the tablet isn't paired", async () => {
+    jest.mocked(readPairedId).mockResolvedValue(null);
     await start();
     expect(playback.screen).toBe("unpaired");
   });
 
   it("picks up a new pairing when asked to check again", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(null);
+    jest.mocked(readPairedId).mockResolvedValue(null);
     await start();
 
-    jest.mocked(getCarepartnerId).mockResolvedValue(7);
+    jest.mocked(readPairedId).mockResolvedValue(7);
     await act(() => playback.checkPairing());
 
     expect(playback.screen).toBe("alwaysOn");
   });
 
-  it("starts at night when it is night", async () => {
-    await start("2026-10-12T23:00:00");
-    expect(playback.screen).toBe("night");
-  });
-
-  it("switches to night when night starts", async () => {
-    await start("2026-10-12T19:59:30");
+  it("shows night when told night has started, and the day screen when it has ended", async () => {
+    await start();
     expect(playback.screen).toBe("alwaysOn");
 
-    await act(async () => jest.advanceTimersByTime(NIGHT_CHECK_MS));
-
+    await act(async () => playback.setNight(true));
     expect(playback.screen).toBe("night");
+
+    await act(async () => playback.setNight(false));
+    expect(playback.screen).toBe("alwaysOn");
   });
 
   it("plays, ends and stops through the machine", async () => {
