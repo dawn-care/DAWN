@@ -18,9 +18,10 @@ jest.mock("expo-router", () => {
 jest.mock("../../playback/PlaybackProvider", () => ({
   PlaybackProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-jest.mock("../../schedule/ScheduleProvider", () => ({
-  ScheduleProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+jest.mock("../../screen/ScreenProvider", () => ({
+  ScreenProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+jest.mock("../../schedule/SchedulePlayer", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: () => null }));
 
 describe("RootLayout", () => {

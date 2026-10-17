@@ -7,7 +7,7 @@
  */
 
 import { API_URL } from "../api/config";
-import type { MediaItem } from "./media";
+import { readMedia, type MediaItem } from "./media";
 
 /**
  * How long to wait for the lookup. React Native's `fetch` has no time limit of
@@ -16,8 +16,9 @@ import type { MediaItem } from "./media";
 export const MEDIA_LOOKUP_TIMEOUT_MS = 5_000;
 
 /**
- * The media item to play, or null if it can't be looked up in time. A photo
- * shows for the default time, since a staff play has no display time.
+ * The media item to play, or null if it can't be looked up in time or isn't
+ * playable. A photo shows for the default time, since a staff play has no
+ * display time.
  */
 export async function fetchMediaItem(mediaId: number): Promise<MediaItem | null> {
   const controller = new AbortController();
@@ -25,13 +26,9 @@ export async function fetchMediaItem(mediaId: number): Promise<MediaItem | null>
   try {
     const res = await fetch(`${API_URL}/media/${mediaId}`, { signal: controller.signal });
     if (!res.ok) throw new Error(`Media request failed (${res.status})`);
-    const media: unknown = await res.json();
-    if (typeof media !== "object" || media === null) throw new Error("Media response is not an object");
-    const { kind, url, display_name } = media as Record<string, unknown>;
-    if (typeof kind !== "string" || typeof url !== "string") {
-      throw new Error("Media response is missing its kind or file");
-    }
-    return { module_type: kind, metadata: { id: mediaId, url, displayed_name: display_name } };
+    const item = readMedia(await res.json());
+    if (!item) throw new Error("Media response isn't something the tablet can play");
+    return item;
   } catch (error) {
     console.warn(`Couldn't look up media ${mediaId}`, error);
     return null;

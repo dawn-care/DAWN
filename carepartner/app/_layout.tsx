@@ -4,7 +4,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { useTabletDisplay } from "../src/display/useTabletDisplay";
 import { PlaybackProvider } from "../src/playback/PlaybackProvider";
 import StaffCommands from "../src/playback/StaffCommands";
-import { ScheduleProvider } from "../src/schedule/ScheduleProvider";
+import SchedulePlayer from "../src/schedule/SchedulePlayer";
+import { ScreenProvider } from "../src/screen/ScreenProvider";
 import { useAppFonts } from "../src/theme/fonts";
 
 SplashScreen.preventAutoHideAsync();
@@ -25,10 +26,11 @@ export default function RootLayout() {
 
   return (
     <PlaybackProvider>
-      <ScheduleProvider>
+      <ScreenProvider>
         <StaffCommands />
+        <SchedulePlayer />
         <Stack screenOptions={{ headerShown: false, animation: "none" }} />
-      </ScheduleProvider>
+      </ScreenProvider>
     </PlaybackProvider>
   );
 }

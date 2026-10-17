@@ -32,7 +32,7 @@ import {
 import { router } from "expo-router";
 import { Image } from "react-native";
 import { getCarepartnerId } from "../src/pairing/carepartnerId";
-import { useSchedule } from "../src/schedule/ScheduleProvider";
+import { useScreen } from "../src/screen/ScreenProvider";
 
 /* ============================
    Helpers
@@ -72,12 +72,12 @@ export default function Screensaver() {
   /* ============================
      State
   ============================ */
-  const { carepartner, refresh } = useSchedule();
+  const { screen, refresh } = useScreen();
   const [hasCarepartnerId, setHasCarepartnerId] = useState<boolean | null>(null);
   const [syncing, setSyncing] = useState(false);
 
-  const autoStartTimeLabel = carepartner?.auto_start
-    ? formatTime(carepartner.auto_start)
+  const wakeTimeLabel = screen
+    ? formatTime(screen.awakeHours.wake)
     : '...';
 
   /* ============================
@@ -175,8 +175,8 @@ export default function Screensaver() {
 
                 <View style={styles.autoGlass}>
                 <Text style={styles.autoText}>
-                    Auto-Starts at{" "}
-                    <Text style={styles.autoTimeText}>{autoStartTimeLabel}</Text>
+                    Wakes up at{" "}
+                    <Text style={styles.autoTimeText}>{wakeTimeLabel}</Text>
                 </Text>
                 </View>
             </View>

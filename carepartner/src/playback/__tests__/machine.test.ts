@@ -9,8 +9,8 @@ import {
   type PlaySource,
 } from "../machine";
 
-const song: MediaItem = { module_type: "audio", metadata: { id: 1 } };
-const photo: MediaItem = { module_type: "photo", metadata: { id: 2 } };
+const song: MediaItem = { kind: "audio", url: "/media/1/file" };
+const photo: MediaItem = { kind: "photo", url: "/media/2/file" };
 
 const run = (state: PlaybackState, ...events: PlaybackEvent[]) => events.reduce(playbackReducer, state);
 const paired = run(initialPlaybackState, { type: "pairingChecked", carepartnerId: 7 });

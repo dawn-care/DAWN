@@ -7,7 +7,7 @@ import { NIGHT_CHECK_MS, PlaybackProvider, usePlayback } from "../PlaybackProvid
 
 jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
 
-const song: MediaItem = { module_type: "audio", metadata: { id: 1 } };
+const song: MediaItem = { kind: "audio", url: "/media/1/file" };
 
 let playback: ReturnType<typeof usePlayback>;
 function Probe() {

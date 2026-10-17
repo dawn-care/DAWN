@@ -523,7 +523,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 - `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").
-- `schedule` covers today and tomorrow so playback keeps working past midnight. Trigger playback when the local time reaches an occurrence's `date` and `time`, as `carepartner/app/ScheduleContext.tsx` does today. Play photos for `duration_seconds`.
+- `schedule` covers today and tomorrow so playback keeps working past midnight. Trigger playback when the local time reaches an occurrence's `date` and `time`, as `carepartner/src/schedule/SchedulePlayer.tsx` does. Play photos for `duration_seconds`.
 - A sports `result` of `upcoming` means the team hasn't played yet this season.
 
 ### Re-fetching
