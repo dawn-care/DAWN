@@ -3,7 +3,7 @@ import { act, render } from "@testing-library/react-native";
 import { API_URL } from "../../api/config";
 import { setClock } from "../../clock/clock";
 import { getCarepartnerId } from "../../pairing/carepartnerId";
-import { PlaybackProvider } from "../../playback/PlaybackProvider";
+import { PlaybackProvider, usePlayback } from "../../playback/PlaybackProvider";
 import { STALE_AFTER_MS } from "../screen";
 import { SCREEN_CHECK_MS, SCREEN_REFRESH_MS, ScreenProvider, useScreen } from "../ScreenProvider";
 
@@ -28,9 +28,23 @@ function mockServer(...responses: ({ status: number } | object)[]) {
   return fetchMock;
 }
 
+/** Holds every screen request open until the test answers it, by index. */
+function pendingServer() {
+  const answers: ((body: object) => Promise<void>)[] = [];
+  globalThis.fetch = jest.fn(
+    () =>
+      new Promise((resolve) => {
+        answers.push((body) => act(async () => resolve({ ok: true, status: 200, json: async () => body })));
+      }),
+  ) as unknown as typeof fetch;
+  return answers;
+}
+
 let current: ReturnType<typeof useScreen>;
+let playback: ReturnType<typeof usePlayback>;
 function Probe() {
   current = useScreen();
+  playback = usePlayback();
   return null;
 }
 
@@ -114,6 +128,36 @@ describe("ScreenProvider", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(current.screen?.awakeHours.wake).toBe("08:00");
+  });
+
+  it("keeps the newer screen when an older fetch answers last", async () => {
+    const answers = pendingServer();
+    await start();
+    await act(async () => {
+      current.refresh();
+    });
+    await answers[1](screenResponse("08:00"));
+    await answers[0](screenResponse("07:00"));
+
+    expect(current.screen?.awakeHours.wake).toBe("08:00");
+  });
+
+  it("clears the screen when unpaired, and drops a fetch that answers afterwards", async () => {
+    const answers = pendingServer();
+    await start();
+    await answers[0](screenResponse());
+    await act(async () => {
+      current.refresh();
+    });
+
+    jest.mocked(getCarepartnerId).mockResolvedValue(null);
+    await act(async () => playback.checkPairing());
+
+    expect(current.screen).toBeNull();
+
+    await answers[1](screenResponse("08:00"));
+
+    expect(current.screen).toBeNull();
   });
 
   it.each([

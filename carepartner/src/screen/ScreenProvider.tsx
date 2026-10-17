@@ -8,6 +8,8 @@
  *   check of a new day, and whenever `refresh()` is called (the socket's
  *   refresh message and the Sync button).
  * - Keeps the last good screen if a fetch fails.
+ * - Only the latest fetch counts, so an older response arriving late, or one
+ *   for a carepartner the tablet is no longer paired as, is dropped.
  * - Live data (weather, sports, news) hides once the last good fetch is hours
  *   old (see `hideStaleWidgets`).
  */
@@ -42,25 +44,31 @@ export function ScreenProvider({ children }: { children: React.ReactNode }) {
   const [fetched, setFetched] = useState<{ screen: Screen; at: Date } | null>(null);
   /** When the last fetch was tried, successful or not, so a failing server is tried every 5 minutes, not every check. */
   const lastTried = useRef<Date | null>(null);
+  /** Counts fetches, so a response is applied only if no newer fetch or carepartner change came after it. */
+  const latest = useRef(0);
   /** Re-reads the clock at each check, so stale data hides even when no fetch succeeds. */
   const [checkedAt, setCheckedAt] = useState(() => now());
 
   const refresh = useCallback(async () => {
     if (id == null) return;
+    const request = ++latest.current;
     lastTried.current = now();
     try {
       const res = await fetch(`${API_URL}/screen?carepartner_id=${id}`);
       if (!res.ok) throw new Error(`Screen request failed (${res.status})`);
       const screen = readScreen(await res.json());
+      if (request !== latest.current) return;
       if (!screen) throw new Error("Screen response is malformed");
       setFetched({ screen, at: now() });
     } catch (error) {
       // Keep the last good screen; the next check tries again.
-      console.warn("Couldn't refresh the screen", error);
+      if (request === latest.current) console.warn("Couldn't refresh the screen", error);
     }
   }, [id]);
 
   useEffect(() => {
+    // Drops a fetch still in flight for the previous carepartner.
+    latest.current++;
     setFetched(null);
     if (id == null) return;
     refresh();

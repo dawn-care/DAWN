@@ -187,6 +187,7 @@ Staff play and stop clips from their phones; the server pushes each command to t
 
 `ScreenProvider` (in `_layout.tsx`, inside `PlaybackProvider`) keeps the server's `GET /screen?carepartner_id=` response (see `docs/api/screen-and-media.md`), which holds the layout, awake hours, widget spots and the schedule. `useScreen()` gives `screen` (null until the first good response) and `refresh()`.
 - Once paired, it fetches the screen, then checks every minute and fetches again when 5 minutes have passed since the last try or the day has changed. The socket's `refresh` message and the old home screen's Sync button call `refresh()`.
+- Only the latest fetch counts: a response that arrives after a newer fetch started, or after the carepartner changed, is dropped.
 - `readScreen` (`screen.ts`) checks the response once: a malformed widget becomes an empty spot, so the others keep their places, and a schedule entry the tablet can't play is dropped. A failed or malformed response keeps the last good screen.
 - `hideStaleWidgets` empties weather, sports and news spots once the last good fetch is `STALE_AFTER_MS` (3 hours) old, so old data is never shown as current.
 - Nothing draws the spots yet; the old `screensaver.tsx` uses only the wake time. Drawing them is #316. Night hours still come from the default in `@shared`, not `awake_hours`.
@@ -195,7 +196,7 @@ Staff play and stop clips from their phones; the server pushes each command to t
 
 `SchedulePlayer` (in `_layout.tsx`, draws nothing) plays the screen's `schedule`, today's and tomorrow's plays, through the machine with source `scheduled`:
 - Every 15 seconds, and whenever the screen or the machine changes, it plays `duePlay` if `canPlay(state, "scheduled")`: the earliest play whose time came within the last `GRACE_MS` (10 minutes) and that hasn't played. Later than that it is skipped, so a play missed while the tablet was off or busy with a staff clip doesn't start long after its time. Plays flagged `outsideAwakeHours` are skipped.
-- A play counts as played once it starts, so a failed one doesn't loop. Played plays (`playKey`: scheduled item and date) are stored on the device by `playedStore.ts`, so a restart within the grace window doesn't repeat one. Nothing plays until they've loaded. This moves to the server's `Playback` records once scheduled plays are reported (#299).
+- A play counts as played once the machine puts it on screen, so a failed one doesn't loop, and one the machine refuses (a staff clip got there first) can still play later. Played plays (`playKey`: scheduled item and date) are stored on the device by `playedStore.ts`, so a restart within the grace window doesn't repeat one. Nothing plays until they've loaded. This moves to the server's `Playback` records once scheduled plays are reported (#299).
 - Times are compared in the tablet's local time, which is assumed to be the carepartner's timezone.
 
 The pure decisions are in `schedule.ts`.

@@ -35,6 +35,16 @@ describe("schedule", () => {
       expect(duePlay(schedule, new Date(at("08:00").getTime() + GRACE_MS), new Set())).toBeNull();
     });
 
+    it("is still due just after midnight for a play late the day before", () => {
+      const lateNight = play(3, "23:55");
+      expect(duePlay([lateNight], new Date("2026-10-13T00:02:00"), new Set())?.scheduledItemId).toBe(3);
+    });
+
+    it("isn't due early for tomorrow's play at the same time", () => {
+      const tomorrow = play(1, "08:00", { date: "2026-10-13" });
+      expect(duePlay([tomorrow], at("08:05"), new Set())).toBeNull();
+    });
+
     it("isn't due once played", () => {
       expect(duePlay(schedule, at("08:01"), new Set(["1@2026-10-12"]))).toBeNull();
     });

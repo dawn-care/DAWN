@@ -2,6 +2,7 @@ import React from "react";
 import { act, render } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
 import { getCarepartnerId } from "../../pairing/carepartnerId";
+import * as playbackProvider from "../../playback/PlaybackProvider";
 import { PlaybackProvider, usePlayback } from "../../playback/PlaybackProvider";
 import type { ScheduledPlay } from "../../screen/screen";
 import { useScreen } from "../../screen/ScreenProvider";
@@ -55,6 +56,7 @@ describe("SchedulePlayer", () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     setClock(null);
     jest.useRealTimers();
     jest.clearAllMocks();
@@ -141,6 +143,17 @@ describe("SchedulePlayer", () => {
     await tick(2 * SCHEDULE_CHECK_MS);
 
     expect(playingUrl()).toBe("/media/2/file");
+  });
+
+  it("doesn't count a play the machine refused, and asks again", async () => {
+    const realUsePlayback = playbackProvider.usePlayback;
+    const refusedPlay = jest.fn();
+    jest.spyOn(playbackProvider, "usePlayback").mockImplementation(() => ({ ...realUsePlayback(), play: refusedPlay }));
+    await start("2026-10-12T08:00:30");
+    await tick();
+
+    expect(refusedPlay).toHaveBeenCalledTimes(2);
+    expect(savePlayed).not.toHaveBeenCalled();
   });
 
   it("plays nothing without a screen yet", async () => {
