@@ -37,7 +37,7 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 
 // GetScreenHandler godoc
 // @Summary Everything the carepartner's tablet shows
-// @Description Layout preset; each region's slots in order (null for an empty slot) with widget settings, photo and data; awake hours; and today's and tomorrow's schedule. A widget whose outside lookup fails has data null and error "UPSTREAM_UNAVAILABLE". Weather, sports and news results are cached for 10 minutes. Times are in the carepartner's timezone.
+// @Description Each widget in reading order with its place on the 4x3 grid (col, row, width, height), settings, photo and data; awake hours; and today's and tomorrow's schedule. A widget whose outside lookup fails has data null and error "UPSTREAM_UNAVAILABLE". Weather, sports and news results are cached for 10 minutes. Times are in the carepartner's timezone.
 // @Tags screen
 // @Produce json
 // @Param carepartner_id query int true "Carepartner ID"

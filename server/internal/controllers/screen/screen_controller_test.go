@@ -23,13 +23,13 @@ func (m *mockScreenService) GetScreen(carepartnerID int) (*svc.Screen, error) {
 }
 
 func TestGetScreenHandler(t *testing.T) {
-	m := &mockScreenService{screen: &svc.Screen{CarepartnerID: 1, LayoutPreset: "balanced"}}
+	m := &mockScreenService{screen: &svc.Screen{CarepartnerID: 1, Today: "2026-10-16"}}
 	w := httptest.NewRecorder()
 	NewScreenController(m).GetScreenHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen?carepartner_id=1", nil))
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, 1, m.gotID)
-	assert.Contains(t, w.Body.String(), `"layout_preset":"balanced"`)
+	assert.Contains(t, w.Body.String(), `"today":"2026-10-16"`)
 }
 
 func TestGetScreenHandler_Errors(t *testing.T) {

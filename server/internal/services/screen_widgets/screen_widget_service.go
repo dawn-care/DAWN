@@ -2,28 +2,22 @@ package screen_widgets
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/lib/pq"
-
-	"server/internal/db"
 	mediaModel "server/internal/models/media"
 	settingsModel "server/internal/models/screen_settings"
 	model "server/internal/models/screen_widgets"
-	settings "server/internal/services/screen_settings"
 )
 
 var (
 	ErrInvalidCarepartner = errors.New("invalid carepartner_id")
 	ErrCarepartnerMissing = errors.New("carepartner not found")
 	ErrNotFound           = errors.New("screen widget not found")
+	ErrInvalidRequest     = errors.New("invalid request")
 	ErrInvalidType        = fmt.Errorf("type must be one of %v", WidgetTypes)
 	ErrInvalidConfig      = errors.New("invalid config")
 	ErrInvalidPhoto       = errors.New("invalid photo")
-	ErrUnknownSpot        = errors.New("the current layout has no such spot")
-	ErrSpotTaken          = errors.New("that spot already has a widget")
 )
 
 type ScreenWidgetService struct {
@@ -34,58 +28,8 @@ func NewScreenWidgetService(db *sql.DB) *ScreenWidgetService {
 	return &ScreenWidgetService{DB: db}
 }
 
-// CreateInput places a new widget in a spot of the carepartner's current preset
-type CreateInput struct {
-	CarepartnerID int             `json:"carepartner_id"`
-	Type          string          `json:"type"`
-	Spot          *int            `json:"spot"`
-	Config        json.RawMessage `json:"config" swaggertype:"object"`
-	PhotoMediaID  *int            `json:"photo_media_id"`
-}
-
-// UpdateInput replaces a widget's settings and photo; its type and spot don't change
-type UpdateInput struct {
-	Config       json.RawMessage `json:"config" swaggertype:"object"`
-	PhotoMediaID *int            `json:"photo_media_id"`
-}
-
-// MoveInput names the spot to move a widget to
-type MoveInput struct {
-	Spot *int `json:"spot"`
-}
-
-func placementErr(base error, format string, args ...any) error {
+func wrap(base error, format string, args ...any) error {
 	return fmt.Errorf("%w: %s", base, fmt.Sprintf(format, args...))
-}
-
-// isSpotConflict reports whether err is the unique (carepartner, spot) violation
-func isSpotConflict(err error) bool {
-	var pqErr *pq.Error
-	return errors.As(err, &pqErr) && pqErr.Code == "23505"
-}
-
-// currentPreset returns the layout preset the carepartner's screen uses
-func currentPreset(exec db.QueryRower, carepartnerID int) (settings.Preset, error) {
-	s, err := settingsModel.GetScreenSettings(exec, carepartnerID)
-	if err != nil {
-		return settings.Preset{}, fmt.Errorf("failed to get screen settings: %w", err)
-	}
-	if s == nil {
-		return settings.Preset{}, ErrCarepartnerMissing
-	}
-	preset, ok := settings.PresetByName(s.LayoutPreset)
-	if !ok {
-		return settings.Preset{}, fmt.Errorf("carepartner %d has unknown layout preset %q", carepartnerID, s.LayoutPreset)
-	}
-	return preset, nil
-}
-
-// checkPlacement checks that the preset has the spot; any widget type can go in any spot
-func checkPlacement(preset settings.Preset, spot int) error {
-	if !preset.HasSpot(spot) {
-		return placementErr(ErrUnknownSpot, "%q has spots 0 to %d, not %d", preset.Name, preset.Spots-1, spot)
-	}
-	return nil
 }
 
 // checkPhoto checks a widget's photo: required for photo widgets, optional for
@@ -94,7 +38,7 @@ func checkPhoto(tx *sql.Tx, widgetType string, carepartnerID int, photoID *int) 
 	switch widgetType {
 	case TypePhoto:
 		if photoID == nil {
-			return placementErr(ErrInvalidPhoto, "photo widgets need a photo_media_id")
+			return wrap(ErrInvalidPhoto, "photo widgets need a photo_media_id")
 		}
 	case TypeMessage:
 		if photoID == nil {
@@ -102,7 +46,7 @@ func checkPhoto(tx *sql.Tx, widgetType string, carepartnerID int, photoID *int) 
 		}
 	default:
 		if photoID != nil {
-			return placementErr(ErrInvalidPhoto, "only photo and message widgets have a photo")
+			return wrap(ErrInvalidPhoto, "only photo and message widgets have a photo")
 		}
 		return nil
 	}
@@ -112,90 +56,51 @@ func checkPhoto(tx *sql.Tx, widgetType string, carepartnerID int, photoID *int) 
 		return fmt.Errorf("failed to check photo: %w", err)
 	}
 	if m == nil || m.CarepartnerID != carepartnerID {
-		return placementErr(ErrInvalidPhoto, "photo %d not found for this carepartner", *photoID)
+		return wrap(ErrInvalidPhoto, "photo %d not found for this carepartner", *photoID)
 	}
 	if m.Kind != mediaModel.KindPhoto {
-		return placementErr(ErrInvalidPhoto, "media %d is a %s, not a photo", *photoID, m.Kind)
+		return wrap(ErrInvalidPhoto, "media %d is a %s, not a photo", *photoID, m.Kind)
 	}
 	return nil
 }
 
-// commit commits tx, reporting a lost race for a spot as ErrSpotTaken
-func commit(tx *sql.Tx) error {
-	if err := tx.Commit(); err != nil {
-		if isSpotConflict(err) {
-			return ErrSpotTaken
-		}
-		return err
-	}
-	return nil
-}
-
-// markHidden flags widgets whose spot the preset doesn't have
-func markHidden(widgets []model.ScreenWidget, preset settings.Preset) {
-	for i := range widgets {
-		widgets[i].Hidden = !preset.HasSpot(widgets[i].Spot)
-	}
-}
-
-// ─────────────────────────────────────────────
-// CREATE
-// ─────────────────────────────────────────────
-
-func (s *ScreenWidgetService) CreateWidget(in CreateInput) (*model.ScreenWidget, error) {
-	if in.CarepartnerID <= 0 {
-		return nil, ErrInvalidCarepartner
-	}
+/*
+checkWidget checks one widget of a layout and returns it ready to store. It checks, in
+order: type, ID (one of the carepartner's widgets, listed once, same type), corners,
+config, then photo. stored holds the carepartner's current widgets by ID; seen collects
+the IDs already in the layout.
+*/
+func checkWidget(tx *sql.Tx, carepartnerID int, in model.WidgetInput, stored map[int]model.ScreenWidget, seen map[int]bool) (model.ScreenWidget, error) {
 	if !validType(in.Type) {
-		return nil, ErrInvalidType
+		return model.ScreenWidget{}, ErrInvalidType
 	}
-	if in.Spot == nil {
-		return nil, placementErr(ErrUnknownSpot, "spot is required")
+	w := model.ScreenWidget{CarepartnerID: carepartnerID, Type: in.Type, PhotoMediaID: in.PhotoMediaID}
+	if in.ID != nil {
+		existing, ok := stored[*in.ID]
+		if !ok {
+			return w, wrap(ErrNotFound, "widget %d isn't one of this carepartner's widgets", *in.ID)
+		}
+		if seen[*in.ID] {
+			return w, wrap(ErrInvalidRequest, "widget %d is listed more than once", *in.ID)
+		}
+		if existing.Type != in.Type {
+			return w, wrap(ErrInvalidType, "widget %d is a %s widget; send a new widget without an id to change the type", *in.ID, existing.Type)
+		}
+		seen[*in.ID] = true
+		w.ID = *in.ID
 	}
+	if err := checkArea(in.TopLeft, in.BottomRight); err != nil {
+		return w, err
+	}
+	w.TopLeft, w.BottomRight = *in.TopLeft, *in.BottomRight
+
 	config, err := NormalizeConfig(in.Type, in.Config)
 	if err != nil {
-		return nil, err
+		return w, err
 	}
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	preset, err := currentPreset(tx, in.CarepartnerID)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkPlacement(preset, *in.Spot); err != nil {
-		return nil, err
-	}
-	if err := checkPhoto(tx, in.Type, in.CarepartnerID, in.PhotoMediaID); err != nil {
-		return nil, err
-	}
-	occupant, err := model.GetScreenWidgetAt(tx, in.CarepartnerID, *in.Spot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check spot: %w", err)
-	}
-	if occupant != nil {
-		return nil, ErrSpotTaken
-	}
-
-	w := &model.ScreenWidget{
-		CarepartnerID: in.CarepartnerID,
-		Type:          in.Type,
-		Spot:          *in.Spot,
-		Config:        config,
-		PhotoMediaID:  in.PhotoMediaID,
-	}
-	if err := model.CreateScreenWidget(tx, w); err != nil {
-		if isSpotConflict(err) {
-			return nil, ErrSpotTaken
-		}
-		return nil, fmt.Errorf("failed to create widget: %w", err)
-	}
-	if err := commit(tx); err != nil {
-		return nil, err
+	w.Config = config
+	if err := checkPhoto(tx, in.Type, carepartnerID, in.PhotoMediaID); err != nil {
+		return w, err
 	}
 	return w, nil
 }
@@ -204,103 +109,44 @@ func (s *ScreenWidgetService) CreateWidget(in CreateInput) (*model.ScreenWidget,
 // READ
 // ─────────────────────────────────────────────
 
-/*
-ListWidgets returns a carepartner's widgets in spot order. Widgets in the current preset
-come first, since hidden ones sit in spots past the preset's last.
-*/
-func (s *ScreenWidgetService) ListWidgets(carepartnerID int) ([]model.ScreenWidget, error) {
+// GetLayout returns a carepartner's widgets in reading order
+func (s *ScreenWidgetService) GetLayout(carepartnerID int) (*model.Layout, error) {
 	if carepartnerID <= 0 {
 		return nil, ErrInvalidCarepartner
 	}
-	preset, err := currentPreset(s.DB, carepartnerID)
+	settings, err := settingsModel.GetScreenSettings(s.DB, carepartnerID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get screen settings: %w", err)
+	}
+	if settings == nil {
+		return nil, ErrCarepartnerMissing
 	}
 	widgets, err := model.ListScreenWidgets(s.DB, carepartnerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list widgets: %w", err)
 	}
-	markHidden(widgets, preset)
-	return widgets, nil
-}
-
-func (s *ScreenWidgetService) GetWidget(id int) (*model.ScreenWidget, error) {
-	if id <= 0 {
-		return nil, ErrNotFound
-	}
-	w, err := model.GetScreenWidgetByID(s.DB, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get widget: %w", err)
-	}
-	if w == nil {
-		return nil, ErrNotFound
-	}
-	preset, err := currentPreset(s.DB, w.CarepartnerID)
-	if err != nil {
-		return nil, err
-	}
-	w.Hidden = !preset.HasSpot(w.Spot)
-	return w, nil
+	return &model.Layout{Widgets: widgets}, nil
 }
 
 // ─────────────────────────────────────────────
-// UPDATE
+// SAVE
 // ─────────────────────────────────────────────
-
-// UpdateWidget replaces a widget's settings and photo
-func (s *ScreenWidgetService) UpdateWidget(id int, in UpdateInput) (*model.ScreenWidget, error) {
-	if id <= 0 {
-		return nil, ErrNotFound
-	}
-
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	w, err := model.GetScreenWidgetForUpdate(tx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get widget: %w", err)
-	}
-	if w == nil {
-		return nil, ErrNotFound
-	}
-	config, err := NormalizeConfig(w.Type, in.Config)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkPhoto(tx, w.Type, w.CarepartnerID, in.PhotoMediaID); err != nil {
-		return nil, err
-	}
-
-	w.Config, w.PhotoMediaID = config, in.PhotoMediaID
-	if err := model.UpdateScreenWidgetConfig(tx, w); err != nil {
-		return nil, fmt.Errorf("failed to update widget: %w", err)
-	}
-	preset, err := currentPreset(tx, w.CarepartnerID)
-	if err != nil {
-		return nil, err
-	}
-	if err := commit(tx); err != nil {
-		return nil, err
-	}
-	w.Hidden = !preset.HasSpot(w.Spot)
-	return w, nil
-}
 
 /*
-MoveWidget moves a widget to another spot of the current preset. If that spot has a
-widget, the two swap places; the other widget takes the moving widget's old spot, even
-if that spot is hidden in the current preset.
+SaveLayout replaces a carepartner's whole layout in one transaction: widgets with an ID
+are updated, widgets without one are created, and the carepartner's other widgets are
+deleted. Nothing is saved unless every widget is valid and no two share a cell. Errors
+name a widget by its index in the list, e.g. "widgets[2]". The saved widgets come back
+in the order they were sent, so new widgets' IDs can be matched up by position.
 */
-func (s *ScreenWidgetService) MoveWidget(id int, in MoveInput) (*model.ScreenWidget, error) {
-	if id <= 0 {
-		return nil, ErrNotFound
+func (s *ScreenWidgetService) SaveLayout(carepartnerID int, in model.LayoutInput) (*model.Layout, error) {
+	if carepartnerID <= 0 {
+		return nil, ErrInvalidCarepartner
 	}
-	if in.Spot == nil {
-		return nil, placementErr(ErrUnknownSpot, "spot is required")
+	if in.Widgets == nil {
+		return nil, wrap(ErrInvalidRequest, "widgets is required; send [] to clear the screen")
 	}
+	inputs := *in.Widgets
 
 	tx, err := s.DB.Begin()
 	if err != nil {
@@ -308,59 +154,58 @@ func (s *ScreenWidgetService) MoveWidget(id int, in MoveInput) (*model.ScreenWid
 	}
 	defer tx.Rollback()
 
-	w, err := model.GetScreenWidgetForUpdate(tx, id)
+	// One save at a time per carepartner
+	found, err := settingsModel.LockScreenSettings(tx, carepartnerID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get widget: %w", err)
-	}
-	if w == nil {
-		return nil, ErrNotFound
-	}
-	preset, err := currentPreset(tx, w.CarepartnerID)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkPlacement(preset, *in.Spot); err != nil {
-		return nil, err
-	}
-	if w.Spot == *in.Spot {
-		w.Hidden = false
-		return w, nil
-	}
-
-	occupant, err := model.GetScreenWidgetAt(tx, w.CarepartnerID, *in.Spot)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check spot: %w", err)
-	}
-	if occupant != nil {
-		if err := model.MoveScreenWidget(tx, occupant.ID, w.Spot); err != nil {
-			return nil, fmt.Errorf("failed to move widget: %w", err)
-		}
-	}
-	if err := model.MoveScreenWidget(tx, w.ID, *in.Spot); err != nil {
-		return nil, fmt.Errorf("failed to move widget: %w", err)
-	}
-	if err := commit(tx); err != nil {
-		return nil, err
-	}
-
-	w.Spot, w.Hidden = *in.Spot, false
-	return w, nil
-}
-
-// ─────────────────────────────────────────────
-// DELETE
-// ─────────────────────────────────────────────
-
-func (s *ScreenWidgetService) DeleteWidget(id int) error {
-	if id <= 0 {
-		return ErrNotFound
-	}
-	found, err := model.DeleteScreenWidget(s.DB, id)
-	if err != nil {
-		return fmt.Errorf("failed to delete widget: %w", err)
+		return nil, fmt.Errorf("failed to lock screen settings: %w", err)
 	}
 	if !found {
-		return ErrNotFound
+		return nil, ErrCarepartnerMissing
 	}
-	return nil
+	current, err := model.ListScreenWidgetsForUpdate(tx, carepartnerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list widgets: %w", err)
+	}
+	stored := make(map[int]model.ScreenWidget, len(current))
+	for _, w := range current {
+		stored[w.ID] = w
+	}
+
+	widgets := make([]model.ScreenWidget, len(inputs))
+	areas := make([]model.GridArea, len(inputs))
+	seen := map[int]bool{}
+	for i, input := range inputs {
+		w, err := checkWidget(tx, carepartnerID, input, stored, seen)
+		if err != nil {
+			return nil, fmt.Errorf("widgets[%d]: %w", i, err)
+		}
+		widgets[i], areas[i] = w, w.Area()
+	}
+	if a, b, overlap := findOverlap(areas); overlap {
+		return nil, wrap(ErrOverlap, "widgets[%d] and widgets[%d] cover the same cell", a, b)
+	}
+
+	keep := []int{}
+	for _, w := range widgets {
+		if w.ID != 0 {
+			keep = append(keep, w.ID)
+		}
+	}
+	if err := model.DeleteScreenWidgetsExcept(tx, carepartnerID, keep); err != nil {
+		return nil, fmt.Errorf("failed to delete widgets: %w", err)
+	}
+	for i := range widgets {
+		if widgets[i].ID == 0 {
+			err = model.CreateScreenWidget(tx, &widgets[i])
+		} else {
+			err = model.UpdateScreenWidget(tx, &widgets[i])
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to save widgets[%d]: %w", i, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &model.Layout{Widgets: widgets}, nil
 }

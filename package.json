@@ -10,7 +10,7 @@
     "dev:mobile": "cd carepartner && npm start",
     "dev:caregiver": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
     "dev:carepartner": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
-    "typecheck:shared": "node carepartner/node_modules/typescript/bin/tsc -p shared --noEmit"
+    "typecheck:shared": "node carepartner/node_modules/typescript/bin/tsc -p shared/tsconfig.lib.json --noEmit"
   },
   "repository": {
     "type": "git",

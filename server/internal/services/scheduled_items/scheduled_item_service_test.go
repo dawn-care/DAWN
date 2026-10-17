@@ -48,8 +48,8 @@ func expectMedia(mock sqlmock.Sqlmock, id, carepartnerID int, kind string, durat
 
 func expectSettings(mock sqlmock.Sqlmock, wake, bed string) {
 	mock.ExpectQuery(qSettings).WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).
-			AddRow(1, "balanced", wake, bed))
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}).
+			AddRow(1, wake, bed))
 }
 
 func itemRow(id, mediaID int, bg, display any, start, at, repeat string, end any, kind string, duration any) *sqlmock.Rows {

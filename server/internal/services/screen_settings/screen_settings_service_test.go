@@ -23,13 +23,12 @@ func TestGetScreenSettings(t *testing.T) {
 
 	mock.ExpectQuery(selectSettings).
 		WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).
-			AddRow(1, "balanced", "07:00", "21:00"))
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}).
+			AddRow(1, "07:00", "21:00"))
 
 	s, err := NewScreenSettingsService(db).GetScreenSettings(1)
 
 	require.NoError(t, err)
-	assert.Equal(t, "balanced", s.LayoutPreset)
 	assert.Equal(t, "07:00", s.WakeTime)
 	assert.Equal(t, "21:00", s.BedTime)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -40,7 +39,7 @@ func TestGetScreenSettings_NotFound(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery(selectSettings).WithArgs(9).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}))
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}))
 
 	_, err := NewScreenSettingsService(db).GetScreenSettings(9)
 	assert.ErrorIs(t, err, ErrNotFound)
@@ -66,13 +65,11 @@ func TestUpdateScreenSettings(t *testing.T) {
 
 	// Times are zero-padded before they reach the database
 	mock.ExpectQuery(updateSettings).
-		WithArgs("balanced", "06:30", "22:00", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"layout_preset", "wake_time", "bed_time"}).
-			AddRow("balanced", "06:30", "22:00"))
+		WithArgs("06:30", "22:00", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"wake_time", "bed_time"}).
+			AddRow("06:30", "22:00"))
 
-	s, err := NewScreenSettingsService(db).UpdateScreenSettings(1, UpdateInput{
-		LayoutPreset: "balanced", WakeTime: "6:30", BedTime: "22:00",
-	})
+	s, err := NewScreenSettingsService(db).UpdateScreenSettings(1, UpdateInput{WakeTime: "6:30", BedTime: "22:00"})
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, s.CarepartnerID)
@@ -86,11 +83,9 @@ func TestUpdateScreenSettings_NotFound(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery(updateSettings).
-		WillReturnRows(sqlmock.NewRows([]string{"layout_preset", "wake_time", "bed_time"}))
+		WillReturnRows(sqlmock.NewRows([]string{"wake_time", "bed_time"}))
 
-	_, err := NewScreenSettingsService(db).UpdateScreenSettings(9, UpdateInput{
-		LayoutPreset: "balanced", WakeTime: "07:00", BedTime: "21:00",
-	})
+	_, err := NewScreenSettingsService(db).UpdateScreenSettings(9, UpdateInput{WakeTime: "07:00", BedTime: "21:00"})
 	assert.ErrorIs(t, err, ErrNotFound)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -100,14 +95,12 @@ func TestUpdateScreenSettings_Validation(t *testing.T) {
 	defer db.Close()
 	service := NewScreenSettingsService(db)
 
-	valid := UpdateInput{LayoutPreset: "balanced", WakeTime: "07:00", BedTime: "21:00"}
+	valid := UpdateInput{WakeTime: "07:00", BedTime: "21:00"}
 	cases := []struct {
 		name string
 		edit func(*UpdateInput)
 		want error
 	}{
-		{"unknown preset", func(in *UpdateInput) { in.LayoutPreset = "photo_focus" }, ErrInvalidPreset},
-		{"missing preset", func(in *UpdateInput) { in.LayoutPreset = "" }, ErrInvalidPreset},
 		{"wake before 6:00", func(in *UpdateInput) { in.WakeTime = "05:59" }, ErrInvalidWakeTime},
 		{"wake after 10:00", func(in *UpdateInput) { in.WakeTime = "10:01" }, ErrInvalidWakeTime},
 		{"wake in the evening", func(in *UpdateInput) { in.WakeTime = "20:00" }, ErrInvalidWakeTime},
@@ -138,46 +131,15 @@ func TestUpdateScreenSettings_Bounds(t *testing.T) {
 	service := NewScreenSettingsService(db)
 
 	for _, in := range []UpdateInput{
-		{LayoutPreset: "balanced", WakeTime: "06:00", BedTime: "19:00"},
-		{LayoutPreset: "balanced", WakeTime: "10:00", BedTime: "22:00"},
+		{WakeTime: "06:00", BedTime: "19:00"},
+		{WakeTime: "10:00", BedTime: "22:00"},
 	} {
 		mock.ExpectQuery(updateSettings).
-			WithArgs(in.LayoutPreset, in.WakeTime, in.BedTime, 1).
-			WillReturnRows(sqlmock.NewRows([]string{"layout_preset", "wake_time", "bed_time"}).
-				AddRow(in.LayoutPreset, in.WakeTime, in.BedTime))
+			WithArgs(in.WakeTime, in.BedTime, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"wake_time", "bed_time"}).
+				AddRow(in.WakeTime, in.BedTime))
 		_, err := service.UpdateScreenSettings(1, in)
 		assert.NoError(t, err, "%+v is inside the allowed range", in)
 	}
 	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestUpdateScreenSettings_EveryPreset(t *testing.T) {
-	db, mock := utils.SetupMockDB(t)
-	defer db.Close()
-	service := NewScreenSettingsService(db)
-
-	for _, preset := range []string{"simple", "balanced", "grid", "busier"} {
-		mock.ExpectQuery(updateSettings).
-			WithArgs(preset, "07:00", "21:00", 1).
-			WillReturnRows(sqlmock.NewRows([]string{"layout_preset", "wake_time", "bed_time"}).
-				AddRow(preset, "07:00", "21:00"))
-		s, err := service.UpdateScreenSettings(1, UpdateInput{LayoutPreset: preset, WakeTime: "07:00", BedTime: "21:00"})
-		require.NoError(t, err, preset)
-		assert.Equal(t, preset, s.LayoutPreset)
-	}
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestPresetHasSpot(t *testing.T) {
-	balanced, ok := PresetByName("balanced")
-	require.True(t, ok)
-	assert.False(t, balanced.HasSpot(-1))
-	assert.True(t, balanced.HasSpot(0))
-	assert.True(t, balanced.HasSpot(3))
-	assert.False(t, balanced.HasSpot(4))
-
-	simple, _ := PresetByName("simple")
-	assert.False(t, simple.HasSpot(2))
-	busier, _ := PresetByName("busier")
-	assert.True(t, busier.HasSpot(5))
 }

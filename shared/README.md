@@ -12,7 +12,7 @@ Rules used by both the caregiver app and the carepartner tablet, so the caregive
 - No imports of React, React Native, Expo or any DOM API. Anything that depends on the React Native theme, fonts or screen size stays in the app.
 - No dependencies. `shared/` has no `package.json` or `node_modules`.
 
-`npm run typecheck:shared` (from the repo root, using the carepartner's TypeScript, so run `npm install` in `carepartner/` first) compiles this folder with no DOM lib and no framework types, so such an import fails.
+`npm run typecheck:shared` (from the repo root, using the carepartner's TypeScript, so run `npm install` in `carepartner/` first) compiles this folder with no DOM lib and no framework types, so such an import fails. It uses `tsconfig.lib.json`, which leaves out the tests. `tsconfig.json` is for the editor: it also covers the tests, with Jest's types taken from `carepartner/node_modules`.
 
 ## Using it
 
