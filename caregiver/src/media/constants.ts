@@ -16,6 +16,9 @@ export type MediaKind = "photo" | "video" | "audio";
 // Longest video or audio the server accepts (MaxDurationSeconds)
 export const MAX_DURATION_SECONDS = 600;
 
+// Largest file the server accepts (MAX_MEDIA_UPLOAD_MB), 1 GB
+export const MAX_FILE_BYTES = 1024 * 1024 * 1024;
+
 export const KIND_LABELS: Record<MediaKind, string> = {
   photo: "Photo",
   video: "Video",
@@ -34,7 +37,7 @@ export interface AcceptedTypes {
 
 export const ACCEPTED_TYPES: Record<MediaKind, AcceptedTypes> = {
   photo: {
-    mimeTypes: ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"],
+    mimeTypes: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/heic"],
     extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"],
   },
   video: {
@@ -42,7 +45,18 @@ export const ACCEPTED_TYPES: Record<MediaKind, AcceptedTypes> = {
     extensions: [".mp4", ".mov", ".webm", ".ogv", ".ogg"],
   },
   audio: {
-    mimeTypes: ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp4", "audio/aac", "audio/ogg", "audio/webm"],
+    mimeTypes: [
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/wave",
+      "audio/x-wav",
+      "audio/mp4",
+      "audio/x-m4a",
+      "audio/aac",
+      "audio/ogg",
+      "audio/webm",
+    ],
     extensions: [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".oga", ".webm"],
   },
 };

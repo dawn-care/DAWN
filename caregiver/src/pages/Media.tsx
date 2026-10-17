@@ -13,8 +13,9 @@
  *    was picked in the header
  *
  * Camera and voice recording are switched off for now, so uploading a file is
- * the only way to add something. The upload panel is a placeholder until it
- * is built.
+ * the only way to add something. Files picked in the upload panel are checked
+ * and queued; naming and saving them is not built yet, so the queue is only
+ * listed.
  */
 
 import { useEffect, useState } from "react";
@@ -31,6 +32,9 @@ import DetailPanel from "../media/DetailPanel";
 import FilterPills from "../media/FilterPills";
 import type { Pill } from "../media/FilterPills";
 import MediaCard from "../media/MediaCard";
+import type { PendingFile } from "../media/files";
+import { formatDuration } from "../media/labels";
+import UploadPanel from "../media/UploadPanel";
 
 // Items the caregiver removed whose Undo toast is still open. The server is
 // told to delete them only when the toast closes, so they stay hidden from
@@ -122,6 +126,9 @@ export default function Media() {
   const [filter, setFilter] = useState<Filter>("all");
   const [panel, setPanel] = useState<Panel>("detail");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Files that passed the upload checks and are waiting to be named and saved, plus a message for each that didn't pass
+  const [queue, setQueue] = useState<PendingFile[]>([]);
+  const [notices, setNotices] = useState<string[]>([]);
 
   /* ============================
      Effects
@@ -190,6 +197,22 @@ export default function Media() {
       },
       onDismiss: () => void commitRemoval(removed, showToast, reload),
     });
+  };
+
+  const handleChosen = (accepted: PendingFile[], rejected: string[]) => {
+    setQueue(accepted);
+    setNotices(rejected);
+  };
+
+  // Back to the empty upload panel, for closing the queue
+  const clearQueue = () => {
+    setQueue([]);
+    setNotices([]);
+  };
+
+  const closeUpload = () => {
+    clearQueue();
+    setPanel("detail");
   };
 
   const retry = () => {
@@ -288,15 +311,34 @@ export default function Media() {
                 {all.length === 0 ? "Add a media file to see it here." : "Pick something to see it here."}
               </p>
             )
+          ) : queue.length === 0 ? (
+            <UploadPanel onClose={closeUpload} onChosen={handleChosen} />
           ) : (
-            <div className="flex items-center justify-between">
-              <h2 className="m-0 text-xl font-extrabold">Upload a file</h2>
-              <IconButton
-                label="Close"
-                icon={<X size={20} strokeWidth={2.4} aria-hidden="true" />}
-                onClick={() => setPanel("detail")}
-              />
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="m-0 text-xl font-extrabold">Ready to save</h2>
+                <IconButton
+                  label="Close"
+                  icon={<X size={20} strokeWidth={2.4} aria-hidden="true" />}
+                  onClick={clearQueue}
+                />
+              </div>
+              {notices.length > 0 && (
+                <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-dawn-accent">
+                  {notices.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              )}
+              <ul className="m-0 pl-5 flex flex-col gap-1 text-base">
+                {queue.map((pending) => (
+                  <li key={pending.id} className="break-words">
+                    {pending.file.name} ({pending.kind}
+                    {pending.seconds !== null && `, ${formatDuration(pending.seconds)}`})
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </aside>
       </div>

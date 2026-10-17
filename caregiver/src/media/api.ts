@@ -155,11 +155,14 @@ export function listScheduledItems(carepartnerId: number): Promise<ScheduledItem
    Length of a local file
 ============================ */
 
+// How long to wait for a file's length before giving up on it
+const PROBE_TIMEOUT_MS = 8000;
+
 /**
  * Length in seconds of a video or audio file the caregiver picked, read from
  * its metadata in the browser. Returns null when the browser can't tell
- * (an unsupported codec, or a fresh browser recording that has no length
- * yet); the caller should then let the server check the length.
+ * (an unsupported codec, a file with no stored length, or a file that takes
+ * too long to read); the caller should then let the server check the length.
  */
 export function probeDuration(file: Blob, kind: "video" | "audio"): Promise<number | null> {
   return new Promise((resolve) => {
@@ -172,9 +175,18 @@ export function probeDuration(file: Blob, kind: "video" | "audio"): Promise<numb
       resolve(seconds);
     };
 
+    // Some files neither load nor fail; don't wait on them forever
+    const giveUp = window.setTimeout(() => done(null), PROBE_TIMEOUT_MS);
+
     el.preload = "metadata";
-    el.onloadedmetadata = () => done(Number.isFinite(el.duration) ? el.duration : null);
-    el.onerror = () => done(null);
+    el.onloadedmetadata = () => {
+      window.clearTimeout(giveUp);
+      done(Number.isFinite(el.duration) ? el.duration : null);
+    };
+    el.onerror = () => {
+      window.clearTimeout(giveUp);
+      done(null);
+    };
     el.src = url;
   });
 }
