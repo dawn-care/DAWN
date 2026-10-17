@@ -1,7 +1,7 @@
 /**
  * S4 · Clip picker
  *
- * Lists the resident's real videos and audio from the server and plays one on
+ * Lists the resident's real media (videos and audio) from the server and plays one on
  * their tablet. Clips aren't sorted by family member or situation yet (there is
  * no backend for that), so every path here shows all of the resident's clips,
  * newest first.
@@ -21,6 +21,7 @@ import { getClips, getResident, playOnTablet } from '../../../data/server';
 import type { Clip, Resident, SleepingHours } from '../../../data/types';
 import { formatTime, isAsleep } from '../../../lib/sleepingHours';
 import { logEvent } from '../../../lib/log';
+import { useThemeColors } from '../../../lib/theme';
 
 const formatDuration = (seconds: number | null) =>
   seconds === null ? '' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -35,6 +36,7 @@ export default function ClipsScreen() {
     situation?: string;
   }>();
   const residentId = Number(id);
+  const colors = useThemeColors();
 
   const [resident, setResident] = useState<Resident | null>(null);
   const [hours, setHours] = useState<SleepingHours | null>(null);
@@ -102,7 +104,7 @@ export default function ClipsScreen() {
     <ScrollView className="flex-1 bg-page" contentContainerClassName="p-4 pb-10">
       {heading && <Text className="text-base text-ink-muted">{heading}</Text>}
       <Text className="mb-5 text-3xl font-bold text-ink">
-        {clips.length === 0 ? 'No videos yet' : `${firstName}'s videos`}
+        {clips.length === 0 ? 'No media yet' : `${firstName}'s media`}
       </Text>
 
       {asleep && (
@@ -134,7 +136,7 @@ export default function ClipsScreen() {
               <Ionicons
                 name={clip.kind === 'video' ? 'videocam' : 'musical-notes'}
                 size={44}
-                color="rgb(255 248 239)"
+                color={colors.onNav}
               />
               {clip.duration !== null && (
                 <Text className="absolute bottom-3 right-4 text-base font-semibold text-on-nav">
@@ -157,9 +159,9 @@ export default function ClipsScreen() {
                 } ${disabled && !asleep ? 'opacity-60' : ''}`}
               >
                 {sending ? (
-                  <ActivityIndicator color="rgb(30 33 64)" />
+                  <ActivityIndicator color={colors.onAccent} />
                 ) : (
-                  <Ionicons name="play" size={20} color={asleep ? 'rgb(91 96 145)' : 'rgb(30 33 64)'} />
+                  <Ionicons name="play" size={20} color={asleep ? colors.statusGrayText : colors.onAccent} />
                 )}
                 <Text
                   className={`ml-2 text-lg font-semibold ${

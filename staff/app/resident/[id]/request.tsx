@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getResident } from '../../../data/server';
 import type { Resident } from '../../../data/types';
 import { logEvent } from '../../../lib/log';
+import { useThemeColors } from '../../../lib/theme';
 
 const TOPICS = [
   { id: 'going_home', label: 'Going home' },
@@ -28,6 +29,7 @@ const FACILITY = "St. Ann's";
 export default function RequestScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const residentId = Number(id);
+  const colors = useThemeColors();
 
   const [resident, setResident] = useState<Resident | null>(null);
   const [topic, setTopic] = useState(TOPICS[0].id);
@@ -51,7 +53,7 @@ export default function RequestScreen() {
     return (
       <ScrollView className="flex-1 bg-page" contentContainerClassName="p-4">
         <View className="mt-6 rounded-2xl bg-status-green-bg p-5">
-          <Ionicons name="checkmark-circle" size={32} color="rgb(31 61 44)" />
+          <Ionicons name="checkmark-circle" size={32} color={colors.statusGreenText} />
           <Text className="mt-2 text-xl font-bold text-status-green-text">
             Request sent
           </Text>

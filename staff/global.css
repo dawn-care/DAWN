@@ -6,8 +6,9 @@
  * Semantic design tokens.
  *
  * Brand colors (night, cream, dusk, ember, apricot, gold, lavender) appear ONLY
- * in this file. Components must use semantic token names (bg-page, text-ink,
- * bg-accent, ...) so the palette can change in one place.
+ * in this file and in lib/theme.ts, which copies the few that icons and the
+ * header need. Components must use semantic token names (bg-page, text-ink,
+ * bg-accent, ...) or useThemeColors, so the palette changes in those two places.
  *
  * Values are space-separated RGB channels so Tailwind's <alpha-value> works.
  */

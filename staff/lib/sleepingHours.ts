@@ -37,5 +37,20 @@ export const formatTime = (hhmm: string): string => {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-export const describeWindow = (hours: { start: string; end: string }): string =>
+/**
+ * A time field's text kept to "HH:MM" while staff type: anything that isn't a
+ * digit is dropped, and the colon goes in after the hour.
+ */
+export const formatTimeInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '').slice(0, 4);
+  return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+};
+
+/** Whether "HH:MM" is a real 24-hour time. */
+export const isValidTime = (hhmm: string): boolean => {
+  const match = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  return match !== null && Number(match[1]) < 24 && Number(match[2]) < 60;
+};
+
+export const describeWindow =(hours: { start: string; end: string }): string =>
   `${formatTime(hours.start)} – ${formatTime(hours.end)}`;

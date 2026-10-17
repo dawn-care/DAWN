@@ -20,6 +20,7 @@ import LoadError from '../components/LoadError';
 import { getResidents } from '../data/server';
 import type { Resident } from '../data/types';
 import { logEvent } from '../lib/log';
+import { useThemeColors } from '../lib/theme';
 
 /** Placeholder until staff accounts exist. */
 const STAFF_NAME = 'Sam';
@@ -27,6 +28,7 @@ const STAFF_NAME = 'Sam';
 export default function ResidentsScreen() {
   const [residents, setResidents] = useState<Resident[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const colors = useThemeColors();
 
   const load = useCallback(() => {
     setFailed(false);
@@ -65,12 +67,12 @@ export default function ResidentsScreen() {
             className="mb-3 flex-row items-center rounded-2xl border border-border bg-surface p-4 active:opacity-70"
           >
             <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-page">
-              <Ionicons name="person" size={24} color="rgb(91 96 145)" />
+              <Ionicons name="person" size={24} color={colors.inkMuted} />
             </View>
             <Text className="flex-1 text-lg font-semibold text-ink">
               {resident.name}
             </Text>
-            <Ionicons name="chevron-forward" size={22} color="rgb(91 96 145)" />
+            <Ionicons name="chevron-forward" size={22} color={colors.inkMuted} />
           </Pressable>
         ))
       )}

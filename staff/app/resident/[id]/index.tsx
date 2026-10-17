@@ -25,12 +25,20 @@ import LoadError from '../../../components/LoadError';
 import { SITUATIONS, getSleepingHours, setSleepingHours } from '../../../data/mock';
 import { getResident } from '../../../data/server';
 import type { Resident, Situation, SleepingHours } from '../../../data/types';
-import { describeWindow, formatTime, isAsleep } from '../../../lib/sleepingHours';
+import {
+  describeWindow,
+  formatTime,
+  formatTimeInput,
+  isAsleep,
+  isValidTime,
+} from '../../../lib/sleepingHours';
 import { logEvent } from '../../../lib/log';
+import { useThemeColors } from '../../../lib/theme';
 
 export default function ResidentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const residentId = Number(id);
+  const colors = useThemeColors();
 
   const [resident, setResident] = useState<Resident | null>(null);
   // Sleeping hours are fake for now: edits last until the app reloads.
@@ -39,6 +47,7 @@ export default function ResidentScreen() {
   const [editingHours, setEditingHours] = useState(false);
   const [draftStart, setDraftStart] = useState('');
   const [draftEnd, setDraftEnd] = useState('');
+  const [hoursError, setHoursError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setFailed(false);
@@ -77,12 +86,19 @@ export default function ResidentScreen() {
   const startEditing = () => {
     setDraftStart(hours.start);
     setDraftEnd(hours.end);
+    setHoursError(null);
     setEditingHours(true);
   };
 
   const saveHours = async () => {
-    const valid = /^\d{2}:\d{2}$/;
-    if (!valid.test(draftStart) || !valid.test(draftEnd)) return;
+    if (!isValidTime(draftStart) || !isValidTime(draftEnd)) {
+      setHoursError('Enter both times as 4 digits, like 2030 for 8:30 pm.');
+      return;
+    }
+    if (draftStart === draftEnd) {
+      setHoursError("Sleep and wake times can't be the same.");
+      return;
+    }
 
     await setSleepingHours(resident.id, { start: draftStart, end: draftEnd });
     logEvent({
@@ -103,7 +119,7 @@ export default function ResidentScreen() {
       {/* Resident header */}
       <View className="mb-6 flex-row items-center rounded-2xl border border-border bg-surface p-4">
         <View className="mr-4 h-14 w-14 items-center justify-center rounded-full bg-page">
-          <Ionicons name="person" size={28} color="rgb(91 96 145)" />
+          <Ionicons name="person" size={28} color={colors.inkMuted} />
         </View>
         <View className="flex-1">
           <Text className="text-xl font-semibold text-ink">
@@ -116,14 +132,14 @@ export default function ResidentScreen() {
       {asleep && (
         <View className="mb-6 rounded-2xl bg-status-purple-bg p-4">
           <View className="mb-1 flex-row items-center">
-            <Ionicons name="moon" size={18} color="rgb(52 41 90)" />
+            <Ionicons name="moon" size={18} color={colors.statusPurpleText} />
             <Text className="ml-2 text-base font-semibold text-status-purple-text">
               Sleeping hours
             </Text>
           </View>
           <Text className="text-base text-status-purple-text">
             Playing is paused until {formatTime(hours.end)}. You can still
-            look through their videos.
+            look through their media.
           </Text>
         </View>
       )}
@@ -142,7 +158,7 @@ export default function ResidentScreen() {
             <Ionicons
               name={situation.icon as never}
               size={26}
-              color="rgb(224 122 95)"
+              color={colors.accent}
             />
             <Text className="mt-3 text-lg font-semibold leading-6 text-ink">
               {situation.label}
@@ -178,9 +194,11 @@ export default function ResidentScreen() {
                 </Text>
                 <TextInput
                   value={draftStart}
-                  onChangeText={setDraftStart}
+                  onChangeText={(text) => setDraftStart(formatTimeInput(text))}
+                  keyboardType="number-pad"
+                  maxLength={5}
                   placeholder="20:30"
-                  placeholderTextColor="rgb(169 173 208)"
+                  placeholderTextColor={colors.placeholder}
                   className="rounded-xl border border-border bg-page p-3 text-base text-ink"
                 />
               </View>
@@ -190,13 +208,19 @@ export default function ResidentScreen() {
                 </Text>
                 <TextInput
                   value={draftEnd}
-                  onChangeText={setDraftEnd}
+                  onChangeText={(text) => setDraftEnd(formatTimeInput(text))}
+                  keyboardType="number-pad"
+                  maxLength={5}
                   placeholder="07:00"
-                  placeholderTextColor="rgb(169 173 208)"
+                  placeholderTextColor={colors.placeholder}
                   className="rounded-xl border border-border bg-page p-3 text-base text-ink"
                 />
               </View>
             </View>
+
+            {hoursError && (
+              <Text className="mt-3 text-base text-status-red-text">{hoursError}</Text>
+            )}
 
             <View className="mt-4 flex-row">
               <Pressable

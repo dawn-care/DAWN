@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getFamilyFolders } from '../../../data/mock';
 import type { FamilyFolder } from '../../../data/types';
 import { logEvent } from '../../../lib/log';
+import { useThemeColors } from '../../../lib/theme';
 
 export default function FamilyScreen() {
   const { id, situation } = useLocalSearchParams<{
@@ -22,6 +23,7 @@ export default function FamilyScreen() {
     situation?: string;
   }>();
   const residentId = Number(id);
+  const colors = useThemeColors();
 
   const [folders, setFolders] = useState<FamilyFolder[] | null>(null);
 
@@ -59,7 +61,7 @@ export default function FamilyScreen() {
               >
                 <View className="flex-row items-center">
                   <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-status-yellow-bg">
-                    <Ionicons name="person" size={24} color="rgb(61 52 25)" />
+                    <Ionicons name="person" size={24} color={colors.statusYellowText} />
                   </View>
                   <View className="flex-1">
                     <Text className="text-lg font-semibold text-status-yellow-text">
@@ -83,7 +85,7 @@ export default function FamilyScreen() {
                 className="mb-3 flex-row items-center rounded-2xl border border-border bg-surface p-4 active:opacity-70"
               >
                 <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-page">
-                  <Ionicons name="person" size={24} color="rgb(91 96 145)" />
+                  <Ionicons name="person" size={24} color={colors.inkMuted} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-lg font-semibold text-ink">
@@ -96,7 +98,7 @@ export default function FamilyScreen() {
                 <Ionicons
                   name="chevron-forward"
                   size={22}
-                  color="rgb(91 96 145)"
+                  color={colors.inkMuted}
                 />
               </Pressable>
             )

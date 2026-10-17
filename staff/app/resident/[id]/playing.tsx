@@ -23,6 +23,7 @@ import { rateClip } from '../../../data/mock';
 import { getClip, getResident, stopOnTablet } from '../../../data/server';
 import type { Clip, Rating, Resident } from '../../../data/types';
 import { logEvent } from '../../../lib/log';
+import { useThemeColors, type ThemeColors } from '../../../lib/theme';
 
 const RATING_WINDOW_MS = 5 * 60 * 1000;
 /** How long the server waits for an offline tablet before the command expires. */
@@ -31,10 +32,10 @@ const DELIVERY_WINDOW_MS = 30 * 1000;
 const formatDuration = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
-const OPTIONS: { rating: Rating; label: string; icon: string; color: string }[] = [
-  { rating: 'helped', label: 'Helped', icon: 'checkmark', color: 'rgb(31 61 44)' },
-  { rating: 'no_change', label: 'No change', icon: 'remove', color: 'rgb(91 96 145)' },
-  { rating: 'worse', label: 'Made it worse', icon: 'arrow-down', color: 'rgb(74 34 38)' },
+const OPTIONS: { rating: Rating; label: string; icon: string; color: keyof ThemeColors }[] = [
+  { rating: 'helped', label: 'Helped', icon: 'checkmark', color: 'statusGreenText' },
+  { rating: 'no_change', label: 'No change', icon: 'remove', color: 'statusGrayText' },
+  { rating: 'worse', label: 'Made it worse', icon: 'arrow-down', color: 'statusRedText' },
 ];
 
 /**
@@ -54,6 +55,7 @@ export default function PlayingScreen() {
     delivered: string;
   }>();
   const residentId = Number(id);
+  const colors = useThemeColors();
 
   const [clip, setClip] = useState<Clip | null>(null);
   const [resident, setResident] = useState<Resident | null>(null);
@@ -194,12 +196,12 @@ export default function PlayingScreen() {
             className="mt-4 flex-row items-center justify-center rounded-xl border border-border py-4 active:opacity-70"
           >
             {stopping ? (
-              <ActivityIndicator color="rgb(30 33 64)" />
+              <ActivityIndicator color={colors.ink} />
             ) : (
-              <Ionicons name="square" size={16} color="rgb(30 33 64)" />
+              <Ionicons name="square" size={16} color={colors.ink} />
             )}
             <Text className="ml-2 text-lg font-semibold text-ink">
-              {phase === 'waiting' ? 'Cancel' : 'Stop video'}
+              {phase === 'waiting' ? 'Cancel' : 'Stop'}
             </Text>
           </Pressable>
         )}
@@ -244,7 +246,7 @@ export default function PlayingScreen() {
                 onPress={() => submitRating(option.rating)}
                 className="mb-3 flex-row items-center rounded-2xl border border-border bg-surface p-4 active:opacity-70"
               >
-                <Ionicons name={option.icon as never} size={24} color={option.color} />
+                <Ionicons name={option.icon as never} size={24} color={colors[option.color]} />
                 <Text className="ml-3 text-lg font-semibold text-ink">{option.label}</Text>
               </Pressable>
             ))}
