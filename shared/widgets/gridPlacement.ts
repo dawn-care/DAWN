@@ -1,9 +1,10 @@
 /**
  * gridPlacement.ts
  *
- * Where widgets can go on the screen's 4 x 3 grid (grid.ts). Each widget type has
- * a fixed size in cells and sits at one cell, its top left corner, so a widget is
- * stored as a type plus a `col` and `row`. Cells count from 0 with (0, 0) at the
+ * Where widgets can go on the screen's 4 x 3 grid (grid.ts). The top row always
+ * holds the date and time (`DATE_TIME_AREA`), so the caregiver's widgets go in the
+ * rows below it. Each widget type has a fixed size in cells and sits at one cell,
+ * its top left corner, so a widget is stored as a type plus a `col` and `row`. Cells count from 0 with (0, 0) at the
  * top left, the same as `GridArea`. The caregiver highlights `openCells` for the
  * widget being placed and sends the whole list of placed widgets when saving; the
  * tablet draws each one at `widgetArea`.
@@ -23,9 +24,19 @@ export type PlacedWidget = Cell & {
   type: ScreenWidgetType;
 };
 
-/** How many cells each widget type covers. Provisional until the sizes are final. */
+/**
+ * The date and time widget: the day of the week and the time of day, across the
+ * whole top row of every screen. It isn't stored or placed by the caregiver, and
+ * no other widget can cover it.
+ */
+export const DATE_TIME_AREA: Readonly<GridArea> = { col: 0, row: 0, width: GRID.columns, height: 1 };
+
+/** Parts of the grid every screen has, which no widget can cover. */
+export const FIXED_AREAS: readonly Readonly<GridArea>[] = [DATE_TIME_AREA];
+
+/** How many cells each widget type covers. */
 export const WIDGET_SIZES: Readonly<Record<ScreenWidgetType, { width: number; height: number }>> = {
-  photo: { width: 2, height: 3 },
+  photo: { width: 2, height: 2 },
   message: { width: 2, height: 1 },
   reminder: { width: 2, height: 1 },
   news: { width: 2, height: 1 },
@@ -48,9 +59,14 @@ export function areasOverlap(a: GridArea, b: GridArea): boolean {
   );
 }
 
+/** Whether an area is on the grid and clear of the fixed areas, ignoring other widgets. */
+function fitsScreen(area: GridArea): boolean {
+  return fitsGrid(area) && FIXED_AREAS.every((fixed) => !areasOverlap(area, fixed));
+}
+
 /**
  * Whether a widget of this type can have its top left corner at `cell`: it stays
- * on the grid and covers no other widget. Pass `movingId` when moving a widget so
+ * on the grid, off the fixed areas, and covers no other widget. Pass `movingId` when moving a widget so
  * it isn't blocked by its own old place.
  */
 export function canPlace(
@@ -60,7 +76,7 @@ export function canPlace(
   movingId?: PlacedWidget["id"],
 ): boolean {
   const area = widgetArea({ type, ...cell });
-  if (!fitsGrid(area)) return false;
+  if (!fitsScreen(area)) return false;
   return widgets.every((other) => other.id === movingId || !areasOverlap(area, widgetArea(other)));
 }
 
@@ -87,12 +103,12 @@ export function hasRoom(widgets: readonly PlacedWidget[], type: ScreenWidgetType
   return openCells(widgets, type).length > 0;
 }
 
-/** Whether every widget fits on the grid and none overlap. Checked before saving the list. */
+/** Whether every widget fits on the grid, off the fixed areas, and none overlap. Checked before saving the list. */
 export function isValidPlacement(widgets: readonly PlacedWidget[]): boolean {
   return widgets.every((widget, index) => {
     const area = widgetArea(widget);
     return (
-      fitsGrid(area) &&
+      fitsScreen(area) &&
       widgets.slice(index + 1).every((other) => !areasOverlap(area, widgetArea(other)))
     );
   });
