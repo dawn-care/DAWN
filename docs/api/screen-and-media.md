@@ -1,6 +1,6 @@
 # Screen & Media API Guide
 
-How the caregiver web app and the carepartner tablet talk to the new backend: the media library, screen layouts and widgets, the schedule, and the single endpoint the tablet reads. Written for ticket i332; updated 2026-10-14 (widgets placed by `spot`, four layouts).
+How the caregiver web app and the carepartner tablet talk to the new backend: the media library, screen layouts and widgets, the schedule, and the single endpoint the tablet reads. Written for ticket i332; updated 2026-10-16 (widgets placed on a 4×3 grid; layout presets removed).
 
 > **The old endpoints are going away.** `/api/photo`, `/api/video`, `/api/audio`, `/api/weather`, `/api/news`, `/api/sports`, the prompt endpoints, modules, configurations and exceptions all read tables that no longer exist, so they return database errors on a fresh database. Move to the endpoints in this guide; the old Go code is removed in a follow-up ticket.
 
@@ -9,8 +9,8 @@ How the caregiver web app and the carepartner tablet talk to the new backend: th
 1. [Basics](#basics)
 2. [Fetch helper and types](#fetch-helper-and-types)
 3. [Media library](#media-library)
-4. [Screen settings and presets](#screen-settings-and-presets)
-5. [Screen widgets](#screen-widgets)
+4. [Screen settings](#screen-settings)
+5. [Screen layout](#screen-layout)
 6. [Sports teams](#sports-teams)
 7. [Scheduled items](#scheduled-items)
 8. [Calendar](#calendar)
@@ -47,7 +47,7 @@ File URLs support HTTP Range requests, so video and audio players can seek.
 
 ### Which carepartner
 
-Nothing here is behind a login yet. Requests name the carepartner with `carepartner_id`, either in the query string or the body. The caregiver app uses `activeCarePartnerId` from `AuthContext`; the tablet uses the paired ID from `getCarepartnerId()`. Endpoints that take an item ID (`/media/{id}`, `/screen-widgets/{id}`, `/scheduled-items/{id}`) work out the carepartner from the item.
+Nothing here is behind a login yet. Requests name the carepartner with `carepartner_id`, either in the query string or the body. The caregiver app uses `activeCarePartnerId` from `AuthContext`; the tablet uses the paired ID from `getCarepartnerId()`. Endpoints that take an item ID (`/media/{id}`, `/scheduled-items/{id}`) work out the carepartner from the item.
 
 ### Dates and times
 
@@ -120,15 +120,13 @@ export interface Media {
   url: string;                     // e.g. "/media/4/file"
 }
 
-// ---- Screen settings and presets ----
+// ---- Screen settings ----
 export interface ScreenSettings {
   carepartner_id: number;
-  layout_preset: string; // "simple" | "balanced" | "grid" | "busier"
-  wake_time: string;     // "HH:MM", 06:00 to 10:00
-  bed_time: string;      // "HH:MM", 19:00 to 22:00
+  wake_time: string; // "HH:MM", 06:00 to 10:00
+  bed_time: string;  // "HH:MM", 19:00 to 22:00
 }
 export type WidgetType = "photo" | "message" | "reminder" | "weather" | "sports" | "news";
-export interface Preset { name: string; spots: number }
 
 // ---- Widget settings (the "config" object, by type) ----
 export interface PhotoConfig { caption?: string }
@@ -144,16 +142,31 @@ export interface WeatherConfig { zip: string }
 export interface SportsConfig { league: "nfl" | "nba" | "mlb" | "nhl"; team: string } // team = abbreviation
 export type NewsConfig = Record<string, never>;
 
-export interface ScreenWidget {
+export type WidgetConfig = PhotoConfig | MessageConfig | ReminderConfig | WeatherConfig | SportsConfig | NewsConfig;
+
+// ---- Screen layout (the editor) ----
+// GridCell and GridCorners match shared/widgets/grid.ts
+export interface GridCell { col: number; row: number } // col 0-3, row 0-2
+export interface LayoutWidget {
   id: number;
   carepartner_id: number;
   type: WidgetType;
-  spot: number; // 0-based; Widgets follow reading order
-  config: PhotoConfig | MessageConfig | ReminderConfig | WeatherConfig | SportsConfig | NewsConfig;
+  top_left: GridCell;     // both corners inclusive: a 1x1 widget has the same cell twice
+  bottom_right: GridCell;
+  config: WidgetConfig;
   photo_media_id: number | null;
   photo_url: string | null;
-  hidden: boolean; // spot >= the current preset's spots
 }
+export interface Layout { widgets: LayoutWidget[] }
+export interface LayoutWidgetInput {
+  id?: number;            // leave out to create a widget
+  type: WidgetType;
+  top_left: GridCell;
+  bottom_right: GridCell;
+  config: WidgetConfig;
+  photo_media_id?: number | null;
+}
+export interface LayoutInput { widgets: LayoutWidgetInput[] } // [] clears the screen
 
 // ---- Sports teams ----
 export interface SportsLeague { id: string; name: string; teams: { name: string; abbr: string }[] }
@@ -198,15 +211,18 @@ export interface Screen {
   generated_at: string;  // RFC 3339 with the carepartner's offset
   timezone: string;
   today: string;
-  layout_preset: string;
   awake_hours: { wake: string; bed: string; is_awake_now: boolean };
-  spots: (ScreenSpotWidget | null)[]; // one entry per spot of the preset
-  schedule: Occurrence[]; // today and tomorrow
+  widgets: ScreenWidget[]; // reading order
+  schedule: Occurrence[];  // today and tomorrow
 }
-export interface ScreenSpotWidget {
+export interface ScreenWidget {
   id: number;
   type: WidgetType;
-  config: ScreenWidget["config"];
+  col: number;    // col, row, width and height are a GridArea (shared/widgets/grid.ts)
+  row: number;
+  width: number;  // in cells
+  height: number;
+  config: WidgetConfig;
   photo: { id: number; display_name: string; url: string } | null;
   data: PhotoData | WeatherData | SportsData | NewsData | null;
   error: "UPSTREAM_UNAVAILABLE" | null;
@@ -274,9 +290,9 @@ Delete the item and its file. What else changes, so the confirmation can say so:
 
 Check `usage` first and warn when it isn't empty.
 
-## Screen settings and presets
+## Screen settings
 
-Every carepartner gets settings when they're created: the Balanced layout, awake from 07:00 to 21:00. `layout_preset` is one of the names from `/screen-settings/presets`.
+Every carepartner gets settings when they're created: awake from 07:00 to 21:00. Widget placement isn't a setting; it's the [screen layout](#screen-layout).
 
 ### `GET /screen-settings?carepartner_id={id}`
 
@@ -284,80 +300,80 @@ Returns `ScreenSettings`.
 
 ### `PUT /screen-settings?carepartner_id={id}`
 
-Replace all three settings; every field is required. Wake time must be 06:00 to 10:00 and bed time 19:00 to 22:00, inclusive. `"6:30"` is accepted and stored as `"06:30"`.
+Replace both settings; both fields are required. Wake time must be 06:00 to 10:00 and bed time 19:00 to 22:00, inclusive. `"6:30"` is accepted and stored as `"06:30"`.
 
 ```json
-{ "layout_preset": "balanced", "wake_time": "07:00", "bed_time": "21:00" }
+{ "wake_time": "07:00", "bed_time": "21:00" }
 ```
 
-### `GET /screen-settings/presets`
+## Screen layout
 
-Every layout and how many widget spots it has. Take the list of layouts and their spot counts from here instead of hard-coding them.
+The tablet's screen is a fixed grid of **4 columns × 3 rows**. Columns count 0 to 3 from the left and rows 0 to 2 from the top. The caregiver places each widget by its **top-left and bottom-right cells, both inclusive**, so a widget can cover several cells: a 2×2 photo in the corner is `top_left {col 0, row 0}` to `bottom_right {col 1, row 1}`, and a 1×1 widget has the same cell for both. Any widget type can be any size and go anywhere on the grid. Cells no widget covers are empty. A new carepartner has no widgets.
 
-```json
-[
-  { "name": "simple",   "spots": 2 },
-  { "name": "balanced", "spots": 4 },
-  { "name": "grid",     "spots": 4 },
-  { "name": "busier",   "spots": 6 }
-]
+```
+          col 0    col 1    col 2    col 3
+       ┌─────────────────┬────────┬────────┐
+row 0  │      photo      │reminder│weather │
+       │      (2×2)      ├────────┴────────┤
+row 1  │                 │   news (2×1)    │
+       ├─────────────────┴─────────────────┤
+row 2  │              (empty)              │
+       └───────────────────────────────────┘
 ```
 
-The server only knows how many spots each layout has. Where each spot sits on screen is up to the frontend and the tablet. Spot numbers mean the same thing in every layout, so a widget keeps its place when the caregiver switches layouts.
+The editor and the preview see the same widget in two shapes: `/screen-layout` uses corners, and `/screen` uses `col`, `row`, `width` and `height` (the tablet's `GridArea`). Convert between them with `cornersToArea` and `areaToCorners` from `shared/widgets/grid.ts`, and check a dragged widget with `fitsGrid` and the `GRID` size from the same file. **Don't convert by hand:** the corners are inclusive, so `width = bottom_right.col - top_left.col + 1`, and a missing `+ 1` draws widgets one cell too small. The caregiver app can't import `@shared` yet (#354); until it can, copy those functions and their tests across.
 
-## Screen widgets
+### `GET /screen-layout?carepartner_id={id}`
 
-The caregiver fills the current layout spot by spot. Each widget has a 0-based `spot`, and **any widget type can go in any spot**. A new carepartner has no widgets.
-
-A widget whose `spot` is past the current layout's last spot is kept but hidden. For example, after switching from Busier (6 spots) to Simple (2 spots), widgets in spots 2 to 5 are hidden. They come back in the same spots when the caregiver switches to a layout with enough spots.
-
-### `GET /screen-widgets?carepartner_id={id}`
-
-All widgets in spot order, so hidden widgets (`hidden: true`) come last. Show them separately in the editor ("2 widgets don't fit this layout").
-
-### `POST /screen-widgets`
-
-Place a widget in an empty spot of the current layout. Returns `201` with the `ScreenWidget`. A spot the layout doesn't have gets `UNKNOWN_SPOT`; a spot that already has a widget gets `SPOT_TAKEN`.
-
-```json
-{ "carepartner_id": 1, "type": "photo", "spot": 0,
-  "config": { "caption": "Sarah" }, "photo_media_id": 4 }
-```
-
-```json
-{ "carepartner_id": 1, "type": "weather", "spot": 2, "config": { "zip": "14617" } }
-```
+Every widget in reading order (top row first, then left to right), to load the editor:
 
 ```json
 {
-  "id": 10, "carepartner_id": 1, "type": "weather", "spot": 2,
-  "config": { "zip": "14617" }, "photo_media_id": null, "photo_url": null, "hidden": false
+  "widgets": [
+    {
+      "id": 1, "carepartner_id": 1, "type": "photo",
+      "top_left": { "col": 0, "row": 0 }, "bottom_right": { "col": 1, "row": 1 },
+      "config": { "caption": "Sarah" }, "photo_media_id": 4, "photo_url": "/media/4/file"
+    },
+    {
+      "id": 2, "carepartner_id": 1, "type": "weather",
+      "top_left": { "col": 3, "row": 0 }, "bottom_right": { "col": 3, "row": 0 },
+      "config": { "zip": "14617" }, "photo_media_id": null, "photo_url": null
+    }
+  ]
 }
 ```
 
-### `GET /screen-widgets/{id}`
+### `PUT /screen-layout?carepartner_id={id}`
 
-One widget.
+Save the whole screen at once, from the editor's save button. Send **every** widget on the screen:
 
-### `PUT /screen-widgets/{id}`
+- A widget **with** `id` updates that widget: its corners, `config` and photo. Its type can't change (`INVALID_TYPE`); to swap a widget for another kind, send the new one without an `id`.
+- A widget **without** `id` is created.
+- Every widget of the carepartner that isn't in the list is **deleted**.
 
-Replace a widget's settings and photo: `{"config": {...}, "photo_media_id": 4}`. Send the whole config, not just the changed field. Its type and spot don't change.
+```json
+{
+  "widgets": [
+    { "id": 1, "type": "photo", "top_left": { "col": 0, "row": 0 }, "bottom_right": { "col": 1, "row": 1 },
+      "config": { "caption": "Sarah" }, "photo_media_id": 4 },
+    { "type": "news", "top_left": { "col": 2, "row": 1 }, "bottom_right": { "col": 3, "row": 1 }, "config": {} }
+  ]
+}
+```
 
-### `POST /screen-widgets/{id}/move`
+Returns `200` with the saved layout, in the same shape as `GET`, with the widgets **in the order you sent them**, so you can read a new widget's `id` from its position.
 
-Move to another spot: `{"spot": 2}`. The spot must exist in the current layout (`UNKNOWN_SPOT` otherwise). If it has a widget, the two always swap places. Use this for drag and drop.
-
-Moving a hidden widget into view sends the widget that was there to the hidden widget's old spot, so that one becomes hidden instead.
-
-### `DELETE /screen-widgets/{id}`
-
-Remove a widget; its spot becomes empty.
+- **`widgets` is required.** `{"widgets": []}` clears the screen. A missing key or `null` is rejected with `INVALID_REQUEST`, so a request built from state that hasn't loaded yet can't wipe the screen. Watch for this in JavaScript: `JSON.stringify({ widgets: undefined })` is `"{}"`.
+- **All or nothing.** If any widget is invalid, nothing is saved. The `error` names the widget by its position in the list, for example `"widgets[2]: invalid config: ..."`, so the editor can highlight it.
+- **Each widget is checked** for its type (`INVALID_TYPE`); its `id`, which must be one of this carepartner's widgets (`NOT_FOUND`) and listed only once (`INVALID_REQUEST`); its corners, which must both be present, inside the grid and in order (`INVALID_POSITION`); its `config` and its photo (below).
+- **No overlap.** No two widgets may cover the same cell (`WIDGETS_OVERLAP`, naming both). Widgets that touch edge to edge are fine.
 
 ### Widget settings by type
 
 Unknown fields are rejected (`INVALID_CONFIG`), which catches typos. Text is trimmed.
 
-Every type can go in any spot.
+Any type can be any size and go anywhere on the grid.
 
 | Type | `config` | Photo |
 |---|---|---|
@@ -467,7 +483,7 @@ For "delete just this day", pass the occurrence's `scheduled_item_id` and `date`
 
 ### `GET /screen?carepartner_id={id}`
 
-Everything the tablet shows, in one response. The caregiver's preview of the tablet should use it too, so both always agree. Here is a response for the Balanced layout (4 spots), with the news widget's service down:
+Everything the tablet shows, in one response. The caregiver's preview of the tablet should use it too, so both always agree. Here is a response for the layout drawn under [Screen layout](#screen-layout), with the news widget's service down:
 
 ```json
 {
@@ -475,21 +491,21 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
   "generated_at": "2026-10-12T15:39:52-04:00",
   "timezone": "America/New_York",
   "today": "2026-10-12",
-  "layout_preset": "balanced",
   "awake_hours": { "wake": "07:00", "bed": "21:00", "is_awake_now": true },
-  "spots": [
+  "widgets": [
     {
-      "id": 1, "type": "photo", "config": {},
+      "id": 1, "type": "photo", "col": 0, "row": 0, "width": 2, "height": 2, "config": {},
       "photo": { "id": 1, "display_name": "Sarah", "url": "/media/1/file" },
       "data": { "caption": "Sarah" }, "error": null
     },
     {
-      "id": 2, "type": "reminder",
+      "id": 2, "type": "reminder", "col": 2, "row": 0, "width": 1, "height": 1,
       "config": { "items": [{ "icon": "meal", "text": "Lunch", "time": "12:00" }] },
       "photo": null, "data": null, "error": null
     },
     {
-      "id": 3, "type": "weather", "config": { "zip": "14617" }, "photo": null,
+      "id": 3, "type": "weather", "col": 3, "row": 0, "width": 1, "height": 1,
+      "config": { "zip": "14617" }, "photo": null,
       "data": {
         "location": "Irondequoit", "temp": 48, "feels_like": 44, "temp_min": 45, "temp_max": 51,
         "humidity": 71, "wind_speed": 8, "condition": "Clouds", "description": "overcast clouds", "message": ""
@@ -497,7 +513,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
       "error": null
     },
     {
-      "id": 4, "type": "news", "config": {}, "photo": null,
+      "id": 4, "type": "news", "col": 2, "row": 1, "width": 2, "height": 1, "config": {}, "photo": null,
       "data": null, "error": "UPSTREAM_UNAVAILABLE"
     }
   ],
@@ -518,12 +534,11 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 
 ### How to render it
 
-- `spots` has exactly as many entries as the layout has spots, in spot order. `null` is an empty spot. Place each spot on screen by the convention under [presets](#get-screen-settingspresets): the widgets follow reading order.
-- Hidden widgets are already left out.
+- `widgets` is in reading order. Each widget's `col`, `row`, `width` and `height` is a `GridArea`, so it goes straight into the tablet's existing `fitsGrid` and `cellRect`. Cells no widget covers are empty; there are no `null` placeholders.
 - `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").
-- `schedule` covers today and tomorrow so playback keeps working past midnight. Trigger playback when the local time reaches an occurrence's `date` and `time`, as `carepartner/app/ScheduleContext.tsx` does today. Play photos for `duration_seconds`.
+- `schedule` covers today and tomorrow so playback keeps working past midnight. Trigger playback when the local time reaches an occurrence's `date` and `time`, as `carepartner/src/schedule/SchedulePlayer.tsx` does. Play photos for `duration_seconds`.
 - A sports `result` of `upcoming` means the team hasn't played yet this season.
 
 ### Re-fetching
@@ -612,8 +627,8 @@ export interface Playback {
 
 | Code | Status | When | Suggested message |
 |---|---|---|---|
-| `INVALID_REQUEST` | 400 | Missing or bad `carepartner_id`, body isn't JSON | Something went wrong. Please try again. |
-| `NOT_FOUND` | 404 | The item or carepartner doesn't exist | This was deleted. Refresh to see the latest. |
+| `INVALID_REQUEST` | 400 | Missing or bad `carepartner_id`, body isn't JSON, `widgets` missing from a layout save, or a widget `id` listed twice | Something went wrong. Please try again. |
+| `NOT_FOUND` | 404 | The item or carepartner doesn't exist, or a layout widget's `id` isn't one of theirs (deleted elsewhere) | This was deleted. Refresh to see the latest. |
 | `INTERNAL_ERROR` | 500 | Server or database error | Something went wrong. Please try again. |
 | `INVALID_KIND` | 400 | Media `kind` isn't photo, video or audio | Choose photo, video or audio. |
 | `INVALID_FILE_TYPE` | 400 | File isn't an accepted type for its kind | That file type isn't supported. |
@@ -621,14 +636,13 @@ export interface Playback {
 | `FILE_TOO_LARGE` | 413 | Upload over 1 GB | That file is too large. Try a shorter clip. |
 | `MEDIA_TOO_LONG` | 422 | Video or audio over 10 minutes | Videos and audio can be at most 10 minutes long. |
 | `UNREADABLE_MEDIA` | 422 | The server can't read the file's length | That file couldn't be read. Try exporting it again. |
-| `INVALID_LAYOUT_PRESET` | 400 | Unknown layout | Choose a layout from the list. |
 | `INVALID_WAKE_TIME` | 400 | Wake time outside 06:00 to 10:00 | Wake time must be between 6:00 and 10:00 AM. |
 | `INVALID_BED_TIME` | 400 | Bed time outside 19:00 to 22:00 | Bed time must be between 7:00 and 10:00 PM. |
-| `INVALID_TYPE` | 400 | Unknown widget type | Choose a widget from the list. |
+| `INVALID_TYPE` | 400 | Unknown widget type, or a changed type under the same `id` | Choose a widget from the list. |
 | `INVALID_CONFIG` | 400 | Widget settings fail a rule (see `error`) | Check the highlighted fields. |
 | `INVALID_PHOTO` | 400 | Photo missing, not a photo, or another carepartner's | Choose a photo from this person's library. |
-| `UNKNOWN_SPOT` | 400 | Spot missing, negative, or past the current layout's last spot | That spot isn't in this layout. |
-| `SPOT_TAKEN` | 409 | Spot already has a widget | That spot is already in use. |
+| `INVALID_POSITION` | 400 | A corner is missing, outside the 4×3 grid, or `bottom_right` is above or left of `top_left` | That widget doesn't fit on the screen. |
+| `WIDGETS_OVERLAP` | 400 | Two widgets cover the same cell | Widgets can't overlap. Move one of them. |
 | `INVALID_REPEAT` | 400 | Repeat isn't once, daily, weekly or monthly | Choose how often it repeats. |
 | `INVALID_DATE` | 400 | Bad date, end before start, or an end date on a once item | Check the dates. |
 | `INVALID_TIME` | 400 | Time isn't `HH:MM` | Choose a time. |
@@ -647,13 +661,13 @@ export interface Playback {
 1. Add the fetch helper and types to a shared API module.
 2. **Settings page first:** replace "Auto Start Time" with wake and bed time on `/screen-settings`. Today it silently drops what caregivers save.
 3. Media library: one list with a kind filter, `usage` badges, durations, upload errors, and delete warnings.
-4. Screen editor: take the layouts and spot counts from `/screen-settings/presets`, fill spots with `/screen-widgets`, list hidden widgets separately, swap with `/move`, take teams from `/widgets/sports/teams`, preview with `/screen`.
+4. Screen editor: draw the 4×3 grid (`GRID` from `shared/`), let caregivers place and resize widgets by cells, load with `GET /screen-layout` and save the whole screen with `PUT /screen-layout` (always send `widgets`; `[]` clears it). Convert with `cornersToArea`/`areaToCorners`, check with `fitsGrid`, take teams from `/widgets/sports/teams`, preview with `/screen`. Wiring `@shared` into the caregiver (#354) first saves copying the grid helpers.
 5. Calendar: render `/calendar`; schedule with quarter-hour times, the repeat options and the four shapes; check same-time overlap; offer "just this day" and "every time" deletes; mark `outside_awake_hours`.
 6. Remove calls to the old media, widget, prompt, module and configuration endpoints, and the hardcoded team list.
 
 ### Carepartner tablet
 
-1. Fetch `/screen` on a timer and render `spots` for each layout, with a fallback for `null` spots and `UPSTREAM_UNAVAILABLE` widgets.
+1. Fetch `/screen` on a timer and draw `widgets` with the existing `Grid` (each widget's `col`, `row`, `width` and `height`), with a fallback for `UPSTREAM_UNAVAILABLE` widgets.
 2. Drive the screensaver from `awake_hours`; show `wake` instead of "Auto-Starts at".
 3. Trigger playback from `schedule`, including audio with a background photo and timed photos.
 4. Load media through `resolveApiUri(url)`.
@@ -666,10 +680,10 @@ If this guide and the server ever disagree, the server is right; please update t
 | Area | Routes | Request/response types and rules |
 |---|---|---|
 | Media | `server/internal/routes/media/media.go` | `server/internal/models/media/media_model.go`, `server/internal/services/media/media_service.go`, `server/internal/controllers/media/media_controller.go` |
-| Screen settings and presets | `server/internal/routes/screen_settings/` | `server/internal/services/screen_settings/screen_settings_service.go` (`Presets` and their spot counts, awake hour limits) |
-| Screen widgets | `server/internal/routes/screen_widgets/` | `server/internal/services/screen_widgets/config.go` (settings per type), `screen_widget_service.go` (placement rules) |
+| Screen settings | `server/internal/routes/screen_settings/` | `server/internal/services/screen_settings/screen_settings_service.go` (awake hour limits) |
+| Screen layout | `server/internal/routes/screen_widgets/` | `server/internal/models/screen_widgets/` (`layout.go` request and response types, `grid_area.go` corners to size), `server/internal/services/screen_widgets/` (`grid.go` grid size and corner and overlap checks, `screen_widget_service.go` saving, `config.go` settings per type) |
 | Sports teams | `server/internal/routes/widgets/news/sports_news.go` | `server/internal/services/widgets/news/sports_teams.go` |
 | Scheduled items and calendar | `server/internal/routes/scheduled_items/` | `server/internal/models/scheduled_items/scheduled_item_model.go` (`ScheduledItem`, `Occurrence`), `server/internal/services/scheduled_items/` (`recurrence.go`, validation) |
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
 | Playback | `server/internal/routes/playback/playback.go` | `server/internal/models/playback/playback_model.go`, `server/internal/services/playback/playback_service.go` (source and status rules) |
-| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables) |
+| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables; migration 6 moves widgets onto the grid and drops layout presets) |

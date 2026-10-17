@@ -8,39 +8,33 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	model "server/internal/models/screen_widgets"
 	"server/internal/utils"
 )
 
 var (
-	qSettings  = regexp.QuoteMeta(`FROM "ScreenSettings"`)
-	qMedia     = regexp.QuoteMeta(`FROM "Media" m`)
-	qSpot      = regexp.QuoteMeta(`WHERE carepartner_id = $1 AND spot = $2 FOR UPDATE;`)
-	qByID      = regexp.QuoteMeta(`WHERE id = $1 FOR UPDATE;`)
-	qInsert    = regexp.QuoteMeta(`INSERT INTO "ScreenWidget"`)
-	qMove      = regexp.QuoteMeta(`UPDATE "ScreenWidget" SET spot = $1 WHERE id = $2;`)
-	qUpdate    = regexp.QuoteMeta(`UPDATE "ScreenWidget" SET config = $1, photo_media_id = $2 WHERE id = $3;`)
-	qList      = regexp.QuoteMeta(`WHERE carepartner_id = $1 ORDER BY spot, id;`)
-	qDelete    = regexp.QuoteMeta(`DELETE FROM "ScreenWidget" WHERE id = $1;`)
-	widgetCols = []string{"id", "carepartner_id", "type", "spot", "config", "photo_media_id"}
-	mediaCols  = []string{"id", "carepartner_id", "kind", "display_name", "object_key", "mime_type",
+	qSettings   = regexp.QuoteMeta(`FROM "ScreenSettings"`)
+	qLock       = regexp.QuoteMeta(`SELECT carepartner_id FROM "ScreenSettings" WHERE carepartner_id = $1 FOR UPDATE;`)
+	qList       = regexp.QuoteMeta(`WHERE carepartner_id = $1 ORDER BY row_start, col_start, id;`)
+	qListLocked = regexp.QuoteMeta(`WHERE carepartner_id = $1 ORDER BY row_start, col_start, id FOR UPDATE;`)
+	qMedia      = regexp.QuoteMeta(`FROM "Media" m`)
+	qDelete     = regexp.QuoteMeta(`DELETE FROM "ScreenWidget" WHERE carepartner_id = $1 AND NOT (id = ANY($2));`)
+	qUpdate     = regexp.QuoteMeta(`UPDATE "ScreenWidget"`)
+	qInsert     = regexp.QuoteMeta(`INSERT INTO "ScreenWidget"`)
+	widgetCols  = []string{"id", "carepartner_id", "type", "col_start", "row_start", "col_end", "row_end", "config", "photo_media_id"}
+	mediaCols   = []string{"id", "carepartner_id", "kind", "display_name", "object_key", "mime_type",
 		"size_bytes", "duration_seconds", "created_at", "on_screen", "audio_background", "scheduled"}
 )
 
 func intp(i int) *int { return &i }
 
-func expectPreset(mock sqlmock.Sqlmock, carepartnerID int, preset string) {
-	mock.ExpectQuery(qSettings).WithArgs(carepartnerID).
-		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}).
-			AddRow(carepartnerID, preset, "07:00", "21:00"))
-}
-
-// Balanced has 4 spots, 0 to 3
-func expectBalanced(mock sqlmock.Sqlmock, carepartnerID int) {
-	expectPreset(mock, carepartnerID, "balanced")
+func newService(t *testing.T) (*ScreenWidgetService, sqlmock.Sqlmock) {
+	db, mock := utils.SetupMockDB(t)
+	t.Cleanup(func() { db.Close() })
+	return NewScreenWidgetService(db), mock
 }
 
 func expectMedia(mock sqlmock.Sqlmock, id, carepartnerID int, kind string) {
@@ -49,172 +43,195 @@ func expectMedia(mock sqlmock.Sqlmock, id, carepartnerID int, kind string) {
 			AddRow(id, carepartnerID, kind, "Sarah", "k", "image/png", 10, nil, time.Now(), false, false, false))
 }
 
-func expectEmptySpot(mock sqlmock.Sqlmock) {
-	mock.ExpectQuery(qSpot).WillReturnRows(sqlmock.NewRows(widgetCols))
+// The carepartner's stored widgets: a 2x2 photo, a weather tile and a news tile
+func storedRows() *sqlmock.Rows {
+	return sqlmock.NewRows(widgetCols).
+		AddRow(1, 1, "photo", 0, 0, 1, 1, []byte(`{"caption":"Sarah"}`), 4).
+		AddRow(2, 1, "weather", 2, 0, 2, 0, []byte(`{"zip":"14617"}`), nil).
+		AddRow(3, 1, "news", 3, 0, 3, 0, []byte(`{}`), nil)
 }
 
-func newService(t *testing.T) (*ScreenWidgetService, sqlmock.Sqlmock) {
-	db, mock := utils.SetupMockDB(t)
-	t.Cleanup(func() { db.Close() })
-	return NewScreenWidgetService(db), mock
-}
-
-// ─────────────────────────────────────────────
-// Create
-// ─────────────────────────────────────────────
-
-func TestCreateWidget_Photo(t *testing.T) {
-	s, mock := newService(t)
+// expectSaveStart expects the transaction, the settings lock and the locked widget list
+func expectSaveStart(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
 	mock.ExpectBegin()
-	expectBalanced(mock, 1)
+	mock.ExpectQuery(qLock).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}).AddRow(1))
+	mock.ExpectQuery(qListLocked).WithArgs(1).WillReturnRows(rows)
+}
+
+func widget(id *int, widgetType string, top, left, bottom, right int, config string) model.WidgetInput {
+	return model.WidgetInput{
+		ID: id, Type: widgetType,
+		TopLeft:     &model.Cell{Col: left, Row: top},
+		BottomRight: &model.Cell{Col: right, Row: bottom},
+		Config:      json.RawMessage(config),
+	}
+}
+
+func layout(widgets ...model.WidgetInput) model.LayoutInput {
+	if widgets == nil {
+		widgets = []model.WidgetInput{}
+	}
+	return model.LayoutInput{Widgets: &widgets}
+}
+
+// ─────────────────────────────────────────────
+// GetLayout
+// ─────────────────────────────────────────────
+
+func TestGetLayout(t *testing.T) {
+	s, mock := newService(t)
+	mock.ExpectQuery(qSettings).WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}).
+			AddRow(1, "07:00", "21:00"))
+	mock.ExpectQuery(qList).WithArgs(1).WillReturnRows(storedRows())
+
+	l, err := s.GetLayout(1)
+
+	require.NoError(t, err)
+	require.Len(t, l.Widgets, 3)
+	photo := l.Widgets[0]
+	assert.Equal(t, model.Cell{Col: 0, Row: 0}, photo.TopLeft)
+	assert.Equal(t, model.Cell{Col: 1, Row: 1}, photo.BottomRight)
+	assert.Equal(t, model.GridArea{Col: 0, Row: 0, Width: 2, Height: 2}, photo.Area())
+	assert.Equal(t, "/media/4/file", *photo.PhotoURL)
+	assert.NoError(t, mock.ExpectationsWereMet())
+
+	raw, err := json.Marshal(l)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"top_left":{"col":0,"row":0},"bottom_right":{"col":1,"row":1}`)
+}
+
+func TestGetLayout_Errors(t *testing.T) {
+	s, mock := newService(t)
+	_, err := s.GetLayout(0)
+	assert.ErrorIs(t, err, ErrInvalidCarepartner)
+
+	mock.ExpectQuery(qSettings).WithArgs(9).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "wake_time", "bed_time"}))
+	_, err = s.GetLayout(9)
+	assert.ErrorIs(t, err, ErrCarepartnerMissing)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ─────────────────────────────────────────────
+// SaveLayout
+// ─────────────────────────────────────────────
+
+func TestSaveLayout_CreatesUpdatesAndDeletes(t *testing.T) {
+	// Keep the photo but make it 1x2, move the weather tile, drop the news tile, add a
+	// 2x1 sports widget that touches the weather tile edge to edge
+	s, mock := newService(t)
+	expectSaveStart(mock, storedRows())
 	expectMedia(mock, 4, 1, "photo")
-	expectEmptySpot(mock)
-	mock.ExpectQuery(qInsert).
-		WithArgs(1, "photo", 0, []byte(`{"caption":"Sarah"}`), 4).
+	mock.ExpectExec(qDelete).WithArgs(1, "{1,2}").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qUpdate).WithArgs(0, 0, 0, 1, []byte(`{"caption":"Sarah"}`), 4, 1).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(qUpdate).WithArgs(1, 0, 1, 0, []byte(`{"zip":"10001"}`), nil, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(qInsert).WithArgs(1, "sports", 2, 0, 3, 0, []byte(`{"league":"mlb","team":"NYY"}`), nil).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(9))
 	mock.ExpectCommit()
 
-	w, err := s.CreateWidget(CreateInput{
-		CarepartnerID: 1, Type: "photo", Spot: intp(0),
-		Config: json.RawMessage(`{"caption":" Sarah "}`), PhotoMediaID: intp(4),
-	})
+	photo := widget(intp(1), "photo", 0, 0, 1, 0, `{"caption":" Sarah "}`)
+	photo.PhotoMediaID = intp(4)
+	l, err := s.SaveLayout(1, layout(
+		photo,
+		widget(intp(2), "weather", 0, 1, 0, 1, `{"zip":"10001"}`),
+		widget(nil, "sports", 0, 2, 0, 3, `{"league":"mlb","team":"nyy"}`),
+	))
 
 	require.NoError(t, err)
-	assert.Equal(t, 9, w.ID)
-	assert.Equal(t, 0, w.Spot)
-	assert.Equal(t, "/media/4/file", *w.PhotoURL)
+	require.Len(t, l.Widgets, 3)
+	assert.Equal(t, []int{1, 2, 9}, []int{l.Widgets[0].ID, l.Widgets[1].ID, l.Widgets[2].ID}, "in the order sent, with the new widget's id")
+	assert.Equal(t, model.GridArea{Col: 0, Row: 0, Width: 1, Height: 2}, l.Widgets[0].Area())
+	assert.Equal(t, model.GridArea{Col: 2, Row: 0, Width: 2, Height: 1}, l.Widgets[2].Area())
+	assert.Equal(t, "/media/4/file", *l.Widgets[0].PhotoURL)
+	assert.JSONEq(t, `{"league":"mlb","team":"NYY"}`, string(l.Widgets[2].Config), "config is normalized")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCreateWidget_WeatherDefaultZip(t *testing.T) {
+func TestSaveLayout_EmptyListClearsTheScreen(t *testing.T) {
 	s, mock := newService(t)
-	mock.ExpectBegin()
-	expectBalanced(mock, 1)
-	expectEmptySpot(mock)
-	mock.ExpectQuery(qInsert).
-		WithArgs(1, "weather", 2, []byte(`{"zip":"14617"}`), nil).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
+	expectSaveStart(mock, storedRows())
+	mock.ExpectExec(qDelete).WithArgs(1, "{}").WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectCommit()
 
-	w, err := s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "weather", Spot: intp(2)})
+	l, err := s.SaveLayout(1, layout())
 
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"zip":"14617"}`, string(w.Config))
-	assert.Nil(t, w.PhotoURL)
+	assert.Empty(t, l.Widgets)
+	raw, _ := json.Marshal(l)
+	assert.JSONEq(t, `{"widgets":[]}`, string(raw))
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestCreateWidget_AnyTypeInAnySpot(t *testing.T) {
-	cases := []struct {
-		widgetType string
-		spot       int
-		config     string
-	}{
-		{"weather", 0, `{"zip":"14617"}`},
-		{"message", 1, `{"text":"hi"}`},
-		{"news", 0, `{}`},
-		{"reminder", 3, `{"items":[{"time":"09:00","text":"Pills"}]}`},
-	}
-	for _, tc := range cases {
-		t.Run(tc.widgetType, func(t *testing.T) {
-			s, mock := newService(t)
-			mock.ExpectBegin()
-			expectBalanced(mock, 1)
-			expectEmptySpot(mock)
-			mock.ExpectQuery(qInsert).
-				WithArgs(1, tc.widgetType, tc.spot, sqlmock.AnyArg(), nil).
-				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
-			mock.ExpectCommit()
+func TestSaveLayout_WidgetsRequired(t *testing.T) {
+	// A missing key or null must never be read as "clear the screen"
+	s, mock := newService(t)
 
-			w, err := s.CreateWidget(CreateInput{CarepartnerID: 1, Type: tc.widgetType, Spot: intp(tc.spot), Config: json.RawMessage(tc.config)})
+	_, err := s.SaveLayout(1, model.LayoutInput{})
 
-			require.NoError(t, err)
-			assert.Equal(t, tc.spot, w.Spot)
-			assert.NoError(t, mock.ExpectationsWereMet())
-		})
-	}
+	assert.ErrorIs(t, err, ErrInvalidRequest)
+	assert.Contains(t, err.Error(), "send [] to clear the screen")
+	assert.NoError(t, mock.ExpectationsWereMet(), "nothing reaches the database")
 }
 
-func TestCreateWidget_UnknownSpot(t *testing.T) {
+func TestSaveLayout_InvalidWidgets(t *testing.T) {
+	missingCorners := widget(nil, "news", 0, 0, 0, 0, `{}`)
+	missingCorners.BottomRight = nil
+	weatherWithPhoto := widget(nil, "weather", 0, 0, 0, 0, `{}`)
+	weatherWithPhoto.PhotoMediaID = intp(4)
+	ok := widget(nil, "news", 2, 3, 2, 3, `{}`)
+
 	cases := []struct {
-		name   string
-		preset string
-		spot   int
+		name    string
+		widgets []model.WidgetInput
+		want    error
+		message string
 	}{
-		{"past the end of balanced", "balanced", 4},
-		{"past the end of simple", "simple", 2},
-		{"negative", "busier", -1},
+		{"unknown type", []model.WidgetInput{ok, widget(nil, "clock", 0, 0, 0, 0, `{}`)}, ErrInvalidType, "widgets[1]"},
+		{"id of another carepartner's widget", []model.WidgetInput{widget(intp(77), "news", 0, 0, 0, 0, `{}`)}, ErrNotFound, "widget 77 isn't one of this carepartner's widgets"},
+		{"id listed twice", []model.WidgetInput{widget(intp(3), "news", 0, 0, 0, 0, `{}`), widget(intp(3), "news", 1, 0, 1, 0, `{}`)}, ErrInvalidRequest, "widgets[1]: invalid request: widget 3 is listed more than once"},
+		{"type changed under the same id", []model.WidgetInput{widget(intp(2), "news", 0, 0, 0, 0, `{}`)}, ErrInvalidType, "widget 2 is a weather widget"},
+		{"missing corner", []model.WidgetInput{missingCorners}, ErrInvalidPosition, "widgets[0]"},
+		{"column 4 is off the grid", []model.WidgetInput{widget(nil, "news", 0, 3, 0, 4, `{}`)}, ErrInvalidPosition, "widgets[0]"},
+		{"row 3 is off the grid", []model.WidgetInput{widget(nil, "news", 2, 0, 3, 0, `{}`)}, ErrInvalidPosition, "widgets[0]"},
+		{"corners reversed", []model.WidgetInput{widget(nil, "news", 1, 1, 0, 0, `{}`)}, ErrInvalidPosition, "widgets[0]"},
+		{"bad config", []model.WidgetInput{ok, widget(nil, "weather", 0, 0, 0, 0, `{"zip":"abc"}`)}, ErrInvalidConfig, "widgets[1]"},
+		{"photo on a weather widget", []model.WidgetInput{weatherWithPhoto}, ErrInvalidPhoto, "widgets[0]"},
+		{"a 1x1 inside a 2x2", []model.WidgetInput{widget(nil, "news", 0, 0, 1, 1, `{}`), ok, widget(nil, "weather", 1, 1, 1, 1, `{}`)}, ErrOverlap, "widgets[0] and widgets[2] cover the same cell"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			s, mock := newService(t)
-			mock.ExpectBegin()
-			expectPreset(mock, 1, tc.preset)
+			expectSaveStart(mock, storedRows())
 			mock.ExpectRollback()
 
-			_, err := s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "news", Spot: intp(tc.spot)})
+			_, err := s.SaveLayout(1, layout(tc.widgets...))
 
-			assert.ErrorIs(t, err, ErrUnknownSpot)
-			assert.NoError(t, mock.ExpectationsWereMet())
+			assert.ErrorIs(t, err, tc.want)
+			assert.Contains(t, err.Error(), tc.message)
+			assert.NoError(t, mock.ExpectationsWereMet(), "nothing is written")
 		})
 	}
 }
 
-func TestCreateWidget_SpotTaken(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	expectBalanced(mock, 1)
-	mock.ExpectQuery(qSpot).WithArgs(1, 1).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(5, 1, "news", 1, []byte(`{}`), nil))
-	mock.ExpectRollback()
-
-	_, err := s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "weather", Spot: intp(1)})
-
-	assert.ErrorIs(t, err, ErrSpotTaken)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestCreateWidget_LostRaceAtCommit(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	expectBalanced(mock, 1)
-	expectEmptySpot(mock)
-	mock.ExpectQuery(qInsert).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
-	// The unique constraint is deferred, so a concurrent insert fails at commit
-	mock.ExpectCommit().WillReturnError(&pq.Error{Code: "23505"})
-
-	_, err := s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "weather", Spot: intp(0)})
-
-	assert.ErrorIs(t, err, ErrSpotTaken)
-}
-
-func TestCreateWidget_Photos(t *testing.T) {
+func TestSaveLayout_PhotoChecks(t *testing.T) {
 	cases := []struct {
 		name       string
-		widgetType string
-		config     string
-		photo      *int
 		mediaOwner int
 		mediaKind  string
 	}{
-		{"photo widget without a photo", "photo", `{}`, nil, 0, ""},
-		{"photo of another carepartner", "photo", `{}`, intp(4), 2, "photo"},
-		{"video as a photo", "photo", `{}`, intp(4), 1, "video"},
-		{"message with a video", "message", `{"text":"hi"}`, intp(4), 1, "video"},
-		{"weather with a photo", "weather", `{}`, intp(4), 0, ""},
+		{"photo of another carepartner", 2, "photo"},
+		{"video as a photo", 1, "video"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			s, mock := newService(t)
-			mock.ExpectBegin()
-			expectBalanced(mock, 1)
-			if tc.mediaKind != "" {
-				expectMedia(mock, 4, tc.mediaOwner, tc.mediaKind)
-			}
+			expectSaveStart(mock, sqlmock.NewRows(widgetCols))
+			expectMedia(mock, 4, tc.mediaOwner, tc.mediaKind)
 			mock.ExpectRollback()
 
-			_, err := s.CreateWidget(CreateInput{CarepartnerID: 1, Type: tc.widgetType,
-				Spot: intp(0), Config: json.RawMessage(tc.config), PhotoMediaID: tc.photo})
+			photo := widget(nil, "photo", 0, 0, 1, 1, `{}`)
+			photo.PhotoMediaID = intp(4)
+			_, err := s.SaveLayout(1, layout(photo))
 
 			assert.ErrorIs(t, err, ErrInvalidPhoto)
 			assert.NoError(t, mock.ExpectationsWereMet())
@@ -222,256 +239,22 @@ func TestCreateWidget_Photos(t *testing.T) {
 	}
 }
 
-func TestCreateWidget_InvalidInput(t *testing.T) {
+func TestSaveLayout_Errors(t *testing.T) {
 	s, mock := newService(t)
-
-	_, err := s.CreateWidget(CreateInput{CarepartnerID: 0, Type: "news", Spot: intp(0)})
-	assert.ErrorIs(t, err, ErrInvalidCarepartner)
-	_, err = s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "clock", Spot: intp(0)})
-	assert.ErrorIs(t, err, ErrInvalidType)
-	_, err = s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "news"})
-	assert.ErrorIs(t, err, ErrUnknownSpot, "spot is required")
-	_, err = s.CreateWidget(CreateInput{CarepartnerID: 1, Type: "weather", Spot: intp(0), Config: json.RawMessage(`{"zip":"abc"}`)})
-	assert.ErrorIs(t, err, ErrInvalidConfig)
-	assert.NoError(t, mock.ExpectationsWereMet(), "invalid input never reaches the database")
-}
-
-func TestCreateWidget_CarepartnerMissing(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qSettings).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}))
-	mock.ExpectRollback()
-
-	_, err := s.CreateWidget(CreateInput{CarepartnerID: 99, Type: "news", Spot: intp(0)})
-	assert.ErrorIs(t, err, ErrCarepartnerMissing)
-}
-
-// ─────────────────────────────────────────────
-// List / Get
-// ─────────────────────────────────────────────
-
-func expectListRows(mock sqlmock.Sqlmock) {
-	mock.ExpectQuery(qList).WithArgs(1).
-		WillReturnRows(sqlmock.NewRows(widgetCols).
-			AddRow(1, 1, "photo", 0, []byte(`{}`), 4).
-			AddRow(2, 1, "weather", 1, []byte(`{"zip":"14617"}`), nil).
-			AddRow(3, 1, "message", 3, []byte(`{"text":"Ana"}`), nil).
-			AddRow(4, 1, "news", 5, []byte(`{}`), nil))
-}
-
-func TestListWidgets_OrderAndHidden(t *testing.T) {
-	s, mock := newService(t)
-	expectBalanced(mock, 1)
-	expectListRows(mock)
-
-	widgets, err := s.ListWidgets(1)
-
-	require.NoError(t, err)
-	var ids []int
-	var hidden []bool
-	for _, w := range widgets {
-		ids = append(ids, w.ID)
-		hidden = append(hidden, w.Hidden)
-	}
-	assert.Equal(t, []int{1, 2, 3, 4}, ids, "spot order, so hidden widgets come last")
-	assert.Equal(t, []bool{false, false, false, true}, hidden, "balanced has spots 0 to 3")
-	assert.Equal(t, "/media/4/file", *widgets[0].PhotoURL)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestListWidgets_PresetChangesWhatIsHidden(t *testing.T) {
-	cases := []struct {
-		preset string
-		hidden []bool
-	}{
-		{"simple", []bool{false, false, true, true}},
-		{"grid", []bool{false, false, false, true}},
-		{"busier", []bool{false, false, false, false}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.preset, func(t *testing.T) {
-			s, mock := newService(t)
-			expectPreset(mock, 1, tc.preset)
-			expectListRows(mock)
-
-			widgets, err := s.ListWidgets(1)
-
-			require.NoError(t, err)
-			var hidden []bool
-			for _, w := range widgets {
-				hidden = append(hidden, w.Hidden)
-			}
-			assert.Equal(t, tc.hidden, hidden)
-			assert.NoError(t, mock.ExpectationsWereMet())
-		})
-	}
-}
-
-func TestListWidgets_Errors(t *testing.T) {
-	s, mock := newService(t)
-	_, err := s.ListWidgets(0)
+	_, err := s.SaveLayout(0, layout())
 	assert.ErrorIs(t, err, ErrInvalidCarepartner)
 
-	mock.ExpectQuery(qSettings).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id", "layout_preset", "wake_time", "bed_time"}))
-	_, err = s.ListWidgets(99)
+	mock.ExpectBegin()
+	mock.ExpectQuery(qLock).WithArgs(9).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}))
+	mock.ExpectRollback()
+	_, err = s.SaveLayout(9, layout())
 	assert.ErrorIs(t, err, ErrCarepartnerMissing)
-}
 
-func TestGetWidget(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(`WHERE id = $1;`)).WithArgs(3).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(3, 1, "news", 5, []byte(`{}`), nil))
-	expectBalanced(mock, 1)
-
-	w, err := s.GetWidget(3)
-	require.NoError(t, err)
-	assert.True(t, w.Hidden)
-
-	mock.ExpectQuery(regexp.QuoteMeta(`WHERE id = $1;`)).WithArgs(8).WillReturnRows(sqlmock.NewRows(widgetCols))
-	_, err = s.GetWidget(8)
-	assert.ErrorIs(t, err, ErrNotFound)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-// ─────────────────────────────────────────────
-// Update
-// ─────────────────────────────────────────────
-
-func TestUpdateWidget(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "weather", 1, []byte(`{"zip":"14617"}`), nil))
-	mock.ExpectExec(qUpdate).WithArgs([]byte(`{"zip":"10001"}`), nil, 4).WillReturnResult(sqlmock.NewResult(0, 1))
-	expectBalanced(mock, 1)
-	mock.ExpectCommit()
-
-	w, err := s.UpdateWidget(4, UpdateInput{Config: json.RawMessage(`{"zip":"10001"}`)})
-
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"zip":"10001"}`, string(w.Config))
-	assert.Equal(t, 1, w.Spot, "spot unchanged")
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestUpdateWidget_Errors(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).WillReturnRows(sqlmock.NewRows(widgetCols))
-	mock.ExpectRollback()
-	_, err := s.UpdateWidget(4, UpdateInput{})
-	assert.ErrorIs(t, err, ErrNotFound)
-
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "message", 3, []byte(`{"text":"Ana"}`), nil))
-	mock.ExpectRollback()
-	_, err = s.UpdateWidget(4, UpdateInput{Config: json.RawMessage(`{}`)})
-	assert.ErrorIs(t, err, ErrInvalidConfig, "message text is still required")
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-// ─────────────────────────────────────────────
-// Move
-// ─────────────────────────────────────────────
-
-func TestMoveWidget_ToEmptySpot(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "weather", 1, []byte(`{}`), nil))
-	expectBalanced(mock, 1)
-	mock.ExpectQuery(qSpot).WithArgs(1, 3).WillReturnRows(sqlmock.NewRows(widgetCols))
-	mock.ExpectExec(qMove).WithArgs(3, 4).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
-
-	w, err := s.MoveWidget(4, MoveInput{Spot: intp(3)})
-
-	require.NoError(t, err)
-	assert.Equal(t, 3, w.Spot)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestMoveWidget_Swap(t *testing.T) {
-	// Any two widgets can swap: a weather widget can take the photo's main spot
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "weather", 2, []byte(`{}`), nil))
-	expectBalanced(mock, 1)
-	mock.ExpectQuery(qSpot).WithArgs(1, 0).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(5, 1, "photo", 0, []byte(`{}`), 7))
-	mock.ExpectExec(qMove).WithArgs(2, 5).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qMove).WithArgs(0, 4).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
-
-	w, err := s.MoveWidget(4, MoveInput{Spot: intp(0)})
-
-	require.NoError(t, err)
-	assert.Equal(t, 0, w.Spot)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestMoveWidget_HiddenWidgetSwapsIntoView(t *testing.T) {
-	// The widget in the target spot takes the hidden spot and becomes hidden
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "weather", 5, []byte(`{}`), nil))
-	expectBalanced(mock, 1)
-	mock.ExpectQuery(qSpot).WithArgs(1, 1).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(5, 1, "sports", 1, []byte(`{}`), nil))
-	mock.ExpectExec(qMove).WithArgs(5, 5).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(qMove).WithArgs(1, 4).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
-
-	w, err := s.MoveWidget(4, MoveInput{Spot: intp(1)})
-
-	require.NoError(t, err)
-	assert.Equal(t, 1, w.Spot)
-	assert.False(t, w.Hidden)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestMoveWidget_SameSpotAndBadTarget(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "weather", 1, []byte(`{}`), nil))
-	expectBalanced(mock, 1)
-	mock.ExpectRollback()
-	w, err := s.MoveWidget(4, MoveInput{Spot: intp(1)})
-	require.NoError(t, err)
-	assert.Equal(t, 1, w.Spot, "moving to its own spot is a no-op")
-
-	mock.ExpectBegin()
-	mock.ExpectQuery(qByID).WithArgs(4).
-		WillReturnRows(sqlmock.NewRows(widgetCols).AddRow(4, 1, "weather", 1, []byte(`{}`), nil))
-	expectBalanced(mock, 1)
-	mock.ExpectRollback()
-	_, err = s.MoveWidget(4, MoveInput{Spot: intp(4)})
-	assert.ErrorIs(t, err, ErrUnknownSpot, "balanced has no spot 4")
-
-	_, err = s.MoveWidget(4, MoveInput{})
-	assert.ErrorIs(t, err, ErrUnknownSpot, "spot is required")
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-// ─────────────────────────────────────────────
-// Delete
-// ─────────────────────────────────────────────
-
-func TestDeleteWidget(t *testing.T) {
-	s, mock := newService(t)
-	mock.ExpectExec(qDelete).WithArgs(4).WillReturnResult(sqlmock.NewResult(0, 1))
-	assert.NoError(t, s.DeleteWidget(4))
-
-	mock.ExpectExec(qDelete).WithArgs(5).WillReturnResult(sqlmock.NewResult(0, 0))
-	assert.ErrorIs(t, s.DeleteWidget(5), ErrNotFound)
-
-	mock.ExpectExec(qDelete).WithArgs(6).WillReturnError(errors.New("db down"))
-	err := s.DeleteWidget(6)
-	assert.Error(t, err)
-	assert.NotErrorIs(t, err, ErrNotFound)
+	expectSaveStart(mock, sqlmock.NewRows(widgetCols))
+	mock.ExpectExec(qDelete).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(qInsert).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(5))
+	mock.ExpectCommit().WillReturnError(errors.New("connection lost"))
+	_, err = s.SaveLayout(1, layout(widget(nil, "news", 0, 0, 0, 0, `{}`)))
+	assert.EqualError(t, err, "connection lost")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

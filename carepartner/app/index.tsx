@@ -20,10 +20,10 @@ export default function Index() {
         <MediaPlayer
           key={playId}
           item={item}
-          onFinished={() => ended(playId)}
+          onFinished={() => ended(playId, "finished")}
           onFailed={(reason) => {
             console.warn("Playback failed:", reason);
-            ended(playId);
+            ended(playId, "failed");
           }}
         />
       );

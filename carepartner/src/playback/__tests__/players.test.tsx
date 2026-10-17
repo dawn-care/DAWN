@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { AppState, type AppStateStatus } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useVideoPlayer } from "expo-video";
 import AudioPlayer, { AUDIO_LOAD_TIMEOUT_MS, AUDIO_STALL_TIMEOUT_MS } from "../AudioPlayer";
@@ -45,10 +46,18 @@ describe("players", () => {
   const onFinished = jest.fn();
   const onFailed = jest.fn();
 
+  // The app's foreground and background changes, which tests send by calling these.
+  let appStateListeners: ((state: AppStateStatus) => void)[];
+
   // Cleared before each test, not after: the previous test's player is unmounted
   // after its afterEach hooks, and that unmount calls into the mocks.
   beforeEach(() => {
     jest.clearAllMocks();
+    appStateListeners = [];
+    jest.spyOn(AppState, "addEventListener").mockImplementation((_event, listener) => {
+      appStateListeners.push(listener);
+      return { remove: () => (appStateListeners = appStateListeners.filter((l) => l !== listener)) };
+    });
   });
 
   afterEach(() => {
@@ -102,6 +111,17 @@ describe("players", () => {
       await act(async () => video.emit("statusChange", { status: "readyToPlay" }));
 
       expect(onFailed).not.toHaveBeenCalled();
+    });
+
+    it("resumes when the app returns to the foreground, since Android pauses it in the background", async () => {
+      await renderVideo();
+      video.play.mockClear();
+
+      await act(async () => appStateListeners.forEach((listener) => listener("background")));
+      expect(video.play).not.toHaveBeenCalled();
+
+      await act(async () => appStateListeners.forEach((listener) => listener("active")));
+      expect(video.play).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -196,6 +216,21 @@ describe("players", () => {
 
       await act(async () => jest.advanceTimersByTime(1));
       expect(onFailed).toHaveBeenCalledWith("Audio did not load");
+    });
+
+    it("keeps its load timer when the parent passes new callbacks", async () => {
+      jest.useFakeTimers();
+      const view = await render(audioElement());
+      await act(async () => jest.advanceTimersByTime(AUDIO_LOAD_TIMEOUT_MS - 1000));
+
+      const latest = jest.fn();
+      await view.rerender(
+        <AudioPlayer uri="http://server/audio/file?id=9" title="Moon River" onFinished={onFinished} onFailed={latest} />,
+      );
+      await act(async () => jest.advanceTimersByTime(1000));
+
+      expect(latest).toHaveBeenCalledWith("Audio did not load");
+      expect(onFailed).not.toHaveBeenCalled();
     });
 
     it("does not report failed while loaded audio keeps moving", async () => {

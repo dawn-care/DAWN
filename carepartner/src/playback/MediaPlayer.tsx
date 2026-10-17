@@ -1,16 +1,13 @@
 /**
  * MediaPlayer.tsx
  *
- * Plays a media item from the server with the player for its type, using
- * the metadata checked in media.ts. An item that can't be played renders
- * nothing.
+ * Plays a media item with the player for its kind.
  */
 
 import React from "react";
-import { API_URL } from "../api/config";
 import { resolveApiUri } from "../api/resolveApiUri";
 import AudioPlayer from "./AudioPlayer";
-import { DEFAULT_DURATION_SECONDS, readMetadata, type MediaItem } from "./media";
+import { DEFAULT_DURATION_SECONDS, type MediaItem } from "./media";
 import PhotoPlayer from "./PhotoPlayer";
 import VideoPlayer from "./VideoPlayer";
 
@@ -23,23 +20,21 @@ type MediaPlayerProps = {
 };
 
 /**
- * Plays one media item, starting on its own, and renders nothing for an
- * item `isPlayable` rejects. Remount it (change its `key`) to play another.
+ * Plays one media item, starting on its own. Remount it (change its `key`) to
+ * play another.
  */
 export default function MediaPlayer({ item, onFinished, onFailed }: MediaPlayerProps) {
-  const metadata = readMetadata(item.metadata);
-  if (!metadata) return null;
-  const uri = `${API_URL}/${item.module_type}/file?id=${metadata.id}`;
+  const uri = resolveApiUri(item.url)!;
 
-  switch (item.module_type) {
+  switch (item.kind) {
     case "video":
       return <VideoPlayer uri={uri} onFinished={onFinished} onFailed={onFailed} />;
     case "audio":
       return (
         <AudioPlayer
           uri={uri}
-          title={metadata.displayedName}
-          coverUri={resolveApiUri(metadata.coverUri)}
+          title={item.title}
+          coverUri={resolveApiUri(item.coverUrl)}
           onFinished={onFinished}
           onFailed={onFailed}
         />
@@ -48,12 +43,10 @@ export default function MediaPlayer({ item, onFinished, onFailed }: MediaPlayerP
       return (
         <PhotoPlayer
           uri={uri}
-          durationSeconds={item.duration && item.duration > 0 ? item.duration : DEFAULT_DURATION_SECONDS}
+          durationSeconds={item.durationSeconds && item.durationSeconds > 0 ? item.durationSeconds : DEFAULT_DURATION_SECONDS}
           onFinished={onFinished}
           onFailed={onFailed}
         />
       );
-    default:
-      return null;
   }
 }

@@ -21,7 +21,7 @@ jest.mock("../../../app/screensaver", () => {
 });
 
 const ended = jest.fn();
-const item = { module_type: "video", metadata: { id: 5 } };
+const item = { kind: "video" as const, url: "/media/5/file" };
 
 function showing(screenName: Screen) {
   jest.mocked(usePlayback).mockReturnValue({
@@ -70,7 +70,7 @@ describe("index route", () => {
 
     await act(async () => props.onFinished());
     await act(async () => props.onFailed("404"));
-    expect(ended).toHaveBeenNthCalledWith(1, 3);
-    expect(ended).toHaveBeenNthCalledWith(2, 3);
+    expect(ended).toHaveBeenNthCalledWith(1, 3, "finished");
+    expect(ended).toHaveBeenNthCalledWith(2, 3, "failed");
   });
 });

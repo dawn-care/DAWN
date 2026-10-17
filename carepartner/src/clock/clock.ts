@@ -45,3 +45,10 @@ export function now(): Date {
 export function setClock(start: Date | null): void {
   source = start ? startingAt(start) : realTime;
 }
+
+/** "YYYY-MM-DD" for the local day of `time`. */
+export function dayOf(time: Date): string {
+  const month = String(time.getMonth() + 1).padStart(2, "0");
+  const day = String(time.getDate()).padStart(2, "0");
+  return `${time.getFullYear()}-${month}-${day}`;
+}

@@ -11,18 +11,17 @@ import (
 Screen is everything the carepartner's tablet shows, as returned by GET /api/screen.
 It is the contract between the backend and the tablet (and the caregiver's preview).
 
-Times are in the carepartner's timezone. Spots always has exactly as many entries as
-the preset has spots, in spot order (The widgets follow reading order); an empty spot
-is null. Widgets whose spot the current preset doesn't have are left out.
+Times are in the carepartner's timezone. Widgets are in reading order (top row first,
+then left to right), each with its place on the 4x3 grid; cells no widget covers are
+empty.
 */
 type Screen struct {
 	CarepartnerID int                          `json:"carepartner_id"`
 	GeneratedAt   string                       `json:"generated_at"` // RFC 3339 with the carepartner's UTC offset
 	Timezone      string                       `json:"timezone"`
 	Today         string                       `json:"today"` // "YYYY-MM-DD" in the carepartner's timezone
-	LayoutPreset  string                       `json:"layout_preset"`
 	AwakeHours    AwakeHours                   `json:"awake_hours"`
-	Spots         []*Widget                    `json:"spots"`    // null for an empty spot
+	Widgets       []*Widget                    `json:"widgets"`
 	Schedule      []scheduled_items.Occurrence `json:"schedule"` // today and tomorrow, so playback works across midnight
 }
 
@@ -34,8 +33,12 @@ type AwakeHours struct {
 }
 
 /*
-Widget is a widget placed in a spot, with its data filled in.
-Config is the widget's settings as stored (see the screen widget endpoints).
+Widget is a widget placed on the grid, with its data filled in.
+Col, Row, Width, Height - where it sits, in cells, in the shape of GridArea in
+shared/widgets/grid.ts, so the tablet can lay it out directly. They're plain fields
+rather than an embedded GridArea because swag can't document an embedded type from
+another package.
+Config is the widget's settings as stored (see the screen layout endpoints).
 Data depends on the type and is null for photo, message and reminder widgets,
 whose content is all in Config and Photo:
   - photo: PhotoData (the caption to show)
@@ -49,6 +52,10 @@ never breaks the whole screen.
 type Widget struct {
 	ID     int             `json:"id"`
 	Type   string          `json:"type"`
+	Col    int             `json:"col"`
+	Row    int             `json:"row"`
+	Width  int             `json:"width"`
+	Height int             `json:"height"`
 	Config json.RawMessage `json:"config" swaggertype:"object"`
 	Photo  *Photo          `json:"photo"`
 	Data   any             `json:"data"`

@@ -16,7 +16,6 @@ import (
 	widgetModel "server/internal/models/screen_widgets"
 	carepartnerModel "server/internal/models/user/carepartner"
 	scheduled "server/internal/services/scheduled_items"
-	settings "server/internal/services/screen_settings"
 	widgets "server/internal/services/screen_widgets"
 	newsSvc "server/internal/services/widgets/news"
 	"server/internal/services/widgets/weather"
@@ -71,8 +70,8 @@ func (s *ScreenService) lookups() *lookupCache {
 }
 
 /*
-GetScreen assembles the carepartner's screen: the current preset's spots with each
-spot's widget and its data, awake hours, and today's and tomorrow's schedule.
+GetScreen assembles the carepartner's screen: each widget with its place on the grid and
+its data, awake hours, and today's and tomorrow's schedule.
 */
 func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 	if carepartnerID <= 0 {
@@ -99,16 +98,11 @@ func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 	if ss == nil {
 		return nil, ErrCarepartnerMissing
 	}
-	preset, ok := settings.PresetByName(ss.LayoutPreset)
-	if !ok {
-		return nil, fmt.Errorf("carepartner %d has unknown layout preset %q", carepartnerID, ss.LayoutPreset)
-	}
-
 	stored, err := widgetModel.ListScreenWidgets(s.DB, carepartnerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list widgets: %w", err)
 	}
-	spots, err := s.fillSpots(preset, stored)
+	placed, err := s.fillWidgets(stored)
 	if err != nil {
 		return nil, err
 	}
@@ -126,30 +120,30 @@ func (s *ScreenService) GetScreen(carepartnerID int) (*Screen, error) {
 		GeneratedAt:   now.Format(time.RFC3339),
 		Timezone:      cp.Timezone,
 		Today:         today,
-		LayoutPreset:  preset.Name,
 		AwakeHours: AwakeHours{
 			Wake:       ss.WakeTime,
 			Bed:        ss.BedTime,
 			IsAwakeNow: clock >= ss.WakeTime && clock < ss.BedTime,
 		},
-		Spots:    spots,
+		Widgets:  placed,
 		Schedule: schedule,
 	}, nil
 }
 
 /*
-fillSpots puts each stored widget in its spot of the preset (leaving out widgets whose
-spot the preset doesn't have) and fills in their photos and data. Outside lookups run
-in parallel.
+fillWidgets turns the stored widgets, in their order, into the screen's widgets with
+their grid areas, photos and data. Outside lookups run in parallel.
 */
-func (s *ScreenService) fillSpots(preset settings.Preset, stored []widgetModel.ScreenWidget) ([]*Widget, error) {
-	spots := make([]*Widget, preset.Spots)
+func (s *ScreenService) fillWidgets(stored []widgetModel.ScreenWidget) ([]*Widget, error) {
+	placed := make([]*Widget, len(stored))
 	var wg sync.WaitGroup
-	for _, w := range stored {
-		if !preset.HasSpot(w.Spot) {
-			continue
+	for i, w := range stored {
+		area := w.Area()
+		out := &Widget{
+			ID: w.ID, Type: w.Type,
+			Col: area.Col, Row: area.Row, Width: area.Width, Height: area.Height,
+			Config: w.Config,
 		}
-		out := &Widget{ID: w.ID, Type: w.Type, Config: w.Config}
 		if w.PhotoMediaID != nil {
 			photo, err := mediaModel.GetMediaByID(s.DB, *w.PhotoMediaID)
 			if err != nil {
@@ -159,7 +153,7 @@ func (s *ScreenService) fillSpots(preset settings.Preset, stored []widgetModel.S
 				out.Photo = &Photo{ID: photo.ID, DisplayName: photo.DisplayName, URL: photo.URL}
 			}
 		}
-		spots[w.Spot] = out
+		placed[i] = out
 
 		wg.Add(1)
 		go func() {
@@ -168,7 +162,7 @@ func (s *ScreenService) fillSpots(preset settings.Preset, stored []widgetModel.S
 		}()
 	}
 	wg.Wait()
-	return spots, nil
+	return placed, nil
 }
 
 // fillData sets a widget's Data, or its Error if an outside lookup fails

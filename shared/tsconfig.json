@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
-    "types": [],
+    "typeRoots": ["../carepartner/node_modules/@types"],
+    "types": ["jest"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -12,6 +13,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["**/__tests__/**"]
+  "include": ["**/*.ts"]
 }
