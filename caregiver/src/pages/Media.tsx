@@ -14,15 +14,14 @@
  *
  * Camera and voice recording are switched off for now, so uploading a file is
  * the only way to add something. Files picked in the upload panel are checked
- * and queued; naming and saving them is not built yet, so the queue is only
- * listed.
+ * and queued, then named and saved one at a time. Saved items go to the top
+ * of the grid with a "New" badge, selected, with a toast.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Mic, Upload, Video, X } from "lucide-react";
+import { Mic, Upload, Video } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import IconButton from "../components/ui/IconButton";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import { ApiError, deleteMedia, friendlyError, listMedia, listScheduledItems } from "../media/api";
@@ -33,7 +32,7 @@ import FilterPills from "../media/FilterPills";
 import type { Pill } from "../media/FilterPills";
 import MediaCard from "../media/MediaCard";
 import type { PendingFile } from "../media/files";
-import { formatDuration } from "../media/labels";
+import SavePanel from "../media/SavePanel";
 import UploadPanel from "../media/UploadPanel";
 
 // Items the caregiver removed whose Undo toast is still open. The server is
@@ -129,6 +128,14 @@ export default function Media() {
   // Files that passed the upload checks and are waiting to be named and saved, plus a message for each that didn't pass
   const [queue, setQueue] = useState<PendingFile[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
+  // How many files were picked together, for "File 2 of 5"
+  const [batchSize, setBatchSize] = useState(0);
+  // Saved in this session of the page; shown with a "New" badge until the caregiver picks something else
+  const [newIds, setNewIds] = useState<number[]>([]);
+  // The item whose detail panel says "Saved. You can use it any time."
+  const [justSavedId, setJustSavedId] = useState<number | null>(null);
+  // What has been saved from the files picked together, for one toast when they are done
+  const savedInBatch = useRef<MediaItem[]>([]);
 
   /* ============================
      Effects
@@ -200,12 +207,23 @@ export default function Media() {
   };
 
   const handleChosen = (accepted: PendingFile[], rejected: string[]) => {
+    savedInBatch.current = [];
+    setBatchSize(accepted.length);
     setQueue(accepted);
     setNotices(rejected);
   };
 
-  // Back to the empty upload panel, for closing the queue
+  // One toast for everything saved from the files picked together
+  const announceSaved = () => {
+    const saved = savedInBatch.current;
+    savedInBatch.current = [];
+    if (saved.length === 0) return;
+    toast.show(saved.length === 1 ? `Added "${saved[0].display_name}".` : `Added ${saved.length} files.`);
+  };
+
+  // Back to the empty upload panel, ending the queue
   const clearQueue = () => {
+    announceSaved();
     setQueue([]);
     setNotices([]);
   };
@@ -213,6 +231,37 @@ export default function Media() {
   const closeUpload = () => {
     clearQueue();
     setPanel("detail");
+  };
+
+  // Moves on to the next picked file. After the last one: to the saved item if anything was
+  // saved, otherwise back to the upload panel.
+  const nextInQueue = () => {
+    const rest = queue.slice(1);
+    setQueue(rest);
+    if (rest.length > 0) return;
+
+    const savedAny = savedInBatch.current.length > 0;
+    announceSaved();
+    setNotices([]);
+    if (savedAny) setPanel("detail");
+  };
+
+  const handleSaved = (saved: MediaItem) => {
+    savedInBatch.current.push(saved);
+    // Newest first, like the server's list
+    setItems((list) => [saved, ...(list ?? [])]);
+    setNewIds((ids) => [...ids, saved.id]);
+    setFilter("all");
+    setSelectedId(saved.id);
+    setJustSavedId(saved.id);
+    nextInQueue();
+  };
+
+  const selectItem = (id: number) => {
+    setSelectedId(id);
+    setPanel("detail");
+    setNewIds([]);
+    setJustSavedId(null);
   };
 
   const retry = () => {
@@ -282,10 +331,8 @@ export default function Media() {
                     key={item.id}
                     media={item}
                     selected={panel === "detail" && item.id === selected?.id}
-                    onSelect={() => {
-                      setSelectedId(item.id);
-                      setPanel("detail");
-                    }}
+                    isNew={newIds.includes(item.id)}
+                    onSelect={() => selectItem(item.id)}
                   />
                 ))}
               </div>
@@ -303,6 +350,7 @@ export default function Media() {
                 key={selected.id}
                 media={selected}
                 scheduled={scheduled}
+                justSaved={selected.id === justSavedId}
                 onRenamed={handleRenamed}
                 onRemoved={() => handleRemoved(selected)}
               />
@@ -313,33 +361,19 @@ export default function Media() {
             )
           ) : queue.length === 0 ? (
             <UploadPanel onClose={closeUpload} onChosen={handleChosen} />
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="m-0 text-xl font-extrabold">Ready to save</h2>
-                <IconButton
-                  label="Close"
-                  icon={<X size={20} strokeWidth={2.4} aria-hidden="true" />}
-                  onClick={clearQueue}
-                />
-              </div>
-              {notices.length > 0 && (
-                <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-dawn-accent">
-                  {notices.map((message) => (
-                    <li key={message}>{message}</li>
-                  ))}
-                </ul>
-              )}
-              <ul className="m-0 pl-5 flex flex-col gap-1 text-base">
-                {queue.map((pending) => (
-                  <li key={pending.id} className="break-words">
-                    {pending.file.name} ({pending.kind}
-                    {pending.seconds !== null && `, ${formatDuration(pending.seconds)}`})
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          ) : activeCarePartnerId !== null ? (
+            <SavePanel
+              key={queue[0].id}
+              carepartnerId={activeCarePartnerId}
+              pending={queue[0]}
+              position={batchSize - queue.length + 1}
+              total={batchSize}
+              notices={notices}
+              onSaved={handleSaved}
+              onSkip={nextInQueue}
+              onClose={clearQueue}
+            />
+          ) : null}
         </aside>
       </div>
     </div>

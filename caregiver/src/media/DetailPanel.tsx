@@ -21,7 +21,7 @@
 import { useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Image, Music, Play, Video } from "lucide-react";
+import { Check, Image, Music, Play, Video } from "lucide-react";
 import TextField from "../components/ui/form/TextField";
 import { fileUrl, friendlyError, renameMedia } from "./api";
 import type { Media, ScheduledItem } from "./api";
@@ -34,6 +34,8 @@ interface DetailPanelProps {
   media: Media;
   /** All scheduled items, or null if they couldn't be loaded */
   scheduled: ScheduledItem[] | null;
+  /** The caregiver just saved this item; shows "Saved. You can use it any time." */
+  justSaved?: boolean;
   /** The server accepted a new name; `updated` is the item as it is now */
   onRenamed: (updated: Media) => void;
   /** The caregiver confirmed removing the item */
@@ -85,7 +87,7 @@ const PREVIEW_BOX = "h-[196px] flex items-center justify-center overflow-hidden 
    Component
 ============================ */
 
-export default function DetailPanel({ media, scheduled, onRenamed, onRemoved }: DetailPanelProps) {
+export default function DetailPanel({ media, scheduled, justSaved = false, onRenamed, onRemoved }: DetailPanelProps) {
   const [playing, setPlaying] = useState(false);
   const [playFailed, setPlayFailed] = useState(false);
   // Browsers can't draw every photo type (HEIC outside Safari); show the icon instead
@@ -156,6 +158,16 @@ export default function DetailPanel({ media, scheduled, onRenamed, onRemoved }: 
 
   return (
     <div className="flex flex-col gap-3">
+      {justSaved && (
+        <p
+          role="status"
+          className="m-0 flex items-center gap-2 px-2.5 py-2 rounded-lg bg-dawn-success/10 text-[15px] font-bold text-dawn-success"
+        >
+          <Check size={18} strokeWidth={2.6} aria-hidden="true" />
+          Saved. You can use it any time.
+        </p>
+      )}
+
       {/* Preview, or the player once Play is pressed */}
       {playing && media.kind === "video" ? (
         <video

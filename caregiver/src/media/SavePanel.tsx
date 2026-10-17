@@ -1,0 +1,168 @@
+/**
+ * SavePanel.tsx
+ *
+ * User: Caregiver
+ *
+ * Names and saves one picked file. The caregiver sees a small preview, a name
+ * field (starting as the file name) and Save; there is no scheduling or
+ * placement here, that happens from the detail panel afterwards.
+ *
+ * When several files were picked, the panel is shown for each in turn with
+ * "File 2 of 5" and a Skip button. If saving fails the file is kept, so
+ * Save becomes "Try again" and nothing has to be picked again.
+ */
+
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { Image, Music, Video, X } from "lucide-react";
+import IconButton from "../components/ui/IconButton";
+import TextField from "../components/ui/form/TextField";
+import { friendlyError, uploadMedia } from "./api";
+import type { Media } from "./api";
+import { ERROR_MESSAGES } from "./constants";
+import type { PendingFile } from "./files";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
+
+interface SavePanelProps {
+  carepartnerId: number;
+  pending: PendingFile;
+  /** 1-based place of this file among the ones picked */
+  position: number;
+  total: number;
+  /** Messages for files that were turned away before this step */
+  notices: string[];
+  onSaved: (media: Media) => void;
+  onSkip: () => void;
+  /** Stop going through the rest */
+  onClose: () => void;
+}
+
+const KIND_ICONS = { photo: Image, video: Video, audio: Music };
+
+// "Beach day.mp4" -> "Beach day"
+function nameFromFile(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, "");
+}
+
+/**
+ * Mount with `key={pending.id}` so the name and any error start fresh for
+ * each file.
+ */
+export default function SavePanel({
+  carepartnerId,
+  pending,
+  position,
+  total,
+  notices,
+  onSaved,
+  onSkip,
+  onClose,
+}: SavePanelProps) {
+  const { file, kind } = pending;
+  const [name, setName] = useState(() => nameFromFile(file.name));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // The last attempt reached the server and failed, as opposed to an empty name caught here
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBroken, setPreviewBroken] = useState(false);
+
+  // A photo is shown as itself; the object URL is released when the file changes or the panel goes
+  useEffect(() => {
+    if (kind !== "photo") return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file, kind]);
+
+  const Icon = KIND_ICONS[kind];
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    if (name.trim() === "") {
+      setError(ERROR_MESSAGES.INVALID_NAME);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSaveFailed(false);
+    try {
+      onSaved(await uploadMedia({ carepartnerId, file, kind, displayName: name }));
+    } catch (err) {
+      setError(friendlyError(err));
+      setSaveFailed(true);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={save} className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="m-0 text-xl font-extrabold">Name and Save</h2>
+        <IconButton
+          label="Close"
+          icon={<X size={20} strokeWidth={2.4} aria-hidden="true" />}
+          onClick={onClose}
+          disabled={saving}
+        />
+      </div>
+
+      {total > 1 && (
+        <p className="m-0 text-base font-bold text-dawn-muted">
+          File {position} of {total}
+        </p>
+      )}
+
+      {position === 1 && notices.length > 0 && (
+        <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-dawn-accent">
+          {notices.map((message) => (
+            <li key={message}>{message}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex items-center gap-3">
+        <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-dawn-avatar text-dawn-avatar-ink">
+          {previewUrl && !previewBroken ? (
+            <img
+              src={previewUrl}
+              alt=""
+              onError={() => setPreviewBroken(true)}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Icon size={32} aria-hidden="true" />
+          )}
+        </div>
+        <div className="grow min-w-0">
+          <TextField
+            label="Name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            disabled={saving}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "save-error" : undefined}
+          />
+        </div>
+      </div>
+
+      <p className="m-0 text-[15px] text-dawn-muted break-words">{file.name}</p>
+
+      {error && (
+        <p id="save-error" role="alert" className="m-0 text-base font-bold text-dawn-accent">
+          {error}
+        </p>
+      )}
+
+      <div className="flex justify-between gap-2">
+        <button type="button" onClick={onSkip} disabled={saving} className={SECONDARY_BUTTON}>
+          Skip
+        </button>
+        <button type="submit" disabled={saving} className={PRIMARY_BUTTON}>
+          {saving ? "Saving…" : saveFailed ? "Try again" : "Save"}
+        </button>
+      </div>
+    </form>
+  );
+}
