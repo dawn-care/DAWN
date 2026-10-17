@@ -20,6 +20,9 @@ import {
   type Screen,
 } from "./machine";
 
+/** How long to wait before reading pairing again after storage fails at startup. */
+export const PAIRING_RETRY_MS = 5_000;
+
 type PlaybackContextValue = {
   state: PlaybackState;
   screen: Screen;
@@ -56,8 +59,21 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "pairingChecked", carepartnerId: await readPairedId() });
   }, []);
 
+  // Reading storage can fail on Android; until it works the screen stays
+  // blank, so keep trying rather than give up or guess.
   useEffect(() => {
-    checkPairing();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    const attempt = () =>
+      checkPairing().catch((error) => {
+        console.warn("Couldn't read whether this tablet is paired, trying again", error);
+        if (!cancelled) timer = setTimeout(attempt, PAIRING_RETRY_MS);
+      });
+    attempt();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [checkPairing]);
 
   const setNight = useCallback((night: boolean) => dispatch({ type: "nightChanged", night }), []);

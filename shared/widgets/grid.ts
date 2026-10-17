@@ -33,6 +33,11 @@ export function fitsGrid(
   );
 }
 
+/** Whether two areas share at least one cell. */
+export function areasOverlap(a: GridArea, b: GridArea): boolean {
+  return a.col < b.col + b.width && b.col < a.col + a.width && a.row < b.row + b.height && b.row < a.row + a.height;
+}
+
 /** One cell of the grid. Columns and rows count from 0. */
 export type GridCell = {
   col: number;

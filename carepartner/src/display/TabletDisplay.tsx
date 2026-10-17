@@ -9,13 +9,10 @@
 
 import { useEffect, useMemo } from "react";
 import { DEFAULT_NIGHT_HOURS, isNight, nightHoursFromAwake } from "@shared";
-import { now } from "../clock/clock";
+import { everyMinute, now } from "../clock/clock";
 import { usePlayback } from "../playback/PlaybackProvider";
 import { useScreen } from "../screen/ScreenProvider";
 import { useTabletDisplay } from "./useTabletDisplay";
-
-/** How often to check whether night has started or ended. */
-export const NIGHT_CHECK_MS = 60_000;
 
 export default function TabletDisplay() {
   const awake = useScreen().screen?.awakeHours;
@@ -32,8 +29,7 @@ export default function TabletDisplay() {
   useEffect(() => {
     const update = () => setNight(isNight(now(), hours));
     update();
-    const timer = setInterval(update, NIGHT_CHECK_MS);
-    return () => clearInterval(timer);
+    return everyMinute(update);
   }, [hours, setNight]);
 
   return null;

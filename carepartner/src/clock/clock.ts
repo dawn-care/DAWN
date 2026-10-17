@@ -51,6 +51,27 @@ export function setClock(start: Date | null): void {
   source = start ? startingAt(start) : realTime;
 }
 
+const MINUTE_MS = 60_000;
+
+/**
+ * Calls `tick` as each minute of the app clock starts, so checks of the time
+ * (night, the schedule, the time of day) happen on the minute rather than up
+ * to a minute late. Returns a function that stops it.
+ */
+export function everyMinute(tick: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout>;
+  const wait = () => {
+    // Worked out again each minute, so it never drifts. A timer that fires a
+    // little early just ticks twice.
+    timer = setTimeout(() => {
+      tick();
+      wait();
+    }, MINUTE_MS - (source() % MINUTE_MS));
+  };
+  wait();
+  return () => clearTimeout(timer);
+}
+
 /** "YYYY-MM-DD" for the local day of `time`. */
 export function dayOf(time: Date): string {
   const month = String(time.getMonth() + 1).padStart(2, "0");

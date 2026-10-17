@@ -1,4 +1,6 @@
 import { fitFontSize, fitFontSizeToBox, GLYPH_WIDTH, LINE_HEIGHT, linesAt } from "../fitText";
+import { TEXT_LIMITS } from "@shared";
+import { fontSizes, legibility, space } from "../../theme/theme";
 
 describe("fitFontSize", () => {
   it("keeps the full size when the text fits", () => {
@@ -48,5 +50,21 @@ describe("linesAt", () => {
   it("counts the whole lines that fit, at least one", () => {
     expect(linesAt(25, 100)).toBe(3);
     expect(linesAt(40, 10)).toBe(1);
+  });
+});
+
+describe("TEXT_LIMITS", () => {
+  // Characters that fit a box at the smallest text size, counting whole lines.
+  const capacity = (width: number, height: number) =>
+    Math.floor(width / (legibility.minText * GLYPH_WIDTH)) * linesAt(legibility.minText, height);
+
+  // Boxes measured on the 1280x800 design, inside a 2x1 tile.
+  it("leaves room for the longest message beside a photo and under a label", () => {
+    const labelHeight = fontSizes.label * LINE_HEIGHT + space.xs / 2;
+    expect(capacity(343, 167 - labelHeight)).toBeGreaterThanOrEqual(TEXT_LIMITS.message);
+  });
+
+  it("leaves room for the longest reminder on two lines beside its icon and time", () => {
+    expect(capacity(300, 2 * legibility.minText * LINE_HEIGHT)).toBeGreaterThanOrEqual(TEXT_LIMITS.reminder);
   });
 });

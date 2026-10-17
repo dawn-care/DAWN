@@ -3,7 +3,7 @@ import { act, render } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
 import { readPairedId } from "../../pairing/pairingState";
 import type { MediaItem } from "../media";
-import { PlaybackProvider, usePlayback } from "../PlaybackProvider";
+import { PAIRING_RETRY_MS, PlaybackProvider, usePlayback } from "../PlaybackProvider";
 
 jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 
@@ -47,6 +47,19 @@ describe("PlaybackProvider", () => {
     jest.mocked(readPairedId).mockResolvedValue(null);
     await start();
     expect(playback.screen).toBe("unpaired");
+  });
+
+  it("tries again while storage can't be read, showing nothing until it can", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.mocked(readPairedId).mockRejectedValueOnce(new Error("keystore unavailable"));
+    await start();
+    expect(playback.screen).toBe("starting");
+
+    await act(async () => jest.advanceTimersByTime(PAIRING_RETRY_MS));
+
+    expect(playback.screen).toBe("alwaysOn");
+    expect(readPairedId).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 
   it("picks up a new pairing when asked to check again", async () => {
