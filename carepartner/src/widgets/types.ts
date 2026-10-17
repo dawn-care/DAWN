@@ -46,6 +46,19 @@ export type ReminderItem = {
 /** The day's reminders, in time order. */
 export type ReminderData = { items: ReminderItem[] };
 
+/**
+ * A 2×1 data widget: an icon beside a short label, a word in large type and
+ * an optional detail line. Sports uses it as the team, "Lost 3–4" and
+ * "vs Tampa Bay Rays".
+ */
+export type WideTileData = {
+  /** A tile icon key (see `renderers/icons.ts`). */
+  icon: string;
+  label: string;
+  word: string;
+  detail?: string | null;
+};
+
 /** One news headline. */
 export type HeadlineData = { title: string };
 
@@ -61,6 +74,7 @@ export type WidgetPlacement =
   | Placed<"tile", TileData>
   | Placed<"message", MessageData>
   | Placed<"reminder", ReminderData>
-  | Placed<"headline", HeadlineData>;
+  | Placed<"headline", HeadlineData>
+  | Placed<"wideTile", WideTileData>;
 
 export type RendererName = WidgetPlacement["renderer"];

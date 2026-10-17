@@ -44,15 +44,28 @@ describe("placementsFor", () => {
     });
   });
 
-  it.each([
-    ["won", "Won"],
-    ["lost", "Lost"],
-    ["tied", "Tied"],
-    ["upcoming", "Soon"],
-  ])("shows a sports result of %s as %s, with the team", (result, word) => {
-    const sports = widget({ type: "sports", data: { league: "mlb", team_name: "Yankees", result } });
+  it("shows a sports result with the score and the opponent", () => {
+    const sports = widget({
+      type: "sports", width: 2, height: 1,
+      data: {
+        league: "mlb", team_name: "New York Yankees", result: "lost",
+        opponent_team_name: "Tampa Bay Rays", team_score: 3, opponent_score: 4,
+      },
+    });
 
-    expect(placed(sports)[0]).toMatchObject({ renderer: "tile", data: { icon: "baseball", word, label: "Yankees" } });
+    expect(placed(sports)[0]).toMatchObject({
+      renderer: "wideTile",
+      data: { icon: "baseball", label: "New York Yankees", word: "Lost 3–4", detail: "vs Tampa Bay Rays" },
+    });
+  });
+
+  it("says when a team hasn't played yet this season", () => {
+    const sports = widget({
+      type: "sports", width: 2, height: 1,
+      data: { league: "nba", team_name: "Boston Celtics", result: "upcoming", opponent_team_name: "", team_score: 0, opponent_score: 0 },
+    });
+
+    expect(placed(sports)[0].data).toEqual({ icon: "basketball", label: "Boston Celtics", word: "No games yet" });
   });
 
   it("shows a photo with its caption, or else its name", () => {
@@ -132,7 +145,8 @@ describe("placementsFor", () => {
     ["has a message with no text", widget({ type: "message", width: 2, height: 1, config: { text: " " } })],
     ["has no reminders it can read", widget({ type: "reminder", width: 2, height: 1, config: { items: [{ time: "9" }] } })],
     ["has no headlines", widget({ type: "news", width: 2, height: 1, data: { articles: [] } })],
-    ["has a sports result it doesn't know", widget({ type: "sports", data: { team_name: "Yankees", result: "rained out" } })],
+    ["has a sports result it doesn't know", widget({ type: "sports", width: 2, height: 1, data: { team_name: "Yankees", result: "rained out", team_score: 1, opponent_score: 0 } })],
+    ["has a sports result with no score", widget({ type: "sports", width: 2, height: 1, data: { team_name: "Yankees", result: "won" } })],
   ])("leaves out a widget that %s, and says how many", (_name, bad) => {
     const good = widget({ id: 9, col: 3, data: { temp: 48 } });
 
