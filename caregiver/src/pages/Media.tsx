@@ -8,7 +8,7 @@
  *
  *  - Header with three ways to add something: camera, voice, file upload
  *  - Filter pills (All / Photos / Videos / Audio) with counts
- *  - A three column grid of cards, newest first
+ *  - A grid of cards (3 columns, 2 beside the panel on wide screens), newest first
  *  - A right-hand panel that shows the selected item, or the add flow that
  *    was picked in the header
  *
@@ -24,7 +24,7 @@ import { Mic, Upload, Video } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
-import { ApiError, deleteMedia, friendlyError, listMedia, listScheduledItems } from "../media/api";
+import { ApiError, deleteMedia, deleteMediaOnExit, friendlyError, listMedia, listScheduledItems } from "../media/api";
 import type { Media as MediaItem, ScheduledItem } from "../media/api";
 import type { MediaKind } from "../media/constants";
 import DetailPanel from "../media/DetailPanel";
@@ -38,7 +38,11 @@ import UploadPanel from "../media/UploadPanel";
 // Items the caregiver removed whose Undo toast is still open. The server is
 // told to delete them only when the toast closes, so they stay hidden from
 // every list load until then. Module level, because the toast outlives this page.
+// If the page is closed or reloaded first, the pagehide listener below sends
+// the deletes then, so a removed item doesn't come back.
 const pendingRemovalIds = new Set<number>();
+
+window.addEventListener("pagehide", () => pendingRemovalIds.forEach(deleteMediaOnExit));
 
 type Filter = "all" | MediaKind;
 type Panel = "detail" | "file";
@@ -140,6 +144,8 @@ export default function Media() {
   const savedInBatch = useRef<MediaItem[]>([]);
   // Focus goes back here when the upload panel is closed
   const uploadButton = useRef<HTMLButtonElement>(null);
+  // The carepartner whose list is on screen; null until it has loaded
+  const loadedFor = useRef<number | null>(null);
 
   /* ============================
      Effects
@@ -148,23 +154,45 @@ export default function Media() {
   useEffect(() => {
     if (activeCarePartnerId === null) return;
 
+    // Another carepartner's list must not show while this one loads
+    if (loadedFor.current !== activeCarePartnerId) {
+      loadedFor.current = null;
+      setItems(null);
+    }
+
     let cancelled = false;
     // The schedule only adds detail, so a failure there must not hide the media
-    Promise.all([listMedia(activeCarePartnerId), listScheduledItems(activeCarePartnerId).catch(() => null)])
+    Promise.all([
+      listMedia(activeCarePartnerId),
+      listScheduledItems(activeCarePartnerId).catch((err) => {
+        console.warn("Could not load the schedule; showing plainer schedule text", err);
+        return null;
+      }),
+    ])
       .then(([list, schedule]) => {
         if (cancelled) return;
+        loadedFor.current = activeCarePartnerId;
         setItems(list.filter((item) => !pendingRemovalIds.has(item.id)));
         setScheduled(schedule);
         setLoadError(null);
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(friendlyError(err));
+        if (cancelled) return;
+        // A refresh that fails leaves what is already on screen; only a first load has nothing to show
+        if (loadedFor.current === activeCarePartnerId) {
+          toast.show(`Couldn't refresh the list. ${friendlyError(err)}`, {
+            actionLabel: "Try again",
+            onAction: () => setReloadKey((key) => key + 1),
+          });
+        } else {
+          setLoadError(friendlyError(err));
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeCarePartnerId, reloadKey]);
+  }, [activeCarePartnerId, reloadKey, toast]);
 
   /* ============================
      Derived Values

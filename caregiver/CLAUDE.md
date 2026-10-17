@@ -28,9 +28,9 @@ Single `<Routes>` tree. Two independent gates apply to most routes:
 - `AuthContext` (`src/context/AuthContext.tsx`) tracks `isAuthenticated`/`user` (Google OAuth session) and `activeCarePartnerId` — the carepartner currently being managed, persisted to `localStorage` so it survives reloads. A caregiver can manage multiple carepartners; nothing in the UI scopes data by carepartner except this one context value.
 - `RequireCarePartner` (`src/components/RequireCarepartner.tsx`) wraps almost every content route (`/library`, `/agenda`, `/agenda/:date`, `/media*`, `/prompt*`, `/widget*`) and redirects to `/setup` if `activeCarePartnerId` is falsy. It does **not** check `isAuthenticated` — a route can be "carepartner-gated" without being auth-gated, so don't assume one implies the other. `/`, `/guide`, `/login`, `/settings`, `/setup` are intentionally ungated.
 
-### No API client layer — calls are per-component
+### API calls: per-component, except the media page
 
-There is no shared `api.ts`/service module. Each page/component that talks to the backend independently reads `const API_URL = import.meta.env.VITE_API_URL` at the top of the file and calls `fetch`/`axios` directly inline (see `src/pages/Login.tsx`, `src/pages/AccountSetup.tsx`, `src/components/ConfigurationForm.tsx`). When adding a new API call, follow this existing per-file convention rather than introducing a new shared client — that would be inconsistent with everything else in the codebase.
+There is no app-wide `api.ts`/service module. Each older page/component that talks to the backend independently reads `const API_URL = import.meta.env.VITE_API_URL` at the top of the file and calls `fetch`/`axios` directly inline (see `src/pages/Login.tsx`, `src/pages/AccountSetup.tsx`, `src/components/ConfigurationForm.tsx`). The newer feature folders (so far `src/media/`) keep one `api.ts` for their feature, with typed responses, an `ApiError` carrying the server's `code`, and `friendlyError` for caregiver wording; follow that for a new feature built on the endpoints in `docs/api/screen-and-media.md`. Don't add one app-wide client, and don't move the older inline calls into these files.
 
 ### Module/Configuration types mirror the backend
 

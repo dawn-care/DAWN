@@ -3,13 +3,15 @@
  *
  * User: Caregiver
  *
- * Names and saves one picked file. The caregiver sees a small preview, a name
- * field (starting as the file name) and Save; there is no scheduling or
- * placement here, that happens from the detail panel afterwards.
+ * Names and saves one picked file. The caregiver sees a preview (the photo
+ * itself, or an icon for video and audio), a name field (starting as the
+ * file name) and Save; there is no scheduling or placement here, that
+ * happens from the detail panel afterwards.
  *
  * When several files were picked, the panel is shown for each in turn with
- * "File 2 of 5" and a Skip button. If saving fails the file is kept, so
- * Save becomes "Try again" and nothing has to be picked again.
+ * "File 2 of 5". Skip is always there. Close stops going through the rest,
+ * and cancels the upload if one is running. If saving fails the file is
+ * kept, so Save becomes "Try again" and nothing has to be picked again.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +19,7 @@ import type { FormEvent } from "react";
 import { Image, Music, Video, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
 import TextField from "../components/ui/form/TextField";
-import { friendlyError, uploadMedia } from "./api";
+import { friendlyError, isAbort, uploadMedia } from "./api";
 import type { Media } from "./api";
 import { ERROR_MESSAGES } from "./constants";
 import type { PendingFile } from "./files";
@@ -29,7 +31,7 @@ interface SavePanelProps {
   /** 1-based place of this file among the ones picked */
   position: number;
   total: number;
-  /** Messages for files that were turned away before this step */
+  /** Messages for files that were turned away before this step; shown on the first file only */
   notices: string[];
   onSaved: (media: Media) => void;
   onSkip: () => void;
@@ -67,12 +69,17 @@ export default function SavePanel({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBroken, setPreviewBroken] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
+  // The upload in progress, so closing the panel can cancel it
+  const upload = useRef<AbortController | null>(null);
 
   // Each file's panel opens ready to type its name; the suggested name is selected so typing replaces it
   useEffect(() => {
     nameField.current?.focus();
     nameField.current?.select();
   }, []);
+
+  // Leaving the panel any other way (e.g. picking a card) also cancels a running upload
+  useEffect(() => () => upload.current?.abort(), []);
 
   // A photo is shown as itself; the object URL is released when the file changes or the panel goes
   useEffect(() => {
@@ -94,13 +101,27 @@ export default function SavePanel({
     setSaving(true);
     setError(null);
     setSaveFailed(false);
+    const controller = new AbortController();
+    upload.current = controller;
+    let saved: Media;
     try {
-      onSaved(await uploadMedia({ carepartnerId, file, kind, displayName: name }));
+      saved = await uploadMedia({ carepartnerId, file, kind, displayName: name, signal: controller.signal });
     } catch (err) {
+      // Closing the panel cancelled it; there is nothing left to update
+      if (isAbort(err)) return;
       setError(friendlyError(err));
       setSaveFailed(true);
       setSaving(false);
+      return;
     }
+    // Outside the try: a problem handling the saved item must not read as a failed upload (retrying would add a duplicate)
+    onSaved(saved);
+  };
+
+  // Close while an upload is running cancels it
+  const close = () => {
+    upload.current?.abort();
+    onClose();
   };
 
   return (
@@ -110,8 +131,7 @@ export default function SavePanel({
         <IconButton
           label="Close"
           icon={<X size={20} strokeWidth={2.4} aria-hidden="true" />}
-          onClick={onClose}
-          disabled={saving}
+          onClick={close}
         />
       </div>
 

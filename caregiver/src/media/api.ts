@@ -48,6 +48,8 @@ export interface ScheduledItem {
   start_time: string;
   repeat: Repeat;
   end_date: string | null;
+  /** Single days removed with "delete just this day" */
+  skip_dates: string[];
 }
 
 /* ============================
@@ -65,35 +67,53 @@ export class ApiError extends Error {
   }
 }
 
-// Lists change whenever something is saved or removed, so never reuse a stored response. Without this the browser can keep an old one, such as the error page an out-of-date server sent earlier
+// Lists change whenever something is saved or removed, so never reuse a stored response
 const NO_CACHE: RequestInit = { cache: "no-store" };
 
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  // A FormData body needs no Content-Type: the browser adds the multipart boundary
-  const headers =
-    init.body && !(init.body instanceof FormData)
-      ? { "Content-Type": "application/json", ...init.headers }
-      : init.headers;
+// The code to use when the response has no JSON body, e.g. a proxy's own error page
+function codeFromStatus(status: number): string {
+  return status === 413 ? "FILE_TOO_LARGE" : "INTERNAL_ERROR";
+}
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  // A FormData body needs no Content-Type: the browser adds the multipart boundary
+  if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  } catch (err) {
+    // A request the caller cancelled is not a failure to report
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    console.error(`${init.method ?? "GET"} ${path} could not reach the server`, err);
+    throw new ApiError(0, "NETWORK_ERROR", "could not reach the server");
+  }
   if (res.status === 204) return undefined as T;
 
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new ApiError(res.status, body?.code ?? "INTERNAL_ERROR", body?.error ?? res.statusText);
+    const code = body?.code ?? codeFromStatus(res.status);
+    if (!ERROR_MESSAGES[code]) console.error(`${init.method ?? "GET"} ${path} failed`, res.status, body);
+    throw new ApiError(res.status, code, body?.error ?? res.statusText);
   }
-  // A 200 that isn't JSON means we reached something other than the API (e.g. an old server build that serves the web app for unknown paths)
+  // A 200 that isn't JSON means we reached something other than the API (e.g. the web app's catch-all page)
   if (body === null) throw new ApiError(res.status, "INTERNAL_ERROR", "response was not JSON");
   return body as T;
 }
 
 /**
- * Wording to show the caregiver for anything thrown by a call here. Network
- * failures and unknown codes get the generic message.
+ * Wording to show the caregiver for anything thrown by a call here. Unknown
+ * codes and anything that isn't an ApiError get the generic message.
  */
 export function friendlyError(err: unknown): string {
   if (err instanceof ApiError) return ERROR_MESSAGES[err.code] ?? GENERIC_ERROR;
   return GENERIC_ERROR;
+}
+
+/** The caregiver cancelled a request, e.g. closed the panel during an upload */
+export function isAbort(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
 }
 
 /* ============================
@@ -111,15 +131,17 @@ interface UploadInput {
   file: File;
   kind: MediaKind;
   displayName: string;
+  /** Aborting it cancels the upload; the call then rejects (see isAbort) */
+  signal?: AbortSignal;
 }
 
-export function uploadMedia({ carepartnerId, file, kind, displayName }: UploadInput): Promise<Media> {
+export function uploadMedia({ carepartnerId, file, kind, displayName, signal }: UploadInput): Promise<Media> {
   const form = new FormData();
   form.append("file", file);
   form.append("kind", kind);
   form.append("carepartner_id", String(carepartnerId));
   form.append("display_name", displayName.trim());
-  return api<Media>("/media", { method: "POST", body: form });
+  return api<Media>("/media", { method: "POST", body: form, signal });
 }
 
 export function renameMedia(id: number, displayName: string): Promise<Media> {
@@ -131,10 +153,21 @@ export function renameMedia(id: number, displayName: string): Promise<Media> {
 
 /**
  * Deletes the item and its file. The server also removes what depends on it
- * (widgets, scheduled items), so warn first when `usage` is not empty.
+ * (widgets, scheduled items); the remove dialog tells the caregiver so.
  */
 export function deleteMedia(id: number): Promise<void> {
   return api<void>(`/media/${id}`, { method: "DELETE" });
+}
+
+/**
+ * Deletes an item as the page is being left, when a normal request would be
+ * cancelled. `keepalive` lets the browser finish it after the page is gone,
+ * so there is no result to wait for.
+ */
+export function deleteMediaOnExit(id: number): void {
+  void fetch(`${API_URL}/media/${id}`, { method: "DELETE", keepalive: true }).catch(() => {
+    // Nothing can be shown once the page is closing; the item is simply still there next visit
+  });
 }
 
 /** Address of the file itself, for <img>, <video> and <audio>; supports seeking */
@@ -146,7 +179,7 @@ export function fileUrl(media: Pick<Media, "url">): string {
    Scheduled items
 ============================ */
 
-/** Every scheduled item, once each. Used to say when a video or audio plays */
+/** Every scheduled item, once each. Used to say when a media item plays */
 export function listScheduledItems(carepartnerId: number): Promise<ScheduledItem[]> {
   return api<ScheduledItem[]>(`/scheduled-items?carepartner_id=${carepartnerId}`, NO_CACHE);
 }
@@ -158,35 +191,51 @@ export function listScheduledItems(carepartnerId: number): Promise<ScheduledItem
 // How long to wait for a file's length before giving up on it
 const PROBE_TIMEOUT_MS = 8000;
 
+export interface MediaProbe {
+  /** Length in seconds, or null if the browser couldn't tell */
+  seconds: number | null;
+  /** True when a file read as video has no picture, i.e. it is really audio; false if unknown */
+  audioOnly: boolean;
+}
+
+const UNKNOWN_PROBE: MediaProbe = { seconds: null, audioOnly: false };
+
 /**
- * Length in seconds of a video or audio file the caregiver picked, read from
- * its metadata in the browser. Returns null when the browser can't tell
- * (an unsupported codec, a file with no stored length, or a file that takes
- * too long to read); the caller should then let the server check the length.
+ * Reads a video or audio file the caregiver picked from its metadata in the
+ * browser. Both kinds are read with a <video> element so a picture-less file
+ * (a voice memo saved as .webm, .ogg or .mp4) shows up as `audioOnly`.
+ * Returns unknown values when the browser can't tell (an unsupported codec, a
+ * file with no stored length, or one that takes too long to read); the caller
+ * should then let the server check.
  */
-export function probeDuration(file: Blob, kind: "video" | "audio"): Promise<number | null> {
+export function probeMedia(file: Blob): Promise<MediaProbe> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
-    const el = document.createElement(kind);
-    const done = (seconds: number | null) => {
+    const el = document.createElement("video");
+    let settled = false;
+    const done = (probe: MediaProbe) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(giveUp);
       el.removeAttribute("src");
       el.load();
       URL.revokeObjectURL(url);
-      resolve(seconds);
+      resolve(probe);
     };
 
     // Some files neither load nor fail; don't wait on them forever
-    const giveUp = window.setTimeout(() => done(null), PROBE_TIMEOUT_MS);
+    const giveUp = window.setTimeout(() => {
+      console.warn("Timed out reading the length of a picked file");
+      done(UNKNOWN_PROBE);
+    }, PROBE_TIMEOUT_MS);
 
     el.preload = "metadata";
-    el.onloadedmetadata = () => {
-      window.clearTimeout(giveUp);
-      done(Number.isFinite(el.duration) ? el.duration : null);
-    };
-    el.onerror = () => {
-      window.clearTimeout(giveUp);
-      done(null);
-    };
+    el.onloadedmetadata = () =>
+      done({
+        seconds: Number.isFinite(el.duration) ? el.duration : null,
+        audioOnly: el.videoWidth === 0,
+      });
+    el.onerror = () => done(UNKNOWN_PROBE);
     el.src = url;
   });
 }

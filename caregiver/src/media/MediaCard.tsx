@@ -33,7 +33,7 @@ interface MediaCardProps {
 }
 
 export default function MediaCard({ media, selected, isNew = false, onSelect }: MediaCardProps) {
-  // Browsers can't draw every photo type (HEIC outside Safari); show the icon instead
+  // The photo didn't load (a type the browser can't draw, such as HEIC outside Safari, or the file is unreachable); show the icon instead
   const [photoBroken, setPhotoBroken] = useState(false);
   const status = mediaStatus(media);
   const Icon = KIND_ICONS[media.kind];
@@ -54,7 +54,10 @@ export default function MediaCard({ media, selected, isNew = false, onSelect }: 
             src={fileUrl(media)}
             alt=""
             loading="lazy"
-            onError={() => setPhotoBroken(true)}
+            onError={() => {
+              console.warn(`Photo ${media.id} did not load`);
+              setPhotoBroken(true);
+            }}
             className="w-full h-full object-cover"
           />
         ) : (

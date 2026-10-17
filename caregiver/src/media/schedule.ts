@@ -3,9 +3,9 @@
  *
  * User: Caregiver
  *
- * Turns scheduled items into the plain-English line shown on a video's or
- * audio's detail panel, e.g. "Every day at 8:00 am". Day and date names
- * come from @shared so they match the rest of the app.
+ * Turns scheduled items into the plain-English line shown on a media item's
+ * detail panel, e.g. "Every day at 8:00 am". Day and date names come from
+ * @shared so they match the rest of the app.
  */
 
 import { dateLabel, dayName, ordinal, parseDate, timeLabel } from "@shared";
@@ -37,15 +37,35 @@ export function describeScheduledItem(item: ScheduledItem): string {
   return text;
 }
 
+// "YYYY-MM-DD" in local time, comparable with the server's date text
+function todayText(now: Date): string {
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+// Whether the item can still play: a one-time item that has passed or been skipped,
+// or a repeating one whose end date has passed, is finished
+function isUpcoming(item: ScheduledItem, today: string): boolean {
+  if (item.repeat === "once") return item.start_date >= today && !item.skip_dates.includes(item.start_date);
+  return item.end_date === null || item.end_date >= today;
+}
+
 /**
- * The line for everything scheduled for one media item: the earliest
- * schedule, plus "and N more" when there are others. Null when nothing is
- * scheduled for it.
+ * The line for everything still scheduled for one media item: the earliest
+ * schedule, plus "and N more" when there are others. Finished schedules are
+ * left out. Null when nothing is scheduled for it. `now` is only for telling
+ * what has finished.
  */
-export function describeSchedule(items: ScheduledItem[], mediaId: number): string | null {
+export function describeSchedule(items: ScheduledItem[], mediaId: number, now: Date = new Date()): string | null {
+  const today = todayText(now);
   const mine = items
-    .filter((item) => item.media_id === mediaId)
-    .sort((a, b) => `${a.start_date} ${a.start_time}`.localeCompare(`${b.start_date} ${b.start_time}`));
+    .filter((item) => item.media_id === mediaId && isUpcoming(item, today))
+    .sort((a, b) => {
+      const first = `${a.start_date} ${a.start_time}`;
+      const second = `${b.start_date} ${b.start_time}`;
+      return first < second ? -1 : first > second ? 1 : 0;
+    });
 
   if (mine.length === 0) return null;
   const first = describeScheduledItem(mine[0]);

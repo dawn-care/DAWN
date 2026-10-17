@@ -12,7 +12,7 @@
  * is the authority, so a file the browser can't measure is let through.
  */
 
-import { probeDuration } from "./api";
+import { probeMedia } from "./api";
 import { ACCEPTED_TYPES, MAX_DURATION_SECONDS, MAX_FILE_BYTES } from "./constants";
 import type { MediaKind } from "./constants";
 
@@ -44,6 +44,8 @@ function extensionOf(name: string): string {
  * Which kind of media a file is, or null if it isn't a type we accept. The
  * browser's MIME type decides when it gives a known one; HEIC, MOV and some
  * others arrive with no type or a generic one, so the extension decides then.
+ * This is a first guess for files that could be either (.webm, .ogg): the
+ * video list is tried first, and checkFiles moves a file with no picture to audio.
  */
 export function kindOfFile(file: File): MediaKind | null {
   const byMime = KINDS.find((kind) => ACCEPTED_TYPES[kind].mimeTypes.includes(file.type));
@@ -53,13 +55,23 @@ export function kindOfFile(file: File): MediaKind | null {
   return KINDS.find((kind) => ACCEPTED_TYPES[kind].extensions.includes(extension)) ?? null;
 }
 
-/** Checks each file and splits them into accepted and rejected, keeping the order picked */
+/**
+ * Checks each file and splits them into accepted and rejected, keeping the
+ * order picked. Files are read one at a time: many <video> elements loading
+ * at once can make slow ones time out, which would skip their length check.
+ */
 export async function checkFiles(files: File[]): Promise<CheckedFiles> {
-  const results = await Promise.all(files.map(checkFile));
-
   const accepted: PendingFile[] = [];
   const rejected: string[] = [];
-  for (const result of results) {
+  for (const file of files) {
+    let result: PendingFile | string;
+    try {
+      result = await checkFile(file);
+    } catch (err) {
+      // One unreadable file must not sink the others
+      console.error(`Could not check "${file.name}"`, err);
+      result = `"${file.name}" couldn't be checked. Try picking it again.`;
+    }
     if (typeof result === "string") rejected.push(result);
     else accepted.push(result);
   }
@@ -67,14 +79,18 @@ export async function checkFiles(files: File[]): Promise<CheckedFiles> {
 }
 
 async function checkFile(file: File): Promise<PendingFile | string> {
-  const kind = kindOfFile(file);
+  let kind = kindOfFile(file);
   if (!kind) return `"${file.name}" isn't a supported file type.`;
   if (file.size > MAX_FILE_BYTES) return `"${file.name}" is too large. Try a shorter clip.`;
 
   let seconds: number | null = null;
   if (kind !== "photo") {
-    seconds = await probeDuration(file, kind);
-    if (seconds !== null && seconds > MAX_DURATION_SECONDS) {
+    const probe = await probeMedia(file);
+    seconds = probe.seconds;
+    // .webm, .ogg and .mp4 hold either; a "video" with no picture is audio
+    if (kind === "video" && probe.audioOnly) kind = "audio";
+    // The server rounds before comparing, so a file a fraction over still passes there
+    if (seconds !== null && Math.round(seconds) > MAX_DURATION_SECONDS) {
       return `"${file.name}" is too long. Videos and audio can be at most 10 minutes long.`;
     }
   }

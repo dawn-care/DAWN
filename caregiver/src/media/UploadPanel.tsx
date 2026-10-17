@@ -16,7 +16,7 @@ import { Upload, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
 import { FILE_INPUT_ACCEPT } from "./constants";
 import { checkFiles } from "./files";
-import type { PendingFile } from "./files";
+import type { CheckedFiles, PendingFile } from "./files";
 import { PRIMARY_BUTTON } from "./styles";
 
 interface UploadPanelProps {
@@ -33,9 +33,16 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
   // Messages for files that failed when none passed, so there is nothing else to show
   const [rejected, setRejected] = useState<string[]>([]);
 
+  // False once the panel is closed, so a check still running can't queue files the caregiver walked away from
+  const mounted = useRef(true);
+
   // The panel opens because the caregiver asked for it, so put the keyboard in it
   useEffect(() => {
     chooseButton.current?.focus();
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
   const handleFiles = async (picked: File[]) => {
@@ -43,7 +50,18 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
 
     setChecking(true);
     setRejected([]);
-    const result = await checkFiles(picked);
+    let result: CheckedFiles;
+    try {
+      result = await checkFiles(picked);
+    } catch (err) {
+      console.error("Checking the picked files failed", err);
+      if (mounted.current) {
+        setChecking(false);
+        setRejected(["Those files couldn't be checked. Please try again."]);
+      }
+      return;
+    }
+    if (!mounted.current) return;
     setChecking(false);
 
     if (result.accepted.length > 0) onChosen(result.accepted, result.rejected);

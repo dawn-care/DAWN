@@ -1,11 +1,17 @@
 import { ordinal, parseDate, timeLabel } from "../dateLabels";
 
+// In a US time zone, reading "2026-10-03" as UTC would give October 2 in the evening, so
+// these only catch that mistake when the tests run in such a zone
 describe("parseDate", () => {
-  it("reads the date as a local date, not UTC", () => {
-    const date = parseDate("2026-10-03");
-    expect(date.getFullYear()).toBe(2026);
-    expect(date.getMonth()).toBe(9);
-    expect(date.getDate()).toBe(3);
+  it.each([
+    ["2026-10-03", 2026, 9, 3],
+    ["2026-01-05", 2026, 0, 5],
+    ["2026-12-31", 2026, 11, 31],
+  ])("reads %s as a local date, not UTC", (text, year, month, day) => {
+    const date = parseDate(text);
+    expect(date.getFullYear()).toBe(year);
+    expect(date.getMonth()).toBe(month);
+    expect(date.getDate()).toBe(day);
     expect(date.getHours()).toBe(0);
   });
 });

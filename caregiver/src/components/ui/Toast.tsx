@@ -3,7 +3,9 @@
  *
  * User: Caregiver
  *
- * Status toast with an optional action (e.g. Undo).
+ * Status toast with an optional action (e.g. Undo) and an optional
+ * onDismiss, which runs when the toast closes without its action being used
+ * (timeout, its X, or dismiss()).
  *
  *  - ToastProvider holds the toast stack and provides useToast(). Mount it
  *    once at the app root so any page can show a toast.
@@ -87,7 +89,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (!target) return;
     stack.current = stack.current.filter((t) => t.id !== target.id);
     setToasts(stack.current);
-    if (!options.actionTaken) target.onDismiss?.();
+    if (!options.actionTaken) {
+      try {
+        target.onDismiss?.();
+      } catch (err) {
+        // The toast is already closed; a failing callback must not become an uncaught error in a timer or click
+        console.error("A toast's onDismiss threw", err);
+      }
+    }
   }, []);
 
   const show = useCallback((text: string, options: ToastOptions = {}) => {

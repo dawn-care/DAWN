@@ -7,8 +7,9 @@
  * each kind, the 10 minute limit, and the wording for server error codes.
  * The server decides what it accepts by sniffing the file's bytes
  * (server/internal/controllers/media/media_controller.go); these lists
- * mirror docs/api/screen-and-media.md so the picker and the messages
- * match, but the server stays the authority.
+ * follow what it accepts (the docs/api/screen-and-media.md list leaves out
+ * a few formats, e.g. AAC) so the picker and the messages match, but the
+ * server stays the authority.
  */
 
 export type MediaKind = "photo" | "video" | "audio";
@@ -37,8 +38,8 @@ export interface AcceptedTypes {
 
 export const ACCEPTED_TYPES: Record<MediaKind, AcceptedTypes> = {
   photo: {
-    mimeTypes: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/heic"],
-    extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"],
+    mimeTypes: ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif"],
+    extensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"],
   },
   video: {
     mimeTypes: ["video/mp4", "video/quicktime", "video/webm", "video/ogg"],
@@ -69,10 +70,12 @@ export const FILE_INPUT_ACCEPT = Object.values(ACCEPTED_TYPES)
 // Shown when the server gives a code we have no wording for
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
 
-// Caregiver-facing wording for the server's error codes (docs/api/screen-and-media.md)
+// Caregiver-facing wording for the server's error codes (docs/api/screen-and-media.md), plus NETWORK_ERROR
 export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_REQUEST: GENERIC_ERROR,
   INTERNAL_ERROR: GENERIC_ERROR,
+  // Not a server code: the request never got an answer
+  NETWORK_ERROR: "Can't reach the server. Check your connection and try again.",
   NOT_FOUND: "This was deleted. Refresh to see the latest.",
   INVALID_KIND: "Choose photo, video or audio.",
   INVALID_FILE_TYPE: "That file type isn't supported.",

@@ -3,9 +3,11 @@
  *
  * User: Caregiver
  *
- * Asks the caregiver to confirm removing a photo, video or audio file. It
- * only asks: the page does the removing, and shows an Undo toast afterwards,
- * so the dialog needs no warning text.
+ * Asks the caregiver to confirm removing a photo, video or audio file, and
+ * says what else goes with it. The warning is the same whether or not the
+ * file is in use: the server removes whatever depends on it (widgets,
+ * scheduled items). The dialog only asks: the page does the removing, and
+ * shows an Undo toast afterwards.
  */
 
 import Dialog from "../components/ui/Dialog";
@@ -42,7 +44,7 @@ export default function RemoveMediaDialog({ media, open, onOpenChange, onConfirm
         </>
       }
     >
-      {null}
+      <p className="m-0 text-base">This will be removed from the carepartner screen and all scheduled media.</p>
     </Dialog>
   );
 }

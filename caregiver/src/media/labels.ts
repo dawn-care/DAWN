@@ -3,9 +3,9 @@
  *
  * User: Caregiver
  *
- * Short wording for a media item: the badge on its card ("Video 0:48")
- * and its status line ("On screen", "Not scheduled"). Both are
- * worked out from the item's kind, length and `usage`.
+ * Short wording for a media item: the badge on its card ("Video 0:48",
+ * from its kind and length) and its status line ("On screen", "Not
+ * scheduled", from its kind and `usage`).
  */
 
 import { KIND_LABELS } from "./constants";

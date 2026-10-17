@@ -19,7 +19,7 @@
  */
 
 import { useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent, ReactNode } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode, SyntheticEvent } from "react";
 import { Link } from "react-router-dom";
 import { Check, Image, Music, Play, Video } from "lucide-react";
 import TextField from "../components/ui/form/TextField";
@@ -89,8 +89,9 @@ const PREVIEW_BOX = "h-[196px] flex items-center justify-center overflow-hidden 
 
 export default function DetailPanel({ media, scheduled, justSaved = false, onRenamed, onRemoved }: DetailPanelProps) {
   const [playing, setPlaying] = useState(false);
-  const [playFailed, setPlayFailed] = useState(false);
-  // Browsers can't draw every photo type (HEIC outside Safari); show the icon instead
+  // Why playing failed, worded for the caregiver; null while it hasn't
+  const [playError, setPlayError] = useState<string | null>(null);
+  // The photo didn't load (a type the browser can't draw, such as HEIC outside Safari, or the file is unreachable); show the icon instead
   const [photoBroken, setPhotoBroken] = useState(false);
 
   const [renaming, setRenaming] = useState(false);
@@ -106,6 +107,16 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
   const line = scheduleLine(media, scheduled);
   const onScreen = media.usage.includes("on_screen");
   const PlaceholderIcon = { photo: Image, video: Video, audio: Music }[media.kind];
+
+  const handlePlayError = (event: SyntheticEvent<HTMLMediaElement>) => {
+    const error = event.currentTarget.error;
+    console.error(`Could not play media ${media.id}`, error);
+    setPlayError(
+      error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+        ? "This file couldn't be played in your browser."
+        : "This file couldn't be loaded. Check your connection and try again."
+    );
+  };
 
   /* ============================
      Rename
@@ -137,13 +148,16 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
 
     setSaving(true);
     setRenameError(null);
+    let updated: Media;
     try {
-      onRenamed(await renameMedia(media.id, draft));
+      updated = await renameMedia(media.id, draft);
     } catch (err) {
       setRenameError(friendlyError(err));
       setSaving(false);
       return;
     }
+    // Outside the try: a problem handling the new name must not read as a failed rename
+    onRenamed(updated);
     setSaving(false);
     stopRename();
   };
@@ -174,7 +188,7 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
           src={fileUrl(media)}
           controls
           autoPlay
-          onError={() => setPlayFailed(true)}
+          onError={handlePlayError}
           className="w-full h-[196px] rounded-xl bg-black"
         />
       ) : (
@@ -183,7 +197,10 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
             <img
               src={fileUrl(media)}
               alt={media.display_name}
-              onError={() => setPhotoBroken(true)}
+              onError={() => {
+                console.warn(`Photo ${media.id} did not load`);
+                setPhotoBroken(true);
+              }}
               className="w-full h-full object-contain"
             />
           ) : (
@@ -193,18 +210,21 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
       )}
 
       {playing && media.kind === "audio" && (
-        <audio src={fileUrl(media)} controls autoPlay onError={() => setPlayFailed(true)} className="w-full" />
+        <audio src={fileUrl(media)} controls autoPlay onError={handlePlayError} className="w-full" />
       )}
-      {playFailed && (
+      {playError && (
         <p role="alert" className="m-0 text-base font-bold text-dawn-accent">
-          This file couldn&apos;t be played in your browser.
+          {playError}
         </p>
       )}
 
       {!isPhoto && !playing && (
         <button
           type="button"
-          onClick={() => setPlaying(true)}
+          onClick={() => {
+            setPlayError(null);
+            setPlaying(true);
+          }}
           className={`self-start h-11 px-4 flex items-center gap-2 rounded-[10px] bg-dawn-ink text-base font-bold text-white cursor-pointer ${FOCUS_RING}`}
         >
           <Play size={16} fill="currentColor" aria-hidden="true" />
@@ -245,9 +265,9 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
       {isPhoto ? (
         <>
           <InfoBlock heading="Screen">
-            <span>{onScreen ? "On screen" : "Not on screen"}</span>
+            <span>{onScreen ? "On her screen" : "Not on her screen"}</span>
             <Link to="/" className={ACTION_LINK}>
-              {onScreen ? "Remove from screen" : "Add to screen"}
+              {onScreen ? "Change" : "Add to her screen"}
             </Link>
           </InfoBlock>
           {line && <ScheduleBlock line={line} />}
