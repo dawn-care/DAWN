@@ -3,20 +3,28 @@
  *
  * Palette, type sizes and spacing for the tablet, taken from the
  * visual design (drawn at 1280×800).
+ *
+ * The day colours follow the D.A.W.N. brand palette the staff and family apps
+ * use (night #1E2140, cream #FFF8EF, dusk #5B6091, ember #B4533A). Where a
+ * brand token falls below the tablet's stricter floors it is darkened or
+ * swapped: secondary text is dusk darkened toward night (dusk itself is 5.6:1
+ * on cream, under the 7:1 floor), tile borders are dusk (the brand's border is
+ * nearly invisible on a white tile), and the accent is ember (apricot is too
+ * pale for a marker). The night colours stay warm, for sleep.
  */
 
 export const colors = {
   day: {
-    background: "#F2EADB",
+    background: "#FFF8EF",
     surface: "#FFFFFF",
-    text: "#1E1A15",
-    textSecondary: "#4A4238",
-    border: "#8A7B66",
-    accent: "#9A3412",
-    placeholder: "#E8DDCB",
-    placeholderIcon: "#6B5E4E",
+    text: "#1E2140",
+    textSecondary: "#494D79",
+    border: "#5B6091",
+    accent: "#B4533A",
+    placeholder: "#EDE3D6",
+    placeholderIcon: "#5B6091",
     positive: "#2F5D3A",
-    photoCaption: "rgba(30,26,21,0.84)",
+    photoCaption: "rgba(30,33,64,0.84)",
   },
   night: {
     background: "#15110D",
