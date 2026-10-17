@@ -12,8 +12,7 @@
  *  - A right-hand panel that shows the selected item, or the add flow that
  *    was picked in the header
  *
- * The panel contents are placeholders until the detail, camera, voice and
- * upload panels are built.
+ * The camera, voice and upload panels are placeholders until they are built.
  */
 
 import { useEffect, useState } from "react";
@@ -22,12 +21,19 @@ import { Mic, Upload, Video, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import IconButton from "../components/ui/IconButton";
 import { FOCUS_RING } from "../components/ui/styles";
-import { friendlyError, listMedia } from "../media/api";
-import type { Media as MediaItem } from "../media/api";
+import { useToast } from "../components/ui/toastContext";
+import { ApiError, deleteMedia, friendlyError, listMedia, listScheduledItems } from "../media/api";
+import type { Media as MediaItem, ScheduledItem } from "../media/api";
 import type { MediaKind } from "../media/constants";
+import DetailPanel from "../media/DetailPanel";
 import FilterPills from "../media/FilterPills";
 import type { Pill } from "../media/FilterPills";
 import MediaCard from "../media/MediaCard";
+
+// Items the caregiver removed whose Undo toast is still open. The server is
+// told to delete them only when the toast closes, so they stay hidden from
+// every list load until then. Module level, because the toast outlives this page.
+const pendingRemovalIds = new Set<number>();
 
 type Filter = "all" | MediaKind;
 type Panel = "detail" | "camera" | "mic" | "file";
@@ -44,6 +50,30 @@ const FILTERS: { value: Filter; label: string; empty: string }[] = [
   { value: "video", label: "Videos", empty: "No videos yet." },
   { value: "audio", label: "Audio", empty: "No audio yet." },
 ];
+
+/* ============================
+   Removing
+============================ */
+
+// The Undo toast has closed without Undo: delete for real. A failure brings the item back, with a toast saying so.
+async function commitRemoval(
+  removed: MediaItem,
+  showToast: (text: string) => void,
+  reload: () => void
+) {
+  try {
+    await deleteMedia(removed.id);
+  } catch (err) {
+    // Already gone (deleted somewhere else) is the outcome the caregiver wanted
+    if (!(err instanceof ApiError && err.status === 404)) {
+      showToast(`Couldn't remove "${removed.display_name}". ${friendlyError(err)}`);
+    }
+  } finally {
+    pendingRemovalIds.delete(removed.id);
+    // Show the server's answer: the item is back if the delete failed, and the schedule reflects what went with it
+    reload();
+  }
+}
 
 /* ============================
    Header buttons
@@ -82,8 +112,11 @@ function AddButton({ icon, title, subtitle, open, onClick }: AddButtonProps) {
 
 export default function Media() {
   const { activeCarePartnerId } = useAuth();
+  const toast = useToast();
 
   const [items, setItems] = useState<MediaItem[] | null>(null);
+  // Null if the schedule could not be loaded; the page still works, with plainer schedule text
+  const [scheduled, setScheduled] = useState<ScheduledItem[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Bumped to fetch the list again (the "Try again" button)
   const [reloadKey, setReloadKey] = useState(0);
@@ -100,10 +133,12 @@ export default function Media() {
     if (activeCarePartnerId === null) return;
 
     let cancelled = false;
-    listMedia(activeCarePartnerId)
-      .then((list) => {
+    // The schedule only adds detail, so a failure there must not hide the media
+    Promise.all([listMedia(activeCarePartnerId), listScheduledItems(activeCarePartnerId).catch(() => null)])
+      .then(([list, schedule]) => {
         if (cancelled) return;
-        setItems(list);
+        setItems(list.filter((item) => !pendingRemovalIds.has(item.id)));
+        setScheduled(schedule);
         setLoadError(null);
       })
       .catch((err) => {
@@ -129,6 +164,35 @@ export default function Media() {
     label,
     count: value === "all" ? all.length : all.filter((item) => item.kind === value).length,
   }));
+
+  const handleRenamed = (updated: MediaItem) => {
+    setItems((list) => list && list.map((item) => (item.id === updated.id ? updated : item)));
+    toast.show(`Renamed to "${updated.display_name}".`);
+  };
+
+  // Hide it from the grid right away and select its neighbour. The server
+  // isn't told to delete it until the Undo toast closes, so Undo only has to
+  // cancel that and show the item again.
+  const handleRemoved = (removed: MediaItem) => {
+    const index = visible.findIndex((item) => item.id === removed.id);
+    const neighbour = visible[index + 1] ?? visible[index - 1] ?? null;
+    const reload = () => setReloadKey((key) => key + 1);
+    const showToast = toast.show;
+
+    pendingRemovalIds.add(removed.id);
+    setItems((list) => list && list.filter((item) => item.id !== removed.id));
+    setSelectedId(neighbour?.id ?? null);
+
+    toast.show(`Removed "${removed.display_name}".`, {
+      actionLabel: "Undo",
+      onAction: () => {
+        pendingRemovalIds.delete(removed.id);
+        setSelectedId(removed.id);
+        reload();
+      },
+      onDismiss: () => void commitRemoval(removed, showToast, reload),
+    });
+  };
 
   const retry = () => {
     setLoadError(null);
@@ -212,7 +276,13 @@ export default function Media() {
         >
           {panel === "detail" ? (
             selected ? (
-              <h2 className="m-0 text-xl font-extrabold break-words">{selected.display_name}</h2>
+              <DetailPanel
+                key={selected.id}
+                media={selected}
+                scheduled={scheduled}
+                onRenamed={handleRenamed}
+                onRemoved={() => handleRemoved(selected)}
+              />
             ) : items === null ? null : (
               <p className="m-auto text-center text-2xl font-bold text-dawn-muted">
                 {all.length === 0 ? "Add a media file to see it here." : "Pick something to see it here."}

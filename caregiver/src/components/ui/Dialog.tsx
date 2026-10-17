@@ -33,7 +33,7 @@ export default function Dialog({ open, onOpenChange, title, children, footer }: 
           className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto flex flex-col gap-3 p-4 bg-white border-[1.5px] border-dawn-line-strong rounded-[14px] shadow-dialog text-dawn-ink"
         >
           <div className="flex items-start justify-between gap-2">
-            <RadixDialog.Title className="m-0 text-lg font-extrabold">{title}</RadixDialog.Title>
+            <RadixDialog.Title className="m-0 min-w-0 text-lg font-extrabold break-words">{title}</RadixDialog.Title>
             <RadixDialog.Close asChild>
               <IconButton label="Close" icon={<X size={18} strokeWidth={2.4} aria-hidden="true" />} />
             </RadixDialog.Close>

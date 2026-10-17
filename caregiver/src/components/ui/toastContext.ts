@@ -14,6 +14,17 @@ export interface ToastOptions {
   actionLabel?: string;
   /** Called when the action button is clicked; the toast then closes */
   onAction?: () => void;
+  /**
+   * Called when the toast closes without its action being used: it timed
+   * out, its X was pressed, or dismiss() closed it. Lets a caller finish
+   * something it held back until the chance to undo had passed.
+   */
+  onDismiss?: () => void;
+}
+
+export interface DismissOptions {
+  /** True when the toast closed because its action was used, so onDismiss is skipped */
+  actionTaken?: boolean;
 }
 
 export interface ToastState extends ToastOptions {
@@ -32,8 +43,9 @@ export interface ToastApi {
   /**
    * Closes the toast with this id, wherever it is in the stack. With no id,
    * closes the toast on top. Does nothing if that toast is already gone.
+   * Runs the toast's onDismiss unless `actionTaken` is set.
    */
-  dismiss: (id?: number) => void;
+  dismiss: (id?: number, options?: DismissOptions) => void;
 }
 
 // What ToastViewport needs beyond the API: the stack to draw, and a way to

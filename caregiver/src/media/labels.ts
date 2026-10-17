@@ -4,12 +4,13 @@
  * User: Caregiver
  *
  * Short wording for a media item: the badge on its card ("Video 0:48")
- * and its status line ("On her screen", "Not scheduled"). Both are
+ * and its status line ("On screen", "Not scheduled"). Both are
  * worked out from the item's kind, length and `usage`.
  */
 
 import { KIND_LABELS } from "./constants";
-import type { Media } from "./api";
+import type { Media, ScheduledItem } from "./api";
+import { describeSchedule } from "./schedule";
 
 /** Seconds as m:ss, e.g. 48 -> "0:48", 192 -> "3:12" */
 export function formatDuration(seconds: number): string {
@@ -30,7 +31,7 @@ export interface MediaStatus {
 }
 
 /**
- * Where the item is used. Photos can be on her screen, scheduled and an audio
+ * Where the item is used. Photos can be on screen, scheduled and an audio
  * background all at once; the line names the first that applies. Video and
  * audio can only be scheduled.
  */
@@ -38,7 +39,7 @@ export function mediaStatus(media: Media): MediaStatus {
   const { usage } = media;
 
   if (media.kind === "photo") {
-    if (usage.includes("on_screen")) return { text: "On her screen", active: true };
+    if (usage.includes("on_screen")) return { text: "On screen", active: true };
     if (usage.includes("scheduled")) return { text: "Scheduled", active: true };
     if (usage.includes("audio_background")) return { text: "Audio background", active: true };
     return { text: "Saved", active: false };
@@ -47,4 +48,15 @@ export function mediaStatus(media: Media): MediaStatus {
   return usage.includes("scheduled")
     ? { text: "Scheduled", active: true }
     : { text: "Not scheduled", active: false };
+}
+
+/**
+ * When the item plays, e.g. "Every day at 8:00 am", or null if it isn't
+ * scheduled. `scheduled` is null when the schedule couldn't be loaded; the
+ * item's `usage` still says it is scheduled, so fall back to a plain
+ * "Scheduled".
+ */
+export function scheduleLine(media: Media, scheduled: ScheduledItem[] | null): string | null {
+  const line = scheduled ? describeSchedule(scheduled, media.id) : null;
+  return line ?? (media.usage.includes("scheduled") ? "Scheduled" : null);
 }

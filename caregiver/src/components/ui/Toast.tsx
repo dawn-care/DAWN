@@ -39,7 +39,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { X } from "lucide-react";
 import IconButton from "./IconButton";
 import { ToastContext, ToastStateContext, useToast } from "./toastContext";
-import type { ToastApi, ToastOptions, ToastState, ToastViewportState } from "./toastContext";
+import type { DismissOptions, ToastApi, ToastOptions, ToastState, ToastViewportState } from "./toastContext";
 import { FOCUS_RING } from "./styles";
 
 // Long enough to read the message and reach an Undo
@@ -76,10 +76,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // Which toast the timer is counting down for, and how much time it has left
   const timedId = useRef<number | undefined>(undefined);
   const remaining = useRef(TOAST_DURATION_MS);
+  // The same stack as `toasts`, kept current as soon as it changes, so dismiss
+  // can tell which toast it is closing (and close each only once) without
+  // waiting for a render
+  const stack = useRef<ToastState[]>([]);
   const topId = toasts[0]?.id;
 
-  const dismiss = useCallback((id?: number) => {
-    setToasts((stack) => (id === undefined ? stack.slice(1) : stack.filter((t) => t.id !== id)));
+  const dismiss = useCallback((id?: number, options: DismissOptions = {}) => {
+    const target = id === undefined ? stack.current[0] : stack.current.find((t) => t.id === id);
+    if (!target) return;
+    stack.current = stack.current.filter((t) => t.id !== target.id);
+    setToasts(stack.current);
+    if (!options.actionTaken) target.onDismiss?.();
   }, []);
 
   const show = useCallback((text: string, options: ToastOptions = {}) => {
@@ -88,7 +96,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const active = document.activeElement;
     const returnFocus =
       active instanceof HTMLElement && active !== document.body ? active : null;
-    setToasts((stack) => [...stack, { id, text, returnFocus, ...options }]);
+    stack.current = [...stack.current, { id, text, returnFocus, ...options }];
+    setToasts(stack.current);
     return id;
   }, []);
 
@@ -147,9 +156,10 @@ export function ToastViewport() {
 
   // Close from the toast's own buttons: give focus back if it was inside the
   // toast, so keyboard users don't restart from the top of the page
-  const close = (toast: ToastState, afterClose?: () => void) => {
+  // Closing with the action button is not a dismissal, so onDismiss is skipped
+  const close = (toast: ToastState, actionTaken: boolean, afterClose?: () => void) => {
     const focusWasInside = topCard.current?.contains(document.activeElement) ?? false;
-    dismiss(toast.id);
+    dismiss(toast.id, { actionTaken });
     if (focusWasInside) restoreFocus(toast.returnFocus);
     afterClose?.();
   };
@@ -193,7 +203,7 @@ export function ToastViewport() {
                 // Close first, so a toast the action shows (e.g. "Restored") isn't closed with it
                 <button
                   type="button"
-                  onClick={() => close(toast, toast.onAction)}
+                  onClick={() => close(toast, true, toast.onAction)}
                   className={`shrink-0 h-9 px-2.5 bg-transparent text-[15px] font-bold text-dawn-accent hover:text-dawn-accent-hover cursor-pointer ${FOCUS_RING}`}
                 >
                   {toast.actionLabel}
@@ -202,7 +212,7 @@ export function ToastViewport() {
               <IconButton
                 label="Dismiss"
                 icon={<X size={18} strokeWidth={2.4} aria-hidden="true" />}
-                onClick={() => close(toast)}
+                onClick={() => close(toast, false)}
                 className="-ml-1.5 w-9 h-9"
               />
             </div>
