@@ -10,7 +10,7 @@
  * good ones so the next step can show them.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent } from "react";
 import { Upload, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
@@ -27,10 +27,16 @@ interface UploadPanelProps {
 
 export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
   const input = useRef<HTMLInputElement>(null);
+  const chooseButton = useRef<HTMLButtonElement>(null);
   const [checking, setChecking] = useState(false);
   const [dragging, setDragging] = useState(false);
   // Messages for files that failed when none passed, so there is nothing else to show
   const [rejected, setRejected] = useState<string[]>([]);
+
+  // The panel opens because the caregiver asked for it, so put the keyboard in it
+  useEffect(() => {
+    chooseButton.current?.focus();
+  }, []);
 
   const handleFiles = async (picked: File[]) => {
     if (picked.length === 0) return;
@@ -88,6 +94,7 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
           aria-hidden="true"
         />
         <button
+          ref={chooseButton}
           type="button"
           onClick={() => input.current?.click()}
           disabled={checking}
@@ -99,6 +106,11 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
           Photos, videos up to 10 minutes, or audio and songs. You can pick several.
         </div>
       </div>
+
+      {/* The button label changes while checking, which is not announced by itself */}
+      <p role="status" className="sr-only">
+        {checking ? "Checking files" : ""}
+      </p>
 
       {rejected.length > 0 && (
         <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-dawn-accent">

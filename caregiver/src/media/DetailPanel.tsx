@@ -62,7 +62,7 @@ function ScheduleBlock({ line }: { line: string | null }) {
     <InfoBlock heading="Schedule">
       {line ? (
         <>
-          <Link to="/calendar" className={`text-dawn-ink underline underline-offset-2 hover:text-dawn-accent ${FOCUS_RING}`}>
+          <Link to="/calendar" className={`inline-flex items-center min-h-11 text-dawn-ink underline underline-offset-2 hover:text-dawn-accent ${FOCUS_RING}`}>
             {line}
           </Link>
           <Link to="/calendar" className={ACTION_LINK}>

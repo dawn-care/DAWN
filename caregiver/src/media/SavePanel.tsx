@@ -12,7 +12,7 @@
  * Save becomes "Try again" and nothing has to be picked again.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Image, Music, Video, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
@@ -66,6 +66,13 @@ export default function SavePanel({
   const [saveFailed, setSaveFailed] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBroken, setPreviewBroken] = useState(false);
+  const nameField = useRef<HTMLInputElement>(null);
+
+  // Each file's panel opens ready to type its name; the suggested name is selected so typing replaces it
+  useEffect(() => {
+    nameField.current?.focus();
+    nameField.current?.select();
+  }, []);
 
   // A photo is shown as itself; the object URL is released when the file changes or the panel goes
   useEffect(() => {
@@ -137,6 +144,7 @@ export default function SavePanel({
         </div>
         <div className="grow min-w-0">
           <TextField
+            ref={nameField}
             label="Name"
             value={name}
             onChange={(event) => setName(event.target.value)}

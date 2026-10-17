@@ -16,4 +16,4 @@ export const SECONDARY_BUTTON = `h-11 px-4 rounded-[10px] border-2 border-dawn-c
 export const PRIMARY_BUTTON = `h-11 px-4 rounded-[10px] border-2 border-dawn-accent bg-dawn-accent text-base font-bold text-white cursor-pointer hover:bg-dawn-accent-hover hover:border-dawn-accent-hover disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`;
 
 // Bold accent text link, e.g. "See on calendar"
-export const ACTION_LINK = `shrink-0 font-bold text-dawn-accent hover:text-dawn-accent-hover ${FOCUS_RING}`;
+export const ACTION_LINK = `shrink-0 inline-flex items-center min-h-11 font-bold text-dawn-accent hover:text-dawn-accent-hover ${FOCUS_RING}`;

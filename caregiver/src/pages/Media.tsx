@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Mic, Upload, Video } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { FOCUS_RING } from "../components/ui/styles";
@@ -85,16 +85,18 @@ interface AddButtonProps {
   open: boolean;
   disabled?: boolean;
   onClick: () => void;
+  ref?: Ref<HTMLButtonElement>;
 }
 
-function AddButton({ icon, title, subtitle, open, disabled = false, onClick }: AddButtonProps) {
+function AddButton({ icon, title, subtitle, open, disabled = false, onClick, ref }: AddButtonProps) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-pressed={open}
       disabled={disabled}
       onClick={onClick}
-      className={`h-[76px] flex items-center gap-3.5 px-[18px] rounded-[14px] border-2 text-left text-dawn-ink ${
+      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-dawn-ink ${
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
       } ${open ? "bg-dawn-accent/10 border-dawn-accent" : "bg-white border-dawn-line-strong"} ${FOCUS_RING}`}
     >
@@ -136,6 +138,8 @@ export default function Media() {
   const [justSavedId, setJustSavedId] = useState<number | null>(null);
   // What has been saved from the files picked together, for one toast when they are done
   const savedInBatch = useRef<MediaItem[]>([]);
+  // Focus goes back here when the upload panel is closed
+  const uploadButton = useRef<HTMLButtonElement>(null);
 
   /* ============================
      Effects
@@ -231,6 +235,7 @@ export default function Media() {
   const closeUpload = () => {
     clearQueue();
     setPanel("detail");
+    uploadButton.current?.focus();
   };
 
   // Moves on to the next picked file. After the last one: to the saved item if anything was
@@ -274,10 +279,11 @@ export default function Media() {
   ============================ */
 
   return (
-    <div className="h-screen flex flex-col gap-3 px-7 py-5">
+    // Wide screens: the page fits the window and the grid and panel scroll on their own. Narrower: the panel sits below the grid and the page scrolls.
+    <div className="lg:h-screen flex flex-col gap-3 px-7 py-5">
       <h1 className="m-0 min-h-11 flex items-center text-3xl font-extrabold">Photos, videos &amp; audio</h1>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <AddButton
           icon={<Video size={34} aria-hidden="true" />}
           title="Use your camera"
@@ -300,15 +306,16 @@ export default function Media() {
           subtitle="Photos, videos, audio or music"
           open={panel === "file"}
           onClick={() => setPanel("file")}
+          ref={uploadButton}
         />
       </div>
 
-      <div className="flex gap-6 grow min-h-0">
+      <div className="flex flex-col lg:flex-row gap-6 grow min-h-0">
         <section aria-label="Your media" className="grow min-w-0 flex flex-col gap-3">
           <FilterPills pills={pills} value={filter} onChange={setFilter} label="Show" />
 
           {/* p-[3px] leaves room for the selected card's border, which the scroll area would clip */}
-          <div className="grow min-h-0 overflow-y-auto p-[3px]">
+          <div className="grow min-h-0 lg:overflow-y-auto p-[3px]">
             {loadError ? (
               <div role="alert" className="flex flex-col items-start gap-2 text-base">
                 <p className="m-0">{loadError}</p>
@@ -321,11 +328,13 @@ export default function Media() {
                 </button>
               </div>
             ) : items === null ? (
-              <p className="m-0 text-base text-dawn-muted">Loading…</p>
+              <p role="status" className="m-0 text-base text-dawn-muted">
+                Loading…
+              </p>
             ) : visible.length === 0 ? (
               <p className="m-0 text-base text-dawn-muted">{FILTERS.find((f) => f.value === filter)?.empty}</p>
             ) : (
-              <div className="grid grid-cols-3 gap-3 content-start">
+              <div className="grid grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3 content-start">
                 {visible.map((item) => (
                   <MediaCard
                     key={item.id}
@@ -342,7 +351,7 @@ export default function Media() {
 
         <aside
           aria-label={panel === "detail" ? "Selected item" : "Upload a file"}
-          className="w-[420px] shrink-0 overflow-y-auto flex flex-col gap-3 p-[18px] bg-white border-[1.5px] border-dawn-line rounded-2xl"
+          className="w-full lg:w-[420px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-[18px] bg-white border-[1.5px] border-dawn-line rounded-2xl"
         >
           {panel === "detail" ? (
             selected ? (
