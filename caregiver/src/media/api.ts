@@ -65,6 +65,9 @@ export class ApiError extends Error {
   }
 }
 
+// Lists change whenever something is saved or removed, so never reuse a stored response. Without this the browser can keep an old one, such as the error page an out-of-date server sent earlier
+const NO_CACHE: RequestInit = { cache: "no-store" };
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   // A FormData body needs no Content-Type: the browser adds the multipart boundary
   const headers =
@@ -79,6 +82,8 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     throw new ApiError(res.status, body?.code ?? "INTERNAL_ERROR", body?.error ?? res.statusText);
   }
+  // A 200 that isn't JSON means we reached something other than the API (e.g. an old server build that serves the web app for unknown paths)
+  if (body === null) throw new ApiError(res.status, "INTERNAL_ERROR", "response was not JSON");
   return body as T;
 }
 
@@ -97,7 +102,7 @@ export function friendlyError(err: unknown): string {
 
 /** Newest first */
 export function listMedia(carepartnerId: number): Promise<Media[]> {
-  return api<Media[]>(`/media?carepartner_id=${carepartnerId}`);
+  return api<Media[]>(`/media?carepartner_id=${carepartnerId}`, NO_CACHE);
 }
 
 interface UploadInput {
@@ -143,7 +148,7 @@ export function fileUrl(media: Pick<Media, "url">): string {
 
 /** Every scheduled item, once each. Used to say when a video or audio plays */
 export function listScheduledItems(carepartnerId: number): Promise<ScheduledItem[]> {
-  return api<ScheduledItem[]>(`/scheduled-items?carepartner_id=${carepartnerId}`);
+  return api<ScheduledItem[]>(`/scheduled-items?carepartner_id=${carepartnerId}`, NO_CACHE);
 }
 
 /* ============================
