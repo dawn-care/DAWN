@@ -54,7 +54,6 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 - For Maestro, build with the emulator closed (`npm run build:emulator`, x86_64 only), then start the emulator and run `npm run e2e:install` and `npm run e2e`. Building and emulating at the same time needs a lot of memory. `android/` is generated and gitignored.
 - Framework-free rules that the caregiver app also needs live in the repo-root `shared/` folder and are imported as `@shared` (see "Shared code" below). `npm test` runs their tests too, because Jest's `roots` include `../shared`.
 - Test files live in a `__tests__/` folder inside each feature folder (`src/pairing/x.ts` → `src/pairing/__tests__/x.test.ts`), never in `app/` (where they would become routes). A test of a route file goes in the matching feature's `__tests__/`. React Native Testing Library is v14, where `render` is async (`await render(...)`).
-- `npm run lint` reports existing warnings in the old `app/screensaver.tsx`; it is due to be replaced (#316), so don't fix them in passing.
 - `npm run reset-project` is left over from the Expo template, and the `scripts/` directory it points to doesn't exist.
 
 ## Redesign
@@ -81,8 +80,8 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 
 - The tablet polls one "screen" endpoint about every 10–15 minutes. Widget changes don't need to be immediate.
 - The server resolves every widget and returns layout plus display data together. Widgets do not fetch for themselves, so renderers are pure display.
-- The screen is a coarse grid (about 4 columns × 3 rows). Everything on it is a widget, including day and time, the photo and "what's next". Each widget type declares the sizes it supports; day and time is locked.
-- The caregiver picks widgets and the **server arranges them**. Positions are stored and sent explicitly (column, row, width, height) so free placement can be added later.
+- The screen is a grid of 4 columns × 3 rows. Everything on it is a widget, including day and time, the photo and "what's next". Each widget type has **one fixed size** (`WIDGET_SIZES` in `@shared`); a different size is a different type. Day and time is locked.
+- The caregiver places each widget anywhere on the grid (since #364), and the server stores and sends its position explicitly (column, row, width, height). The server doesn't check the fixed sizes yet, so the tablet skips a widget that isn't its type's size.
 - The tablet has one renderer per *look*, not per widget: orientation (day and time), photo, next event, person, and a generic tile (icon, word, short label) shared by weather, sports and future data widgets. An unknown renderer is skipped.
 - Updates apply in place with no animation. At night the grid is replaced by the night screen. A widget whose data has gone stale for hours hides instead of showing old information.
 - The design rules above apply to every widget: no taps required, no motion, and the text-size floors.
@@ -126,7 +125,7 @@ carepartner/
 
 ### Shared code
 
-The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea` and `fitsGrid` (`widgets/grid.ts`). See `shared/README.md`.
+The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea`, `fitsGrid` and the corner conversions (`widgets/grid.ts`), and `WIDGET_SIZES`, `widgetSize` and `hasWidgetSize` (`widgets/widgetSizes.ts`). `nightHoursFromAwake` turns the screen's awake hours into night hours. See `shared/README.md`.
 
 - Import from `@shared` only (`import { isNight } from "@shared"`). The path is set in `tsconfig.json`, Metro watches the folder through `metro.config.js`, and Jest maps it through `roots` and `moduleNameMapper` in `package.json`. Names are unchanged from when this code lived in `src/`.
 - Nothing in `shared/` may import React, React Native, Expo or a DOM API. Anything that needs the theme, fonts or screen size stays here: `src/widgets/layout.ts` keeps `cellRect` and builds the tablet's `GRID` from the shared one by adding padding and gap. There are two objects called `GRID`: the shared one holds only `columns` and `rows`, and the tablet's adds `gap` and `padding`. `fitsGrid` takes any `{ columns, rows }`, so either works.
@@ -153,17 +152,16 @@ The repo-root `shared/` folder holds plain TypeScript rules used by this app and
 - `src/theme/theme.ts` holds the palette, type sizes and spacing from the visual design. Its test enforces the contrast and text-size floors in the design rules.
 - `src/theme/fonts.ts` loads Atkinson Hyperlegible Next (regular, bold, extra bold) and exports `fonts`, the family names to use in styles. On Android a custom font's weight comes from its family name, so set `fontFamily: fonts.bold` and never `fontWeight`. `app/_layout.tsx` keeps the splash screen up until the fonts load, and carries on with the system font if they fail.
 - `src/clock/clock.ts` is the only source of the current time (`now()`), and has `dayOf` for the local "YYYY-MM-DD". `EXPO_PUBLIC_FAKE_TIME` starts the clock at a given time for manual checks, and tests call `setClock`. Never call `new Date()` for the current time in app code.
-- `src/display/` keeps the screen on while the app runs (`expo-keep-awake`) and dims it at night. Night hours are part of the carepartner's schedule, set by the caregiver and stored on the server; the server doesn't send them yet, so `shared/display/nightHours.ts` (imported from `@shared`) supplies a default (20:00 to 7:00). `useTabletDisplay(nightHours)`, called in `app/_layout.tsx`, sets the app window's brightness low at night and returns it to the system setting by day, on Android only. It sets the window brightness, not the system setting, so the `expo-brightness` config plugin (which only adds the `WRITE_SETTINGS` permission) is deliberately left out of `app.json`.
+- `app/_layout.tsx` keeps the screen on while the app runs (`expo-keep-awake`). `src/display/TabletDisplay.tsx` (inside `ScreenProvider`, draws nothing) decides when it is night: from the carepartner's bed time to their wake time (the screen's `awakeHours`, through `nightHoursFromAwake`), or the default 20:00 to 7:00 (`DEFAULT_NIGHT_HOURS`) until the first screen arrives. Once a minute, and whenever the hours change, it tells the machine through `usePlayback().setNight`. It also calls `useTabletDisplay(nightHours)`, which sets the app window's brightness low at night and returns it to the system setting by day, on Android only. It sets the window brightness, not the system setting, so the `expo-brightness` config plugin (which only adds the `WRITE_SETTINGS` permission) is deliberately left out of `app.json`.
 - The app is locked to landscape in `app.json`. On the target tablet and the emulator it lays out at 1280 x 800 dp, the same size as the visual design.
-- `src/widgets/` is the always-on screen's grid. `Grid` places each widget from its column, row, width and height (`layout.ts`: the shared 4 x 3 cell counts from `@shared` plus the tablet's 48 dp padding and 32 dp gaps, sized from the screen; `fitsGrid` and `GridArea` come from `@shared`) and skips widgets with an unknown renderer or that don't fit. `registry.ts` maps renderer names to components and says which sit in a tile frame (`WidgetFrame`). Renderers so far: `orientation` (day and time of day from the app clock, using `timeOfDay`, `dayName` and `dateLabel` from `@shared`), `photo` (family photo with a name caption, placeholder if missing) and `tile` (icon key, word, optional label; icon keys are ours, mapped in `renderers/icons.ts`). Types are in `types.ts`.
-- Text that must fit a fixed width uses `fitFontSize` (`src/widgets/fitText.ts`), which works on web too; React Native's `adjustsFontSizeToFit` is ignored by the web build. Never shrink below the legibility floors in `theme.ts`.
-- `app/preview.tsx` is a temporary route showing the grid on `sampleScreen` (`/preview` on web, `carepartner://preview` on Android). Delete it when the always-on screen becomes the home screen.
+- `src/widgets/` is the always-on screen's grid. `Grid` places each widget from its column, row, width and height (`layout.ts`: the shared 4 x 3 cell counts from `@shared` plus the tablet's 48 dp padding and 32 dp gaps, sized from the screen; `fitsGrid` and `GridArea` come from `@shared`) and skips widgets with an unknown renderer or that don't fit. `registry.ts` maps renderer names to components and says which sit in a tile frame (`WidgetFrame`). Renderers: `orientation` (day and time of day from the app clock, using `timeOfDay`, `dayName` and `dateLabel` from `@shared`), `photo` (family photo with a name caption, placeholder if missing), `tile` (icon key, word, optional label; icon keys are ours, mapped in `renderers/icons.ts`), `message` (a caregiver's message with an optional role and photo), `reminder` (the next two of the day's reminders by the app clock, the soonest marked) and `headline` (one news headline). Types are in `types.ts`.
+- Text that must fit a fixed width uses `fitFontSize` (`src/widgets/fitText.ts`), and wrapped text that must fit a box uses `fitFontSizeToBox` with `linesAt`; both work on web too, where React Native's `adjustsFontSizeToFit` is ignored. Never shrink below the legibility floors in `theme.ts`.
 
-Every screen imports `API_URL` and calls `fetch` inline. There is no shared API client yet.
+`src/api/request.ts` has `getJson` and `postJson`: the server address, a timeout (`REQUEST_TIMEOUT_MS`, 10 s by default), and an error for a failed status. They return the JSON unchecked, for the caller to check where it enters the app. `pair.tsx` still calls `fetch` inline until #315.
 
 ### Routes in `app/`
 
-Expo Router treats each file in `app/` as a route. `index.tsx` and `pair.tsx` are the redesign's two routes. `screensaver.tsx` (the old home screen, still shown as the always-on screen until #316) and `terms.tsx` (a stub) are left over.
+Expo Router treats each file in `app/` as a route. `index.tsx` and `pair.tsx` are the redesign's two routes. `terms.tsx` (a stub) is left over.
 
 ### Playback state machine (`src/playback/machine.ts`, `PlaybackProvider.tsx`)
 
@@ -171,8 +169,8 @@ One state machine decides what the screen shows. Its state is three facts: `pair
 
 - Playback starts only through `usePlayback().play(item, source)`, never by navigating, so there is no player route and no back stack. `canPlay` holds the rules: nothing plays until paired; a `staff` play pre-empts anything (the newest wins); a `scheduled` or `tap` play starts only when nothing is playing, so it never interrupts a staff clip.
 - When the player reports finished or failed, `ended(playId, reason)` returns the screen to idle with no animation. A report whose `playId` isn't the current play is ignored, so a replaced player can't end the new one. `stop(playbackId)` stops only the play with that record, so a late stop can't end a newer clip.
-- `PlaybackProvider` (in `_layout.tsx`) reads pairing at startup and checks night once a minute through `src/clock`. The machine keeps the stored carepartner ID, so the screen and the socket take it from `usePlayback().state.carepartnerId` instead of reading storage again. A stored carepartner ID counts as paired for now, though the pair screen stores one before pairing completes (#343). After pairing succeeds, `pair.tsx` calls `checkPairing()` and returns to `/`.
-- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `MediaPlayer` keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (a plain dark placeholder until #314), and `alwaysOn` renders `screensaver.tsx`.
+- `PlaybackProvider` (in `_layout.tsx`) reads pairing at startup (`readPairedId`, see "Pairing and identity"); `TabletDisplay` tells it when night starts and ends. The machine keeps the paired carepartner ID, so the screen and the socket take it from `usePlayback().state.carepartnerId` instead of reading storage again. After pairing succeeds, `pair.tsx` calls `checkPairing()` and returns to `/`.
+- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `MediaPlayer` keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (dark and warm, with the day and "You're safe. Sleep well."), and `alwaysOn` renders `src/screen/AlwaysOnScreen.tsx`.
 
 ### Staff commands (`src/playback/useStaffCommands.ts`, `socket.ts`, `socketMessages.ts`, `staffItem.ts`)
 
@@ -185,12 +183,14 @@ Staff play and stop clips from their phones; the server pushes each command to t
 
 ### Screen (`src/screen/`)
 
-`ScreenProvider` (in `_layout.tsx`, inside `PlaybackProvider`) keeps the server's `GET /screen?carepartner_id=` response (see `docs/api/screen-and-media.md`), which holds the layout, awake hours, widget spots and the schedule. `useScreen()` gives `screen` (null until the first good response) and `refresh()`.
-- Once paired, it fetches the screen, then checks every minute and fetches again when 5 minutes have passed since the last try or the day has changed. The socket's `refresh` message and the old home screen's Sync button call `refresh()`.
+`ScreenProvider` (in `_layout.tsx`, inside `PlaybackProvider`) keeps the server's `GET /screen?carepartner_id=` response (see `docs/api/screen-and-media.md`), which holds the awake hours, the widgets with their places on the grid, and the schedule. `useScreen()` gives `screen` (null until the first good response) and `refresh()`.
+- Once paired, it fetches the screen, then checks every minute and fetches again when 5 minutes have passed since the last try or the day has changed. The socket's `refresh` message calls `refresh()`.
 - Only the latest fetch counts: a response that arrives after a newer fetch started, or after the carepartner changed, is dropped.
-- `readScreen` (`screen.ts`) checks the response once: a malformed widget becomes an empty spot, so the others keep their places, and a schedule entry the tablet can't play is dropped. A failed or malformed response keeps the last good screen.
-- `hideStaleWidgets` empties weather, sports and news spots once the last good fetch is `STALE_AFTER_MS` (3 hours) old, so old data is never shown as current.
-- Nothing draws the spots yet; the old `screensaver.tsx` uses only the wake time. Drawing them is #316. Night hours still come from the default in `@shared`, not `awake_hours`.
+- `readScreen` (`screen.ts`) checks the response once: a malformed widget or a schedule entry the tablet can't play is dropped, and the rest kept. A failed or malformed response keeps the last good screen.
+- `hideStaleWidgets` removes weather, sports and news widgets once the last good fetch is `STALE_AFTER_MS` (3 hours) old, so old data is never shown as current.
+- `AlwaysOnScreen` draws the widgets on the grid, through `placementsFor` (`placements.ts`, logic only). It checks each type's `config` and `data` and maps it to a renderer: `photo` → photo, `weather` (temperature and a plain condition word) and `sports` (result and team) → tile, `message` → message, `reminder` → reminder, `news` → headline, and `day_time` → orientation. A widget is left out, so its cells stay empty, if its type is unknown, it isn't its type's size, its outside service is down (`error`), or its data is missing. Only a count is logged.
+- When there is nothing to draw (before the first screen arrives, with no widgets, or only ones it left out), `AlwaysOnScreen` shows the day, time of day and date instead, so the screen is never blank.
+- Day and time on the grid is the `day_time` type, which the server doesn't have yet (#366), so a screen with widgets shows no day and time until it does.
 
 ### Schedule (`src/schedule/`)
 
@@ -219,15 +219,15 @@ A scheduled photo shows for its display time. A staff-started photo has none, so
 
 Media is streamed from the `url` the server gives (`/media/{id}/file`), resolved against `API_URL` by `src/api/resolveApiUri.ts`. Plain `http://` is allowed in Android builds only for an `http://` server address (see `app.config.ts`).
 
-### Pairing and identity (`app/pair.tsx`, `src/pairing/carepartnerId.ts`)
+### Pairing and identity (`app/pair.tsx`, `src/pairing/`)
 
 There is no login. On the pair screen, the device:
 1. Validates its stored ID, or creates a new carepartner (`POST /users/carepartner/create-carepartner` with a placeholder name).
 2. Requests a pairing code.
-3. Polls `/users/device-pairing/status` when the user taps Verify.
+3. Checks `/users/device-pairing/status` when the user taps Verify, and finishes only when it reports `paired: true`.
 
-The ID is stored under the key `carepartnerID`, via `carepartnerId.ts` (`localStorage` on web, `expo-secure-store` on native). `terms.tsx` is still a stub.
+The ID is stored under the key `carepartnerID`, via `carepartnerId.ts` (`localStorage` on web, `expo-secure-store` on native), and that pairing completed under a separate key (`pairingComplete`), since the pair screen stores the ID before a caregiver claims it. Storing a new ID clears it. `terms.tsx` is still a stub.
 
-A tablet without a stored ID is sent to the pair screen by `index.tsx`; one with an ID counts as paired, even if pairing never completed (#343). Verifying succeeds whenever the status request does, even if the server reports `paired: false`. The home screen's Pair Device button also still opens it. If the stored ID is lost, the tablet creates a new carepartner row instead of reattaching to the existing one.
+`readPairedId` (`pairingState.ts`) is what counts as paired: a stored ID with pairing recorded. A tablet that paired before pairing was recorded has an ID but no record, so the server is asked once and the answer recorded; if it can't be reached, the tablet keeps counting as paired and asks again next launch. An unpaired tablet is sent to the pair screen by `index.tsx`; nothing else opens it. If the stored ID is lost, the tablet creates a new carepartner row instead of reattaching to the existing one.
 
 Nothing authenticates the device: the carepartner ID is its only credential, and it is a guessable integer. The intended fix is a device record with a secret token issued at pairing, which the tablet presents on every request and on its socket. That should be in place before tablets are deployed in residents' rooms.

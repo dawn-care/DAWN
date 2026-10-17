@@ -3,7 +3,7 @@ import { Redirect } from "expo-router";
 import NightScreen from "../src/display/NightScreen";
 import MediaPlayer from "../src/playback/MediaPlayer";
 import { usePlayback } from "../src/playback/PlaybackProvider";
-import Screensaver from "./screensaver";
+import AlwaysOnScreen from "../src/screen/AlwaysOnScreen";
 
 /** Shows whatever the playback machine says the screen should show. */
 export default function Index() {
@@ -31,6 +31,6 @@ export default function Index() {
     case "night":
       return <NightScreen />;
     case "alwaysOn":
-      return <Screensaver />;
+      return <AlwaysOnScreen />;
   }
 }

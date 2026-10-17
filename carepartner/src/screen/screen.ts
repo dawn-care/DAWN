@@ -6,12 +6,13 @@
  * Logic only.
  */
 
+import type { GridArea } from "@shared";
 import { readMedia, type MediaItem } from "../playback/media";
 
-/** A widget in one spot of the layout. Renderers check `config` and `data` for their type (#316). */
-export type ScreenWidget = {
+/** A widget and its place on the grid. `placementsFor` checks `config` and `data` for its type. */
+export type ScreenWidget = GridArea & {
   id: number;
-  /** "photo", "message", "reminder", "weather", "sports" or "news"; unknown types are kept and skipped when drawn. */
+  /** "photo", "message", "reminder", "weather", "sports", "news" or "day_time"; unknown types are kept and skipped when drawn. */
   type: string;
   config: unknown;
   photo: { url: string; displayName: string } | null;
@@ -33,10 +34,9 @@ export type ScheduledPlay = {
 };
 
 export type Screen = {
-  layoutPreset: string;
   awakeHours: { wake: string; bed: string };
-  /** One entry per spot of the layout, in reading order; null is an empty spot. */
-  spots: (ScreenWidget | null)[];
+  /** In reading order. Cells no widget covers are empty. */
+  widgets: ScreenWidget[];
   /** Today and tomorrow, so playback carries on past midnight. */
   schedule: ScheduledPlay[];
 };
@@ -53,11 +53,16 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function readWidget(value: unknown): ScreenWidget | null {
   if (!isObject(value) || typeof value.id !== "number" || typeof value.type !== "string") return null;
-  const { photo } = value;
+  const { col, row, width, height, photo } = value;
+  if (![col, row, width, height].every((n) => typeof n === "number")) return null;
   if (photo != null && (!isObject(photo) || typeof photo.url !== "string")) return null;
   return {
     id: value.id,
     type: value.type,
+    col: col as number,
+    row: row as number,
+    width: width as number,
+    height: height as number,
     config: value.config ?? null,
     photo: isObject(photo)
       ? { url: photo.url as string, displayName: typeof photo.display_name === "string" ? photo.display_name : "" }
@@ -88,35 +93,32 @@ function readScheduledPlay(value: unknown): ScheduledPlay | null {
 }
 
 /**
- * The screen, or null if the response isn't one. A malformed widget becomes an
- * empty spot, so the others keep their places, and a malformed schedule entry
- * is dropped. Only counts are logged: widgets can hold a caregiver's messages.
+ * The screen, or null if the response isn't one. A malformed widget or
+ * schedule entry is dropped, and the rest kept. Only counts are logged:
+ * widgets can hold a caregiver's messages.
  */
 export function readScreen(raw: unknown): Screen | null {
-  if (!isObject(raw) || !Array.isArray(raw.spots) || !Array.isArray(raw.schedule)) return null;
+  if (!isObject(raw) || !Array.isArray(raw.widgets) || !Array.isArray(raw.schedule)) return null;
   const { awake_hours } = raw;
-  if (typeof raw.layout_preset !== "string" || !isObject(awake_hours)) return null;
-  if (typeof awake_hours.wake !== "string" || typeof awake_hours.bed !== "string") return null;
+  if (!isObject(awake_hours) || typeof awake_hours.wake !== "string" || typeof awake_hours.bed !== "string") return null;
 
-  const rawSpots: unknown[] = raw.spots;
-  const spots = rawSpots.map((spot) => (spot === null ? null : readWidget(spot)));
-  const badSpots = spots.filter((spot, i) => spot === null && rawSpots[i] !== null).length;
-  if (badSpots) console.warn(`Dropped ${badSpots} malformed widgets from the screen`);
+  const widgets = raw.widgets.map(readWidget).filter((widget): widget is ScreenWidget => widget !== null);
+  const badWidgets = raw.widgets.length - widgets.length;
+  if (badWidgets) console.warn(`Dropped ${badWidgets} malformed widgets from the screen`);
 
   const schedule = raw.schedule.map(readScheduledPlay).filter((play): play is ScheduledPlay => play !== null);
   const badPlays = raw.schedule.length - schedule.length;
   if (badPlays) console.warn(`Dropped ${badPlays} schedule entries the tablet can't play`);
 
   return {
-    layoutPreset: raw.layout_preset,
     awakeHours: { wake: awake_hours.wake, bed: awake_hours.bed },
-    spots,
+    widgets,
     schedule,
   };
 }
 
 /**
- * The screen with live-data widgets (weather, sports, news) emptied once the
+ * The screen with live-data widgets (weather, sports, news) removed once the
  * last good fetch is `STALE_AFTER_MS` old, so the screen never shows old
  * information as current.
  */
@@ -124,6 +126,6 @@ export function hideStaleWidgets(screen: Screen, fetchedAt: Date, time: Date): S
   if (time.getTime() - fetchedAt.getTime() < STALE_AFTER_MS) return screen;
   return {
     ...screen,
-    spots: screen.spots.map((spot) => (spot && LIVE_DATA_TYPES.includes(spot.type) ? null : spot)),
+    widgets: screen.widgets.filter((widget) => !LIVE_DATA_TYPES.includes(widget.type)),
   };
 }

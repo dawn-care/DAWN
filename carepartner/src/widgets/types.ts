@@ -26,6 +26,29 @@ export type TileData = {
   label?: string | null;
 };
 
+/** A caregiver's short message, with an optional photo and a role such as "Nurse". */
+export type MessageData = {
+  text: string;
+  label?: string | null;
+  photoUri?: string | null;
+};
+
+/** One reminder: a time of day, a few words and an icon key (see `reminderIcon`). */
+export type ReminderItem = {
+  /** Minutes after midnight, for picking the ones still to come. */
+  minute: number;
+  /** For example "8:30 AM". */
+  timeLabel: string;
+  text: string;
+  icon: string;
+};
+
+/** The day's reminders, in time order. */
+export type ReminderData = { items: ReminderItem[] };
+
+/** One news headline. */
+export type HeadlineData = { title: string };
+
 type Placed<R extends string, D> = GridArea & {
   id: string;
   renderer: R;
@@ -35,6 +58,9 @@ type Placed<R extends string, D> = GridArea & {
 export type WidgetPlacement =
   | Placed<"orientation", OrientationData>
   | Placed<"photo", PhotoData>
-  | Placed<"tile", TileData>;
+  | Placed<"tile", TileData>
+  | Placed<"message", MessageData>
+  | Placed<"reminder", ReminderData>
+  | Placed<"headline", HeadlineData>;
 
 export type RendererName = WidgetPlacement["renderer"];

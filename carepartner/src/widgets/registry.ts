@@ -1,6 +1,9 @@
 import type { ComponentType } from "react";
+import Headline from "./renderers/Headline";
+import Message from "./renderers/Message";
 import Orientation from "./renderers/Orientation";
 import Photo from "./renderers/Photo";
+import Reminder from "./renderers/Reminder";
 import Tile from "./renderers/Tile";
 import type { RendererName, WidgetPlacement } from "./types";
 
@@ -15,6 +18,9 @@ export const registry: { [R in RendererName]: Entry<R> } = {
   orientation: { component: Orientation, framed: false },
   photo: { component: Photo, framed: false },
   tile: { component: Tile, framed: true },
+  message: { component: Message, framed: true },
+  reminder: { component: Reminder, framed: true },
+  headline: { component: Headline, framed: true },
 };
 
 /** The registry entry for a renderer name, or undefined for one this app version doesn't know. */

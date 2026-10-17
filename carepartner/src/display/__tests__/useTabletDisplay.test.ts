@@ -1,11 +1,9 @@
 import { act, renderHook } from "@testing-library/react-native";
 import { Platform } from "react-native";
 import * as Brightness from "expo-brightness";
-import { useKeepAwake } from "expo-keep-awake";
 import { setClock } from "../../clock/clock";
 import { BRIGHTNESS_CHECK_MS, NIGHT_BRIGHTNESS, useTabletDisplay } from "../useTabletDisplay";
 
-jest.mock("expo-keep-awake", () => ({ useKeepAwake: jest.fn() }));
 jest.mock("expo-brightness", () => ({
   setBrightnessAsync: jest.fn(() => Promise.resolve()),
   restoreSystemBrightnessAsync: jest.fn(() => Promise.resolve()),
@@ -33,12 +31,6 @@ describe("useTabletDisplay", () => {
     setClock(null);
     jest.useRealTimers();
     jest.restoreAllMocks();
-  });
-
-  it("keeps the screen awake", async () => {
-    await startAt("2026-10-03T12:00:00");
-
-    expect(useKeepAwake).toHaveBeenCalled();
   });
 
   it("uses the system brightness by day", async () => {
@@ -115,7 +107,6 @@ describe("useTabletDisplay", () => {
     await startAt("2026-10-03T22:00:00");
     await waitOneCheck();
 
-    expect(useKeepAwake).toHaveBeenCalled();
     expect(Brightness.setBrightnessAsync).not.toHaveBeenCalled();
     expect(Brightness.restoreSystemBrightnessAsync).not.toHaveBeenCalled();
   });

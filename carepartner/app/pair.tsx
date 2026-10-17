@@ -17,7 +17,8 @@
  *  2. A pairing code is generated via backend
  *  3. Caregiver enters this code on their web app
  *  4. Carepartner device checks pairing status
- *  5. If paired → playback re-checks pairing and the app returns home
+ *  5. Only once the server says it's paired → pairing is recorded, playback
+ *     re-checks pairing and the app returns home
  * 
  * API interactions:
  *  - POST /carepartner/create-carepartner → create new carepartner
@@ -26,7 +27,8 @@
  *  - GET  /carepartner/:id → validate existing carepartner
  * 
  * Local storage:
- *  - Uses getCarepartnerId / storeCarepartnerId to persist ID on device
+ *  - Uses getCarepartnerId / storeCarepartnerId to persist ID on device, and
+ *    markPairingComplete once a caregiver has claimed it
  */
 
 import React, { useEffect, useState } from "react";
@@ -42,7 +44,8 @@ import {
 } from "react-native";
 import { Stack, router, type Href } from "expo-router";
 import { API_URL } from "../src/api/config";
-import { getCarepartnerId, storeCarepartnerId } from "../src/pairing/carepartnerId";
+import { getCarepartnerId, markPairingComplete, storeCarepartnerId } from "../src/pairing/carepartnerId";
+import { fetchPairingStatus } from "../src/pairing/pairingState";
 import { usePlayback } from "../src/playback/PlaybackProvider";
 
 /* ============================
@@ -54,13 +57,6 @@ import { usePlayback } from "../src/playback/PlaybackProvider";
  */
 type CodeResult =
   | { ok: true; pairingCode: string; expiresInSec?: number }
-  | { ok: false; message: string };
-
-/**
- * Result of pairing verification
- */
-type VerifyResult =
-  | { ok: true; deviceId: string }
   | { ok: false; message: string };
 
 /* ============================
@@ -111,29 +107,6 @@ async function fetchPairingCodeForThisDevice(carepartnerID: number): Promise<Cod
     return { ok: true, pairingCode: data.pairing_code, expiresInSec: data.expires_in_sec };
   } catch {
     return { ok: false, message: "Network error while generating code" };
-  }
-}
-
-/**
- * Checks whether this device has been paired by caregiver
- */
-async function verifyThisDeviceIsPaired(carepartnerID: number): Promise<VerifyResult> {
-  try {
-    const res = await fetch(`${API_BASE}/device-pairing/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ carepartner_id: carepartnerID }),
-    });
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      return { ok: false, message: errorData.error || "Failed to check pairing status" };
-    }
-
-    const data = await res.json();
-    return { ok: true, deviceId: data.paired ? "device_123" : "" };
-  } catch {
-    return { ok: false, message: "Network error while checking device pairing" };
   }
 }
 
@@ -294,16 +267,13 @@ export default function PairScreen() {
         return;
       }
 
-      const result = await verifyThisDeviceIsPaired(carepartnerID);
-      if (!result.ok) {
-        setError(result.message);
+      if (!(await fetchPairingStatus(carepartnerID))) {
+        setError("Not paired yet. Enter the code in the caregiver app, then tap Verify.");
         return;
       }
 
-      // TODO: store deviceId if needed
-      // await SecureStore.setItemAsync("deviceId", result.deviceId)
-
-      // Success → let playback know the tablet is paired, then go home
+      // Success → record it, let playback know the tablet is paired, then go home
+      await markPairingComplete();
       await checkPairing();
       router.replace("/" as Href);
     } catch {

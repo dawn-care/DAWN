@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { router } from "expo-router";
 import PairScreen from "../../../app/pair";
 import { usePlayback } from "../../playback/PlaybackProvider";
-import { getCarepartnerId, storeCarepartnerId } from "../carepartnerId";
+import { getCarepartnerId, markPairingComplete, storeCarepartnerId } from "../carepartnerId";
 
 jest.mock("expo-router", () => ({
   Stack: { Screen: () => null },
@@ -15,6 +15,7 @@ jest.mock("../../playback/PlaybackProvider", () => ({ usePlayback: jest.fn() }))
 jest.mock("../carepartnerId", () => ({
   getCarepartnerId: jest.fn(),
   storeCarepartnerId: jest.fn(),
+  markPairingComplete: jest.fn(),
 }));
 
 /** Answers the pair screen's requests by URL suffix. */
@@ -85,20 +86,37 @@ describe("PairScreen", () => {
     expect(await screen.findByText("Code service unavailable")).toBeTruthy();
   });
 
-  it("tells playback the tablet is paired and goes home once pairing is verified", async () => {
+  async function verifyWith(status: { status?: number; body: unknown }) {
     jest.mocked(getCarepartnerId).mockResolvedValue(12);
     mockBackend({
       "/users/carepartner/12": { body: { id: 12 } },
       "/users/device-pairing/code": { body: { pairing_code: "K7M4QP", expires_in_sec: 600 } },
-      "/users/device-pairing/status": { body: { paired: true } },
+      "/users/device-pairing/status": status,
     });
     await render(<PairScreen />);
     await screen.findByText("K7M4QP");
-
     // The instructions also say "Verify"; the button is the last one.
     await fireEvent.press(screen.getAllByText("Verify").at(-1)!);
+  }
 
+  it.each([
+    ["the caregiver hasn't entered the code", { body: { paired: false } }, "Not paired yet. Enter the code in the caregiver app, then tap Verify."],
+    ["the status can't be checked", { status: 500, body: {} }, "Something went wrong. Please check your connection and try again."],
+  ])("stays on the pair screen when %s", async (_name, status, message) => {
+    await verifyWith(status);
+
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(markPairingComplete).not.toHaveBeenCalled();
+    expect(checkPairing).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("records pairing, tells playback and goes home once the caregiver has paired", async () => {
+    await verifyWith({ body: { paired: true } });
+
+    expect(markPairingComplete).toHaveBeenCalled();
     expect(checkPairing).toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith("/");
   });
+
 });

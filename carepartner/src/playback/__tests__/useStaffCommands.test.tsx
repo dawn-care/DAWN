@@ -1,7 +1,7 @@
 import React from "react";
 import { act, render } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
-import { getCarepartnerId } from "../../pairing/carepartnerId";
+import { readPairedId } from "../../pairing/pairingState";
 import type { MediaItem } from "../media";
 import { PlaybackProvider, usePlayback } from "../PlaybackProvider";
 import { connectTablet, type TabletConnection } from "../socket";
@@ -9,7 +9,7 @@ import type { ServerMessage } from "../socketMessages";
 import StaffCommands from "../StaffCommands";
 import { fetchMediaItem } from "../staffItem";
 
-jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
+jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 jest.mock("../staffItem", () => ({ fetchMediaItem: jest.fn() }));
 jest.mock("../socket", () => ({ ...jest.requireActual("../socket"), connectTablet: jest.fn() }));
 const mockRefresh = jest.fn();
@@ -65,7 +65,7 @@ describe("useStaffCommands", () => {
   beforeEach(() => {
     setClock(NOW);
     warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-    jest.mocked(getCarepartnerId).mockResolvedValue(7);
+    jest.mocked(readPairedId).mockResolvedValue(7);
     jest.mocked(fetchMediaItem).mockResolvedValue(video);
     jest.mocked(connectTablet).mockImplementation(({ url, onMessage }) => {
       const send = jest.fn();
@@ -98,7 +98,7 @@ describe("useStaffCommands", () => {
   });
 
   it("doesn't connect while unpaired", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(null);
+    jest.mocked(readPairedId).mockResolvedValue(null);
     await start();
     expect(connectTablet).not.toHaveBeenCalled();
   });

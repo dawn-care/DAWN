@@ -15,7 +15,7 @@ jest.mock("../../display/NightScreen", () => {
   const { Text } = jest.requireActual("react-native");
   return { __esModule: true, default: () => <Text>night</Text> };
 });
-jest.mock("../../../app/screensaver", () => {
+jest.mock("../../screen/AlwaysOnScreen", () => {
   const { Text } = jest.requireActual("react-native");
   return { __esModule: true, default: () => <Text>always-on</Text> };
 });

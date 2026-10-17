@@ -535,6 +535,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 ### How to render it
 
 - `widgets` is in reading order. Each widget's `col`, `row`, `width` and `height` is a `GridArea`, so it goes straight into the tablet's existing `fitsGrid` and `cellRect`. Cells no widget covers are empty; there are no `null` placeholders.
+- Each widget type has one fixed size, `WIDGET_SIZES` in `shared/widgets/widgetSizes.ts` (for example weather 1×1, photo 2×2, news 2×1). The server doesn't check it yet, so the editor should place widgets only at those sizes; the tablet leaves out a widget that isn't its type's size.
 - `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").
