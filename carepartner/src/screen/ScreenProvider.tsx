@@ -6,7 +6,7 @@
  *
  * - Once paired, fetches `/screen`, then again every 5 minutes, on the first
  *   check of a new day, and whenever `refresh()` is called (the socket's
- *   refresh message and the Sync button).
+ *   refresh message and the developer toolbar).
  * - Keeps the last good screen if a fetch fails.
  * - Only the latest fetch counts, so an older response arriving late, or one
  *   for a carepartner the tablet is no longer paired as, is dropped.

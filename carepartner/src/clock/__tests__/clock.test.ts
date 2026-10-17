@@ -1,4 +1,4 @@
-import { now, parseFakeTime, setClock } from "../clock";
+import { everyMinute, now, parseFakeTime, setClock } from "../clock";
 
 describe("clock", () => {
   beforeEach(() => {
@@ -48,5 +48,28 @@ describe("clock", () => {
       expect(parseFakeTime("tomorrow-ish")).toBeNull();
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("tomorrow-ish"));
     });
+  });
+});
+
+describe("everyMinute", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => {
+    setClock(null);
+    jest.useRealTimers();
+  });
+
+  it("ticks as each minute of the app clock starts, until stopped", () => {
+    setClock(new Date("2026-10-12T08:59:45"));
+    const ticks: string[] = [];
+    const stop = everyMinute(() => ticks.push(now().toTimeString().slice(0, 8)));
+
+    jest.advanceTimersByTime(14_999);
+    expect(ticks).toEqual([]);
+    jest.advanceTimersByTime(1 + 120_000);
+    expect(ticks).toEqual(["09:00:00", "09:01:00", "09:02:00"]);
+
+    stop();
+    jest.advanceTimersByTime(60_000);
+    expect(ticks).toHaveLength(3);
   });
 });

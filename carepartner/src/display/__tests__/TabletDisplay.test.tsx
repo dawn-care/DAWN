@@ -5,7 +5,7 @@ import { setClock } from "../../clock/clock";
 import { usePlayback } from "../../playback/PlaybackProvider";
 import type { Screen } from "../../screen/screen";
 import { useScreen } from "../../screen/ScreenProvider";
-import TabletDisplay, { NIGHT_CHECK_MS } from "../TabletDisplay";
+import TabletDisplay from "../TabletDisplay";
 import { useTabletDisplay } from "../useTabletDisplay";
 
 jest.mock("../useTabletDisplay", () => ({ useTabletDisplay: jest.fn() }));
@@ -52,13 +52,14 @@ describe("TabletDisplay", () => {
     expect(toldNight()).toBe(true);
   });
 
-  it("switches to day at wake time", async () => {
+  it("switches to day right at wake time", async () => {
     withAwakeHours({ wake: "10:00", bed: "21:00" });
     setClock(new Date("2026-10-12T09:59:30"));
     await render(<TabletDisplay />);
+    await act(async () => jest.advanceTimersByTime(29_999));
     expect(toldNight()).toBe(true);
 
-    await act(async () => jest.advanceTimersByTime(NIGHT_CHECK_MS));
+    await act(async () => jest.advanceTimersByTime(1));
 
     expect(toldNight()).toBe(false);
   });

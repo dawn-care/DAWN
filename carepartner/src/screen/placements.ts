@@ -7,11 +7,13 @@
  * A widget is left out, so its cells stay empty, when:
  * - its type is unknown to this version, or it isn't its type's fixed size
  *   (`WIDGET_SIZES` in `@shared`);
+ * - it doesn't fit on the grid, or it overlaps a widget before it (the server
+ *   checks both, so this only guards against a bad layout);
  * - its outside service is down (`error`), or the data it needs is missing or
  *   malformed.
  */
 
-import { hasWidgetSize } from "@shared";
+import { areasOverlap, fitsGrid, hasWidgetSize, type GridArea } from "@shared";
 import { resolveApiUri } from "../api/resolveApiUri";
 import type { ReminderItem, WidgetPlacement } from "../widgets/types";
 import type { Screen, ScreenWidget } from "./screen";
@@ -107,12 +109,15 @@ const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
 /** What the grid draws for the screen. Logs only a count of widgets it can't draw, never their content. */
 export function placementsFor(screen: Screen): WidgetPlacement[] {
   let undrawable = 0;
+  const taken: GridArea[] = [];
   const placements = screen.widgets.flatMap((widget): WidgetPlacement[] => {
     const lookFor = Object.prototype.hasOwnProperty.call(LOOKS, widget.type) ? LOOKS[widget.type] : undefined;
-    if (!lookFor || !hasWidgetSize(widget.type, widget)) {
+    const placeable = fitsGrid(widget) && !taken.some((area) => areasOverlap(area, widget));
+    if (!lookFor || !hasWidgetSize(widget.type, widget) || !placeable) {
       undrawable++;
       return [];
     }
+    taken.push(widget);
     // An outside service being down is expected; the widget just isn't shown.
     if (widget.error) return [];
     const look = lookFor(widget);

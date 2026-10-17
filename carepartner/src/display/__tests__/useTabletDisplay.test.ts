@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react-native";
 import { Platform } from "react-native";
 import * as Brightness from "expo-brightness";
 import { setClock } from "../../clock/clock";
-import { BRIGHTNESS_CHECK_MS, NIGHT_BRIGHTNESS, useTabletDisplay } from "../useTabletDisplay";
+import { NIGHT_BRIGHTNESS, useTabletDisplay } from "../useTabletDisplay";
 
 jest.mock("expo-brightness", () => ({
   setBrightnessAsync: jest.fn(() => Promise.resolve()),
@@ -16,7 +16,7 @@ async function startAt(time: string) {
 
 async function waitOneCheck() {
   await act(async () => {
-    jest.advanceTimersByTime(BRIGHTNESS_CHECK_MS);
+    jest.advanceTimersByTime(60_000);
   });
 }
 

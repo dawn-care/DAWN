@@ -2,3 +2,4 @@ export * from "./display/nightHours";
 export * from "./widgets/grid";
 export * from "./widgets/timeOfDay";
 export * from "./widgets/widgetSizes";
+export * from "./widgets/textLimits";

@@ -59,7 +59,7 @@ describe("placementsFor", () => {
     const photo = { url: "/media/4/file", displayName: "sarah_beach" };
     const [captioned, named] = placed(
       widget({ type: "photo", width: 2, height: 2, photo, data: { caption: "Sarah" } }),
-      widget({ id: 2, type: "photo", width: 2, height: 2, photo, data: null }),
+      widget({ id: 2, type: "photo", col: 2, width: 2, height: 2, photo, data: null }),
     );
 
     expect(captioned).toMatchObject({ renderer: "photo", data: { uri: `${API_URL}/media/4/file`, name: "Sarah" } });
@@ -126,6 +126,7 @@ describe("placementsFor", () => {
   it.each([
     ["isn't its type's size", widget({ width: 2, height: 2, data: { temp: 48 } })],
     ["has an unknown type", widget({ type: "slideshow" })],
+    ["runs off the grid", widget({ col: 0, row: 3, data: { temp: 48 } })],
     ["has no data", widget({ data: null })],
     ["has a photo widget with no photo", widget({ type: "photo", width: 2, height: 2 })],
     ["has a message with no text", widget({ type: "message", width: 2, height: 1, config: { text: " " } })],
@@ -136,6 +137,14 @@ describe("placementsFor", () => {
     const good = widget({ id: 9, col: 3, data: { temp: 48 } });
 
     expect(placed(bad, good).map((p) => p.id)).toEqual(["9"]);
+    expect(console.warn).toHaveBeenCalledWith("Left out 1 widgets the tablet can't draw");
+  });
+
+  it("keeps the first of two widgets that overlap, and says how many it left out", () => {
+    const first = widget({ id: 1, type: "photo", width: 2, height: 2, photo: { url: "/media/3/file", displayName: "Ana" } });
+    const second = widget({ id: 2, type: "message", col: 1, row: 1, width: 2, height: 1, config: { text: "Hello" } });
+
+    expect(placed(first, second).map((p) => p.id)).toEqual(["1"]);
     expect(console.warn).toHaveBeenCalledWith("Left out 1 widgets the tablet can't draw");
   });
 });
