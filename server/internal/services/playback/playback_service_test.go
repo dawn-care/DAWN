@@ -258,3 +258,53 @@ func TestUpdateValidationAndFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestListPlayed(t *testing.T) {
+	s, mock := setup(t)
+	expiry := time.Now().UTC().Add(time.Hour)
+	rows := playbackRows("finished", expiry)
+	rows.AddRow(4, 2, nil, "audio", "Deleted song", nil, "scheduled", "stopped",
+		expiry, expiry, expiry, expiry, expiry, nil)
+	mock.ExpectQuery(`SELECT .* FROM "Playback"\s+WHERE carepartner_id = \$1 AND started_at IS NOT NULL\s+ORDER BY started_at DESC, id DESC\s+LIMIT \$2`).
+		WithArgs(2, 10).WillReturnRows(rows)
+	played, err := s.ListPlayed(context.Background(), 2, 10)
+	require.NoError(t, err)
+	require.Len(t, played, 2)
+	require.Equal(t, "finished", played[0].Status)
+	// A playback whose media was deleted still says what played
+	require.Nil(t, played[1].MediaID)
+	require.Equal(t, "Deleted song", played[1].MediaDisplayName)
+}
+
+func TestListPlayedEmpty(t *testing.T) {
+	s, mock := setup(t)
+	mock.ExpectQuery(`SELECT .* FROM "Playback"`).WithArgs(2, 1).
+		WillReturnRows(sqlmock.NewRows(strings.Fields(strings.ReplaceAll(columns, ",", ""))))
+	played, err := s.ListPlayed(context.Background(), 2, 1)
+	require.NoError(t, err)
+	require.NotNil(t, played)
+	require.Empty(t, played)
+}
+
+func TestListPlayedValidationAndFailures(t *testing.T) {
+	for _, test := range []struct{ cp, limit int }{{0, 1}, {2, 0}, {2, MaxListLimit + 1}} {
+		s, _ := setup(t)
+		_, err := s.ListPlayed(context.Background(), test.cp, test.limit)
+		require.ErrorIs(t, err, ErrInvalidInput)
+	}
+	t.Run("query", func(t *testing.T) {
+		s, mock := setup(t)
+		cause := errors.New("database failure")
+		mock.ExpectQuery(`SELECT .* FROM "Playback"`).WillReturnError(cause)
+		_, err := s.ListPlayed(context.Background(), 2, 1)
+		require.ErrorIs(t, err, cause)
+	})
+	t.Run("rows", func(t *testing.T) {
+		s, mock := setup(t)
+		cause := errors.New("connection lost")
+		mock.ExpectQuery(`SELECT .* FROM "Playback"`).
+			WillReturnRows(playbackRows("finished", time.Now().Add(time.Hour)).RowError(0, cause))
+		_, err := s.ListPlayed(context.Background(), 2, 1)
+		require.ErrorIs(t, err, cause)
+	})
+}

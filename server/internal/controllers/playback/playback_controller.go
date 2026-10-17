@@ -19,6 +19,7 @@ import (
 type PlaybackServiceInterface interface {
 	CreatePlayback(context.Context, int, int, *int, string, time.Time) (*playback.Playback, error)
 	UpdateStatus(context.Context, int, int, string) (*playback.Playback, error)
+	ListPlayed(context.Context, int, int) ([]playback.Playback, error)
 	RequestStaffPlay(context.Context, int, int) (*playback.Playback, error)
 	RequestStop(context.Context, int, int) (*playback.Playback, playbackSvc.StopOutcome, error)
 }
@@ -105,6 +106,43 @@ func (c *PlaybackController) UpdateStatusHandler(w http.ResponseWriter, r *http.
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
+}
+
+// defaultListLimit is how many playbacks a list returns when no limit is given.
+const defaultListLimit = 50
+
+// ListPlaybacksHandler godoc
+// @Summary List what played on a carepartner's tablet
+// @Description Playbacks that reached the screen, from any source, most recently started first. Requests that never started are left out.
+// @Tags playback
+// @Produce json
+// @Param carepartner_id query int true "Carepartner ID"
+// @Param limit query int false "How many to return, 1 to 100 (default 50)"
+// @Success 200 {array} playback.Playback
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /playbacks [get]
+func (c *PlaybackController) ListPlaybacksHandler(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	carepartnerID, err := strconv.Atoi(query.Get("carepartner_id"))
+	if err != nil || carepartnerID <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid carepartner ID"})
+		return
+	}
+	limit := defaultListLimit
+	if raw := query.Get("limit"); raw != "" {
+		limit, err = strconv.Atoi(raw)
+		if err != nil || limit <= 0 || limit > playbackSvc.MaxListLimit {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid limit"})
+			return
+		}
+	}
+	played, err := c.Service.ListPlayed(r.Context(), carepartnerID, limit)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, played)
 }
 
 // Accept only the declared fields and exactly one JSON value. In particular,

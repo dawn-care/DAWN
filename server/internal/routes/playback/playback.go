@@ -7,6 +7,9 @@ import (
 )
 
 func RegisterPlaybackRoutes(r chi.Router, controller *playbackCtrl.PlaybackController) {
+	// What has played, for staff and caregivers.
+	r.Get("/api/playbacks", controller.ListPlaybacksHandler)
+
 	// Tablet-reported plays and status changes.
 	r.Post("/api/playbacks", controller.CreatePlaybackHandler)
 	r.Patch("/api/playbacks/{id}/status", controller.UpdateStatusHandler)

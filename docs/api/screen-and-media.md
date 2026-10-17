@@ -570,6 +570,14 @@ Report progress: `{"carepartner_id": 1, "status": "started"}`. Statuses move for
 
 Repeating the current status is harmless. Acknowledging or starting after `expires_at` records `expired` instead. An invalid move returns `409`.
 
+### `GET /playbacks?carepartner_id=1&limit=1`
+
+What has played on the tablet, newest first. Returns `200` with an array of `Playback` (`[]` when nothing has played).
+
+- Only playbacks that reached the screen (`started_at` is set) are listed, from any source, ordered by `started_at`. Requests that never started (expired, or failed before playing) are left out, so the first entry is what the carepartner last saw or heard.
+- `limit` is optional: 1 to 100, default 50. The staff app's "Last played" uses `limit=1`.
+- A missing or invalid `carepartner_id` or `limit` returns `400`.
+
 ### Staff play and stop
 
 `POST /playbacks/play` with `{"carepartner_id": 1, "media_id": 9}` records a `staff` playback with a 30 second deadline and pushes it to the tablet over the WebSocket at `/realtime/tablet?carepartner_id=1`. `POST /playbacks/{id}/stop` with `{"carepartner_id": 1}` stops one. `module_id` is no longer accepted (`400`).

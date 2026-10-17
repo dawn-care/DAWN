@@ -21,6 +21,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import LastPlayed from '../../../components/LastPlayed';
 import LoadError from '../../../components/LoadError';
 import { SITUATIONS, getSleepingHours, setSleepingHours } from '../../../data/mock';
 import { getResident } from '../../../data/server';
@@ -242,13 +243,7 @@ export default function ResidentScreen() {
         )}
       </View>
 
-      {/* Last played: placeholder until the server can report it */}
-      <View className="mt-3 rounded-2xl bg-surface-raised p-4">
-        <Text className="text-base text-ink-muted">
-          <Text className="font-semibold text-ink">Last played: </Text>
-          not available yet
-        </Text>
-      </View>
+      <LastPlayed residentId={resident.id} />
     </ScrollView>
   );
 }

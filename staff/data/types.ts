@@ -1,7 +1,7 @@
 /**
  * Domain types for the staff app.
  *
- * Residents and clips come from the server (data/server.ts). Family folders,
+ * Residents, clips and what last played come from the server (data/server.ts). Family folders,
  * sleeping hours and ratings have no backend yet and come from data/mock.ts.
  */
 
@@ -54,6 +54,19 @@ export interface Clip {
   duration: number | null;
   /** RFC 3339, when it was uploaded. */
   addedAt: string;
+}
+
+/** Something that reached the resident's tablet, from any source. */
+export interface PlayedItem {
+  /** The name it had when it played, even if the media was deleted since. */
+  title: string;
+  kind: 'photo' | 'video' | 'audio';
+  /** Who started it: staff, the schedule, or a tap on the tablet. */
+  source: 'staff' | 'scheduled' | 'tap';
+  /** "started" means the tablet hasn't reported an end yet. */
+  status: 'started' | 'finished' | 'stopped' | 'failed';
+  /** RFC 3339, when it started on the tablet. */
+  startedAt: string;
 }
 
 export type Rating = 'helped' | 'no_change' | 'worse';

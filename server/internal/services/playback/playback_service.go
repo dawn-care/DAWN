@@ -27,7 +27,15 @@ func NewPlaybackService(db *sql.DB) *PlaybackService {
 const columns = `id, carepartner_id, media_id, media_kind, media_display_name, scheduled_item_id,
 	source, status, requested_at, acknowledged_at, started_at, ended_at, expires_at, rating`
 
-func scanPlayback(row *sql.Row) (*playback.Playback, error) {
+// MaxListLimit caps how many playbacks one list request returns.
+const MaxListLimit = 100
+
+// scanner is a *sql.Row or *sql.Rows.
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanPlayback(row scanner) (*playback.Playback, error) {
 	p := &playback.Playback{}
 	err := row.Scan(&p.ID, &p.CarepartnerID, &p.MediaID, &p.MediaKind, &p.MediaDisplayName,
 		&p.ScheduledItemID, &p.Source, &p.Status,
@@ -149,6 +157,38 @@ func (s *PlaybackService) UpdateStatus(ctx context.Context, id, carepartnerID in
 		return nil, err
 	}
 	return p, nil
+}
+
+// ListPlayed returns up to limit of a carepartner's playbacks that reached the
+// screen (started_at is set), most recently started first. Requests that never
+// started (expired, refused, or failed before playing) are left out, so the
+// first one is what the carepartner last saw or heard, from any source.
+func (s *PlaybackService) ListPlayed(ctx context.Context, carepartnerID, limit int) ([]playback.Playback, error) {
+	if carepartnerID <= 0 || limit <= 0 || limit > MaxListLimit {
+		return nil, fmt.Errorf("%w: a positive carepartner ID and a limit of 1 to %d are required", ErrInvalidInput, MaxListLimit)
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+columns+` FROM "Playback"
+		WHERE carepartner_id = $1 AND started_at IS NOT NULL
+		ORDER BY started_at DESC, id DESC
+		LIMIT $2`, carepartnerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list playbacks: %w", err)
+	}
+	defer rows.Close()
+
+	// Empty rather than nil, so the response is [] and not null
+	played := []playback.Playback{}
+	for rows.Next() {
+		p, err := scanPlayback(rows)
+		if err != nil {
+			return nil, fmt.Errorf("list playbacks: %w", err)
+		}
+		played = append(played, *p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list playbacks: %w", err)
+	}
+	return played, nil
 }
 
 func canTransition(from, to string) bool {

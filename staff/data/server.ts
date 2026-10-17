@@ -4,7 +4,7 @@
  */
 
 import { api, ApiError, apiWithStatus } from "../lib/api";
-import type { Clip, Resident } from "./types";
+import type { Clip, PlayedItem, Resident } from "./types";
 
 interface ServerCarepartner {
   id: number;
@@ -27,7 +27,10 @@ export interface ServerPlayback {
   carepartner_id: number;
   media_id: number | null;
   media_display_name: string;
+  media_kind: "photo" | "video" | "audio";
+  source: "staff" | "scheduled" | "tap";
   status: string;
+  started_at: string | null;
   expires_at: string;
 }
 
@@ -78,6 +81,20 @@ export async function getClip(id: number): Promise<Clip | undefined> {
     if (err instanceof ApiError && err.status === 404) return undefined;
     throw err;
   }
+}
+
+/** What most recently played on the resident's tablet, or null if nothing has. */
+export async function getLastPlayed(residentId: number): Promise<PlayedItem | null> {
+  // The server lists only playbacks that started, most recent first.
+  const [latest] = await api<ServerPlayback[]>(`/playbacks?carepartner_id=${residentId}&limit=1`);
+  if (!latest?.started_at) return null;
+  return {
+    title: latest.media_display_name,
+    kind: latest.media_kind,
+    source: latest.source,
+    status: latest.status as PlayedItem["status"],
+    startedAt: latest.started_at,
+  };
 }
 
 /**
