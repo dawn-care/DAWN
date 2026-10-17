@@ -37,7 +37,7 @@ const WEATHER: Record<string, { icon: string; word: string }> = {
 };
 
 const LEAGUE_ICONS: Record<string, string> = { nfl: "football", nba: "basketball", mlb: "baseball", nhl: "hockey" };
-const RESULTS: Record<string, string> = { won: "Won", lost: "Lost", tied: "Tied", upcoming: "Soon" };
+const RESULTS: Record<string, string> = { won: "Won", lost: "Lost", tied: "Tied" };
 
 const HH_MM = /^(\d{2}):(\d{2})$/;
 
@@ -93,11 +93,20 @@ const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
     };
   },
   sports: ({ data }) => {
-    if (!isObject(data) || typeof data.result !== "string" || !RESULTS[data.result]) return null;
-    const team = text(data.team_name);
-    if (!team) return null;
-    const league = typeof data.league === "string" ? data.league : "";
-    return { renderer: "tile", data: { icon: LEAGUE_ICONS[league] ?? "", word: RESULTS[data.result], label: team } };
+    const team = isObject(data) ? text(data.team_name) : null;
+    if (!isObject(data) || !team) return null;
+    const icon = (typeof data.league === "string" && LEAGUE_ICONS[data.league]) || "";
+    if (data.result === "upcoming") {
+      return { renderer: "wideTile", data: { icon, label: team, word: "No games yet" } };
+    }
+    const word = typeof data.result === "string" ? RESULTS[data.result] : undefined;
+    const { team_score, opponent_score } = data;
+    if (!word || typeof team_score !== "number" || typeof opponent_score !== "number") return null;
+    const opponent = text(data.opponent_team_name);
+    return {
+      renderer: "wideTile",
+      data: { icon, label: team, word: `${word} ${team_score}–${opponent_score}`, detail: opponent && `vs ${opponent}` },
+    };
   },
   news: ({ data }) => {
     const articles = isObject(data) && Array.isArray(data.articles) ? data.articles : [];

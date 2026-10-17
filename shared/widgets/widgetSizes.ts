@@ -18,8 +18,9 @@ export const WIDGET_SIZES = {
   message: { width: 2, height: 1 },
   reminder: { width: 2, height: 1 },
   news: { width: 2, height: 1 },
+  /** Wide enough for the team, the result and score, and the opponent. */
+  sports: { width: 2, height: 1 },
   weather: { width: 1, height: 1 },
-  sports: { width: 1, height: 1 },
 } as const satisfies Record<string, WidgetSize>;
 
 export type WidgetType = keyof typeof WIDGET_SIZES;
