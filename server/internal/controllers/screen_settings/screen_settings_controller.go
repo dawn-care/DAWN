@@ -13,7 +13,6 @@ import (
 // Error codes returned in the "code" field of error responses
 const (
 	CodeInvalidRequest  = "INVALID_REQUEST"
-	CodeInvalidPreset   = "INVALID_LAYOUT_PRESET"
 	CodeInvalidWakeTime = "INVALID_WAKE_TIME"
 	CodeInvalidBedTime  = "INVALID_BED_TIME"
 	CodeNotFound        = "NOT_FOUND"
@@ -22,7 +21,6 @@ const (
 
 // ---- Interface ----
 type ScreenSettingsServiceInterface interface {
-	GetPresets() []svc.Preset
 	GetScreenSettings(carepartnerID int) (*model.ScreenSettings, error)
 	UpdateScreenSettings(carepartnerID int, in svc.UpdateInput) (*model.ScreenSettings, error)
 }
@@ -58,8 +56,6 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, CodeNotFound, err.Error())
 	case errors.Is(err, svc.ErrInvalidCarepartner):
 		writeError(w, http.StatusBadRequest, CodeInvalidRequest, err.Error())
-	case errors.Is(err, svc.ErrInvalidPreset):
-		writeError(w, http.StatusBadRequest, CodeInvalidPreset, err.Error())
 	case errors.Is(err, svc.ErrInvalidWakeTime):
 		writeError(w, http.StatusBadRequest, CodeInvalidWakeTime, err.Error())
 	case errors.Is(err, svc.ErrInvalidBedTime):
@@ -74,20 +70,9 @@ func carepartnerIDParam(r *http.Request) (int, bool) {
 	return id, err == nil && id > 0
 }
 
-// GetPresetsHandler godoc
-// @Summary List the layout presets
-// @Description Each preset has a name and a number of widget spots. Widgets are placed by spot index (0-based); spot 0 is the main photo spot and the rest follow reading order. Any widget type can go in any spot.
-// @Tags screen-settings
-// @Produce json
-// @Success 200 {array} screen_settings.Preset
-// @Router /screen-settings/presets [get]
-func (c *ScreenSettingsController) GetPresetsHandler(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, c.Service.GetPresets())
-}
-
 // GetScreenSettingsHandler godoc
 // @Summary Get a carepartner's screen settings
-// @Description Layout preset and awake hours ("HH:MM", carepartner's local time). Every carepartner has settings from creation (Balanced, 07:00 to 21:00).
+// @Description Awake hours ("HH:MM", carepartner's local time). Every carepartner has settings from creation (07:00 to 21:00). Widget placement is in /screen-layout.
 // @Tags screen-settings
 // @Produce json
 // @Param carepartner_id query int true "Carepartner ID"
@@ -114,7 +99,7 @@ func (c *ScreenSettingsController) GetScreenSettingsHandler(w http.ResponseWrite
 
 // UpdateScreenSettingsHandler godoc
 // @Summary Replace a carepartner's screen settings
-// @Description All fields are required. Wake time must be 06:00 to 10:00 and bed time 19:00 to 22:00.
+// @Description Both fields are required. Wake time must be 06:00 to 10:00 and bed time 19:00 to 22:00.
 // @Tags screen-settings
 // @Accept json
 // @Produce json

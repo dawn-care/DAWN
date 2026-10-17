@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { fonts } from "../theme/fonts";
 import { colors, fontSizes, radii, space } from "../theme/theme";
 import type { PlayerProps } from "./types";
+import { useReportOnce } from "./useReportOnce";
 
 /**
  * expo-audio reports no playback errors, so these timeouts stand in for them:
@@ -32,7 +33,7 @@ const FALLBACK_IMAGE = require("../../assets/images/music-note.jpg");
 export default function AudioPlayer({ uri, title, coverUri, onFinished, onFailed }: AudioPlayerProps) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
-  const ended = useRef(false);
+  const report = useReportOnce({ onFinished, onFailed });
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -48,23 +49,17 @@ export default function AudioPlayer({ uri, title, coverUri, onFinished, onFailed
   }, [player]);
 
   useEffect(() => {
-    if (!status.didJustFinish || ended.current) return;
-    ended.current = true;
-    onFinished();
-  }, [status.didJustFinish, onFinished]);
+    if (status.didJustFinish) report.finished();
+  }, [status.didJustFinish, report]);
 
   // Restarts whenever the playback position moves, so it only fires once playback is stuck.
   useEffect(() => {
     const [timeout, reason] = status.isLoaded
       ? [AUDIO_STALL_TIMEOUT_MS, "Audio stopped playing"]
       : [AUDIO_LOAD_TIMEOUT_MS, "Audio did not load"];
-    const timer = setTimeout(() => {
-      if (ended.current) return;
-      ended.current = true;
-      onFailed(reason);
-    }, timeout);
+    const timer = setTimeout(() => report.failed(reason), timeout);
     return () => clearTimeout(timer);
-  }, [status.isLoaded, status.currentTime, onFailed]);
+  }, [status.isLoaded, status.currentTime, report]);
 
   return (
     <View style={styles.root}>

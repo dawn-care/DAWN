@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import { colors } from "../theme/theme";
 import type { PlayerProps } from "./types";
+import { useReportOnce } from "./useReportOnce";
 
 /**
  * A photo that has neither loaded nor failed by now counts as failed. On
@@ -21,27 +22,12 @@ type PhotoPlayerProps = PlayerProps & {
  */
 export default function PhotoPlayer({ uri, durationSeconds, onFinished, onFailed }: PhotoPlayerProps) {
   const [loaded, setLoaded] = useState(false);
-  const ended = useRef(false);
-
-  // Read the callbacks through a ref, so a parent passing new functions on
-  // every render doesn't restart the timers below.
-  const callbacks = useRef({ onFinished, onFailed });
-  useEffect(() => {
-    callbacks.current = { onFinished, onFailed };
-  });
-
-  /** Reports finished, or failed when given a reason; only the first report counts. */
-  const report = useCallback((failure?: string) => {
-    if (ended.current) return;
-    ended.current = true;
-    if (failure === undefined) callbacks.current.onFinished();
-    else callbacks.current.onFailed(failure);
-  }, []);
+  const report = useReportOnce({ onFinished, onFailed });
 
   useEffect(() => {
     const timer = loaded
-      ? setTimeout(() => report(), durationSeconds * 1000)
-      : setTimeout(() => report("Photo did not load"), PHOTO_LOAD_TIMEOUT_MS);
+      ? setTimeout(report.finished, durationSeconds * 1000)
+      : setTimeout(() => report.failed("Photo did not load"), PHOTO_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [loaded, durationSeconds, report]);
 
@@ -53,7 +39,7 @@ export default function PhotoPlayer({ uri, durationSeconds, onFinished, onFailed
         style={styles.photo}
         resizeMode="contain"
         onLoad={() => setLoaded(true)}
-        onError={() => report("Photo could not be loaded")}
+        onError={() => report.failed("Photo could not be loaded")}
       />
     </View>
   );
