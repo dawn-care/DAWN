@@ -52,7 +52,7 @@ describe("SchedulePlayer", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.mocked(readPairedId).mockResolvedValue(7);
-    jest.mocked(useScreen).mockReturnValue({ screen: { schedule } as never, refresh: jest.fn() });
+    jest.mocked(useScreen).mockReturnValue({ screen: { schedule } as never, refresh: jest.fn(), fetchedAt: null });
   });
 
   afterEach(() => {
@@ -157,7 +157,7 @@ describe("SchedulePlayer", () => {
   });
 
   it("plays nothing without a screen yet", async () => {
-    jest.mocked(useScreen).mockReturnValue({ screen: null, refresh: jest.fn() });
+    jest.mocked(useScreen).mockReturnValue({ screen: null, refresh: jest.fn(), fetchedAt: null });
     await start("2026-10-12T08:00:30");
 
     expect(playingUrl()).toBeNull();

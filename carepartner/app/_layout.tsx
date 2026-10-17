@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { useKeepAwake } from "expo-keep-awake";
 import * as SplashScreen from "expo-splash-screen";
+import DevToolbar from "../src/dev/DevToolbar";
 import TabletDisplay from "../src/display/TabletDisplay";
 import { PlaybackProvider } from "../src/playback/PlaybackProvider";
 import StaffCommands from "../src/playback/StaffCommands";
@@ -33,6 +34,7 @@ export default function RootLayout() {
         <StaffCommands />
         <SchedulePlayer />
         <Stack screenOptions={{ headerShown: false, animation: "none" }} />
+        {__DEV__ && <DevToolbar />}
       </ScreenProvider>
     </PlaybackProvider>
   );

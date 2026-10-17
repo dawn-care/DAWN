@@ -14,7 +14,7 @@ jest.mock("../../widgets/Grid", () => {
   };
 });
 
-const showing = (value: Screen | null) => jest.mocked(useScreen).mockReturnValue({ screen: value, refresh: jest.fn() });
+const showing = (value: Screen | null) => jest.mocked(useScreen).mockReturnValue({ screen: value, refresh: jest.fn(), fetchedAt: null });
 
 const screenWith = (widgets: Screen["widgets"]): Screen => ({ awakeHours: { wake: "07:00", bed: "21:00" }, widgets, schedule: [] });
 
