@@ -12,7 +12,9 @@
  *  - A right-hand panel that shows the selected item, or the add flow that
  *    was picked in the header
  *
- * The camera, voice and upload panels are placeholders until they are built.
+ * Camera and voice recording are switched off for now, so uploading a file is
+ * the only way to add something. The upload panel is a placeholder until it
+ * is built.
  */
 
 import { useEffect, useState } from "react";
@@ -36,13 +38,7 @@ import MediaCard from "../media/MediaCard";
 const pendingRemovalIds = new Set<number>();
 
 type Filter = "all" | MediaKind;
-type Panel = "detail" | "camera" | "mic" | "file";
-
-const PANEL_TITLES: Record<Exclude<Panel, "detail">, string> = {
-  camera: "Use your camera",
-  mic: "Record your voice",
-  file: "Upload a file",
-};
+type Panel = "detail" | "file";
 
 const FILTERS: { value: Filter; label: string; empty: string }[] = [
   { value: "all", label: "All", empty: "No media files added yet." },
@@ -84,18 +80,20 @@ interface AddButtonProps {
   title: string;
   subtitle: string;
   open: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }
 
-function AddButton({ icon, title, subtitle, open, onClick }: AddButtonProps) {
+function AddButton({ icon, title, subtitle, open, disabled = false, onClick }: AddButtonProps) {
   return (
     <button
       type="button"
       aria-pressed={open}
+      disabled={disabled}
       onClick={onClick}
-      className={`h-[76px] flex items-center gap-3.5 px-[18px] rounded-[14px] border-2 text-left text-dawn-ink cursor-pointer ${
-        open ? "bg-dawn-accent/10 border-dawn-accent" : "bg-white border-dawn-line-strong"
-      } ${FOCUS_RING}`}
+      className={`h-[76px] flex items-center gap-3.5 px-[18px] rounded-[14px] border-2 text-left text-dawn-ink ${
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+      } ${open ? "bg-dawn-accent/10 border-dawn-accent" : "bg-white border-dawn-line-strong"} ${FOCUS_RING}`}
     >
       <span className="shrink-0 text-dawn-accent">{icon}</span>
       <span className="flex flex-col gap-0.5">
@@ -211,16 +209,18 @@ export default function Media() {
         <AddButton
           icon={<Video size={34} aria-hidden="true" />}
           title="Use your camera"
-          subtitle="Take a photo or record a video"
-          open={panel === "camera"}
-          onClick={() => setPanel("camera")}
+          subtitle="Coming soon"
+          open={false}
+          disabled
+          onClick={() => {}}
         />
         <AddButton
           icon={<Mic size={34} aria-hidden="true" />}
           title="Record your voice"
-          subtitle="A message or a song"
-          open={panel === "mic"}
-          onClick={() => setPanel("mic")}
+          subtitle="Coming soon"
+          open={false}
+          disabled
+          onClick={() => {}}
         />
         <AddButton
           icon={<Upload size={34} aria-hidden="true" />}
@@ -271,7 +271,7 @@ export default function Media() {
         </section>
 
         <aside
-          aria-label={panel === "detail" ? "Selected item" : PANEL_TITLES[panel]}
+          aria-label={panel === "detail" ? "Selected item" : "Upload a file"}
           className="w-[420px] shrink-0 overflow-y-auto flex flex-col gap-3 p-[18px] bg-white border-[1.5px] border-dawn-line rounded-2xl"
         >
           {panel === "detail" ? (
@@ -290,7 +290,7 @@ export default function Media() {
             )
           ) : (
             <div className="flex items-center justify-between">
-              <h2 className="m-0 text-xl font-extrabold">{PANEL_TITLES[panel]}</h2>
+              <h2 className="m-0 text-xl font-extrabold">Upload a file</h2>
               <IconButton
                 label="Close"
                 icon={<X size={20} strokeWidth={2.4} aria-hidden="true" />}
