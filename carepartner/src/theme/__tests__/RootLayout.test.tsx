@@ -24,6 +24,7 @@ jest.mock("../../screen/ScreenProvider", () => ({
 }));
 jest.mock("../../schedule/SchedulePlayer", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: () => null }));
+jest.mock("../../dev/DevToolbar", () => ({ __esModule: true, default: () => null }));
 
 describe("RootLayout", () => {
   beforeEach(() => {

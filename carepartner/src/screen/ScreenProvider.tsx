@@ -29,6 +29,8 @@ type ScreenContextValue = {
   screen: Screen | null;
   /** Fetches the screen again now. */
   refresh: () => Promise<void>;
+  /** When the last good screen arrived, or null before the first. For developer tools. */
+  fetchedAt: Date | null;
 };
 
 const ScreenContext = createContext<ScreenContextValue | null>(null);
@@ -80,6 +82,7 @@ export function ScreenProvider({ children }: { children: React.ReactNode }) {
   }, [id, refresh]);
 
   const screen = useMemo(() => fetched && hideStaleWidgets(fetched.screen, fetched.at, checkedAt), [fetched, checkedAt]);
-  const value = useMemo(() => ({ screen, refresh }), [screen, refresh]);
+  const fetchedAt = fetched?.at ?? null;
+  const value = useMemo(() => ({ screen, refresh, fetchedAt }), [screen, refresh, fetchedAt]);
   return <ScreenContext.Provider value={value}>{children}</ScreenContext.Provider>;
 }

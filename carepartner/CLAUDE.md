@@ -201,6 +201,14 @@ Staff play and stop clips from their phones; the server pushes each command to t
 
 The pure decisions are in `schedule.ts`.
 
+### Developer toolbar (`src/dev/`)
+
+In development builds only (`__DEV__`; `app/_layout.tsx` leaves it out of release builds), `DevToolbar` draws two buttons in the top right, above every screen:
+- ☰ opens a panel with the app clock (marked when `EXPO_PUBLIC_FAKE_TIME` is set), the screen and what's playing, the awake hours and whether it's night, the carepartner and pairing, whether the server sees the socket, the last good screen fetch, today's and tomorrow's scheduled plays with their status (played, due, upcoming, missed, asleep), and the carepartner's media. Tapping a media item starts a staff play through `POST /playbacks/play`, the same path the staff app will use (#302).
+- ⏭, shown while something plays, stops it as a staff stop would.
+
+Its server calls and the play statuses are in `devInfo.ts`. It uses its own plain styling, not the resident's theme, and none of the design rules apply to it.
+
 ### Types mirror the backend by hand
 
 `Screen`, `ScreenWidget` and `ScheduledPlay` (`src/screen/screen.ts`) are the parts of the Go `Screen` struct (`server/internal/services/screen/types.go`) that the tablet uses, renamed to camelCase. `MediaItem` (`src/playback/media.ts`) is what playback needs from a media object; `readMedia` checks one from `/media/{id}` or a schedule entry. A widget's `config` and `data` stay `unknown` until renderers check them for their type (#316).

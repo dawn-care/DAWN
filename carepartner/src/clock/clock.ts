@@ -34,6 +34,11 @@ export function parseFakeTime(value: string | undefined): Date | null {
 const fakeStart = parseFakeTime(process.env.EXPO_PUBLIC_FAKE_TIME);
 let source: TimeSource = fakeStart ? startingAt(fakeStart) : realTime;
 
+/** The EXPO_PUBLIC_FAKE_TIME the app started at, or null for the real time. For developer tools. */
+export function fakeStartTime(): Date | null {
+  return fakeStart;
+}
+
 export function now(): Date {
   return new Date(source());
 }
