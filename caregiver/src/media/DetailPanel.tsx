@@ -265,9 +265,9 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
       {isPhoto ? (
         <>
           <InfoBlock heading="Screen">
-            <span>{onScreen ? "On her screen" : "Not on her screen"}</span>
+            <span>{onScreen ? "On screen" : "Not on screen"}</span>
             <Link to="/" className={ACTION_LINK}>
-              {onScreen ? "Change" : "Add to her screen"}
+              {onScreen ? "Remove from screen" : "Add to screen"}
             </Link>
           </InfoBlock>
           {line && <ScheduleBlock line={line} />}
