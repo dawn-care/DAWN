@@ -1,7 +1,16 @@
-import { SCREEN_WIDGET_TYPES, isScreenWidgetType, splitKnownWidgets, widgetName } from "../screenWidgets";
+import {
+  ADDABLE_WIDGET_TYPES,
+  LOCKED_WIDGET_TYPES,
+  SCREEN_WIDGET_TYPES,
+  isLockedWidgetType,
+  isScreenWidgetType,
+  splitKnownWidgets,
+  widgetName,
+} from "../screenWidgets";
 
 describe("widgetName", () => {
   it.each([
+    ["day_time", "Day and time"],
     ["photo", "Photo"],
     ["message", "Message"],
     ["reminder", "Reminder"],
@@ -35,6 +44,18 @@ describe("isScreenWidgetType", () => {
   });
 });
 
+describe("locked widgets", () => {
+  it("locks only the day and time", () => {
+    expect(LOCKED_WIDGET_TYPES).toEqual(["day_time"]);
+    expect(isLockedWidgetType("day_time")).toBe(true);
+    expect(isLockedWidgetType("photo")).toBe(false);
+  });
+
+  it("lets the caregiver add every other type, in the same order", () => {
+    expect(ADDABLE_WIDGET_TYPES).toEqual(["photo", "message", "reminder", "weather", "sports", "news"]);
+  });
+});
+
 describe("splitKnownWidgets", () => {
   it("separates widgets with a known type from the rest, keeping order", () => {
     const widgets = [
@@ -42,9 +63,10 @@ describe("splitKnownWidgets", () => {
       { id: 2, type: "clock" },
       { id: 3, type: "news" },
       { id: 4, type: "map" },
+      { id: 5, type: "day_time" },
     ];
     const { known, unknown } = splitKnownWidgets(widgets);
-    expect(known.map((w) => w.id)).toEqual([1, 3]);
+    expect(known.map((w) => w.id)).toEqual([1, 3, 5]);
     expect(unknown.map((w) => w.id)).toEqual([2, 4]);
   });
 

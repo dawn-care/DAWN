@@ -11,6 +11,7 @@
 
 import { areasOverlap, fitsGrid, GRID } from "./grid";
 import type { GridArea } from "./grid";
+import { LOCKED_WIDGET_TYPES } from "./screenWidgets";
 import type { ScreenWidgetType } from "./screenWidgets";
 import { WIDGET_SIZES } from "./widgetSizes";
 
@@ -68,8 +69,15 @@ export function hasRoom(widgets: readonly PlacedWidget[], type: ScreenWidgetType
   return openCells(widgets, type).length > 0;
 }
 
-/** Whether every widget fits on the grid and none overlap. Checked before saving the list. */
+/**
+ * Whether every widget fits on the grid, none overlap, and there's at most one of
+ * each locked type (`day_time`). Checked before saving the list.
+ */
 export function isValidPlacement(widgets: readonly PlacedWidget[]): boolean {
+  const lockedTwice = LOCKED_WIDGET_TYPES.some(
+    (type) => widgets.filter((widget) => widget.type === type).length > 1,
+  );
+  if (lockedTwice) return false;
   return widgets.every((widget, index) => {
     const area = widgetArea(widget);
     return (

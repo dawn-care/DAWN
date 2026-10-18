@@ -18,6 +18,7 @@ describe("widgetArea", () => {
     expect(widgetArea({ type: "message", col: 1, row: 2 })).toEqual({ col: 1, row: 2, width: 2, height: 1 });
     expect(widgetArea({ type: "photo", col: 2, row: 1 })).toEqual({ col: 2, row: 1, width: 2, height: 2 });
     expect(widgetArea({ type: "sports", col: 0, row: 2 })).toEqual({ col: 0, row: 2, width: 2, height: 1 });
+    expect(widgetArea({ type: "day_time", col: 0, row: 0 })).toEqual({ col: 0, row: 0, width: 2, height: 2 });
   });
 });
 
@@ -129,6 +130,34 @@ describe("isValidPlacement", () => {
 
   it("rejects a widget off the grid", () => {
     expect(isValidPlacement([{ id: 9, type: "message", col: 3, row: 0 }])).toBe(false);
+  });
+
+  it("accepts one day and time, and a screen without one", () => {
+    const dayTime: PlacedWidget = { id: 7, type: "day_time", col: 2, row: 0 };
+    expect(isValidPlacement([photo, dayTime])).toBe(true);
+    expect(isValidPlacement([photo])).toBe(true);
+  });
+
+  it("rejects a second day and time, even where it would fit", () => {
+    expect(
+      isValidPlacement([
+        { id: 7, type: "day_time", col: 0, row: 0 },
+        { id: 8, type: "day_time", col: 2, row: 0 },
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe("moving the day and time", () => {
+  it("lights the cells it fits in, ignoring its own place", () => {
+    const dayTime: PlacedWidget = { id: 7, type: "day_time", col: 0, row: 0 };
+    const cells = openCells([dayTime, { id: 3, type: "message", col: 2, row: 2 }], "day_time", dayTime.id);
+    expect(cells).toEqual([
+      { col: 0, row: 0 },
+      { col: 1, row: 0 },
+      { col: 2, row: 0 },
+      { col: 0, row: 1 },
+    ]);
   });
 });
 
