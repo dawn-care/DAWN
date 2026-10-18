@@ -1,5 +1,4 @@
 import {
-  ADDABLE_WIDGET_TYPES,
   LOCKED_WIDGET_TYPES,
   SCREEN_WIDGET_TYPES,
   isLockedWidgetType,
@@ -49,10 +48,6 @@ describe("locked widgets", () => {
     expect(LOCKED_WIDGET_TYPES).toEqual(["day_time"]);
     expect(isLockedWidgetType("day_time")).toBe(true);
     expect(isLockedWidgetType("photo")).toBe(false);
-  });
-
-  it("lets the caregiver add every other type, in the same order", () => {
-    expect(ADDABLE_WIDGET_TYPES).toEqual(["photo", "message", "reminder", "weather", "sports", "news"]);
   });
 });
 
