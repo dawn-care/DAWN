@@ -31,11 +31,16 @@ export function getJson(path: string, options?: Options): Promise<unknown> {
 
 /** POSTs `body` as JSON to `path`; otherwise the same as `getJson`. */
 export function postJson(path: string, body: unknown, options?: Options): Promise<unknown> {
-  return requestJson(
-    path,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
-    options,
-  );
+  return sendJson("POST", path, body, options);
+}
+
+/** PATCHes `body` as JSON to `path`; otherwise the same as `getJson`. */
+export function patchJson(path: string, body: unknown, options?: Options): Promise<unknown> {
+  return sendJson("PATCH", path, body, options);
+}
+
+function sendJson(method: string, path: string, body: unknown, options?: Options): Promise<unknown> {
+  return requestJson(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, options);
 }
 
 async function requestJson(path: string, init: RequestInit, { timeoutMs = REQUEST_TIMEOUT_MS }: Options = {}): Promise<unknown> {

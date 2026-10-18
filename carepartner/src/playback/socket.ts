@@ -6,7 +6,7 @@
  * failed try, and holds messages sent while disconnected until it reconnects.
  * The server's heartbeat pings are answered by the WebSocket itself.
  *
- * Logic only; `useStaffCommands` decides what to do with the messages.
+ * Logic only; `StaffCommands` decides what to do with the messages.
  */
 
 import { API_URL } from "../api/config";

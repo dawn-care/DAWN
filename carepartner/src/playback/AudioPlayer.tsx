@@ -30,10 +30,10 @@ const FALLBACK_IMAGE = require("../../assets/images/music-note.jpg");
  * Plays one audio file over a still screen, starting on its own.
  * Remount it (change its `key`) to play a different file.
  */
-export default function AudioPlayer({ uri, title, coverUri, onFinished, onFailed }: AudioPlayerProps) {
+export default function AudioPlayer({ uri, title, coverUri, onStarted, onFinished, onFailed }: AudioPlayerProps) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
-  const report = useReportOnce({ onFinished, onFailed });
+  const report = useReportOnce({ onStarted, onFinished, onFailed });
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -47,6 +47,10 @@ export default function AudioPlayer({ uri, title, coverUri, onFinished, onFailed
       }
     };
   }, [player]);
+
+  useEffect(() => {
+    if (status.playing) report.started();
+  }, [status.playing, report]);
 
   useEffect(() => {
     if (status.didJustFinish) report.finished();

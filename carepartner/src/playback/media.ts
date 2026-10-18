@@ -11,6 +11,8 @@ export type MediaKind = "video" | "audio" | "photo";
 
 /** One thing to play, with everything `MediaPlayer` needs. */
 export type MediaItem = {
+  /** The server's media id, for reporting plays; missing only in hand-made items. */
+  id?: number;
   kind: MediaKind;
   /** The file: a path relative to `API_URL` such as "/media/4/file", or a full URL. */
   url: string;
@@ -34,9 +36,10 @@ const KINDS: readonly string[] = ["video", "audio", "photo"] satisfies MediaKind
  */
 export function readMedia(value: unknown): MediaItem | null {
   if (typeof value !== "object" || value === null) return null;
-  const { kind, url, display_name } = value as Record<string, unknown>;
+  const { id, kind, url, display_name } = value as Record<string, unknown>;
   if (typeof kind !== "string" || !KINDS.includes(kind) || typeof url !== "string" || !url) return null;
   return {
+    ...(typeof id === "number" ? { id } : {}),
     kind: kind as MediaKind,
     url,
     title: typeof display_name === "string" ? display_name : undefined,

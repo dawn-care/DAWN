@@ -10,7 +10,7 @@ import { useReportOnce } from "./useReportOnce";
  * Plays one video full size with no controls, starting on its own.
  * Remount it (change its `key`) to play a different video.
  */
-export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) {
+export default function VideoPlayer({ uri, onStarted, onFinished, onFailed }: PlayerProps) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
   });
@@ -30,7 +30,10 @@ export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) 
     return () => subscription.remove();
   }, [player]);
 
-  const report = useReportOnce({ onFinished, onFailed });
+  const report = useReportOnce({ onStarted, onFinished, onFailed });
+  useEventListener(player, "playingChange", ({ isPlaying }) => {
+    if (isPlaying) report.started();
+  });
   useEventListener(player, "playToEnd", report.finished);
   useEventListener(player, "statusChange", ({ status, error }) => {
     if (status === "error") report.failed(error?.message ?? "Video could not be played");

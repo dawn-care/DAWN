@@ -7,7 +7,7 @@ import AlwaysOnScreen from "../src/screen/AlwaysOnScreen";
 
 /** Shows whatever the playback machine says the screen should show. */
 export default function Index() {
-  const { state, screen, ended } = usePlayback();
+  const { state, screen, started, ended } = usePlayback();
 
   switch (screen) {
     case "starting":
@@ -20,6 +20,7 @@ export default function Index() {
         <MediaPlayer
           key={playId}
           item={item}
+          onStarted={() => started(playId)}
           onFinished={() => ended(playId, "finished")}
           onFailed={(reason) => {
             console.warn("Playback failed:", reason);

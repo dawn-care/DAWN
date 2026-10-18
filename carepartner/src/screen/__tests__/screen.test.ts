@@ -61,7 +61,7 @@ describe("readScreen", () => {
       schedule: [
         {
           scheduledItemId: 1, date: "2026-10-12", time: "10:00", outsideAwakeHours: false,
-          item: { kind: "video", url: "/media/2/file", title: "Birthday" },
+          item: { id: 2, kind: "video", url: "/media/2/file", title: "Birthday" },
         },
       ],
     });
@@ -101,7 +101,7 @@ describe("readScreen", () => {
     };
 
     expect(readScreen(raw)!.schedule[0].item).toEqual({
-      kind: "audio", url: "/media/9/file", title: "Morning hymn", coverUrl: "/media/4/file",
+      id: 9, kind: "audio", url: "/media/9/file", title: "Morning hymn", coverUrl: "/media/4/file",
     });
   });
 
