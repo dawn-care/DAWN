@@ -8,11 +8,22 @@ export const REQUEST_TIMEOUT_MS = 10_000;
 
 type Options = { timeoutMs?: number };
 
+/** The server answered with an error status, as opposed to not answering at all. */
+export class HttpError extends Error {
+  constructor(
+    readonly path: string,
+    readonly status: number,
+  ) {
+    super(`Request for ${path} failed (${status})`);
+    this.name = "HttpError";
+  }
+}
+
 /**
  * GETs `path` (relative to `API_URL`, such as "/media/9") and returns the
  * parsed JSON, unchecked; callers check its shape where it enters the app.
- * Throws on a network error, an error status or a request that takes longer
- * than `timeoutMs`.
+ * Throws an `HttpError` for an error status, and another error for a network
+ * failure or a request that takes longer than `timeoutMs`.
  */
 export function getJson(path: string, options?: Options): Promise<unknown> {
   return requestJson(path, {}, options);
@@ -32,7 +43,7 @@ async function requestJson(path: string, init: RequestInit, { timeoutMs = REQUES
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${API_URL}${path}`, { ...init, signal: controller.signal });
-    if (!res.ok) throw new Error(`Request for ${path} failed (${res.status})`);
+    if (!res.ok) throw new HttpError(path, res.status);
     return await res.json();
   } finally {
     clearTimeout(timer);

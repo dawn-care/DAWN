@@ -1,5 +1,5 @@
 import { API_URL } from "../config";
-import { getJson, postJson, REQUEST_TIMEOUT_MS } from "../request";
+import { getJson, HttpError, postJson, REQUEST_TIMEOUT_MS } from "../request";
 
 describe("getJson", () => {
   const realFetch = globalThis.fetch;
@@ -31,10 +31,12 @@ describe("getJson", () => {
     });
   });
 
-  it("throws on an error status", async () => {
+  it("throws an HttpError with the status on an error status", async () => {
     respond({ code: "NOT_FOUND" }, 404);
 
-    await expect(getJson("/media/9")).rejects.toThrow("Request for /media/9 failed (404)");
+    const error = await getJson("/media/9").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toMatchObject({ status: 404, message: "Request for /media/9 failed (404)" });
   });
 
   it.each([
