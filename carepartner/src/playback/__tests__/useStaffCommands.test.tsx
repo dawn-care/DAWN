@@ -41,6 +41,8 @@ async function playAccepted(playbackId: number) {
   await connection.receive(playCommand(playbackId));
   await connection.receive(answer(playbackId));
 }
+/** The player on screen says its media is actually playing. */
+const playerStarts = () => act(async () => playback.started(playback.state.playing!.playId));
 /** The statuses reported so far, as [playback id, status]. */
 const reports = () =>
   connection.send.mock.calls.map(([text]) => {
@@ -115,6 +117,10 @@ describe("useStaffCommands", () => {
 
     expect(fetchMediaItem).toHaveBeenCalledWith(9);
     expect(playback.state.playing).toMatchObject({ item: video, source: "staff", playbackId: 40 });
+    // On screen but still loading: not started yet.
+    expect(reports()).toEqual([[40, "acknowledged"]]);
+
+    await playerStarts();
     expect(reports()).toEqual([
       [40, "acknowledged"],
       [40, "started"],
@@ -124,6 +130,18 @@ describe("useStaffCommands", () => {
 
     expect(playback.screen).toBe("alwaysOn");
     expect(reports()).toContainEqual([40, "finished"]);
+  });
+
+  it("reports a clip that never loads as failed, without started", async () => {
+    await start();
+    await playAccepted(40);
+
+    await act(async () => playback.ended(playback.state.playing!.playId, "failed"));
+
+    expect(reports()).toEqual([
+      [40, "acknowledged"],
+      [40, "failed"],
+    ]);
   });
 
   it("waits for the server to accept the acknowledgement before playing", async () => {
@@ -205,7 +223,9 @@ describe("useStaffCommands", () => {
   it("reports the earlier clip stopped when another staff play replaces it", async () => {
     await start();
     await playAccepted(40);
+    await playerStarts();
     await playAccepted(41);
+    await playerStarts();
 
     expect(playback.state.playing?.playbackId).toBe(41);
     expect(reports()).toEqual(
@@ -270,6 +290,7 @@ describe("useStaffCommands", () => {
       // The newer lookup finishes first, then the older one.
       await act(async () => lookups.get(10)!(song));
       await act(async () => lookups.get(9)!(video));
+      await playerStarts();
 
       expect(playback.state.playing).toMatchObject({ item: song, playbackId: 41 });
       expect(reports()).toEqual([

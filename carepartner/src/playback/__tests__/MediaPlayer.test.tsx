@@ -67,8 +67,9 @@ describe("MediaPlayer", () => {
 });
 
 describe("readMedia", () => {
-  it("reads the server's media", () => {
+  it("reads the server's media, keeping its id for play reports", () => {
     expect(readMedia({ id: 9, kind: "audio", display_name: "Moon River", url: "/media/9/file", duration_seconds: 214 })).toEqual({
+      id: 9,
       kind: "audio",
       url: "/media/9/file",
       title: "Moon River",

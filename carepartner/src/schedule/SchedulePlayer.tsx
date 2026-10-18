@@ -58,7 +58,7 @@ export default function SchedulePlayer() {
     const due = duePlay(schedule, now(), played);
     if (!due) return;
     requested.current = due;
-    play(due.item, "scheduled");
+    play(due.item, "scheduled", { scheduledItemId: due.scheduledItemId });
   }, [schedule, played, state, play, time]);
 
   return null;

@@ -84,7 +84,7 @@ describe("playback machine", () => {
     it.each(["scheduled", "staff", "tap"] as const)("starts a %s play when idle", (source) => {
       const state = playing(source);
 
-      expect(state.playing).toEqual({ playId: 1, item: song, source });
+      expect(state.playing).toMatchObject({ playId: 1, item: song, source, started: false });
       expect(screenFor(state)).toBe("playing");
     });
 
@@ -110,7 +110,33 @@ describe("playback machine", () => {
       const after = run(before, { type: "play", item: photo, source: incoming });
 
       expect(canPlay(before, incoming)).toBe(replaces);
-      expect(after.playing).toEqual(replaces ? { playId: 2, item: photo, source: incoming } : before.playing);
+      if (replaces) expect(after.playing).toMatchObject({ playId: 2, item: photo, source: incoming, started: false });
+      else expect(after.playing).toBe(before.playing);
+    });
+  });
+
+  describe("starting", () => {
+    it("records when the media is actually playing", () => {
+      const state = run(playing("scheduled"), { type: "started", playId: 1 });
+
+      expect(state.playing?.started).toBe(true);
+      expect(screenFor(state)).toBe("playing");
+    });
+
+    it("ignores a repeated started report", () => {
+      const started = run(playing("scheduled"), { type: "started", playId: 1 });
+
+      expect(run(started, { type: "started", playId: 1 })).toBe(started);
+    });
+
+    it("ignores a late started report from a play that was replaced", () => {
+      const replaced = run(playing("scheduled"), { type: "play", item: photo, source: "staff" });
+
+      expect(run(replaced, { type: "started", playId: 1 })).toBe(replaced);
+    });
+
+    it("ignores a started report when nothing is playing", () => {
+      expect(run(paired, { type: "started", playId: 1 })).toBe(paired);
     });
   });
 

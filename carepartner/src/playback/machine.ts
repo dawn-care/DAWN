@@ -24,6 +24,10 @@ export type Playing = {
   source: PlaySource;
   /** The server's Playback record for this play, if it has one (staff plays for now). */
   playbackId?: number;
+  /** For a scheduled play, the scheduled item it comes from. */
+  scheduledItemId?: number;
+  /** The player says the media is actually playing; false while it loads. */
+  started: boolean;
 };
 
 /** Why a play left the screen. */
@@ -55,11 +59,16 @@ export type PlaybackEvent =
   /** The stored carepartner id, or null if none is stored. */
   | { type: "pairingChecked"; carepartnerId: number | null }
   | { type: "nightChanged"; night: boolean }
-  | { type: "play"; item: MediaItem; source: PlaySource; playbackId?: number }
+  | ({ type: "play"; item: MediaItem; source: PlaySource } & PlayOptions)
   /** Stops the current play, or with `playbackId`, only the play with that record. */
   | { type: "stop"; playbackId?: number }
+  /** The player says the media is actually playing. */
+  | { type: "started"; playId: number }
   /** The player reported finished or failed. */
   | { type: "ended"; playId: number; reason: PlayerOutcome };
+
+/** What else a play can carry: its server record (staff), or its scheduled item (scheduled). */
+export type PlayOptions = { playbackId?: number; scheduledItemId?: number };
 
 /** What the screen shows. */
 export type Screen = "starting" | "unpaired" | "playing" | "night" | "alwaysOn";
@@ -96,6 +105,8 @@ export function canPlay(state: PlaybackState, source: PlaySource): boolean {
  *   is ignored otherwise. A play it replaces ends as "replaced".
  * - `stop`: ends whatever is playing, or with a `playbackId`, only the play
  *   with that record, so a late stop can't end a newer clip.
+ * - `started`: records that the play on screen is actually playing. Like
+ *   `ended`, a report for any other `playId` is ignored.
  * - `ended`: ends the play only if `playId` is the one on screen, so a late
  *   report from an earlier play is ignored.
  *
@@ -114,12 +125,22 @@ export function playbackReducer(state: PlaybackState, event: PlaybackEvent): Pla
       if (!canPlay(state, event.source)) return state;
       return {
         ...end(state, "replaced"),
-        playing: { playId: state.nextPlayId, item: event.item, source: event.source, playbackId: event.playbackId },
+        playing: {
+          playId: state.nextPlayId,
+          item: event.item,
+          source: event.source,
+          playbackId: event.playbackId,
+          scheduledItemId: event.scheduledItemId,
+          started: false,
+        },
         nextPlayId: state.nextPlayId + 1,
       };
     case "stop":
       if (event.playbackId !== undefined && state.playing?.playbackId !== event.playbackId) return state;
       return end(state, "stopped");
+    case "started":
+      if (state.playing?.playId !== event.playId || state.playing.started) return state;
+      return { ...state, playing: { ...state.playing, started: true } };
     case "ended":
       return state.playing?.playId === event.playId ? end(state, event.reason) : state;
   }

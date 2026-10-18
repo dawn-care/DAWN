@@ -6,9 +6,9 @@
  * step of a staff play back to the server, so its Playback record always says
  * what the tablet actually did:
  *
- *   play command → acknowledged
- *   on screen    → started
- *   off screen   → finished, failed or stopped
+ *   play command        → acknowledged
+ *   actually playing    → started (a clip that never loads skips it)
+ *   off screen          → finished, failed or stopped
  *
  * The server decides whether a command is still in time: the tablet's clock
  * can be wrong, so a play starts only once the server has accepted its
@@ -66,7 +66,7 @@ export function useStaffCommands(): void {
     const command = pending.current.get(playbackId);
     if (!command?.accepted || !command.item) return;
     pending.current.delete(playbackId);
-    latest.current.play(command.item, "staff", playbackId);
+    latest.current.play(command.item, "staff", { playbackId });
   };
 
   const handle = async (message: ServerMessage) => {
@@ -154,10 +154,10 @@ export function useStaffCommands(): void {
 
   // Reports follow the machine, whatever put a play on or off the screen. Each
   // runs only when its play changes; `report` reads the connection from a ref.
+  const startedPlaybackId = state.playing?.started ? state.playing.playbackId : undefined;
   useEffect(() => {
-    const playbackId = state.playing?.playbackId;
-    if (playbackId !== undefined) report(playbackId, "started");
-  }, [state.playing]);
+    if (startedPlaybackId !== undefined) report(startedPlaybackId, "started");
+  }, [startedPlaybackId]);
 
   useEffect(() => {
     const ended = state.lastEnded;

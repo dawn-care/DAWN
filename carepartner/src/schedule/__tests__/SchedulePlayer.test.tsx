@@ -128,7 +128,7 @@ describe("SchedulePlayer", () => {
 
   it("never interrupts a staff clip, and plays the item after it if still in time", async () => {
     await start("2026-10-12T07:59:00");
-    await act(async () => playback.play({ kind: "video", url: "/media/99/file" }, "staff", 5));
+    await act(async () => playback.play({ kind: "video", url: "/media/99/file" }, "staff", { playbackId: 5 }));
     await tick(2 * 60_000);
 
     expect(playingUrl()).toBe("/media/99/file");
