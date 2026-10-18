@@ -308,17 +308,17 @@ Replace both settings; both fields are required. Wake time must be 06:00 to 10:0
 
 ## Screen layout
 
-The tablet's screen is a fixed grid of **4 columns × 3 rows**. Columns count 0 to 3 from the left and rows 0 to 2 from the top. The caregiver places each widget by its **top-left and bottom-right cells, both inclusive**, so a widget can cover several cells: a 2×2 photo in the corner is `top_left {col 0, row 0}` to `bottom_right {col 1, row 1}`, and a 1×1 widget has the same cell for both. Any widget type can be any size and go anywhere on the grid. Cells no widget covers are empty. A new carepartner has no widgets.
+The tablet's screen is a fixed grid of **4 columns × 3 rows**. Columns count 0 to 3 from the left and rows 0 to 2 from the top. The caregiver places each widget by its **top-left and bottom-right cells, both inclusive**, so a widget can cover several cells: a 2×2 photo in the corner is `top_left {col 0, row 0}` to `bottom_right {col 1, row 1}`, and a 1×1 widget has the same cell for both. A widget can go anywhere on the grid. The server accepts any size, but each type has one fixed size (`WIDGET_SIZES` in `shared/widgets/widgetSizes.ts`), and the tablet leaves out a widget at another size. Cells no widget covers are empty. A new carepartner has no widgets.
 
 ```
           col 0    col 1    col 2    col 3
-       ┌─────────────────┬────────┬────────┐
-row 0  │      photo      │reminder│weather │
-       │      (2×2)      ├────────┴────────┤
-row 1  │                 │   news (2×1)    │
-       ├─────────────────┴─────────────────┤
-row 2  │              (empty)              │
-       └───────────────────────────────────┘
+       ┌─────────────────┬─────────────────┐
+row 0  │      photo      │ reminder (2×1)  │
+       │      (2×2)      ├────────┬────────┤
+row 1  │                 │weather │(empty) │
+       ├─────────────────┼────────┴────────┤
+row 2  │  sports (2×1)   │     (empty)     │
+       └─────────────────┴─────────────────┘
 ```
 
 The editor and the preview see the same widget in two shapes: `/screen-layout` uses corners, and `/screen` uses `col`, `row`, `width` and `height` (the tablet's `GridArea`). Convert between them with `cornersToArea` and `areaToCorners` from `shared/widgets/grid.ts`, and check a dragged widget with `fitsGrid` and the `GRID` size from the same file. **Don't convert by hand:** the corners are inclusive, so `width = bottom_right.col - top_left.col + 1`, and a missing `+ 1` draws widgets one cell too small. The caregiver app can't import `@shared` yet (#354); until it can, copy those functions and their tests across.
@@ -535,6 +535,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 ### How to render it
 
 - `widgets` is in reading order. Each widget's `col`, `row`, `width` and `height` is a `GridArea`, so it goes straight into the tablet's existing `fitsGrid` and `cellRect`. Cells no widget covers are empty; there are no `null` placeholders.
+- Each widget type has one fixed size, `WIDGET_SIZES` in `shared/widgets/widgetSizes.ts` (for example weather 1×1, photo 2×2, news 2×1). The server doesn't check it yet, so the editor should place widgets only at those sizes; the tablet leaves out a widget that isn't its type's size.
 - `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").

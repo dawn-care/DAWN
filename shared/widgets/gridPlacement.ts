@@ -2,16 +2,17 @@
  * gridPlacement.ts
  *
  * Where widgets can go on the screen's 4 x 3 grid (grid.ts). Each widget type has
- * a fixed size in cells and sits at one cell, its top left corner, so a widget is
- * stored as a type plus a `col` and `row`. Cells count from 0 with (0, 0) at the
+ * a fixed size in cells (`WIDGET_SIZES` in widgetSizes.ts) and sits at one cell,
+ * its top left corner, so a widget is placed as a type plus a `col` and `row`. Cells count from 0 with (0, 0) at the
  * top left, the same as `GridArea`. The caregiver highlights `openCells` for the
  * widget being placed and sends the whole list of placed widgets when saving; the
  * tablet draws each one at `widgetArea`.
  */
 
-import { fitsGrid, GRID } from "./grid";
+import { areasOverlap, fitsGrid, GRID } from "./grid";
 import type { GridArea } from "./grid";
 import type { ScreenWidgetType } from "./screenWidgets";
+import { WIDGET_SIZES } from "./widgetSizes";
 
 /** A cell on the grid. Columns and rows count from 0. */
 export type Cell = { col: number; row: number };
@@ -23,29 +24,9 @@ export type PlacedWidget = Cell & {
   type: ScreenWidgetType;
 };
 
-/** How many cells each widget type covers. Provisional until the sizes are final. */
-export const WIDGET_SIZES: Readonly<Record<ScreenWidgetType, { width: number; height: number }>> = {
-  photo: { width: 2, height: 3 },
-  message: { width: 2, height: 1 },
-  reminder: { width: 2, height: 1 },
-  news: { width: 2, height: 1 },
-  weather: { width: 1, height: 1 },
-  sports: { width: 1, height: 1 },
-};
-
 /** The cells a widget of this type covers when its top left corner is at `cell`. */
 export function widgetArea(widget: Cell & { type: ScreenWidgetType }): GridArea {
   return { col: widget.col, row: widget.row, ...WIDGET_SIZES[widget.type] };
-}
-
-/** Whether two areas share at least one cell. */
-export function areasOverlap(a: GridArea, b: GridArea): boolean {
-  return (
-    a.col < b.col + b.width &&
-    b.col < a.col + a.width &&
-    a.row < b.row + b.height &&
-    b.row < a.row + a.height
-  );
 }
 
 /**

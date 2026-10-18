@@ -1,7 +1,10 @@
 import React, { useEffect } from "react";
 import { Stack } from "expo-router";
+import { useKeepAwake } from "expo-keep-awake";
 import * as SplashScreen from "expo-splash-screen";
-import { useTabletDisplay } from "../src/display/useTabletDisplay";
+import DevToolbar from "../src/dev/DevToolbar";
+import TabletDisplay from "../src/display/TabletDisplay";
+import { useHiddenSystemBars } from "../src/display/useHiddenSystemBars";
 import { PlaybackProvider } from "../src/playback/PlaybackProvider";
 import StaffCommands from "../src/playback/StaffCommands";
 import SchedulePlayer from "../src/schedule/SchedulePlayer";
@@ -11,7 +14,9 @@ import { useAppFonts } from "../src/theme/fonts";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  useTabletDisplay();
+  // Keep the screen on from the start, even while the fonts load.
+  useKeepAwake();
+  useHiddenSystemBars();
   const [fontsLoaded, fontError] = useAppFonts();
   const ready = fontsLoaded || !!fontError;
 
@@ -27,9 +32,11 @@ export default function RootLayout() {
   return (
     <PlaybackProvider>
       <ScreenProvider>
+        <TabletDisplay />
         <StaffCommands />
         <SchedulePlayer />
         <Stack screenOptions={{ headerShown: false, animation: "none" }} />
+        {__DEV__ && <DevToolbar />}
       </ScreenProvider>
     </PlaybackProvider>
   );

@@ -1,23 +1,27 @@
 import { hideStaleWidgets, readScreen, STALE_AFTER_MS, type Screen } from "../screen";
 
-/** The Balanced example from docs/api/screen-and-media.md, shortened. */
+/** The example from docs/api/screen-and-media.md, shortened. */
 const response = () => ({
   carepartner_id: 1,
   generated_at: "2026-10-12T15:39:52-04:00",
   timezone: "America/New_York",
   today: "2026-10-12",
-  layout_preset: "balanced",
   awake_hours: { wake: "07:00", bed: "21:00", is_awake_now: true },
-  spots: [
+  widgets: [
     {
-      id: 1, type: "photo", config: {},
+      id: 1, type: "photo", col: 0, row: 0, width: 2, height: 2, config: {},
       photo: { id: 1, display_name: "Sarah", url: "/media/1/file" },
       data: { caption: "Sarah" }, error: null,
     },
-    null,
-    { id: 3, type: "weather", config: { zip: "14617" }, photo: null, data: { temp: 48 }, error: null },
-    { id: 4, type: "news", config: {}, photo: null, data: null, error: "UPSTREAM_UNAVAILABLE" },
-  ],
+    {
+      id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1,
+      config: { zip: "14617" }, photo: null, data: { temp: 48 }, error: null,
+    },
+    {
+      id: 4, type: "news", col: 2, row: 1, width: 2, height: 1,
+      config: {}, photo: null, data: null, error: "UPSTREAM_UNAVAILABLE",
+    },
+  ] as Record<string, unknown>[],
   schedule: [
     {
       scheduled_item_id: 1, date: "2026-10-12", time: "10:00", repeat: "daily", shape: "video",
@@ -36,19 +40,23 @@ describe("readScreen", () => {
     jest.mocked(console.warn).mockRestore();
   });
 
-  it("reads the layout, awake hours, spots and schedule", () => {
+  it("reads the awake hours, widgets with their places, and schedule", () => {
     expect(readScreen(response())).toEqual({
-      layoutPreset: "balanced",
       awakeHours: { wake: "07:00", bed: "21:00" },
-      spots: [
+      widgets: [
         {
-          id: 1, type: "photo", config: {},
+          id: 1, type: "photo", col: 0, row: 0, width: 2, height: 2, config: {},
           photo: { url: "/media/1/file", displayName: "Sarah" },
           data: { caption: "Sarah" }, error: null,
         },
-        null,
-        { id: 3, type: "weather", config: { zip: "14617" }, photo: null, data: { temp: 48 }, error: null },
-        { id: 4, type: "news", config: {}, photo: null, data: null, error: "UPSTREAM_UNAVAILABLE" },
+        {
+          id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1,
+          config: { zip: "14617" }, photo: null, data: { temp: 48 }, error: null,
+        },
+        {
+          id: 4, type: "news", col: 2, row: 1, width: 2, height: 1,
+          config: {}, photo: null, data: null, error: "UPSTREAM_UNAVAILABLE",
+        },
       ],
       schedule: [
         {
@@ -59,14 +67,15 @@ describe("readScreen", () => {
     });
   });
 
-  it("turns a malformed widget into an empty spot, keeping the others in place", () => {
+  it.each([
+    ["no id", { type: "photo" }],
+    ["no place", { id: 5, type: "photo", col: 0, row: 0, width: 2 }],
+    ["a photo with no file", { id: 5, type: "photo", col: 0, row: 0, width: 2, height: 2, photo: { id: 1 } }],
+  ])("drops a widget with %s and keeps the others", (_name, widget) => {
     const raw = response();
-    raw.spots[0] = { type: "photo" } as never;
+    raw.widgets[0] = widget;
 
-    const spots = readScreen(raw)!.spots;
-    expect(spots).toHaveLength(4);
-    expect(spots[0]).toBeNull();
-    expect(spots[2]?.id).toBe(3);
+    expect(readScreen(raw)!.widgets.map((w) => w.id)).toEqual([3, 4]);
     expect(console.warn).toHaveBeenCalledWith("Dropped 1 malformed widgets from the screen");
   });
 
@@ -116,10 +125,9 @@ describe("readScreen", () => {
 
   it.each([
     ["null", null],
-    ["no spots", { ...response(), spots: undefined }],
+    ["no widgets", { ...response(), widgets: undefined }],
     ["no schedule", { ...response(), schedule: null }],
     ["no awake hours", { ...response(), awake_hours: undefined }],
-    ["no layout", { ...response(), layout_preset: 4 }],
   ])("rejects a response with %s", (_name, raw) => {
     expect(readScreen(raw)).toBeNull();
   });
@@ -133,10 +141,10 @@ describe("hideStaleWidgets", () => {
     expect(hideStaleWidgets(screen, fetchedAt, new Date(fetchedAt.getTime() + STALE_AFTER_MS - 1))).toBe(screen);
   });
 
-  it("empties weather, sports and news spots once the data is hours old", () => {
+  it("removes weather, sports and news widgets once the data is hours old", () => {
     const stale = hideStaleWidgets(screen, fetchedAt, new Date(fetchedAt.getTime() + STALE_AFTER_MS));
 
-    expect(stale.spots.map((spot) => spot?.type ?? null)).toEqual(["photo", null, null, null]);
+    expect(stale.widgets.map((widget) => widget.type)).toEqual(["photo"]);
     expect(stale.schedule).toBe(screen.schedule);
   });
 });

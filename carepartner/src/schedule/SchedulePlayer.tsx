@@ -4,7 +4,7 @@
  * Plays scheduled media when it is due, through the playback machine, one at
  * a time. Draws nothing, and never navigates: the screen follows the machine.
  *
- * - Every 15 seconds, and whenever the screen or the machine changes, plays
+ * - As each minute starts, and whenever the screen or the machine changes, plays
  *   the due play (see `duePlay`) if `canPlay` allows a scheduled play. A staff
  *   clip is never interrupted; a play still due when it ends starts then.
  * - A play counts as played once the machine puts it on screen, so a failed
@@ -14,15 +14,13 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { dayOf, now } from "../clock/clock";
+import { dayOf, everyMinute, now } from "../clock/clock";
 import { canPlay } from "../playback/machine";
 import { usePlayback } from "../playback/PlaybackProvider";
 import type { ScheduledPlay } from "../screen/screen";
 import { useScreen } from "../screen/ScreenProvider";
 import { loadPlayed, savePlayed } from "./playedStore";
 import { duePlay, playKey } from "./schedule";
-
-export const SCHEDULE_CHECK_MS = 15_000;
 
 export default function SchedulePlayer() {
   const { state, play } = usePlayback();
@@ -38,10 +36,10 @@ export default function SchedulePlayer() {
     loadPlayed().then((stored) => {
       if (mounted) setPlayed(stored);
     });
-    const timer = setInterval(() => setTime(now()), SCHEDULE_CHECK_MS);
+    const stop = everyMinute(() => setTime(now()));
     return () => {
       mounted = false;
-      clearInterval(timer);
+      stop();
     };
   }, []);
 

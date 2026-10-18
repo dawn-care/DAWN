@@ -1,15 +1,15 @@
 import React from "react";
 import { act, render } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
-import { getCarepartnerId } from "../../pairing/carepartnerId";
+import { readPairedId } from "../../pairing/pairingState";
 import * as playbackProvider from "../../playback/PlaybackProvider";
 import { PlaybackProvider, usePlayback } from "../../playback/PlaybackProvider";
 import type { ScheduledPlay } from "../../screen/screen";
 import { useScreen } from "../../screen/ScreenProvider";
 import { loadPlayed, savePlayed } from "../playedStore";
-import SchedulePlayer, { SCHEDULE_CHECK_MS } from "../SchedulePlayer";
+import SchedulePlayer from "../SchedulePlayer";
 
-jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
+jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 jest.mock("../../screen/ScreenProvider", () => ({ useScreen: jest.fn() }));
 jest.mock("../playedStore", () => ({ loadPlayed: jest.fn(), savePlayed: jest.fn() }));
 
@@ -31,7 +31,7 @@ function Probe() {
 }
 
 const flush = () => act(async () => {});
-const tick = (ms = SCHEDULE_CHECK_MS) => act(async () => jest.advanceTimersByTime(ms));
+const tick = (ms = 60_000) => act(async () => jest.advanceTimersByTime(ms));
 const playingUrl = () => playback.state.playing?.item.url ?? null;
 const endPlay = () => act(async () => playback.ended(playback.state.playing!.playId, "finished"));
 
@@ -51,8 +51,8 @@ async function start(time: string, played: string[] = []) {
 describe("SchedulePlayer", () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    jest.mocked(getCarepartnerId).mockResolvedValue(7);
-    jest.mocked(useScreen).mockReturnValue({ screen: { schedule } as never, refresh: jest.fn() });
+    jest.mocked(readPairedId).mockResolvedValue(7);
+    jest.mocked(useScreen).mockReturnValue({ screen: { schedule } as never, refresh: jest.fn(), fetchedAt: null });
   });
 
   afterEach(() => {
@@ -70,7 +70,9 @@ describe("SchedulePlayer", () => {
 
   it("plays an item when its time comes, as a scheduled play", async () => {
     await start("2026-10-12T07:59:50");
-    await tick();
+    await tick(9_999);
+    expect(playingUrl()).toBeNull();
+    await tick(1);
 
     expect(playingUrl()).toBe("/media/1/file");
     expect(playback.state.playing!.source).toBe("scheduled");
@@ -140,7 +142,7 @@ describe("SchedulePlayer", () => {
     await start("2026-10-12T08:14:30");
     // The 8:00 item has passed its grace window; only the 8:15 one plays.
     expect(playingUrl()).toBeNull();
-    await tick(2 * SCHEDULE_CHECK_MS);
+    await tick(30_000);
 
     expect(playingUrl()).toBe("/media/2/file");
   });
@@ -157,7 +159,7 @@ describe("SchedulePlayer", () => {
   });
 
   it("plays nothing without a screen yet", async () => {
-    jest.mocked(useScreen).mockReturnValue({ screen: null, refresh: jest.fn() });
+    jest.mocked(useScreen).mockReturnValue({ screen: null, refresh: jest.fn(), fetchedAt: null });
     await start("2026-10-12T08:00:30");
 
     expect(playingUrl()).toBeNull();

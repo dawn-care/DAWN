@@ -2,24 +2,25 @@ import React from "react";
 import { act, render } from "@testing-library/react-native";
 import { API_URL } from "../../api/config";
 import { setClock } from "../../clock/clock";
-import { getCarepartnerId } from "../../pairing/carepartnerId";
+import { readPairedId } from "../../pairing/pairingState";
 import { PlaybackProvider, usePlayback } from "../../playback/PlaybackProvider";
 import { STALE_AFTER_MS } from "../screen";
 import { SCREEN_CHECK_MS, SCREEN_REFRESH_MS, ScreenProvider, useScreen } from "../ScreenProvider";
 
-jest.mock("../../pairing/carepartnerId", () => ({ getCarepartnerId: jest.fn() }));
+jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 
 const screenResponse = (wake = "07:00") => ({
-  layout_preset: "balanced",
   awake_hours: { wake, bed: "21:00", is_awake_now: true },
-  spots: [{ id: 3, type: "weather", config: {}, photo: null, data: { temp: 48 }, error: null }],
+  widgets: [
+    { id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1, config: {}, photo: null, data: { temp: 48 }, error: null },
+  ],
   schedule: [],
 });
 
 /** Answers each screen request with the next of `responses`; the last repeats. */
 function mockServer(...responses: ({ status: number } | object)[]) {
   let calls = 0;
-  const fetchMock = jest.fn(async () => {
+  const fetchMock = jest.fn(async (_url: string) => {
     const response = responses[Math.min(calls++, responses.length - 1)];
     if ("status" in response) return { ok: false, status: response.status, json: async () => ({}) };
     return { ok: true, status: 200, json: async () => response };
@@ -69,7 +70,7 @@ describe("ScreenProvider", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     setClock(new Date("2026-10-12T10:00:00"));
-    jest.mocked(getCarepartnerId).mockResolvedValue(7);
+    jest.mocked(readPairedId).mockResolvedValue(7);
     jest.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -85,12 +86,12 @@ describe("ScreenProvider", () => {
     const fetchMock = mockServer(screenResponse());
     await start();
 
-    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/screen?carepartner_id=7`);
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_URL}/screen?carepartner_id=7`);
     expect(current.screen?.awakeHours.wake).toBe("07:00");
   });
 
   it("fetches nothing while unpaired", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(null);
+    jest.mocked(readPairedId).mockResolvedValue(null);
     const fetchMock = mockServer(screenResponse());
     await start();
     await tick(SCREEN_REFRESH_MS);
@@ -150,7 +151,7 @@ describe("ScreenProvider", () => {
       current.refresh();
     });
 
-    jest.mocked(getCarepartnerId).mockResolvedValue(null);
+    jest.mocked(readPairedId).mockResolvedValue(null);
     await act(async () => playback.checkPairing());
 
     expect(current.screen).toBeNull();
@@ -162,7 +163,7 @@ describe("ScreenProvider", () => {
 
   it.each([
     ["fails", { status: 500 }],
-    ["is malformed", { spots: "none" }],
+    ["is malformed", { widgets: "none" }],
   ])("keeps the last good screen when a fetch %s", async (_name, bad) => {
     mockServer(screenResponse(), bad);
     await start();
@@ -177,10 +178,10 @@ describe("ScreenProvider", () => {
     await start();
     await tick(STALE_AFTER_MS - SCREEN_CHECK_MS);
 
-    expect(current.screen?.spots[0]?.type).toBe("weather");
+    expect(current.screen?.widgets[0]?.type).toBe("weather");
 
     await tick();
 
-    expect(current.screen?.spots).toEqual([null]);
+    expect(current.screen?.widgets).toEqual([]);
   });
 });
