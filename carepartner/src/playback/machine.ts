@@ -26,6 +26,11 @@ export type Playing = {
   playbackId?: number;
   /** For a scheduled play, the scheduled item it comes from. */
   scheduledItemId?: number;
+  /**
+   * "chime" while the chime and the pause after it play, so the resident
+   * isn't startled; then "media" while the player plays the item.
+   */
+  phase: "chime" | "media";
   /** The player says the media is actually playing; false while it loads. */
   started: boolean;
 };
@@ -62,6 +67,8 @@ export type PlaybackEvent =
   | ({ type: "play"; item: MediaItem; source: PlaySource } & PlayOptions)
   /** Stops the current play, or with `playbackId`, only the play with that record. */
   | { type: "stop"; playbackId?: number }
+  /** The chime and the pause after it are over, so the media can play. */
+  | { type: "chimed"; playId: number }
   /** The player says the media is actually playing. */
   | { type: "started"; playId: number }
   /** The player reported finished or failed. */
@@ -102,9 +109,12 @@ export function canPlay(state: PlaybackState, source: PlaySource): boolean {
  * - `nightChanged`: records whether it is night. A play in progress carries
  *   on; `screenFor` shows the night screen once it ends.
  * - `play`: starts the item with a new `playId` if `canPlay` allows it, and
- *   is ignored otherwise. A play it replaces ends as "replaced".
+ *   is ignored otherwise. It starts with its chime (`phase: "chime"`). A play
+ *   it replaces ends as "replaced", even during its chime.
  * - `stop`: ends whatever is playing, or with a `playbackId`, only the play
  *   with that record, so a late stop can't end a newer clip.
+ * - `chimed`: moves the play on screen from its chime to its media. Like
+ *   `ended`, a report for any other `playId` is ignored.
  * - `started`: records that the play on screen is actually playing. Like
  *   `ended`, a report for any other `playId` is ignored.
  * - `ended`: ends the play only if `playId` is the one on screen, so a late
@@ -131,6 +141,7 @@ export function playbackReducer(state: PlaybackState, event: PlaybackEvent): Pla
           source: event.source,
           playbackId: event.playbackId,
           scheduledItemId: event.scheduledItemId,
+          phase: "chime",
           started: false,
         },
         nextPlayId: state.nextPlayId + 1,
@@ -138,6 +149,9 @@ export function playbackReducer(state: PlaybackState, event: PlaybackEvent): Pla
     case "stop":
       if (event.playbackId !== undefined && state.playing?.playbackId !== event.playbackId) return state;
       return end(state, "stopped");
+    case "chimed":
+      if (state.playing?.playId !== event.playId || state.playing.phase !== "chime") return state;
+      return { ...state, playing: { ...state.playing, phase: "media" } };
     case "started":
       if (state.playing?.playId !== event.playId || state.playing.started) return state;
       return { ...state, playing: { ...state.playing, started: true } };

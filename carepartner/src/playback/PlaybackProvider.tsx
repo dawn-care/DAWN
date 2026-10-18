@@ -35,6 +35,8 @@ type PlaybackContextValue = {
   play: (item: MediaItem, source: PlaySource, options?: PlayOptions) => void;
   /** Stops the current play, or with `playbackId`, only the play with that record. */
   stop: (playbackId?: number) => void;
+  /** The chime before `playId` and its pause are over. */
+  chimed: (playId: number) => void;
   /** The player for `playId` says its media is actually playing. */
   started: (playId: number) => void;
   /** The player for `playId` reported finished or failed. */
@@ -88,6 +90,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       screen: screenFor(state),
       play: (item, source, options) => dispatch({ type: "play", item, source, ...options }),
       stop: (playbackId) => dispatch({ type: "stop", playbackId }),
+      chimed: (playId) => dispatch({ type: "chimed", playId }),
       started: (playId) => dispatch({ type: "started", playId }),
       ended: (playId, reason) => dispatch({ type: "ended", playId, reason }),
       checkPairing,

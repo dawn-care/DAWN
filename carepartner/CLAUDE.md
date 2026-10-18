@@ -169,10 +169,11 @@ Expo Router treats each file in `app/` as a route. `index.tsx` and `pair.tsx` ar
 One state machine decides what the screen shows. Its state is three facts: `pairing` (`checking`, `paired` or `unpaired`, plus the paired `carepartnerId`), `night`, and `playing` (the current play: a `playId`, the `MediaItem`, its `source` and, for staff plays, the server's `playbackId`; or null). It also records `lastEnded`, the last play to leave the screen and why (`finished`, `failed`, `stopped`, or `replaced` by a staff play), which is what play reports watch. `screenFor` turns that into one screen: `starting` (nothing), `unpaired`, `playing`, `night` or `alwaysOn`. Playing wins over night, so a clip that runs past the start of night finishes first.
 
 - Playback starts only through `usePlayback().play(item, source, options)`, never by navigating, so there is no player route and no back stack. `canPlay` holds the rules: nothing plays until paired; a `staff` play pre-empts anything (the newest wins); a `scheduled` or `tap` play starts only when nothing is playing, so it never interrupts a staff clip.
+- Every play starts in its chime (`phase: "chime"`): `ChimeScreen` plays the chime and the pause after it, then `chimed(playId)` moves it to `"media"` and the player starts. It can be stopped or replaced during the chime like any play, and a scheduled play still can't interrupt it. `started` is reported only once the media itself is playing, so time to play includes the chime.
 - Each play records its `playbackId` (staff) or `scheduledItemId` (scheduled) from `play`'s options, and `started`, which `started(playId)` sets once the player says the media is actually playing; until then it is loading.
 - When the player reports finished or failed, `ended(playId, reason)` returns the screen to idle with no animation. A report whose `playId` isn't the current play is ignored, so a replaced player can't end the new one. `stop(playbackId)` stops only the play with that record, so a late stop can't end a newer clip.
 - `PlaybackProvider` (in `_layout.tsx`) reads pairing at startup (`readPairedId`, see "Pairing and identity"), and tries again every `PAIRING_RETRY_MS` while storage can't be read; `TabletDisplay` tells it when night starts and ends. The machine keeps the paired carepartner ID, so the screen and the socket take it from `usePlayback().state.carepartnerId` instead of reading storage again. After pairing succeeds, `pair.tsx` calls `checkPairing()` and returns to `/`.
-- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `MediaPlayer` keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (dark and warm, with the day and "You're safe. Sleep well."), and `alwaysOn` renders `src/screen/AlwaysOnScreen.tsx`.
+- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `ChimeScreen`, then `MediaPlayer`, keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (dark and warm, with the day and "You're safe. Sleep well."), and `alwaysOn` renders `src/screen/AlwaysOnScreen.tsx`.
 
 ### Staff commands (`src/playback/StaffCommands.tsx`, `socket.ts`, `socketMessages.ts`, `staffItem.ts`)
 
@@ -227,6 +228,14 @@ Its server calls and the play statuses are in `devInfo.ts`. It uses its own plai
 ### Types mirror the backend by hand
 
 `Screen`, `ScreenWidget` and `ScheduledPlay` (`src/screen/screen.ts`) are the parts of the Go `Screen` struct (`server/internal/services/screen/types.go`) that the tablet uses, renamed to camelCase. `MediaItem` (`src/playback/media.ts`) is what playback needs from a media object; `readMedia` checks one from `/media/{id}` or a schedule entry. A widget's `config` and `data` stay `unknown` until renderers check them for their type (#316).
+
+### The chime (`src/playback/ChimeScreen.tsx`)
+
+Before anything plays (#303), `ChimeScreen` shows the player's dark background with one large icon for the kind of media (no words), plays `assets/sounds/chime.mp3` once, then waits `CHIME_PAUSE_MS` (2 s) and calls `onDone`.
+- `CHIME_VOLUME` by day and `NIGHT_CHIME_VOLUME` at night (0.6 and 0.3 of the tablet's volume, to tune by ear).
+- The chime never holds up a play: if it hasn't loaded within `CHIME_LOAD_TIMEOUT_MS` (1.5 s), or hasn't finished within `CHIME_MAX_MS` (3 s), the pause starts anyway.
+- Staff can switch it off per resident once the server sends `chime: false` in `/screen` (#387); a missing value means on. Switched off, the pause still comes, without the sound.
+- The sound is from Pixabay (free to use under the Pixabay Content License, no attribution needed), trimmed to its audible 1.34 s with a short fade-out.
 
 ### Media playback (`src/playback/`)
 

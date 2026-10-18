@@ -55,5 +55,8 @@ export default function VideoPlayer({ uri, onStarted, onFinished, onFailed }: Pl
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.player.background },
-  video: { flex: 1 },
+  // Pinned to the screen rather than flex-sized: on web the video is a plain
+  // <video> element, which won't shrink below its natural size, so a vertical
+  // clip would run off the bottom. `contain` then fits the whole frame inside.
+  video: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%" },
 });

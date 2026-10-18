@@ -16,7 +16,7 @@ jest.mock("../../widgets/Grid", () => {
 
 const showing = (value: Screen | null) => jest.mocked(useScreen).mockReturnValue({ screen: value, refresh: jest.fn(), fetchedAt: null });
 
-const screenWith = (widgets: Screen["widgets"]): Screen => ({ awakeHours: { wake: "07:00", bed: "21:00" }, widgets, schedule: [] });
+const screenWith = (widgets: Screen["widgets"]): Screen => ({ awakeHours: { wake: "07:00", bed: "21:00" }, chime: true, widgets, schedule: [] });
 
 describe("AlwaysOnScreen", () => {
   beforeEach(() => {
@@ -31,7 +31,7 @@ describe("AlwaysOnScreen", () => {
 
   it("draws the screen's widgets on the grid", async () => {
     showing({
-      awakeHours: { wake: "07:00", bed: "21:00" },
+      awakeHours: { wake: "07:00", bed: "21:00" }, chime: true,
       widgets: [
         {
           id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1,
