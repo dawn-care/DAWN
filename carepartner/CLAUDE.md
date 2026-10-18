@@ -33,7 +33,7 @@ The tablet's job is to show a calm, always-on screen and to play media when it i
 - It reports what was shown and every play (start, finish, stop, and whether it was scheduled, staff-started or tapped).
 
 **Design rules** (these apply to every tablet screen)
-- Nothing requires a tap. Tapping is at most an optional shortcut.
+- Nothing requires a tap. Tapping is at most an optional shortcut. The pair screen is the exception: the person setting up the tablet is in the room and does the tapping, so it may have buttons.
 - Nothing moves or flashes on its own apart from playing content.
 - Orientation text (day, time of day) is 76px or larger; all other text is 26px or larger; text contrast is 7:1 or better; touch targets are about 20 mm or larger.
 - Each screen uses a handful of words at most.
@@ -157,7 +157,7 @@ The repo-root `shared/` folder holds plain TypeScript rules used by this app and
 - `src/widgets/` is the always-on screen's grid. `Grid` places each widget from its column, row, width and height (`layout.ts`: the shared 4 x 3 cell counts from `@shared` plus the tablet's 48 dp padding and 32 dp gaps, sized from the screen; `fitsGrid` and `GridArea` come from `@shared`) and skips widgets with an unknown renderer or that don't fit. `registry.ts` maps renderer names to components and says which sit in a tile frame (`WidgetFrame`). Renderers: `orientation` (day and time of day from the app clock, using `timeOfDay`, `dayName` and `dateLabel` from `@shared`), `photo` (family photo with a name caption, placeholder if missing), `tile` (icon key, word, optional label; icon keys are ours, mapped in `renderers/icons.ts`), `message` (a caregiver's message with an optional role and photo), `reminder` (the next two of the day's reminders by the app clock, the soonest marked; long text shrinks to the 26px floor over two lines) `headline` (one news headline) and `wideTile` (a 2×1 data widget: icon, a short label, a word, and an optional detail line). Types are in `types.ts`.
 - Text that must fit a fixed width uses `fitFontSize` (`src/widgets/fitText.ts`), and wrapped text that must fit a box uses `fitFontSizeToBox` with `linesAt`; both work on web too, where React Native's `adjustsFontSizeToFit` is ignored. Never shrink below the legibility floors in `theme.ts`.
 
-`src/api/request.ts` has `getJson` and `postJson`: the server address, a timeout (`REQUEST_TIMEOUT_MS`, 10 s by default), and an error for a failed status. They return the JSON unchecked, for the caller to check where it enters the app. `pair.tsx` still calls `fetch` inline until #315.
+`src/api/request.ts` has `getJson` and `postJson`: the server address, a timeout (`REQUEST_TIMEOUT_MS`, 10 s by default), and an `HttpError` (with the `status`) for a failed status, so a caller can tell the server saying no from the server not answering. They return the JSON unchecked, for the caller to check where it enters the app.
 
 ### Routes in `app/`
 
@@ -229,10 +229,13 @@ Media is streamed from the `url` the server gives (`/media/{id}/file`), resolved
 
 ### Pairing and identity (`app/pair.tsx`, `src/pairing/`)
 
-There is no login. On the pair screen, the device:
-1. Validates its stored ID, or creates a new carepartner (`POST /users/carepartner/create-carepartner` with a placeholder name).
-2. Requests a pairing code.
-3. Checks `/users/device-pairing/status` when the user taps Verify, and finishes only when it reports `paired: true`.
+There is no login. `app/pair.tsx` runs `usePairing` (`src/pairing/usePairing.ts`, logic) and draws `PairScreen` (visual): "Set up this tablet", a large code, "Enter this code in the family app", a seconds countdown and a "New code" button. Pairing needs no tap:
+1. It finds this tablet's carepartner: the stored ID if `findCarepartner` (`pairingApi.ts`) says the server still has it, or a new one (`POST /users/carepartner/create-carepartner` with no name: the server uses a placeholder until the caregiver names the resident when entering the code) if there is none or the server answers 404. While the server can't be reached it shows "Can't reach the server. Trying again…" and retries every `PAIRING_POLL_MS` (5 s), and never creates one, so a tablet that is briefly offline keeps its resident.
+2. It requests a pairing code (10 minutes) and shows it.
+3. Every 5 s it checks `/users/device-pairing/status`. Once that reports `paired: true` it records pairing, calls `checkPairing()` and returns to `/`.
+4. When the code expires, or "New code" is tapped, it checks the status once more and then gets a new code, so a code used just before it expired still completes, and no unused code is made after a claim (the status reads only the newest code, #371). A check that fails while the code still works leaves it on screen.
+
+The QR code #315 asks for is deferred until the staff or family app can read one.
 
 The ID is stored under the key `carepartnerID`, via `carepartnerId.ts` (`localStorage` on web, `expo-secure-store` on native), and that pairing completed under a separate key (`pairingComplete`), since the pair screen stores the ID before a caregiver claims it. Storing a new ID clears it. `terms.tsx` is still a stub.
 

@@ -3,4 +3,4 @@ appId: com.anonymous.carepartner
 ---
 - launchApp:
     clearState: true
-- assertVisible: "Pair Device"
+- assertVisible: "Set up this tablet"
