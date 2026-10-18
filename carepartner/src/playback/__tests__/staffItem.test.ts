@@ -22,7 +22,7 @@ describe("fetchMediaItem", () => {
   it("looks up the media and returns it with its file", async () => {
     respond({ id: 9, carepartner_id: 2, kind: "video", display_name: "Birthday", url: "/media/9/file" });
 
-    await expect(fetchMediaItem(9)).resolves.toEqual({ kind: "video", url: "/media/9/file", title: "Birthday" });
+    await expect(fetchMediaItem(9)).resolves.toEqual({ id: 9, kind: "video", url: "/media/9/file", title: "Birthday" });
     expect(jest.mocked(globalThis.fetch).mock.calls[0][0]).toBe(`${API_URL}/media/9`);
   });
 

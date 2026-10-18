@@ -75,6 +75,16 @@ export function everyMinute(tick: () => void): () => void {
   return () => clearTimeout(timer);
 }
 
+/**
+ * A deadline `ms` from now in real time, for the server to check against its
+ * own clock (such as a play report's `expires_at`). The one place the app
+ * deliberately ignores `EXPO_PUBLIC_FAKE_TIME`: a deadline from a fake clock
+ * hours off would be refused or expire at once.
+ */
+export function serverDeadline(ms: number): Date {
+  return new Date(Date.now() + ms);
+}
+
 /** "YYYY-MM-DD" for the local day of `time`. */
 export function dayOf(time: Date): string {
   const month = String(time.getMonth() + 1).padStart(2, "0");

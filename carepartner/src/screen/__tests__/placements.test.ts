@@ -10,7 +10,7 @@ const widget = (overrides: Partial<ScreenWidget>): ScreenWidget => ({
 });
 
 const screenWith = (...widgets: ScreenWidget[]): Screen => ({
-  awakeHours: { wake: "07:00", bed: "21:00" },
+  awakeHours: { wake: "07:00", bed: "21:00" }, chime: true,
   widgets,
   schedule: [],
 });

@@ -84,7 +84,7 @@ describe("playback machine", () => {
     it.each(["scheduled", "staff", "tap"] as const)("starts a %s play when idle", (source) => {
       const state = playing(source);
 
-      expect(state.playing).toEqual({ playId: 1, item: song, source });
+      expect(state.playing).toMatchObject({ playId: 1, item: song, source, phase: "chime", started: false });
       expect(screenFor(state)).toBe("playing");
     });
 
@@ -110,7 +110,66 @@ describe("playback machine", () => {
       const after = run(before, { type: "play", item: photo, source: incoming });
 
       expect(canPlay(before, incoming)).toBe(replaces);
-      expect(after.playing).toEqual(replaces ? { playId: 2, item: photo, source: incoming } : before.playing);
+      if (replaces) expect(after.playing).toMatchObject({ playId: 2, item: photo, source: incoming, started: false });
+      else expect(after.playing).toBe(before.playing);
+    });
+  });
+
+  describe("chiming", () => {
+    it("moves from the chime to the media once it's over", () => {
+      const state = run(playing("scheduled"), { type: "chimed", playId: 1 });
+
+      expect(state.playing?.phase).toBe("media");
+      expect(screenFor(state)).toBe("playing");
+    });
+
+    it("ignores a late chimed report from a play that was replaced", () => {
+      const replaced = run(playing("scheduled"), { type: "play", item: photo, source: "staff" });
+
+      expect(replaced.playing?.phase).toBe("chime");
+      expect(run(replaced, { type: "chimed", playId: 1 })).toBe(replaced);
+    });
+
+    it("ignores a repeated chimed report", () => {
+      const chimed = run(playing("scheduled"), { type: "chimed", playId: 1 });
+
+      expect(run(chimed, { type: "chimed", playId: 1 })).toBe(chimed);
+    });
+
+    it("can be stopped during the chime, like any play", () => {
+      const state = run(playing("staff"), { type: "stop" });
+
+      expect(state.playing).toBeNull();
+      expect(state.lastEnded?.reason).toBe("stopped");
+    });
+
+    it("still keeps a scheduled play from interrupting it", () => {
+      expect(canPlay(playing("staff"), "scheduled")).toBe(false);
+    });
+  });
+
+  describe("starting", () => {
+    it("records when the media is actually playing", () => {
+      const state = run(playing("scheduled"), { type: "started", playId: 1 });
+
+      expect(state.playing?.started).toBe(true);
+      expect(screenFor(state)).toBe("playing");
+    });
+
+    it("ignores a repeated started report", () => {
+      const started = run(playing("scheduled"), { type: "started", playId: 1 });
+
+      expect(run(started, { type: "started", playId: 1 })).toBe(started);
+    });
+
+    it("ignores a late started report from a play that was replaced", () => {
+      const replaced = run(playing("scheduled"), { type: "play", item: photo, source: "staff" });
+
+      expect(run(replaced, { type: "started", playId: 1 })).toBe(replaced);
+    });
+
+    it("ignores a started report when nothing is playing", () => {
+      expect(run(paired, { type: "started", playId: 1 })).toBe(paired);
     });
   });
 

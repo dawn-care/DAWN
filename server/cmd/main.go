@@ -73,6 +73,7 @@ import (
 
 	database "server/internal/db"
 	mw "server/internal/middleware"
+	"server/internal/migrations"
 	"server/internal/realtime"
 )
 
@@ -107,6 +108,11 @@ func main() {
 		log.Fatal("failed to connect to DB: ", err)
 	}
 	defer db.Close()
+
+	// Apply pending schema changes before accepting API requests.
+	if err := migrations.Up(context.Background(), db); err != nil {
+		log.Fatal("database migration failed: ", err)
+	}
 
 	// MinIO setup
 	minioHost := getEnvOrDefault("MINIO_HOST", "localhost")

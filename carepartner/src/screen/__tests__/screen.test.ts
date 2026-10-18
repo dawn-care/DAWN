@@ -43,6 +43,7 @@ describe("readScreen", () => {
   it("reads the awake hours, widgets with their places, and schedule", () => {
     expect(readScreen(response())).toEqual({
       awakeHours: { wake: "07:00", bed: "21:00" },
+      chime: true,
       widgets: [
         {
           id: 1, type: "photo", col: 0, row: 0, width: 2, height: 2, config: {},
@@ -61,7 +62,7 @@ describe("readScreen", () => {
       schedule: [
         {
           scheduledItemId: 1, date: "2026-10-12", time: "10:00", outsideAwakeHours: false,
-          item: { kind: "video", url: "/media/2/file", title: "Birthday" },
+          item: { id: 2, kind: "video", url: "/media/2/file", title: "Birthday" },
         },
       ],
     });
@@ -101,8 +102,14 @@ describe("readScreen", () => {
     };
 
     expect(readScreen(raw)!.schedule[0].item).toEqual({
-      kind: "audio", url: "/media/9/file", title: "Morning hymn", coverUrl: "/media/4/file",
+      id: 9, kind: "audio", url: "/media/9/file", title: "Morning hymn", coverUrl: "/media/4/file",
     });
+  });
+
+  it("chimes unless the server says staff switched it off", () => {
+    expect(readScreen({ ...response(), chime: false })!.chime).toBe(false);
+    expect(readScreen({ ...response(), chime: true })!.chime).toBe(true);
+    expect(readScreen(response())!.chime).toBe(true);
   });
 
   it("shows a scheduled photo for its display time", () => {

@@ -44,7 +44,7 @@ describe("DevToolbar", () => {
     showing(false);
     jest.mocked(useScreen).mockReturnValue({
       screen: {
-        awakeHours: { wake: "07:00", bed: "21:00" },
+        awakeHours: { wake: "07:00", bed: "21:00" }, chime: true,
         widgets: [],
         schedule: [
           { scheduledItemId: 9, date: "2026-10-17", time: "10:00", outsideAwakeHours: false, item: { kind: "video", url: "/m" } },

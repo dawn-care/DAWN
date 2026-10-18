@@ -17,6 +17,7 @@ import {
   screenFor,
   type PlaybackState,
   type PlayerOutcome,
+  type PlayOptions,
   type PlaySource,
   type Screen,
 } from "./machine";
@@ -29,11 +30,16 @@ type PlaybackContextValue = {
   screen: Screen;
   /**
    * Asks to play an item; the machine decides whether it starts (see `canPlay`).
-   * `playbackId` is the server's Playback record for it, if it has one.
+   * `playbackId` is the server's Playback record for it, if it has one, and
+   * `scheduledItemId` the scheduled item a scheduled play comes from.
    */
-  play: (item: MediaItem, source: PlaySource, playbackId?: number) => void;
+  play: (item: MediaItem, source: PlaySource, options?: PlayOptions) => void;
   /** Stops the current play, or with `playbackId`, only the play with that record. */
   stop: (playbackId?: number) => void;
+  /** The chime before `playId` and its pause are over. */
+  chimed: (playId: number) => void;
+  /** The player for `playId` says its media is actually playing. */
+  started: (playId: number) => void;
   /** The player for `playId` reported finished or failed. */
   ended: (playId: number, reason: PlayerOutcome) => void;
   /** Reads the stored pairing again, for example after pairing completes. */
@@ -85,8 +91,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       screen: screenFor(state),
-      play: (item, source, playbackId) => dispatch({ type: "play", item, source, playbackId }),
+      play: (item, source, options) => dispatch({ type: "play", item, source, ...options }),
       stop: (playbackId) => dispatch({ type: "stop", playbackId }),
+      chimed: (playId) => dispatch({ type: "chimed", playId }),
+      started: (playId) => dispatch({ type: "started", playId }),
       ended: (playId, reason) => dispatch({ type: "ended", playId, reason }),
       checkPairing,
       setNight,

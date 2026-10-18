@@ -20,9 +20,9 @@ type PhotoPlayerProps = PlayerProps & {
  * The time starts once the photo has loaded, so a slow download doesn't use
  * it up. Remount it (change its `key`) to show a different photo.
  */
-export default function PhotoPlayer({ uri, durationSeconds, onFinished, onFailed }: PhotoPlayerProps) {
+export default function PhotoPlayer({ uri, durationSeconds, onStarted, onFinished, onFailed }: PhotoPlayerProps) {
   const [loaded, setLoaded] = useState(false);
-  const report = useReportOnce({ onFinished, onFailed });
+  const report = useReportOnce({ onStarted, onFinished, onFailed });
 
   useEffect(() => {
     const timer = loaded
@@ -38,7 +38,10 @@ export default function PhotoPlayer({ uri, durationSeconds, onFinished, onFailed
         source={{ uri }}
         style={styles.photo}
         resizeMode="contain"
-        onLoad={() => setLoaded(true)}
+        onLoad={() => {
+          setLoaded(true);
+          report.started();
+        }}
         onError={() => report.failed("Photo could not be loaded")}
       />
     </View>

@@ -10,7 +10,7 @@ import { useReportOnce } from "./useReportOnce";
  * Plays one video full size with no controls, starting on its own.
  * Remount it (change its `key`) to play a different video.
  */
-export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) {
+export default function VideoPlayer({ uri, onStarted, onFinished, onFailed }: PlayerProps) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
   });
@@ -30,7 +30,10 @@ export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) 
     return () => subscription.remove();
   }, [player]);
 
-  const report = useReportOnce({ onFinished, onFailed });
+  const report = useReportOnce({ onStarted, onFinished, onFailed });
+  useEventListener(player, "playingChange", ({ isPlaying }) => {
+    if (isPlaying) report.started();
+  });
   useEventListener(player, "playToEnd", report.finished);
   useEventListener(player, "statusChange", ({ status, error }) => {
     if (status === "error") report.failed(error?.message ?? "Video could not be played");
@@ -52,5 +55,8 @@ export default function VideoPlayer({ uri, onFinished, onFailed }: PlayerProps) 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.player.background },
-  video: { flex: 1 },
+  // Pinned to the screen rather than flex-sized: on web the video is a plain
+  // <video> element, which won't shrink below its natural size, so a vertical
+  // clip would run off the bottom. `contain` then fits the whole frame inside.
+  video: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%" },
 });

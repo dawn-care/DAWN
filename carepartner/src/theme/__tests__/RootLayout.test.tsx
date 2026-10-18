@@ -24,8 +24,12 @@ jest.mock("../../playback/PlaybackProvider", () => ({
 jest.mock("../../screen/ScreenProvider", () => ({
   ScreenProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+jest.mock("../../telemetry/TouchTelemetry", () => ({
+  TouchTelemetryProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 jest.mock("../../schedule/SchedulePlayer", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: () => null }));
+jest.mock("../../playback/PlayReports", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../dev/DevToolbar", () => ({ __esModule: true, default: () => null }));
 
 describe("RootLayout", () => {

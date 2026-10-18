@@ -13,8 +13,10 @@ import DevToolbar from "../../dev/DevToolbar";
 import { useHiddenSystemBars } from "../../display/useHiddenSystemBars";
 import { readPairedId } from "../../pairing/pairingState";
 import { PlaybackProvider, usePlayback } from "../../playback/PlaybackProvider";
+import PlayReports from "../../playback/PlayReports";
 import StaffCommands from "../../playback/StaffCommands";
 import SchedulePlayer from "../../schedule/SchedulePlayer";
+import { TouchTelemetryProvider } from "../../telemetry/TouchTelemetry";
 import { useAppFonts } from "../../theme/fonts";
 import type { Preview } from "../previewMode";
 
@@ -39,9 +41,15 @@ jest.mock("expo-router", () => {
 });
 jest.mock("../../screen/ScreenProvider", () => ({
   ScreenProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useScreen: () => ({ screen: null, refresh: jest.fn(), fetchedAt: null }),
 }));
 jest.mock("../../schedule/SchedulePlayer", () => ({ __esModule: true, default: jest.fn(() => null) }));
 jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: jest.fn(() => null) }));
+jest.mock("../../playback/PlayReports", () => ({ __esModule: true, default: jest.fn(() => null) }));
+jest.mock("../../telemetry/TouchTelemetry", () => ({
+  TouchTelemetryProvider: jest.fn(({ children }: { children: React.ReactNode }) => <>{children}</>),
+}));
+jest.mock("../../playback/ChimeScreen", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../dev/DevToolbar", () => ({ __esModule: true, default: jest.fn(() => null) }));
 jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 jest.mock("../../playback/MediaPlayer", () => ({ __esModule: true, default: () => null }));
@@ -62,7 +70,7 @@ describe("preview mode", () => {
     jest.mocked(readPairedId).mockResolvedValue(7);
   });
 
-  it("leaves out keeping the screen on, hiding the bars, staff commands, the schedule and the toolbar", async () => {
+  it("leaves out keeping the screen on, hiding the bars, staff commands, play reports, touch recording, the schedule and the toolbar", async () => {
     await render(<RootLayout />);
     await act(async () => {});
 
@@ -70,6 +78,8 @@ describe("preview mode", () => {
     expect(useKeepAwake).not.toHaveBeenCalled();
     expect(useHiddenSystemBars).not.toHaveBeenCalled();
     expect(StaffCommands).not.toHaveBeenCalled();
+    expect(PlayReports).not.toHaveBeenCalled();
+    expect(TouchTelemetryProvider).not.toHaveBeenCalled();
     expect(SchedulePlayer).not.toHaveBeenCalled();
     expect(DevToolbar).not.toHaveBeenCalled();
   });
@@ -82,6 +92,8 @@ describe("preview mode", () => {
     expect(useKeepAwake).toHaveBeenCalled();
     expect(useHiddenSystemBars).toHaveBeenCalled();
     expect(StaffCommands).toHaveBeenCalled();
+    expect(PlayReports).toHaveBeenCalled();
+    expect(TouchTelemetryProvider).toHaveBeenCalled();
     expect(SchedulePlayer).toHaveBeenCalled();
   });
 
