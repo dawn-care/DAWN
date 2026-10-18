@@ -3,26 +3,34 @@
  *
  * User: Caregiver
  *
- * Full-screen preview of the carepartner's screen at `/preview`. Renders
- * outside AppShell, so there is no nav bar.
- *
- * FUTURE IMPLEMENTATION: the preview content and the button that opens this
- * page are added in a later ticket. Until then it is only reachable by
- * typing the URL.
+ * Full-screen preview of the carepartner's screen at `/preview`, opened by the
+ * home page's Full screen button. Renders outside AppShell, so there is no nav
+ * bar: the carepartner's screen (CarepartnerScreen) fills the window, with an
+ * Exit full screen button over its top right corner.
  */
 
 import { Link } from "react-router-dom";
-import { X } from "lucide-react";
+import { Minimize } from "lucide-react";
+import { FOCUS_RING } from "../components/ui/styles";
+import { useAuth } from "../context/AuthContext";
+import CarepartnerScreen from "../screen/CarepartnerScreen";
+import { previewUrl } from "../screen/previewUrl";
+import ScreenUnavailable from "../screen/ScreenUnavailable";
 
 export default function Preview() {
+  // RequireCarePartner only renders this page once a carepartner is chosen
+  const { activeCarePartnerId } = useAuth();
+  const src = previewUrl(activeCarePartnerId as number);
+
   return (
-    <div className="relative min-h-screen p-10 bg-dawn-preview text-dawn-ink font-dawn">
+    <div className="relative h-screen bg-dawn-preview text-dawn-ink font-dawn">
+      {src ? <CarepartnerScreen src={src} /> : <ScreenUnavailable />}
       <Link
         to="/"
-        className="absolute right-6 top-6 inline-flex items-center gap-2 h-12 px-[18px] rounded-3xl bg-dawn-ink text-white text-base font-bold"
+        className={`absolute right-6 top-6 flex items-center gap-2 h-12 px-[18px] rounded-[10px] bg-dawn-accent hover:bg-dawn-accent-hover text-white text-base font-bold ${FOCUS_RING}`}
       >
-        <X size={18} aria-hidden="true" />
-        Exit preview
+        <Minimize size={20} strokeWidth={2.2} aria-hidden="true" />
+        Exit full screen
       </Link>
     </div>
   );

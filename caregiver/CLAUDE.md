@@ -17,7 +17,7 @@ npm run preview   # preview a production build locally
 
 There is no test suite in this package (no `test`/`vitest` script, no `*.test.tsx` files) — the backend (`server/`) is where automated tests live.
 
-Env vars (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`) come from `.env.development` under `npm run dev` only. `vite build` does not read that file, so Docker builds get both as build args from the compose files; `VITE_GOOGLE_CLIENT_ID` is fed from `GOOGLE_CLIENT_ID` in the repo-root `.env`.
+Env vars (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`) come from `.env.development` under `npm run dev` only. `vite build` does not read that file, so Docker builds get both as build args from the compose files; `VITE_GOOGLE_CLIENT_ID` is fed from `GOOGLE_CLIENT_ID` in the repo-root `.env`. `VITE_CAREPARTNER_URL` (the carepartner web app, `http://localhost:8081` in development; run `npm run web` in `carepartner/`) is where the home page and `/preview` show the carepartner's screen in an iframe, in that app's preview mode (`src/screen/previewUrl.ts`). Docker builds don't set it yet, so both pages say "Carepartner screen can't be shown here." there (`src/screen/ScreenUnavailable.tsx`). Restart `npm run dev` after changing any of them.
 
 ## Architecture
 
