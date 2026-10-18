@@ -199,6 +199,13 @@ Staff play and stop clips from their phones; the server pushes each command to t
 - When there is nothing to draw (before the first screen arrives, with no widgets, or only ones it left out), `AlwaysOnScreen` shows the day, time of day and date instead, so the screen is never blank.
 - Day and time on the grid is the `day_time` type, which the server doesn't have yet (#366), so a screen with widgets shows no day and time until it does.
 
+### Touch telemetry (`src/telemetry/`)
+
+The resident never has to touch the tablet, but where they try to is feedback on the design, so touches are recorded. `TouchTelemetryProvider` (in `_layout.tsx`) keeps a touch log while paired; `TouchArea` wraps the always-on (or default), night and playing screens, but not the pair screen, which staff use.
+- `TouchArea` only listens (`onTouchStart`, `onTouchEnd`), never claims a touch, so nothing becomes tappable. Touch events bubble, so the grid marks each widget as the target from its frame's `onTouchStart` (`useMarkTouchTarget`), which runs before the area's.
+- Each touch records the screen, what was under the finger (a widget's server type and id, an empty cell, or the kind of media playing), and the gesture (`gestureOf` in `gestures.ts`: a swipe if it moved 30 or more, a long press if held 500 ms or more, else a tap). No positions or text.
+- `touchLog.ts` groups repeats (same screen, target and gesture within 2 s) into one event with a count, and sends events every minute, or at 50, to `POST /tablet-events/touches` through a report queue. The server endpoint is #381; until it exists each batch gets 404 and is dropped with a warning.
+
 ### Schedule (`src/schedule/`)
 
 `SchedulePlayer` (in `_layout.tsx`, draws nothing) plays the screen's `schedule`, today's and tomorrow's plays, through the machine with source `scheduled`:

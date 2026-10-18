@@ -64,6 +64,8 @@ export type HeadlineData = { title: string };
 
 type Placed<R extends string, D> = GridArea & {
   id: string;
+  /** The server's widget type ("weather", "sports"…), for touch telemetry; renderers are shared between types. */
+  widgetType?: string;
   renderer: R;
   data: D;
 };

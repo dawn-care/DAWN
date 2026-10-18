@@ -135,7 +135,7 @@ export function placementsFor(screen: Screen): WidgetPlacement[] {
       return [];
     }
     const { col, row, width, height } = widget;
-    return [{ id: String(widget.id), col, row, width, height, ...look } as WidgetPlacement];
+    return [{ id: String(widget.id), widgetType: widget.type, col, row, width, height, ...look } as WidgetPlacement];
   });
   if (undrawable) console.warn(`Left out ${undrawable} widgets the tablet can't draw`);
   return placements;

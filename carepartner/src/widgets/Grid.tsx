@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { fitsGrid } from "@shared";
+import { useMarkTouchTarget } from "../telemetry/TouchTelemetry";
 import { cellRect, type Size } from "./layout";
 import { lookupRenderer } from "./registry";
 import type { WidgetPlacement } from "./types";
@@ -18,6 +19,7 @@ type Props = {
  */
 export default function Grid({ widgets, initialSize }: Props) {
   const [size, setSize] = useState<Size | undefined>(initialSize);
+  const markTouched = useMarkTouchTarget();
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -37,6 +39,11 @@ export default function Grid({ widgets, initialSize }: Props) {
               testID={`widget-${widget.id}`}
               rect={cellRect(widget, size)}
               framed={entry.framed}
+              onTouchStart={
+                markTouched
+                  ? () => markTouched({ type: "widget", widgetType: widget.widgetType ?? widget.renderer, widgetId: widget.id })
+                  : undefined
+              }
             >
               <Widget data={widget.data} />
             </WidgetFrame>

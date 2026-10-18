@@ -4,6 +4,7 @@ import NightScreen from "../src/display/NightScreen";
 import MediaPlayer from "../src/playback/MediaPlayer";
 import { usePlayback } from "../src/playback/PlaybackProvider";
 import AlwaysOnScreen from "../src/screen/AlwaysOnScreen";
+import { TouchArea } from "../src/telemetry/TouchTelemetry";
 
 /** Shows whatever the playback machine says the screen should show. */
 export default function Index() {
@@ -17,20 +18,26 @@ export default function Index() {
     case "playing": {
       const { playId, item } = state.playing!;
       return (
-        <MediaPlayer
-          key={playId}
-          item={item}
-          onStarted={() => started(playId)}
-          onFinished={() => ended(playId, "finished")}
-          onFailed={(reason) => {
-            console.warn("Playback failed:", reason);
-            ended(playId, "failed");
-          }}
-        />
+        <TouchArea screen="playing" target={{ type: "media", mediaKind: item.kind }} style={{ flex: 1 }}>
+          <MediaPlayer
+            key={playId}
+            item={item}
+            onStarted={() => started(playId)}
+            onFinished={() => ended(playId, "finished")}
+            onFailed={(reason) => {
+              console.warn("Playback failed:", reason);
+              ended(playId, "failed");
+            }}
+          />
+        </TouchArea>
       );
     }
     case "night":
-      return <NightScreen />;
+      return (
+        <TouchArea screen="night" style={{ flex: 1 }}>
+          <NightScreen />
+        </TouchArea>
+      );
     case "alwaysOn":
       return <AlwaysOnScreen />;
   }
