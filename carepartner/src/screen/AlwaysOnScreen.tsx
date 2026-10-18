@@ -3,18 +3,18 @@ import { StyleSheet, View } from "react-native";
 import { colors, space } from "../theme/theme";
 import Grid from "../widgets/Grid";
 import Orientation from "../widgets/renderers/Orientation";
-import { placementsFor } from "./placements";
+import { DAY_TIME_PLACEMENT, placementsFor } from "./placements";
 import { useScreen } from "./ScreenProvider";
 
 /**
- * The always-on screen: the caregiver's widgets on the grid. Nothing on it
- * needs a tap. When there is nothing to draw (before the first screen
- * arrives, with no widgets, or only ones the tablet can't draw) it shows the
- * day, time of day and date, so the screen is never blank.
+ * The always-on screen: the day and time in the top left, and the caregiver's
+ * widgets around it on the grid. Nothing on it needs a tap. Until the first
+ * screen arrives it shows the day, time of day and date on their own, so the
+ * screen is never blank.
  */
 export default function AlwaysOnScreen() {
   const { screen } = useScreen();
-  const widgets = useMemo(() => (screen ? placementsFor(screen) : []), [screen]);
+  const widgets = useMemo(() => (screen ? [DAY_TIME_PLACEMENT, ...placementsFor(screen)] : []), [screen]);
 
   return (
     <View testID="always-on-screen" style={styles.root}>

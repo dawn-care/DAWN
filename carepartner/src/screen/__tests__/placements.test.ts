@@ -1,9 +1,10 @@
 import { API_URL } from "../../api/config";
-import { placementsFor } from "../placements";
+import { DAY_TIME_PLACEMENT, placementsFor } from "../placements";
 import type { Screen, ScreenWidget } from "../screen";
 
+// Column 2 of the top row: the day and time fills columns 0 and 1 of the top two rows
 const widget = (overrides: Partial<ScreenWidget>): ScreenWidget => ({
-  id: 1, type: "weather", col: 0, row: 0, width: 1, height: 1,
+  id: 1, type: "weather", col: 2, row: 0, width: 1, height: 1,
   config: {}, photo: null, data: null, error: null,
   ...overrides,
 });
@@ -70,10 +71,9 @@ describe("placementsFor", () => {
 
   it("shows a photo with its caption, or else its name", () => {
     const photo = { url: "/media/4/file", displayName: "sarah_beach" };
-    const [captioned, named] = placed(
-      widget({ type: "photo", width: 2, height: 2, photo, data: { caption: "Sarah" } }),
-      widget({ id: 2, type: "photo", col: 2, width: 2, height: 2, photo, data: null }),
-    );
+    // Only one 2 x 2 photo fits beside the day and time, so each is placed on its own
+    const [captioned] = placed(widget({ type: "photo", width: 2, height: 2, photo, data: { caption: "Sarah" } }));
+    const [named] = placed(widget({ type: "photo", width: 2, height: 2, photo, data: null }));
 
     expect(captioned).toMatchObject({ renderer: "photo", data: { uri: `${API_URL}/media/4/file`, name: "Sarah" } });
     expect(named.data).toMatchObject({ name: "sarah_beach" });
@@ -121,14 +121,19 @@ describe("placementsFor", () => {
     expect(placed(news)[0]).toMatchObject({ renderer: "headline", data: { title: "Zoo welcomes a baby panda" } });
   });
 
-  it("shows a day and time widget, with the date unless switched off", () => {
-    const [withDate, withoutDate] = placed(
-      widget({ type: "day_time", width: 2, height: 2 }),
-      widget({ id: 2, type: "day_time", col: 2, width: 2, height: 2, config: { show_date: false } }),
-    );
+  it("has the day and time in the top left 2 x 2, without the date", () => {
+    expect(DAY_TIME_PLACEMENT).toEqual({
+      id: "day_time", col: 0, row: 0, width: 2, height: 2,
+      renderer: "orientation", data: { showDate: false },
+    });
+  });
 
-    expect(withDate).toMatchObject({ renderer: "orientation", data: { showDate: true } });
-    expect(withoutDate.data).toEqual({ showDate: false });
+  it.each([
+    ["a widget over the day and time", widget({ col: 1, row: 1, data: { temp: 48 } })],
+    ["a day and time widget from the server, which the tablet draws itself", widget({ type: "day_time", col: 0, row: 0, width: 2, height: 2 })],
+  ])("leaves out %s", (_name, bad) => {
+    expect(placed(bad)).toEqual([]);
+    expect(console.warn).toHaveBeenCalledWith("Left out 1 widgets the tablet can't draw");
   });
 
   it("leaves out a widget whose outside service is down, quietly", () => {
@@ -148,7 +153,7 @@ describe("placementsFor", () => {
     ["has a sports result it doesn't know", widget({ type: "sports", width: 2, height: 1, data: { team_name: "Yankees", result: "rained out", team_score: 1, opponent_score: 0 } })],
     ["has a sports result with no score", widget({ type: "sports", width: 2, height: 1, data: { team_name: "Yankees", result: "won" } })],
   ])("leaves out a widget that %s, and says how many", (_name, bad) => {
-    const good = widget({ id: 9, col: 3, data: { temp: 48 } });
+    const good = widget({ id: 9, col: 3, row: 2, data: { temp: 48 } });
 
     expect(placed(bad, good).map((p) => p.id)).toEqual(["9"]);
     expect(console.warn).toHaveBeenCalledWith("Left out 1 widgets the tablet can't draw");
@@ -156,7 +161,7 @@ describe("placementsFor", () => {
 
   it("keeps the first of two widgets that overlap, and says how many it left out", () => {
     const first = widget({ id: 1, type: "photo", width: 2, height: 2, photo: { url: "/media/3/file", displayName: "Ana" } });
-    const second = widget({ id: 2, type: "message", col: 1, row: 1, width: 2, height: 1, config: { text: "Hello" } });
+    const second = widget({ id: 2, type: "message", col: 2, row: 1, width: 2, height: 1, config: { text: "Hello" } });
 
     expect(placed(first, second).map((p) => p.id)).toEqual(["1"]);
     expect(console.warn).toHaveBeenCalledWith("Left out 1 widgets the tablet can't draw");

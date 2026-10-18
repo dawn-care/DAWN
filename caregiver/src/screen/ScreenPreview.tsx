@@ -41,7 +41,8 @@ export default function ScreenPreview({ carepartnerId, reloadKey = 0, editView }
 
   return (
     <div className="w-full max-w-[880px] mx-auto flex flex-col gap-1">
-      <div className="aspect-[16/10] rounded-xl overflow-hidden bg-dawn-preview">
+      {/* The border shows where the carepartner's screen ends */}
+      <div className="aspect-[16/10] rounded-xl overflow-hidden bg-dawn-preview border-2 border-dawn-accent">
         {editing ? (
           <div className="h-full p-4">{editView}</div>
         ) : src ? (

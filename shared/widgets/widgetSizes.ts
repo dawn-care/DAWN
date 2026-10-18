@@ -12,7 +12,10 @@ import type { GridArea } from "./grid";
 export type WidgetSize = { width: number; height: number };
 
 export const WIDGET_SIZES = {
-  /** Day and time of day. The server doesn't have this type yet (#366). */
+  /**
+   * Day and time of day. Not stored or placed by the caregiver: both apps draw
+   * it at `DAY_TIME_AREA` (gridPlacement.ts), the top left of every screen.
+   */
   day_time: { width: 2, height: 2 },
   photo: { width: 2, height: 2 },
   message: { width: 2, height: 1 },

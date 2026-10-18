@@ -1,25 +1,13 @@
 /**
  * screenWidgets.ts
  *
- * The kinds of widget on the carepartner's screen, which ones are locked, and
- * what to call them. Where a widget sits and how big it is is
+ * The kinds of widget on the carepartner's screen, and what to call them. Where a widget sits and how big it is is
  * gridPlacement.ts's job.
  */
 
 export const SCREEN_WIDGET_TYPES = ["day_time", "photo", "message", "reminder", "weather", "sports", "news"] as const;
 
 export type ScreenWidgetType = (typeof SCREEN_WIDGET_TYPES)[number];
-
-/**
- * Widgets every screen has (#366). The caregiver can move one, but not remove it
- * or add another, so a screen has at most one of each.
- */
-export const LOCKED_WIDGET_TYPES = ["day_time"] as const satisfies readonly ScreenWidgetType[];
-
-/** Whether the caregiver can't remove or add widgets of this type. */
-export function isLockedWidgetType(type: ScreenWidgetType): boolean {
-  return (LOCKED_WIDGET_TYPES as readonly ScreenWidgetType[]).includes(type);
-}
 
 /** Whether a string from the server is a widget type this app knows how to draw and place. */
 export function isScreenWidgetType(type: string): type is ScreenWidgetType {

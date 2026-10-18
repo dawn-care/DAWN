@@ -18,7 +18,7 @@ const text = (value: unknown): string | null => (typeof value === "string" && va
 
 /** One short line about each type's settings, or null when there's nothing to say */
 const DETAILS: Record<ScreenWidgetType, (config: Record<string, unknown>) => string | null> = {
-  day_time: (config) => (config.show_date === false ? "Without the date" : "With the date"),
+  day_time: () => "Always on screen",
   photo: (config) => text(config.caption),
   message: (config) => text(config.text),
   reminder: (config) => {

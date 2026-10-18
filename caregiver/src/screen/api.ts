@@ -47,18 +47,13 @@ export interface SportsConfig {
   team: string;
 }
 export type NewsConfig = Record<string, never>;
-/** The server doesn't have this type yet (#366) */
-export interface DayTimeConfig {
-  show_date?: boolean;
-}
 
 export type WidgetConfig =
   | PhotoConfig
   | MessageConfig
   | WeatherConfig
   | SportsConfig
-  | NewsConfig
-  | DayTimeConfig;
+  | NewsConfig;
 
 /**
  * A widget as the server stores it. `type` is a plain string because a newer

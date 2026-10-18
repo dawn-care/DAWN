@@ -1,7 +1,5 @@
 import {
-  LOCKED_WIDGET_TYPES,
   SCREEN_WIDGET_TYPES,
-  isLockedWidgetType,
   isScreenWidgetType,
   splitKnownWidgets,
   widgetName,
@@ -40,14 +38,6 @@ describe("isScreenWidgetType", () => {
 
   it.each(["", "Photo", "calendar", "toString", "__proto__"])("does not know %j", (type) => {
     expect(isScreenWidgetType(type)).toBe(false);
-  });
-});
-
-describe("locked widgets", () => {
-  it("locks only the day and time", () => {
-    expect(LOCKED_WIDGET_TYPES).toEqual(["day_time"]);
-    expect(isLockedWidgetType("day_time")).toBe(true);
-    expect(isLockedWidgetType("photo")).toBe(false);
   });
 });
 

@@ -14,6 +14,7 @@ import {
   areaToCorners,
   areasOverlap,
   cornersToArea,
+  FIXED_AREAS,
   fitsGrid,
   hasWidgetSize,
   isScreenWidgetType,
@@ -43,7 +44,7 @@ export interface LoadedLayout {
   unknown: LayoutWidget[];
   /**
    * Widgets the tablet can't draw either: not their type's size, off the grid,
-   * or overlapping a widget before them. They aren't shown, and saving removes
+   * or overlapping the day and time or a widget before them. They aren't shown, and saving removes
    * them from the screen.
    */
   dropped: LayoutWidget[];
@@ -57,7 +58,8 @@ export interface LoadedLayout {
  */
 export function fromLayout(loaded: readonly LayoutWidget[]): LoadedLayout {
   const result: LoadedLayout = { widgets: [], unknown: [], dropped: [] };
-  const taken: GridArea[] = [];
+  // The day and time is always in the top left, so nothing saved can be there
+  const taken: GridArea[] = [...FIXED_AREAS];
 
   for (const widget of loaded) {
     const { type } = widget;

@@ -4,16 +4,21 @@
  * Turns the screen's widgets into what the grid draws (`WidgetPlacement`),
  * checking each type's `config` and `data` once here. Logic only.
  *
+ * The day and time isn't one of the server's widgets: every screen has it in
+ * the top left (`DAY_TIME_PLACEMENT`, at `DAY_TIME_AREA` in `@shared`), so the
+ * server's widgets can't go there.
+ *
  * A widget is left out, so its cells stay empty, when:
  * - its type is unknown to this version, or it isn't its type's fixed size
  *   (`WIDGET_SIZES` in `@shared`);
- * - it doesn't fit on the grid, or it overlaps a widget before it (the server
- *   checks both, so this only guards against a bad layout);
+ * - it doesn't fit on the grid, or it overlaps the day and time or a widget
+ *   before it (the server checks the grid and overlaps, so this only guards
+ *   against a bad layout);
  * - its outside service is down (`error`), or the data it needs is missing or
  *   malformed.
  */
 
-import { areasOverlap, fitsGrid, hasWidgetSize, type GridArea } from "@shared";
+import { areasOverlap, DAY_TIME_AREA, fitsGrid, hasWidgetSize, type GridArea } from "@shared";
 import { resolveApiUri } from "../api/resolveApiUri";
 import type { ReminderItem, WidgetPlacement } from "../widgets/types";
 import type { Screen, ScreenWidget } from "./screen";
@@ -60,12 +65,16 @@ function readReminderItem(value: unknown): ReminderItem | null {
   return { ...time, text: words, icon: typeof value.icon === "string" ? value.icon : "other" };
 }
 
+/** The day and time of day, in the top left of every screen. */
+export const DAY_TIME_PLACEMENT: WidgetPlacement = {
+  id: "day_time",
+  ...DAY_TIME_AREA,
+  renderer: "orientation",
+  data: { showDate: false },
+};
+
 /** How each widget type is drawn, or null when it has nothing to show. */
 const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
-  day_time: ({ config }) => ({
-    renderer: "orientation",
-    data: { showDate: !(isObject(config) && config.show_date === false) },
-  }),
   photo: ({ photo, data }) =>
     photo && {
       renderer: "photo",
@@ -115,10 +124,13 @@ const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
   },
 };
 
-/** What the grid draws for the screen. Logs only a count of widgets it can't draw, never their content. */
+/**
+ * What the grid draws for the server's widgets, around the day and time (which
+ * the caller adds). Logs only a count of widgets it can't draw, never their content.
+ */
 export function placementsFor(screen: Screen): WidgetPlacement[] {
   let undrawable = 0;
-  const taken: GridArea[] = [];
+  const taken: GridArea[] = [DAY_TIME_AREA];
   const placements = screen.widgets.flatMap((widget): WidgetPlacement[] => {
     const lookFor = Object.prototype.hasOwnProperty.call(LOOKS, widget.type) ? LOOKS[widget.type] : undefined;
     const placeable = fitsGrid(widget) && !taken.some((area) => areasOverlap(area, widget));
