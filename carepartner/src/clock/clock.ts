@@ -62,10 +62,13 @@ export function everyMinute(tick: () => void): () => void {
   let timer: ReturnType<typeof setTimeout>;
   const wait = () => {
     // Worked out again each minute, so it never drifts. A timer that fires a
-    // little early just ticks twice.
+    // little early just ticks twice. A tick that throws doesn't stop the next.
     timer = setTimeout(() => {
-      tick();
-      wait();
+      try {
+        tick();
+      } finally {
+        wait();
+      }
     }, MINUTE_MS - (source() % MINUTE_MS));
   };
   wait();

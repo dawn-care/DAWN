@@ -25,14 +25,15 @@ export default function Message({ data }: { data: MessageData }) {
           onError={() => setPhotoFailed(true)}
         />
       )}
-      <View style={styles.body} onLayout={onLayout}>
+      <View testID="message-body" style={styles.body} onLayout={onLayout}>
         {!!data.label && (
           <Text style={styles.label} numberOfLines={1}>
             {data.label}
           </Text>
         )}
+        {/* Hidden until measured, so it doesn't show at full size and then shrink. */}
         <Text
-          style={[styles.text, { fontSize: size, lineHeight: size * LINE_HEIGHT }]}
+          style={[styles.text, { fontSize: size, lineHeight: size * LINE_HEIGHT, opacity: box.width ? 1 : 0 }]}
           numberOfLines={linesAt(size, textHeight)}
         >
           {data.text}

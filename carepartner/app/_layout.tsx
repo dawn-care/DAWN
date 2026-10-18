@@ -4,6 +4,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import * as SplashScreen from "expo-splash-screen";
 import DevToolbar from "../src/dev/DevToolbar";
 import TabletDisplay from "../src/display/TabletDisplay";
+import { useHiddenSystemBars } from "../src/display/useHiddenSystemBars";
 import { PlaybackProvider } from "../src/playback/PlaybackProvider";
 import StaffCommands from "../src/playback/StaffCommands";
 import SchedulePlayer from "../src/schedule/SchedulePlayer";
@@ -15,6 +16,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   // Keep the screen on from the start, even while the fonts load.
   useKeepAwake();
+  useHiddenSystemBars();
   const [fontsLoaded, fontError] = useAppFonts();
   const ready = fontsLoaded || !!fontError;
 
