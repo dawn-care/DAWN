@@ -2,8 +2,23 @@ import React from "react";
 import { render, screen } from "@testing-library/react-native";
 import { setClock } from "../../clock/clock";
 import Grid from "../Grid";
-import { sampleScreen } from "../sampleScreen";
 import type { WidgetPlacement } from "../types";
+
+/** A screen arranged like the visual design. */
+const sampleScreen: WidgetPlacement[] = [
+  { id: "orientation", renderer: "orientation", col: 0, row: 0, width: 2, height: 2, data: { showDate: true } },
+  {
+    id: "photo",
+    renderer: "photo",
+    col: 2,
+    row: 0,
+    width: 2,
+    height: 3,
+    data: { uri: "http://localhost:8080/api/media/1/file", name: "Sunset" },
+  },
+  { id: "weather", renderer: "tile", col: 0, row: 2, width: 1, height: 1, data: { icon: "partly-cloudy", word: "Chilly" } },
+  { id: "sports", renderer: "tile", col: 1, row: 2, width: 1, height: 1, data: { icon: "baseball", word: "Won", label: "Yankees" } },
+];
 
 const SCREEN = { width: 1280, height: 800 };
 

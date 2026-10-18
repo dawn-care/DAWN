@@ -7,13 +7,15 @@ Rules used by both the caregiver app and the carepartner tablet, so the caregive
 | File | What it decides |
 |---|---|
 | `display/awakeHours.ts` | When the carepartner is awake. `isAwake`, `isStartAllowed` (an item must start between wake up and bed, on a 15 minute step, but may run past bed), `snapToStep`, `startTimeOptions` for the time picker, `itemsOutsideHours` for the warning before new hours are saved, `isValidAwakeHours`, and `parseClock` / `formatClock` for the server's time text. Default 8 am to 10 pm. |
-| `display/nightHours.ts` | The tablet's current night hours. Stays until the night hours ticket moves the tablet to `awakeHours`. |
+| `display/nightHours.ts` | The tablet's night hours, and `nightHoursFromAwake` to turn the screen's awake hours into night hours. |
 | `playback/currentlyPlaying.ts` | What the screen shows at a given time: her usual screen, the night screen, or a video, audio (over her usual screen or one photo) or timed photo that is playing. An item that starts outside the awake hours never plays. `overlappingItems` finds scheduled items that would play at the same time, so the caregiver can refuse to schedule them (pass the id of an item being edited so it doesn't overlap itself); the tablet doesn't pick a winner between overlaps, it finishes the item it is on. |
-| `widgets/gridPlacement.ts` | Where widgets can go on the 4 x 3 grid. The top row is always the date and time (`DATE_TIME_AREA`, listed in `FIXED_AREAS`), which no widget can cover, so widgets go in the two rows below it. Each widget type has a fixed size (`WIDGET_SIZES`: photo 2 x 2, message, reminder and news 2 x 1, weather and sports 1 x 1) and is stored as a type plus the `col` and `row` of its top left cell, counted from 0 at the top left. `openCells` lists the cells to highlight for the widget being placed, `canPlace` and `hasRoom` check one cell or the whole grid, and `isValidPlacement` checks the full list before it is saved. |
+| `widgets/gridPlacement.ts` | Where widgets can go on the 4 x 3 grid. Each widget type has a fixed size (`WIDGET_SIZES` in `widgetSizes.ts`) and is placed as a type plus the `col` and `row` of its top left cell, counted from 0 at the top left. `openCells` lists the cells to highlight for the widget being placed, `canPlace` and `hasRoom` check one cell or the whole grid, and `isValidPlacement` checks the full list before it is saved. |
 | `widgets/screenWidgets.ts` | Widget types and what to call them (`widgetName`). `splitKnownWidgets` sets aside widgets of a type this app doesn't know, so they are not placed or checked and can be sent back unchanged when saving. |
 | `widgets/weather.ts` | The weather tile's word ("Chilly", "Sunny"...). Takes the weather widget's data as it is. The words and temperature lines are provisional. |
 | `widgets/timeOfDay.ts` | Morning, afternoon or evening, the day name and the date label. |
-| `widgets/grid.ts` | The screen's 4 x 3 grid: its size, `GridArea` and `fitsGrid`. |
+| `widgets/grid.ts` | The screen's 4 x 3 grid: its size, `GridArea`, `fitsGrid`, `areasOverlap`, and `cornersToArea` / `areaToCorners` for the screen layout API's inclusive corners. |
+| `widgets/widgetSizes.ts` | Each widget type's one fixed size (`WIDGET_SIZES`, `widgetSize`, `hasWidgetSize`). The tablet skips a widget that isn't its type's size. |
+| `widgets/textLimits.ts` | The longest message and reminder text the tablet shows whole (`TEXT_LIMITS`), for the caregiver's editor to enforce. |
 
 ## What belongs here
 
