@@ -27,6 +27,15 @@ describe("theme legibility", () => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(legibility.minContrast);
   });
 
+  it.each([
+    ["tile border on surface", colors.day.border, colors.day.surface],
+    ["tile border on background", colors.day.border, colors.day.background],
+    ["accent marker on surface", colors.day.accent, colors.day.surface],
+    ["photo placeholder icon on placeholder", colors.day.placeholderIcon, colors.day.placeholder],
+  ])("%s stands out (3:1, for shapes that aren't text)", (_name, foreground, background) => {
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(3);
+  });
+
   it("keeps every text size at or above the floor", () => {
     for (const size of Object.values(fontSizes)) {
       expect(size).toBeGreaterThanOrEqual(legibility.minText);

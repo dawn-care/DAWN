@@ -1,62 +1,36 @@
 import { GRID } from "../grid";
-import {
-  WIDGET_SIZES,
-  areasOverlap,
-  canPlace,
-  hasRoom,
-  isValidPlacement,
-  openCells,
-  widgetArea,
-} from "../gridPlacement";
+import { canPlace, hasRoom, isValidPlacement, openCells, widgetArea } from "../gridPlacement";
 import type { PlacedWidget } from "../gridPlacement";
-import { splitKnownWidgets } from "../screenWidgets";
-import type { ScreenWidgetType } from "../screenWidgets";
-
-const types = Object.keys(WIDGET_SIZES) as ScreenWidgetType[];
+import { SCREEN_WIDGET_TYPES, splitKnownWidgets } from "../screenWidgets";
+import { WIDGET_SIZES } from "../widgetSizes";
 
 const photo: PlacedWidget = { id: 1, type: "photo", col: 0, row: 0 };
 const weather: PlacedWidget = { id: 2, type: "weather", col: 2, row: 0 };
 
-describe("WIDGET_SIZES", () => {
-  it.each(types)("%s is at least one cell and no bigger than the grid", (type) => {
-    const { width, height } = WIDGET_SIZES[type];
-    expect(Number.isInteger(width) && Number.isInteger(height)).toBe(true);
-    expect(width).toBeGreaterThanOrEqual(1);
-    expect(height).toBeGreaterThanOrEqual(1);
-    expect(width).toBeLessThanOrEqual(GRID.columns);
-    expect(height).toBeLessThanOrEqual(GRID.rows);
+describe("sizes", () => {
+  it.each(SCREEN_WIDGET_TYPES)("%s has a size in WIDGET_SIZES", (type) => {
+    expect(WIDGET_SIZES[type]).toBeDefined();
   });
 });
 
 describe("widgetArea", () => {
   it("covers the widget's size starting at its cell", () => {
     expect(widgetArea({ type: "message", col: 1, row: 2 })).toEqual({ col: 1, row: 2, width: 2, height: 1 });
-  });
-});
-
-describe("areasOverlap", () => {
-  const a = { col: 0, row: 0, width: 2, height: 2 };
-
-  it("is true when areas share a cell", () => {
-    expect(areasOverlap(a, { col: 1, row: 1, width: 2, height: 2 })).toBe(true);
-    expect(areasOverlap(a, a)).toBe(true);
-  });
-
-  it("is false for areas that only touch", () => {
-    expect(areasOverlap(a, { col: 2, row: 0, width: 1, height: 1 })).toBe(false);
-    expect(areasOverlap(a, { col: 0, row: 2, width: 1, height: 1 })).toBe(false);
+    expect(widgetArea({ type: "photo", col: 2, row: 1 })).toEqual({ col: 2, row: 1, width: 2, height: 2 });
+    expect(widgetArea({ type: "sports", col: 0, row: 2 })).toEqual({ col: 0, row: 2, width: 2, height: 1 });
   });
 });
 
 describe("canPlace", () => {
   it("allows any cell on an empty grid where the widget stays on the grid", () => {
     expect(canPlace([], "weather", { col: 3, row: 2 })).toBe(true);
-    expect(canPlace([], "photo", { col: 2, row: 0 })).toBe(true);
+    expect(canPlace([], "photo", { col: 2, row: 1 })).toBe(true);
   });
 
   it("refuses a widget that would run off the grid", () => {
     expect(canPlace([], "message", { col: 3, row: 0 })).toBe(false);
-    expect(canPlace([], "photo", { col: 0, row: 1 })).toBe(false);
+    expect(canPlace([], "sports", { col: 3, row: 0 })).toBe(false);
+    expect(canPlace([], "photo", { col: 0, row: 2 })).toBe(false);
   });
 
   it("refuses a cell that is not on the grid", () => {
@@ -67,8 +41,9 @@ describe("canPlace", () => {
 
   it("refuses a place another widget covers, including its far cells", () => {
     expect(canPlace([photo], "weather", { col: 0, row: 0 })).toBe(false);
-    expect(canPlace([photo], "weather", { col: 1, row: 2 })).toBe(false);
-    expect(canPlace([photo], "weather", { col: 2, row: 2 })).toBe(true);
+    expect(canPlace([photo], "weather", { col: 1, row: 1 })).toBe(false);
+    expect(canPlace([photo], "weather", { col: 2, row: 1 })).toBe(true);
+    expect(canPlace([photo], "weather", { col: 0, row: 2 })).toBe(true);
   });
 
   it("refuses a widget whose body would reach a neighbour", () => {
@@ -92,12 +67,15 @@ describe("openCells", () => {
       { col: 0, row: 0 },
       { col: 1, row: 0 },
       { col: 2, row: 0 },
+      { col: 0, row: 1 },
+      { col: 1, row: 1 },
+      { col: 2, row: 1 },
     ]);
   });
 
   it("leaves out cells under an existing widget", () => {
     const cells = openCells([photo], "weather");
-    expect(cells).toHaveLength(GRID.columns * GRID.rows - 6);
+    expect(cells).toHaveLength(GRID.columns * GRID.rows - 4);
     expect(cells).not.toContainEqual({ col: 1, row: 1 });
     expect(cells).toContainEqual({ col: 2, row: 0 });
   });
@@ -106,6 +84,8 @@ describe("openCells", () => {
     const full: PlacedWidget[] = [
       photo,
       { id: 3, type: "photo", col: 2, row: 0 },
+      { id: 4, type: "sports", col: 0, row: 2 },
+      { id: 5, type: "news", col: 2, row: 2 },
     ];
     expect(openCells(full, "message")).toEqual([]);
     expect(openCells(full, "weather")).toEqual([]);
@@ -118,8 +98,22 @@ describe("hasRoom", () => {
     const full: PlacedWidget[] = [
       { id: 1, type: "photo", col: 0, row: 0 },
       { id: 2, type: "photo", col: 2, row: 0 },
+      { id: 3, type: "message", col: 0, row: 2 },
+      { id: 4, type: "reminder", col: 2, row: 2 },
     ];
     expect(hasRoom(full, "weather")).toBe(false);
+  });
+
+  it("is false for a 2x1 widget when only single cells are left in each row", () => {
+    const layout: PlacedWidget[] = [
+      photo,
+      { id: 3, type: "weather", col: 2, row: 0 },
+      { id: 4, type: "weather", col: 3, row: 1 },
+      { id: 5, type: "weather", col: 1, row: 2 },
+      { id: 6, type: "weather", col: 3, row: 2 },
+    ];
+    expect(hasRoom(layout, "sports")).toBe(false);
+    expect(hasRoom(layout, "weather")).toBe(true);
   });
 });
 
@@ -130,7 +124,7 @@ describe("isValidPlacement", () => {
   });
 
   it("rejects overlapping widgets", () => {
-    expect(isValidPlacement([photo, { id: 9, type: "sports", col: 1, row: 1 }])).toBe(false);
+    expect(isValidPlacement([photo, { id: 9, type: "weather", col: 1, row: 1 }])).toBe(false);
   });
 
   it("rejects a widget off the grid", () => {

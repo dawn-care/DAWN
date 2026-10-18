@@ -5,13 +5,13 @@ import { setClock } from "../clock";
 import { useNow } from "../useNow";
 
 function ShowMinutes() {
-  return <Text>{useNow(30_000).getMinutes()}</Text>;
+  return <Text>{useNow().getMinutes()}</Text>;
 }
 
 describe("useNow", () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    setClock(new Date("2026-10-05T09:15:00"));
+    setClock(new Date("2026-10-05T09:15:40"));
   });
 
   afterEach(() => {
@@ -19,12 +19,14 @@ describe("useNow", () => {
     jest.useRealTimers();
   });
 
-  it("starts at the app clock's time and keeps up as time passes", async () => {
+  it("starts at the app clock's time and changes as each minute starts", async () => {
     await render(<ShowMinutes />);
     expect(screen.getByText("15")).toBeTruthy();
 
-    await act(async () => jest.advanceTimersByTime(60_000));
+    await act(async () => jest.advanceTimersByTime(19_999));
+    expect(screen.getByText("15")).toBeTruthy();
 
+    await act(async () => jest.advanceTimersByTime(1));
     expect(screen.getByText("16")).toBeTruthy();
   });
 });
