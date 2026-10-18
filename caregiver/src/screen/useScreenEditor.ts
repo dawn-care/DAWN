@@ -8,8 +8,9 @@
  * reaches the tablet until the draft is saved. A new saved layout (another
  * carepartner, a reload, or a save) ends editing.
  *
- * While editing, the caregiver can pick a widget type to place (`pendingType`),
- * place it on an open square (`add`), change a widget's settings (`update`),
+ * While editing, the caregiver can pick a widget type to place (`pendingType`;
+ * `fullType` instead when it fits nowhere), place it on an open square (`add`),
+ * change a widget's settings (`update`),
  * or remove it (`remove`). `selectedId` is the widget being edited. A widget
  * added since editing began stays in `newIds` until `keep` says its settings
  * were confirmed, so closing its popup with X can take it back off the screen.
@@ -17,7 +18,7 @@
  * FUTURE IMPLEMENTATION (#333): saving the draft is added in a later step.
  */
 
-import { canPlace } from "@shared";
+import { canPlace, hasRoom } from "@shared";
 import type { Cell, ScreenWidgetType } from "@shared";
 import { useCallback, useRef, useState } from "react";
 import type { WidgetConfig } from "./api";
@@ -44,6 +45,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
   const [draft, setDraft] = useState<EditorWidget[] | null>(null);
   const [selectedId, setSelectedId] = useState<EditorWidget["id"] | null>(null);
   const [pendingType, setPendingType] = useState<AddableWidgetType | null>(null);
+  const [fullType, setFullType] = useState<AddableWidgetType | null>(null);
   const [newIds, setNewIds] = useState<readonly EditorWidget["id"][]>([]);
   const nextId = useRef(0);
 
@@ -51,6 +53,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     setDraft(widgets);
     setSelectedId(null);
     setPendingType(null);
+    setFullType(null);
     setNewIds([]);
   };
 
@@ -67,6 +70,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
       setDraft(saved.widgets.map((widget) => ({ ...widget })));
       setSelectedId(null);
       setPendingType(null);
+      setFullType(null);
       setNewIds([]);
     }
   }, [saved]);
@@ -75,13 +79,29 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     setDraft(null);
     setSelectedId(null);
     setPendingType(null);
+    setFullType(null);
     setNewIds([]);
   }, []);
 
-  /** Picks the type to place next, or null to stop placing. Picking the same type again stops. */
-  const pick = useCallback((type: AddableWidgetType | null) => {
-    setPendingType((current) => (current === type ? null : type));
-  }, []);
+  /**
+   * Picks the type to place next, or null to stop placing. Picking the type
+   * being placed again stops. A type that fits nowhere isn't picked: it is
+   * remembered as `fullType` so the add bar can say the screen is full.
+   */
+  const pick = useCallback(
+    (type: AddableWidgetType | null) => {
+      setFullType(null);
+      if (type === null || type === pendingType) {
+        setPendingType(null);
+      } else if (draft && !hasRoom(draft, type)) {
+        setPendingType(null);
+        setFullType(type);
+      } else {
+        setPendingType(type);
+      }
+    },
+    [draft, pendingType],
+  );
 
   /**
    * Places a new widget of the picked type, or of `type` when given, with its
@@ -104,6 +124,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
       setNewIds((ids) => [...ids, id]);
       setSelectedId(id);
       setPendingType(null);
+      setFullType(null);
       return id;
     },
     [draft, pendingType],
@@ -119,6 +140,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     setDraft((widgets) => widgets && widgets.filter((widget) => widget.id !== id));
     setNewIds((ids) => ids.filter((other) => other !== id));
     setSelectedId((current) => (current === id ? null : current));
+    setFullType(null);
   }, []);
 
   /** Selects a widget (the one being edited), or null to select none */
@@ -134,6 +156,8 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     draft,
     selectedId,
     pendingType,
+    /** The type the caregiver picked that fits nowhere, or null */
+    fullType,
     /** Whether the widget was added since editing began and its settings aren't confirmed yet */
     isNew: (id: EditorWidget["id"]) => newIds.includes(id),
     start,

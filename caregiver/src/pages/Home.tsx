@@ -7,16 +7,17 @@
  * account setup, and carepartner selection. Shows the carepartner's saved
  * screen as the tablet draws it (ScreenPreview's iframe). Edit screen swaps it
  * for the placeholder grid of a draft copy of the saved layout (useScreenEditor),
- * and Cancel throws the draft away.
+ * with the add bar (greyed out until then) above it, and Cancel throws the draft away.
  *
- * FUTURE IMPLEMENTATION (#333): the add bar, the pencil and bin on each widget,
- * their popups, and Save changes are added in later steps.
+ * FUTURE IMPLEMENTATION (#333): the pencil and bin on each widget, their
+ * popups, and Save changes are added in later steps.
  */
 
 import { Check, Pencil } from "lucide-react";
 import InfoPopover from "../components/ui/InfoPopover";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
+import AddBar from "../screen/AddBar";
 import ScreenGrid from "../screen/ScreenGrid";
 import ScreenPreview from "../screen/ScreenPreview";
 import { useSavedLayout } from "../screen/useSavedLayout";
@@ -37,7 +38,7 @@ export default function Home() {
   const editor = useScreenEditor(state.status === "ready" ? state.layout : null);
 
   return (
-    <div className="flex flex-col gap-3 px-7 py-5">
+    <div className="flex flex-col gap-3 px-7 pt-5 pb-7 h-screen">
       <div className="flex flex-wrap items-center justify-between gap-4 min-h-11">
         <div className="flex items-center gap-1">
           <h1 className="m-0 text-3xl font-extrabold">Carepartner Screen</h1>
@@ -83,9 +84,20 @@ export default function Home() {
         </div>
       )}
 
+      <AddBar
+        editing={editor.editing}
+        pendingType={editor.pendingType}
+        fullType={editor.fullType}
+        onPick={editor.pick}
+      />
+
       <ScreenPreview
         carepartnerId={carepartnerId}
-        editView={editor.draft ? <ScreenGrid widgets={editor.draft} /> : undefined}
+        editView={
+          editor.draft ? (
+            <ScreenGrid widgets={editor.draft} pendingType={editor.pendingType} onPlace={editor.add} />
+          ) : undefined
+        }
       />
 
       {/* FUTURE IMPLEMENTATION (#333): add that saving removes them, once Save changes exists */}

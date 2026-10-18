@@ -8,17 +8,21 @@
  * each widget covers, and dashed black outlines of every square
  * drawn over the tiles, with each tile's solid edge drawn over them in turn. The
  * outlines are see-through, so they show which squares a tile covers without
- * hiding or being mistaken for its text. Read-only for now.
+ * hiding or being mistaken for its text. While a widget type is being placed
+ * (`pendingType`), the squares it fits at (`openCells`) are lit and clickable.
  *
- * FUTURE IMPLEMENTATION (#333): the editing controls (add bar, lit squares,
- * pencil and bin) are added on top of the same grid.
+ * FUTURE IMPLEMENTATION (#333): the pencil and bin on each tile are added on
+ * top of the same grid.
  */
 
-import { DAY_TIME_AREA, GRID, widgetArea } from "@shared";
-import type { GridArea } from "@shared";
+import { DAY_TIME_AREA, GRID, openCells, widgetArea, widgetName } from "@shared";
+import type { Cell, GridArea } from "@shared";
+import { Plus } from "lucide-react";
 import type { CSSProperties } from "react";
+import { FOCUS_RING } from "../components/ui/styles";
 import type { EditorWidget } from "./layout";
 import { placeholderText } from "./placeholders";
+import type { AddableWidgetType } from "./useScreenEditor";
 import WidgetIcon from "./WidgetIcon";
 
 // Places an area on the CSS grid, which counts lines from 1
@@ -47,9 +51,13 @@ const DAY_TIME_TILE: EditorWidget = {
 
 interface ScreenGridProps {
   widgets: readonly EditorWidget[];
+  /** The type being placed: the squares it fits at are lit and can be clicked */
+  pendingType?: AddableWidgetType | null;
+  onPlace?: (cell: Cell) => void;
 }
 
-export default function ScreenGrid({ widgets }: ScreenGridProps) {
+export default function ScreenGrid({ widgets, pendingType = null, onPlace }: ScreenGridProps) {
+  const lit = pendingType ? openCells(widgets, pendingType) : [];
   return (
     <div
       role="group"
@@ -82,6 +90,21 @@ export default function ScreenGrid({ widgets }: ScreenGridProps) {
           style={gridPosition(widgetArea(widget))}
         />
       ))}
+      {/* Above everything, so a lit square is always clickable */}
+      {pendingType &&
+        lit.map((cell) => (
+          <button
+            key={`lit-${cell.col}-${cell.row}`}
+            type="button"
+            aria-label={`Put the ${widgetName({ type: pendingType }).toLowerCase()} here, column ${cell.col + 1}, row ${cell.row + 1}`}
+            onClick={() => onPlace?.(cell)}
+            className={`z-40 flex items-center justify-center gap-1.5 rounded-xl border-[2.5px] border-dawn-accent bg-dawn-accent/[0.12] hover:bg-dawn-accent/25 text-[15px] font-bold text-dawn-accent cursor-pointer ${FOCUS_RING}`}
+            style={gridPosition({ ...cell, width: 1, height: 1 })}
+          >
+            <Plus size={18} strokeWidth={2.6} aria-hidden="true" />
+            Place here
+          </button>
+        ))}
     </div>
   );
 }
