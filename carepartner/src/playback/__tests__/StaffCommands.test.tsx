@@ -61,7 +61,7 @@ async function start() {
   return view;
 }
 
-describe("useStaffCommands", () => {
+describe("StaffCommands", () => {
   let warn: jest.SpyInstance;
 
   beforeEach(() => {

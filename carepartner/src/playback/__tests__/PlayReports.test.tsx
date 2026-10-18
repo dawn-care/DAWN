@@ -6,8 +6,7 @@ import { readPairedId } from "../../pairing/pairingState";
 import { RETRY_FIRST_MS } from "../../reports/queue";
 import type { MediaItem } from "../media";
 import { PlaybackProvider, usePlayback } from "../PlaybackProvider";
-import PlayReports from "../PlayReports";
-import { REPORT_DEADLINE_MS } from "../usePlayReports";
+import PlayReports, { REPORT_DEADLINE_MS } from "../PlayReports";
 
 jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 jest.mock("../../api/request", () => ({
@@ -44,7 +43,7 @@ async function start() {
   await settle();
 }
 
-describe("usePlayReports", () => {
+describe("PlayReports", () => {
   beforeEach(() => {
     jest.useFakeTimers({ now: new Date("2026-10-18T15:00:00Z") });
     // The app clock is hours off, as with EXPO_PUBLIC_FAKE_TIME.
