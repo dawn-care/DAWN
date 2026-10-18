@@ -125,9 +125,9 @@ carepartner/
 
 ### Shared code
 
-The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea`, `fitsGrid`, `areasOverlap` and the corner conversions (`widgets/grid.ts`), `WIDGET_SIZES`, `widgetSize` and `hasWidgetSize` (`widgets/widgetSizes.ts`), and `TEXT_LIMITS` (`widgets/textLimits.ts`), the longest message and reminder text the tablet shows whole. `nightHoursFromAwake` turns the screen's awake hours into night hours. See `shared/README.md`.
+The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea`, `fitsGrid`, `areasOverlap` and the corner conversions (`widgets/grid.ts`), `WIDGET_SIZES`, `widgetSize` and `hasWidgetSize` (`widgets/widgetSizes.ts`), and `TEXT_LIMITS` (`widgets/textLimits.ts`), the longest message and reminder text the tablet shows whole. `nightHoursFromAwake` turns the screen's awake hours into night hours. It also has rules this app does not use yet: awake hours (`display/awakeHours.ts`), what is playing at a given time (`playback/currentlyPlaying.ts`), grid placement (`widgets/gridPlacement.ts`: the cells a widget can go in, using `WIDGET_SIZES`), widget names (`widgets/screenWidgets.ts`) and the weather word (`widgets/weather.ts`). See `shared/README.md`.
 
-- Import from `@shared` only (`import { isNight } from "@shared"`). The path is set in `tsconfig.json`, Metro watches the folder through `metro.config.js`, and Jest maps it through `roots` and `moduleNameMapper` in `package.json`. Names are unchanged from when this code lived in `src/`.
+- Import from `@shared` only (`import { isNight } from "@shared"`). The path is set in `tsconfig.json`, Metro watches the folder through `metro.config.js`, and Jest maps it through `roots` and `moduleNameMapper` in `package.json`. Metro's `nodeModulesPaths` and Jest's `modulePaths` point at this folder's `node_modules` so files in `shared/` can find Babel's helpers. Names are unchanged from when this code lived in `src/`.
 - Nothing in `shared/` may import React, React Native, Expo or a DOM API. Anything that needs the theme, fonts or screen size stays here: `src/widgets/layout.ts` keeps `cellRect` and builds the tablet's `GRID` from the shared one by adding padding and gap. There are two objects called `GRID`: the shared one holds only `columns` and `rows`, and the tablet's adds `gap` and `padding`. `fitsGrid` takes any `{ columns, rows }`, so either works.
 - Tests for shared code live in `shared/<feature>/__tests__/` and run with `npm test` in this folder. `npm run typecheck:shared` at the repo root checks the framework-free rule; it uses this folder's TypeScript, so run `npm install` here first.
 
@@ -135,7 +135,7 @@ The repo-root `shared/` folder holds plain TypeScript rules used by this app and
 
 - Use a shared theme (palette, Atkinson Hyperlegible font, sizes, corner radii) so the tablet matches the other apps.
 - The grid and tile are our own components: positions are data-driven and the look is fixed by the visual design.
-- Gluestack (the free, MIT-licensed library) is the intended component library for the staff and family apps. Its current version installs only into Expo and React Native projects; confirm it renders on Expo web before adopting it here.
+- Gluestack (the free, MIT-licensed library) is the intended component library for the staff and family apps. Its current version installs only into Expo and React Native projects; confirm it renders on Expo web before adopting it here. It does not install into the Vite caregiver web app (its setup is built around Metro and React Native Web), so `caregiver/` uses Radix UI instead.
 
 ### Testing
 

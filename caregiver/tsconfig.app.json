@@ -22,6 +22,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+
+    /* Rules shared with the carepartner (../shared) */
+    "paths": {
+      "@shared": ["../shared/index.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../shared/**/*.ts"],
+  "exclude": ["../shared/**/__tests__/**"]
 }

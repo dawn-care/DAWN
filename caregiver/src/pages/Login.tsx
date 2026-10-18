@@ -14,7 +14,7 @@
  * 
  * Redirect logic:
  *  - No carepartners → Account setup page
- *  - Has carepartners → Library page
+ *  - Has carepartners → Home page (`/`)
  */
 
 import { GoogleLogin } from "@react-oauth/google";
@@ -127,7 +127,7 @@ const Login = () => {
         navigate("/setup");
       } else {
         setActiveCarePartnerId(user.carepartners[0].id);
-        navigate("/library");
+        navigate("/");
       }
 
       setStatus("success");
