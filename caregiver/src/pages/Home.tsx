@@ -26,7 +26,7 @@ const PRIMARY_BUTTON = `flex items-center gap-2 h-11 px-[18px] rounded-[10px] bo
 const SECONDARY_BUTTON = `h-11 px-[18px] rounded-[10px] border-2 border-dawn-control bg-white hover:bg-dawn-page text-dawn-ink text-base font-bold cursor-pointer ${FOCUS_RING}`;
 
 const PAGE_INFO =
-  "This is where you configure what the carepartner's idle screen will look like. Click Edit Screen to change what it looks like.";
+  "This is where you configure what the carepartner's idle screen will look like. Click Edit screen to change what it looks like.";
 
 export default function Home() {
   // RequireCarePartner only renders this page once a carepartner is chosen
@@ -88,11 +88,12 @@ export default function Home() {
         editView={editor.draft ? <ScreenGrid widgets={editor.draft} /> : undefined}
       />
 
+      {/* FUTURE IMPLEMENTATION (#333): add that saving removes them, once Save changes exists */}
       {state.status === "ready" && state.layout.dropped.length > 0 && (
         <p className="m-0 text-center text-[15px] text-dawn-muted">
           {state.layout.dropped.length === 1
-            ? "1 thing saved on the carepartner's screen can't be shown on the tablet. It's removed the next time you save."
-            : `${state.layout.dropped.length} things saved on the carepartner's screen can't be shown on the tablet. They're removed the next time you save.`}
+            ? "1 thing saved on the carepartner's screen can't be shown on the tablet."
+            : `${state.layout.dropped.length} things saved on the carepartner's screen can't be shown on the tablet.`}
         </p>
       )}
     </div>

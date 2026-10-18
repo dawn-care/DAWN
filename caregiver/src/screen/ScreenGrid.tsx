@@ -8,9 +8,10 @@
  * each widget covers, and dashed black outlines of every square
  * drawn over the tiles, with each tile's solid edge drawn over them in turn. The
  * outlines are see-through, so they show which squares a tile covers without
- * hiding or being mistaken for its text. Read-only for
- * now; the editing controls (lit squares, pencil and bin) are added on top of
- * the same grid.
+ * hiding or being mistaken for its text. Read-only for now.
+ *
+ * FUTURE IMPLEMENTATION (#333): the editing controls (add bar, lit squares,
+ * pencil and bin) are added on top of the same grid.
  */
 
 import { DAY_TIME_AREA, GRID, widgetArea } from "@shared";

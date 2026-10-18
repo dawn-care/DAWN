@@ -170,10 +170,17 @@ export function failedWidgetIndex(err: unknown): number | undefined {
 // The layout changes whenever it's saved, so never reuse a stored response
 const NO_CACHE: RequestInit = { cache: "no-store" };
 
+// The server always sends a list; anything else means the response isn't a layout
+function widgetsOf(layout: Layout, path: string): LayoutWidget[] {
+  if (Array.isArray(layout.widgets)) return layout.widgets;
+  console.error(`${path} returned no widgets list`, layout);
+  throw new ApiError(200, "INTERNAL_ERROR", "response had no widgets list");
+}
+
 /** Every widget on the carepartner's screen, in reading order (top row first, then left to right) */
 export async function loadWidgets(carepartnerId: number): Promise<LayoutWidget[]> {
-  const layout = await api<Layout>(`/screen-layout?carepartner_id=${carepartnerId}`, NO_CACHE);
-  return layout.widgets;
+  const path = `/screen-layout?carepartner_id=${carepartnerId}`;
+  return widgetsOf(await api<Layout>(path, NO_CACHE), path);
 }
 
 /**
@@ -182,13 +189,16 @@ export async function loadWidgets(carepartnerId: number): Promise<LayoutWidget[]
  * carepartner's widgets left out are deleted. `[]` clears the screen. Nothing is
  * saved if any widget is invalid. Returns the saved widgets in the order sent, so
  * a new widget's `id` can be read from its position.
+ *
+ * FUTURE IMPLEMENTATION (#333): nothing calls this yet; Save changes will use it.
  */
 export async function saveWidgets(carepartnerId: number, widgets: LayoutWidgetInput[]): Promise<LayoutWidget[]> {
-  const layout = await api<Layout>(`/screen-layout?carepartner_id=${carepartnerId}`, {
+  const path = `/screen-layout?carepartner_id=${carepartnerId}`;
+  const layout = await api<Layout>(path, {
     method: "PUT",
     body: JSON.stringify({ widgets }),
   });
-  return layout.widgets;
+  return widgetsOf(layout, path);
 }
 
 /** Address of a widget's photo, for <img>; null when it has none */

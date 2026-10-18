@@ -26,4 +26,21 @@ describe("PREVIEW", () => {
     // Jest runs as a native platform, like the tablet
     expect(PREVIEW).toBeNull();
   });
+
+  it("is read from the address on web", () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "location");
+    Object.defineProperty(globalThis, "location", { value: { search: "?preview=1&carepartner_id=4" }, configurable: true });
+    try {
+      jest.isolateModules(() => {
+        jest.doMock("react-native", () => ({ Platform: { OS: "web" } }));
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- a fresh copy of the module, read on "web"
+        const { PREVIEW: onWeb } = require("../previewMode");
+        expect(onWeb).toEqual({ carepartnerId: 4 });
+      });
+    } finally {
+      jest.dontMock("react-native");
+      if (original) Object.defineProperty(globalThis, "location", original);
+      else delete (globalThis as { location?: unknown }).location;
+    }
+  });
 });

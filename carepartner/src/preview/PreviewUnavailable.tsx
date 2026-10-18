@@ -3,11 +3,14 @@ import { StyleSheet, Text, View } from "react-native";
 import { fonts } from "../theme/fonts";
 import { colors, fontSizes, space } from "../theme/theme";
 
-/** Shown in preview mode when the address names no carepartner, in place of the pair screen. */
-export default function PreviewUnavailable() {
+/**
+ * Shown in preview mode in place of a screen: when the address names no
+ * carepartner (instead of the pair screen), or when their screen couldn't be loaded.
+ */
+export default function PreviewUnavailable({ message = "No screen to show." }: { message?: string }) {
   return (
     <View testID="preview-unavailable" style={styles.root}>
-      <Text style={styles.line}>No screen to show.</Text>
+      <Text style={styles.line}>{message}</Text>
     </View>
   );
 }

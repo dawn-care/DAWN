@@ -39,9 +39,10 @@ jest.mock("expo-router", () => {
     Redirect: ({ href }: { href: string }) => <Text>redirect:{href}</Text>,
   };
 });
+const mockScreenFailed = { current: false };
 jest.mock("../../screen/ScreenProvider", () => ({
   ScreenProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useScreen: () => ({ screen: null, refresh: jest.fn(), fetchedAt: null }),
+  useScreen: () => ({ screen: null, refresh: jest.fn(), fetchedAt: null, failed: mockScreenFailed.current }),
 }));
 jest.mock("../../schedule/SchedulePlayer", () => ({ __esModule: true, default: jest.fn(() => null) }));
 jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: jest.fn(() => null) }));
@@ -54,7 +55,10 @@ jest.mock("../../dev/DevToolbar", () => ({ __esModule: true, default: jest.fn(()
 jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 jest.mock("../../playback/MediaPlayer", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../display/NightScreen", () => ({ __esModule: true, default: () => null }));
-jest.mock("../../screen/AlwaysOnScreen", () => ({ __esModule: true, default: () => null }));
+jest.mock("../../screen/AlwaysOnScreen", () => {
+  const { Text } = jest.requireActual("react-native");
+  return { __esModule: true, default: () => <Text>always-on screen</Text> };
+});
 
 let playback: ReturnType<typeof usePlayback>;
 function Probe() {
@@ -66,6 +70,7 @@ describe("preview mode", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPreview.current = { carepartnerId: 4 };
+    mockScreenFailed.current = false;
     jest.mocked(useAppFonts).mockReturnValue([true, null]);
     jest.mocked(readPairedId).mockResolvedValue(7);
   });
@@ -122,5 +127,32 @@ describe("preview mode", () => {
     expect(screen.getByTestId("preview-unavailable")).toBeTruthy();
     expect(screen.getByText("No screen to show.")).toBeTruthy();
     expect(screen.queryByText("redirect:/pair")).toBeNull();
+  });
+
+  it("says the screen couldn't be loaded instead of passing the day and time off as the carepartner's screen", async () => {
+    mockScreenFailed.current = true;
+    await render(
+      <PlaybackProvider>
+        <Index />
+      </PlaybackProvider>,
+    );
+    await act(async () => {});
+
+    expect(screen.getByText("This screen couldn't be loaded.")).toBeTruthy();
+    expect(screen.queryByText("always-on screen")).toBeNull();
+  });
+
+  it("keeps showing the always-on screen on the tablet when a load fails", async () => {
+    mockPreview.current = null;
+    mockScreenFailed.current = true;
+    await render(
+      <PlaybackProvider>
+        <Index />
+      </PlaybackProvider>,
+    );
+    await act(async () => {});
+
+    expect(screen.getByText("always-on screen")).toBeTruthy();
+    expect(screen.queryByTestId("preview-unavailable")).toBeNull();
   });
 });

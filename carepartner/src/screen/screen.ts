@@ -12,7 +12,7 @@ import { readMedia, type MediaItem } from "../playback/media";
 /** A widget and its place on the grid. `placementsFor` checks `config` and `data` for its type. */
 export type ScreenWidget = GridArea & {
   id: number;
-  /** "photo", "message", "reminder", "weather", "sports", "news" or "day_time"; unknown types are kept and skipped when drawn. */
+  /** "photo", "message", "reminder", "weather", "sports" or "news"; unknown types (a stored "day_time" too, since the tablet draws its own) are kept and skipped when drawn. */
   type: string;
   config: unknown;
   photo: { url: string; displayName: string } | null;

@@ -5,7 +5,8 @@
  *
  * Loads the carepartner's saved screen layout for the home page, and loads it
  * again when the carepartner changes or `reload` is called. A response that
- * arrives after a newer request was started is ignored.
+ * arrives after a newer request was started is ignored. A failed load, or a
+ * response fromLayout can't read, shows an error with Try again, and is logged.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -31,10 +32,17 @@ export function useSavedLayout(carepartnerId: number) {
   useEffect(() => {
     let current = true;
     setState({ status: "loading" });
-    loadWidgets(carepartnerId).then(
-      (widgets) => current && setState({ status: "ready", layout: fromLayout(widgets) }),
-      (err: unknown) => current && setState({ status: "error", message: loadErrorMessage(err) }),
-    );
+    // fromLayout runs before the handlers, so anything it throws reaches the error state too
+    loadWidgets(carepartnerId)
+      .then(fromLayout)
+      .then(
+        (layout) => current && setState({ status: "ready", layout }),
+        (err: unknown) => {
+          if (!current) return;
+          console.error(`Loading carepartner ${carepartnerId}'s screen layout failed`, err);
+          setState({ status: "error", message: loadErrorMessage(err) });
+        },
+      );
     return () => {
       current = false;
     };

@@ -159,8 +159,20 @@ describe("isValidPlacement", () => {
   });
 
   it("rejects a widget over the day and time, including a saved day and time widget", () => {
-    expect(isValidPlacement([{ id: 9, type: "weather", col: 1, row: 1 }])).toBe(false);
     expect(isValidPlacement([{ id: 9, type: "day_time", col: 0, row: 0 }])).toBe(false);
+    expect(isValidPlacement([{ id: 9, type: "weather", col: 1, row: 1 }])).toBe(false);
+  });
+
+  it("rejects a day and time widget anywhere, even clear of the top left", () => {
+    expect(isValidPlacement([{ id: 9, type: "day_time", col: 2, row: 0 }])).toBe(false);
+  });
+});
+
+describe("the day and time", () => {
+  it("can't be placed in any cell, so there is never room for it", () => {
+    expect(canPlace([], "day_time", { col: 2, row: 0 })).toBe(false);
+    expect(openCells([], "day_time")).toEqual([]);
+    expect(hasRoom([], "day_time")).toBe(false);
   });
 });
 

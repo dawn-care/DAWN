@@ -23,9 +23,10 @@ import { previewUrl } from "./previewUrl";
 import ScreenUnavailable from "./ScreenUnavailable";
 
 const SCREEN_INFO =
-  "This is what the carepartner's idle screen looks like. Click Edit Screen to change it, or Full Screen to enlarge it.";
+  "This is what the carepartner's idle screen looks like. Click Edit screen to change it, or Full screen to enlarge it.";
+// FUTURE IMPLEMENTATION (#333): say how to place, change and save widgets once the add bar and Save changes exist
 const EDIT_INFO =
-  "Select an icon above and a square to place it on the carepartner's screen. Click Save Changes to apply all of your changes, or Cancel to undo all of them.";
+  "Each square shows where something sits on the carepartner's screen. Nothing changes on the tablet until you save. Click Cancel to undo all of your changes.";
 
 interface ScreenPreviewProps {
   carepartnerId: number;

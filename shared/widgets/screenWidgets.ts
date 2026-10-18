@@ -1,15 +1,17 @@
 /**
  * screenWidgets.ts
  *
- * The kinds of widget on the carepartner's screen, and what to call them. Where a widget sits and how big it is is
- * gridPlacement.ts's job.
+ * The kinds of widget on the carepartner's screen, and what to call them. Where
+ * a widget sits and how big it is is gridPlacement.ts's job. `day_time` is here
+ * for its name, icon and size only: it is drawn in the top left of every screen,
+ * never placed or stored, and the placement rules reject it.
  */
 
 export const SCREEN_WIDGET_TYPES = ["day_time", "photo", "message", "reminder", "weather", "sports", "news"] as const;
 
 export type ScreenWidgetType = (typeof SCREEN_WIDGET_TYPES)[number];
 
-/** Whether a string from the server is a widget type this app knows how to draw and place. */
+/** Whether a string from the server is a widget type this app knows (`day_time` included, though it is never placed). */
 export function isScreenWidgetType(type: string): type is ScreenWidgetType {
   return (SCREEN_WIDGET_TYPES as readonly string[]).includes(type);
 }

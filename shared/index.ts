@@ -1,6 +1,7 @@
 export * from "./display/awakeHours";
 export * from "./display/nightHours";
 export * from "./playback/currentlyPlaying";
+export * from "./preview/previewAddress";
 export * from "./widgets/dateLabels";
 export * from "./widgets/grid";
 export * from "./widgets/gridPlacement";

@@ -80,8 +80,8 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 
 - The tablet polls one "screen" endpoint about every 10–15 minutes. Widget changes don't need to be immediate.
 - The server resolves every widget and returns layout plus display data together. Widgets do not fetch for themselves, so renderers are pure display.
-- The screen is a grid of 4 columns × 3 rows. Everything on it is a widget, including day and time, the photo and "what's next". Each widget type has **one fixed size** (`WIDGET_SIZES` in `@shared`); a different size is a different type. Day and time is fixed: every screen has it in the top left 2×2 (`DAY_TIME_AREA` in `@shared`), drawn by the tablet and the caregiver's editor and never stored, and no other widget may cover it.
-- The caregiver places each widget anywhere on the grid (since #364), and the server stores and sends its position explicitly (column, row, width, height). The server doesn't check the fixed sizes yet, so the tablet skips a widget that isn't its type's size.
+- The screen is a grid of 4 columns × 3 rows. Everything on it is drawn as a widget (a placement), including day and time, the photo and "what's next". Each widget type has **one fixed size** (`WIDGET_SIZES` in `@shared`); a different size is a different type. Day and time is fixed: every screen has it in the top left 2×2 (`DAY_TIME_AREA` in `@shared`), drawn by the tablet and the caregiver's editor and never stored, and no other widget may cover it.
+- The caregiver places each widget anywhere on the grid except the day and time's top left 2×2 (since #364), and the server stores and sends its position explicitly (column, row, width, height). The server doesn't check the fixed sizes yet, so the tablet skips a widget that isn't its type's size.
 - The tablet has one renderer per *look*, not per widget: orientation (day and time), photo, next event, person, a generic tile (icon, word, short label) shared by weather and future 1×1 data widgets, and a wide tile (icon, label, word, detail) for 2×1 ones such as sports. An unknown renderer is skipped.
 - Updates apply in place with no animation. At night the grid is replaced by the night screen. A widget whose data has gone stale for hours hides instead of showing old information.
 - The design rules above apply to every widget: no taps required, no motion, and the text-size floors.
@@ -231,7 +231,8 @@ The caregiver app shows a carepartner's screen (on its home page and full screen
 
 - `PlaybackProvider` takes the carepartner from the address instead of the stored pairing, and never reads or writes storage.
 - `_layout.tsx` leaves out `TabletDevice` (keeping the screen on, which a browser blocks in an iframe, and hiding the system bars), `StaffCommands` (so no socket), `PlayReports`, `SchedulePlayer` (nothing plays), `TouchTelemetryProvider` (the caregiver's clicks aren't the resident's touches) and the developer toolbar. The screen still polls `/screen`, follows the awake hours and shows the night screen.
-- An address without a usable `carepartner_id` shows `PreviewUnavailable` ("No screen to show.") instead of the pair screen.
+- An address without a usable `carepartner_id` shows `PreviewUnavailable` ("No screen to show.") instead of the pair screen. The address's names are `PREVIEW_ADDRESS` in `@shared`, which the caregiver app builds it from.
+- When the screen can't be loaded and none has arrived yet (`useScreen().failed`), `index.tsx` shows `PreviewUnavailable` with "This screen couldn't be loaded." instead of the day and time on their own, which the caregiver would take for the carepartner's screen. The tablet keeps showing the day and time.
 
 ### Types mirror the backend by hand
 

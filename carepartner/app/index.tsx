@@ -13,8 +13,9 @@ import { TouchArea } from "../src/telemetry/TouchTelemetry";
 /** Shows whatever the playback machine says the screen should show. */
 export default function Index() {
   const { state, screen, chimed, started, ended } = usePlayback();
+  const loaded = useScreen();
   // On unless staff have switched it off for this resident (#387).
-  const chime = useScreen().screen?.chime ?? true;
+  const chime = loaded.screen?.chime ?? true;
 
   switch (screen) {
     case "starting":
@@ -50,6 +51,11 @@ export default function Index() {
         </TouchArea>
       );
     case "alwaysOn":
+      // The tablet shows the day and time until a screen arrives; a preview would
+      // pass that off as the carepartner's screen, so it says the load failed
+      if (PREVIEW && !loaded.screen && loaded.failed) {
+        return <PreviewUnavailable message="This screen couldn't be loaded." />;
+      }
       return <AlwaysOnScreen />;
   }
 }
