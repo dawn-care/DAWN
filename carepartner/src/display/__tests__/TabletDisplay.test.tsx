@@ -16,7 +16,7 @@ const setNight = jest.fn();
 
 function withAwakeHours(awakeHours: Screen["awakeHours"] | null) {
   const screen = awakeHours ? ({ awakeHours, chime: true, widgets: [], schedule: [] } as Screen) : null;
-  jest.mocked(useScreen).mockReturnValue({ screen, refresh: jest.fn(), fetchedAt: null });
+  jest.mocked(useScreen).mockReturnValue({ screen, refresh: jest.fn(), fetchedAt: null, failed: false });
 }
 
 /** Whether the machine was last told it is night. */

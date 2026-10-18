@@ -14,7 +14,7 @@ jest.mock("../../widgets/Grid", () => {
   };
 });
 
-const showing = (value: Screen | null) => jest.mocked(useScreen).mockReturnValue({ screen: value, refresh: jest.fn(), fetchedAt: null });
+const showing = (value: Screen | null) => jest.mocked(useScreen).mockReturnValue({ screen: value, refresh: jest.fn(), fetchedAt: null, failed: false });
 
 const screenWith = (widgets: Screen["widgets"]): Screen => ({ awakeHours: { wake: "07:00", bed: "21:00" }, chime: true, widgets, schedule: [] });
 
@@ -29,7 +29,7 @@ describe("AlwaysOnScreen", () => {
     jest.restoreAllMocks();
   });
 
-  it("draws the screen's widgets on the grid", async () => {
+  it("draws the day and time and the screen's widgets on the grid", async () => {
     showing({
       awakeHours: { wake: "07:00", bed: "21:00" }, chime: true,
       widgets: [
@@ -42,18 +42,25 @@ describe("AlwaysOnScreen", () => {
     });
     await render(<AlwaysOnScreen />);
 
-    expect(screen.getByText("grid:3")).toBeTruthy();
+    expect(screen.getByText("grid:day_time,3")).toBeTruthy();
   });
 
   it.each([
-    ["before the first screen arrives", null],
     ["with no widgets", screenWith([])],
     [
       "when it can't draw any of the widgets",
-      screenWith([{ id: 3, type: "weather", col: 0, row: 0, width: 2, height: 2, config: {}, photo: null, data: { temp: 48 }, error: null }]),
+      screenWith([{ id: 3, type: "weather", col: 2, row: 0, width: 2, height: 2, config: {}, photo: null, data: { temp: 48 }, error: null }]),
     ],
-  ])("shows the day, time of day and date %s", async (_name, value) => {
+  ])("still draws the day and time on the grid %s", async (_name, value) => {
     showing(value);
+    await render(<AlwaysOnScreen />);
+
+    expect(screen.getByText("grid:day_time")).toBeTruthy();
+    expect(screen.queryByTestId("default-screen")).toBeNull();
+  });
+
+  it("shows the day, time of day and date before the first screen arrives", async () => {
+    showing(null);
     await render(<AlwaysOnScreen />);
 
     expect(screen.getByTestId("default-screen")).toBeTruthy();

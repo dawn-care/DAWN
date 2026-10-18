@@ -52,6 +52,7 @@ describe("DevToolbar", () => {
       },
       refresh,
       fetchedAt: new Date("2026-10-17T09:58:00"),
+      failed: false,
     });
     jest.mocked(loadPlayed).mockResolvedValue(new Set());
     jest.mocked(fetchMedia).mockResolvedValue([{ id: 3, kind: "photo", name: "sunset" }]);

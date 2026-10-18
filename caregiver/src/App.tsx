@@ -32,7 +32,7 @@ function App() {
 
       {/* Pages without the nav bar; ToastLayout gives them a toast viewport */}
       <Route element={<ToastLayout />}>
-        {/* Full screen, no nav bar. Future implementation: the button that opens it is added in a later ticket */}
+        {/* Full screen, no nav bar; opened by the home page's Full screen button */}
         <Route
           path="/preview"
           element={
