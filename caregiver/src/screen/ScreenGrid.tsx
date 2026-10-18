@@ -10,14 +10,15 @@
  * outlines are see-through, so they show which squares a tile covers without
  * hiding or being mistaken for its text. While a widget type is being placed
  * (`pendingType`), the squares it fits at (`openCells`) are lit and clickable.
- *
- * FUTURE IMPLEMENTATION (#333): the pencil and bin on each tile are added on
- * top of the same grid.
+ * Each widget has a pencil (to change its settings, except news, which has none
+ * and reminders, which the editor doesn't change) and a bin (to remove it) at
+ * its top right; the day and time has neither. Clicking a widget, or its pencil,
+ * selects it, and the selected widget gets a ring.
  */
 
 import { DAY_TIME_AREA, GRID, openCells, widgetArea, widgetName } from "@shared";
 import type { Cell, GridArea } from "@shared";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { FOCUS_RING } from "../components/ui/styles";
 import type { EditorWidget } from "./layout";
@@ -49,14 +50,35 @@ const DAY_TIME_TILE: EditorWidget = {
   photoUrl: null,
 };
 
+// The types with settings the caregiver can change; news has none, and reminders are not edited here
+const EDITABLE_TYPES: readonly EditorWidget["type"][] = ["photo", "message", "weather", "sports"];
+
+const TOOL_BUTTON = `w-10 h-10 flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer ${FOCUS_RING}`;
+
 interface ScreenGridProps {
   widgets: readonly EditorWidget[];
+  /** The widget being edited, drawn with a ring */
+  selectedId?: EditorWidget["id"] | null;
   /** The type being placed: the squares it fits at are lit and can be clicked */
   pendingType?: AddableWidgetType | null;
   onPlace?: (cell: Cell) => void;
+  /** A click on a widget, or its pencil */
+  onSelect?: (id: EditorWidget["id"]) => void;
+  /** The pencil on a widget */
+  onEdit?: (id: EditorWidget["id"]) => void;
+  /** The bin on a widget */
+  onRemove?: (id: EditorWidget["id"]) => void;
 }
 
-export default function ScreenGrid({ widgets, pendingType = null, onPlace }: ScreenGridProps) {
+export default function ScreenGrid({
+  widgets,
+  selectedId = null,
+  pendingType = null,
+  onPlace,
+  onSelect,
+  onEdit,
+  onRemove,
+}: ScreenGridProps) {
   const lit = pendingType ? openCells(widgets, pendingType) : [];
   return (
     <div
@@ -70,7 +92,13 @@ export default function ScreenGrid({ widgets, pendingType = null, onPlace }: Scr
     >
       <PlaceholderTile widget={DAY_TIME_TILE} inFirstSquare />
       {widgets.map((widget) => (
-        <PlaceholderTile key={widget.id} widget={widget} />
+        <PlaceholderTile
+          key={widget.id}
+          widget={widget}
+          tools
+          selected={widget.id === selectedId}
+          onSelect={() => onSelect?.(widget.id)}
+        />
       ))}
       {/* Over the tiles, and never in the way of a click */}
       {CELLS.map((cell) => (
@@ -86,10 +114,34 @@ export default function ScreenGrid({ widgets, pendingType = null, onPlace }: Scr
         <div
           key={`edge-${widget.id}`}
           aria-hidden="true"
-          className="z-30 pointer-events-none rounded-xl ring-2 ring-inset ring-dawn-control"
+          className={`z-30 pointer-events-none rounded-xl ring-2 ring-inset ring-dawn-control ${
+            widget.id === selectedId ? "outline outline-[3px] outline-offset-[3px] outline-dawn-accent" : ""
+          }`}
           style={gridPosition(widgetArea(widget))}
         />
       ))}
+      {/* Above the outlines and edges, so the buttons are never drawn over; clicks pass through everywhere else */}
+      {widgets.map((widget) => {
+        const name = widgetName({ type: widget.type }).toLowerCase();
+        return (
+          <div
+            key={`tools-${widget.id}`}
+            className="relative z-[35] pointer-events-none"
+            style={gridPosition(widgetArea(widget))}
+          >
+            <span className="absolute top-2 right-2 flex gap-1.5 pointer-events-auto">
+              {EDITABLE_TYPES.includes(widget.type) && (
+                <button type="button" onClick={() => onEdit?.(widget.id)} aria-label={`Edit ${name}`} className={TOOL_BUTTON}>
+                  <Pencil size={18} strokeWidth={2} aria-hidden="true" />
+                </button>
+              )}
+              <button type="button" onClick={() => onRemove?.(widget.id)} aria-label={`Remove ${name}`} className={TOOL_BUTTON}>
+                <Trash2 size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </span>
+          </div>
+        );
+      })}
       {/* Above everything, so a lit square is always clickable */}
       {pendingType &&
         lit.map((cell) => (
@@ -113,9 +165,20 @@ interface PlaceholderTileProps {
   widget: EditorWidget;
   /** Centers the words in the tile's top left square rather than across the whole tile */
   inFirstSquare?: boolean;
+  /** Leaves room for the pencil and bin at the tile's top right */
+  tools?: boolean;
+  /** Makes the whole tile a button that selects its widget */
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
-function PlaceholderTile({ widget, inFirstSquare = false }: PlaceholderTileProps) {
+function PlaceholderTile({
+  widget,
+  inFirstSquare = false,
+  tools = false,
+  selected = false,
+  onSelect,
+}: PlaceholderTileProps) {
   const { name, detail } = placeholderText(widget);
   const area = widgetArea(widget);
   // A tile one square wide stacks its icon over its words; wider tiles put them side by side
@@ -124,10 +187,10 @@ function PlaceholderTile({ widget, inFirstSquare = false }: PlaceholderTileProps
   const words = (
     <>
       <WidgetIcon type={widget.type} className="shrink-0 text-dawn-ink" />
-      <div className="flex flex-col min-w-0">
+      <span className="flex flex-col min-w-0">
         <span className="text-lg font-bold leading-tight">{name}</span>
         {detail && <span className="text-[15px] leading-snug text-dawn-muted truncate">{detail}</span>}
-      </div>
+      </span>
     </>
   );
 
@@ -147,14 +210,18 @@ function PlaceholderTile({ widget, inFirstSquare = false }: PlaceholderTileProps
     );
   }
 
+  // Clicking anywhere on the tile selects it, so every widget can be selected, with or without a pencil
   return (
-    <div
-      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm ${
-        narrow ? "flex-col justify-end" : "items-center"
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left text-dawn-ink cursor-pointer ${FOCUS_RING} ${
+        narrow ? "flex-col justify-end" : `items-center ${tools ? "pr-24" : ""}`
       }`}
       style={gridPosition(area)}
     >
       {words}
-    </div>
+    </button>
   );
 }

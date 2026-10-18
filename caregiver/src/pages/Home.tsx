@@ -9,8 +9,8 @@
  * for the placeholder grid of a draft copy of the saved layout (useScreenEditor),
  * with the add bar (greyed out until then) above it, and Cancel throws the draft away.
  *
- * FUTURE IMPLEMENTATION (#333): the pencil and bin on each widget, their
- * popups, and Save changes are added in later steps.
+ * FUTURE IMPLEMENTATION (#333): the popups the pencil opens, and Save changes,
+ * are added in later steps.
  */
 
 import { Check, Pencil } from "lucide-react";
@@ -18,6 +18,7 @@ import InfoPopover from "../components/ui/InfoPopover";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
 import AddBar from "../screen/AddBar";
+import type { EditorWidget } from "../screen/layout";
 import ScreenGrid from "../screen/ScreenGrid";
 import ScreenPreview from "../screen/ScreenPreview";
 import { useSavedLayout } from "../screen/useSavedLayout";
@@ -36,6 +37,12 @@ export default function Home() {
   // The saved layout is what editing starts from; the screen itself doesn't need it
   const { state, reload } = useSavedLayout(carepartnerId);
   const editor = useScreenEditor(state.status === "ready" ? state.layout : null);
+
+  // Selecting a widget stops any placing in progress
+  const selectWidget = (id: EditorWidget["id"]) => {
+    editor.pick(null);
+    editor.select(id);
+  };
 
   return (
     <div className="flex flex-col gap-3 px-7 pt-5 pb-7 h-screen">
@@ -95,7 +102,15 @@ export default function Home() {
         carepartnerId={carepartnerId}
         editView={
           editor.draft ? (
-            <ScreenGrid widgets={editor.draft} pendingType={editor.pendingType} onPlace={editor.add} />
+            <ScreenGrid
+              widgets={editor.draft}
+              selectedId={editor.selectedId}
+              pendingType={editor.pendingType}
+              onPlace={editor.add}
+              onSelect={selectWidget}
+              onEdit={selectWidget}
+              onRemove={editor.remove}
+            />
           ) : undefined
         }
       />
