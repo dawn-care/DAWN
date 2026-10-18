@@ -10,6 +10,7 @@ import { PlaybackProvider } from "../src/playback/PlaybackProvider";
 import StaffCommands from "../src/playback/StaffCommands";
 import SchedulePlayer from "../src/schedule/SchedulePlayer";
 import { ScreenProvider } from "../src/screen/ScreenProvider";
+import { TouchTelemetryProvider } from "../src/telemetry/TouchTelemetry";
 import { useAppFonts } from "../src/theme/fonts";
 
 SplashScreen.preventAutoHideAsync();
@@ -33,12 +34,14 @@ export default function RootLayout() {
   return (
     <PlaybackProvider>
       <ScreenProvider>
-        <TabletDisplay />
-        <StaffCommands />
-        <PlayReports />
-        <SchedulePlayer />
-        <Stack screenOptions={{ headerShown: false, animation: "none" }} />
-        {__DEV__ && <DevToolbar />}
+        <TouchTelemetryProvider>
+          <TabletDisplay />
+          <StaffCommands />
+          <PlayReports />
+          <SchedulePlayer />
+          <Stack screenOptions={{ headerShown: false, animation: "none" }} />
+          {__DEV__ && <DevToolbar />}
+        </TouchTelemetryProvider>
       </ScreenProvider>
     </PlaybackProvider>
   );
