@@ -48,6 +48,9 @@ export function useScreenEditor(saved: LoadedLayout | null) {
   const [fullType, setFullType] = useState<AddableWidgetType | null>(null);
   const [newIds, setNewIds] = useState<readonly EditorWidget["id"][]>([]);
   const nextId = useRef(0);
+  // The latest draft, for actions that run later (a toast's Undo) and must not use an old copy
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
 
   const reset = (widgets: EditorWidget[] | null) => {
     setDraft(widgets);
@@ -143,6 +146,18 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     setFullType(null);
   }, []);
 
+  /**
+   * Puts a removed widget back where it was, with its settings. Returns false,
+   * and changes nothing, when editing has ended or something else now covers
+   * its place.
+   */
+  const restore = useCallback((widget: EditorWidget): boolean => {
+    const current = latestDraft.current;
+    if (!current || !canPlace(current, widget.type, widget)) return false;
+    setDraft([...current, widget]);
+    return true;
+  }, []);
+
   /** Selects a widget (the one being edited), or null to select none */
   const select = useCallback((id: EditorWidget["id"] | null) => setSelectedId(id), []);
 
@@ -166,6 +181,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     add,
     update,
     remove,
+    restore,
     select,
     keep,
   };

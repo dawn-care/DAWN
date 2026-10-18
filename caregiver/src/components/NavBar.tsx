@@ -35,17 +35,17 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean; icon: ReactNode }[]
     to: "/",
     label: "Carepartner Screen",
     end: true, // otherwise "/" would match every route
-    icon: <Monitor size={22} aria-hidden="true" />,
+    icon: <Monitor size={22} aria-hidden="true" className="shrink-0" />,
   },
   {
     to: "/calendar",
     label: "Calendar",
-    icon: <Calendar size={22} aria-hidden="true" />,
+    icon: <Calendar size={22} aria-hidden="true" className="shrink-0" />,
   },
   {
     to: "/media",
     label: "Photos, Videos & Audio",
-    icon: <Image size={22} aria-hidden="true" />,
+    icon: <Image size={22} aria-hidden="true" className="shrink-0" />,
   },
 ];
 
@@ -139,12 +139,12 @@ export default function NavBar() {
       aria-label="Main"
       className="w-1/5 min-w-[220px] max-w-[320px] shrink-0 flex flex-col gap-2.5 px-4 py-7 bg-dawn-sidebar border-r border-dawn-line"
     >
-      <div>
+      <div className="shrink-0">
         <div className="text-2xl font-extrabold">D.A.W.N.</div>
         <div className="text-base text-dawn-muted">Caregiver</div>
       </div>
 
-      <div className="flex items-center gap-3 mt-3.5 mb-2.5">
+      <div className="flex items-center gap-3 mt-3.5 mb-2.5 shrink-0">
         <div
           aria-hidden="true"
           className="w-12 h-12 shrink-0 rounded-full bg-dawn-avatar text-dawn-avatar-ink flex items-center justify-center text-lg font-bold"
@@ -167,7 +167,7 @@ export default function NavBar() {
           to={item.to}
           end={item.end}
           className={({ isActive }) =>
-            `flex items-center gap-2.5 h-12 px-2.5 rounded-[10px] whitespace-nowrap text-base border-[1.5px] ${
+            `flex items-center gap-2.5 min-h-12 shrink-0 px-2.5 py-1.5 rounded-[10px] text-base leading-tight border-[1.5px] ${
               isActive
                 ? "bg-white border-dawn-line-strong font-bold"
                 : "border-transparent hover:bg-white/60"
@@ -184,9 +184,9 @@ export default function NavBar() {
       {/* Account settings, labeled with the signed-in caregiver's name */}
       <Link
         to="/settings"
-        className="flex items-center gap-2.5 h-12 px-2.5 rounded-[10px] text-base hover:bg-white/60"
+        className="flex items-center gap-2.5 h-12 shrink-0 px-2.5 rounded-[10px] text-base hover:bg-white/60"
       >
-        <User size={22} aria-hidden="true" />
+        <User size={22} aria-hidden="true" className="shrink-0" />
         {loading ? (
           <span className="h-5 w-24 rounded bg-dawn-line animate-pulse" />
         ) : (

@@ -53,7 +53,12 @@ const DAY_TIME_TILE: EditorWidget = {
 // The types with settings the caregiver can change; news has none, and reminders are not edited here
 const EDITABLE_TYPES: readonly EditorWidget["type"][] = ["photo", "message", "weather", "sports"];
 
-const TOOL_BUTTON = `w-10 h-10 flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer ${FOCUS_RING}`;
+// The pencil and bin shrink with the screen: 40px when it is large, never under 26px. The grid is a size
+// container, so cqw is a share of its width; this is set on each child, since a container's own cqw
+// refers to the container above it.
+const TOOL_SIZE = "[--tool:clamp(26px,4.4cqw,40px)]";
+
+const TOOL_BUTTON = `w-[var(--tool)] h-[var(--tool)] flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer ${FOCUS_RING}`;
 
 interface ScreenGridProps {
   widgets: readonly EditorWidget[];
@@ -84,7 +89,7 @@ export default function ScreenGrid({
     <div
       role="group"
       aria-label={`The carepartner's screen, ${GRID.columns} squares across and ${GRID.rows} down`}
-      className="grid h-full gap-2"
+      className="grid h-full gap-2 [container-type:inline-size]"
       style={{
         gridTemplateColumns: `repeat(${GRID.columns}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${GRID.rows}, minmax(0, 1fr))`,
@@ -126,17 +131,17 @@ export default function ScreenGrid({
         return (
           <div
             key={`tools-${widget.id}`}
-            className="relative z-[35] pointer-events-none"
+            className={`relative z-[35] pointer-events-none ${TOOL_SIZE}`}
             style={gridPosition(widgetArea(widget))}
           >
-            <span className="absolute top-2 right-2 flex gap-1.5 pointer-events-auto">
+            <span className="absolute top-[calc(var(--tool)*0.2)] right-[calc(var(--tool)*0.2)] flex gap-[calc(var(--tool)*0.15)] pointer-events-auto">
               {EDITABLE_TYPES.includes(widget.type) && (
                 <button type="button" onClick={() => onEdit?.(widget.id)} aria-label={`Edit ${name}`} className={TOOL_BUTTON}>
-                  <Pencil size={18} strokeWidth={2} aria-hidden="true" />
+                  <Pencil size={18} strokeWidth={2} aria-hidden="true" className="w-[45%] h-[45%]" />
                 </button>
               )}
               <button type="button" onClick={() => onRemove?.(widget.id)} aria-label={`Remove ${name}`} className={TOOL_BUTTON}>
-                <Trash2 size={18} strokeWidth={2} aria-hidden="true" />
+                <Trash2 size={18} strokeWidth={2} aria-hidden="true" className="w-[45%] h-[45%]" />
               </button>
             </span>
           </div>
@@ -205,7 +210,8 @@ function PlaceholderTile({
           gridTemplateRows: `repeat(${area.height}, minmax(0, 1fr))`,
         }}
       >
-        <div className="flex items-center justify-center gap-2 p-3 min-w-0">{words}</div>
+        {/* Left aligned and centered top to bottom in the first square, and runs on to the right into the rest of the tile if it needs the room */}
+        <div className="flex items-center justify-start gap-2 p-3 min-w-full w-max whitespace-nowrap">{words}</div>
       </div>
     );
   }
@@ -216,8 +222,8 @@ function PlaceholderTile({
       type="button"
       aria-pressed={selected}
       onClick={onSelect}
-      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left text-dawn-ink cursor-pointer ${FOCUS_RING} ${
-        narrow ? "flex-col justify-end" : `items-center ${tools ? "pr-24" : ""}`
+      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left ${TOOL_SIZE} text-dawn-ink cursor-pointer ${FOCUS_RING} ${
+        narrow ? "flex-col justify-end" : `items-center ${tools ? "pr-[calc(var(--tool)*2+var(--tool)*0.15+var(--tool)*0.4)]" : ""}`
       }`}
       style={gridPosition(area)}
     >
