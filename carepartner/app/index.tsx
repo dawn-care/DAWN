@@ -1,14 +1,18 @@
 import React from "react";
 import { Redirect } from "expo-router";
 import NightScreen from "../src/display/NightScreen";
+import ChimeScreen from "../src/playback/ChimeScreen";
 import MediaPlayer from "../src/playback/MediaPlayer";
 import { usePlayback } from "../src/playback/PlaybackProvider";
 import AlwaysOnScreen from "../src/screen/AlwaysOnScreen";
+import { useScreen } from "../src/screen/ScreenProvider";
 import { TouchArea } from "../src/telemetry/TouchTelemetry";
 
 /** Shows whatever the playback machine says the screen should show. */
 export default function Index() {
-  const { state, screen, started, ended } = usePlayback();
+  const { state, screen, chimed, started, ended } = usePlayback();
+  // On unless staff have switched it off for this resident (#387).
+  const chime = useScreen().screen?.chime ?? true;
 
   switch (screen) {
     case "starting":
@@ -16,19 +20,23 @@ export default function Index() {
     case "unpaired":
       return <Redirect href="/pair" />;
     case "playing": {
-      const { playId, item } = state.playing!;
+      const { playId, item, phase } = state.playing!;
       return (
         <TouchArea screen="playing" target={{ type: "media", mediaKind: item.kind }} style={{ flex: 1 }}>
-          <MediaPlayer
-            key={playId}
-            item={item}
-            onStarted={() => started(playId)}
-            onFinished={() => ended(playId, "finished")}
-            onFailed={(reason) => {
-              console.warn("Playback failed:", reason);
-              ended(playId, "failed");
-            }}
-          />
+          {phase === "chime" ? (
+            <ChimeScreen key={playId} kind={item.kind} sound={chime} night={state.night} onDone={() => chimed(playId)} />
+          ) : (
+            <MediaPlayer
+              key={playId}
+              item={item}
+              onStarted={() => started(playId)}
+              onFinished={() => ended(playId, "finished")}
+              onFailed={(reason) => {
+                console.warn("Playback failed:", reason);
+                ended(playId, "failed");
+              }}
+            />
+          )}
         </TouchArea>
       );
     }

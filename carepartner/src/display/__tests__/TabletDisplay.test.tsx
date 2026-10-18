@@ -15,7 +15,7 @@ jest.mock("../../screen/ScreenProvider", () => ({ useScreen: jest.fn() }));
 const setNight = jest.fn();
 
 function withAwakeHours(awakeHours: Screen["awakeHours"] | null) {
-  const screen = awakeHours ? ({ awakeHours, widgets: [], schedule: [] } as Screen) : null;
+  const screen = awakeHours ? ({ awakeHours, chime: true, widgets: [], schedule: [] } as Screen) : null;
   jest.mocked(useScreen).mockReturnValue({ screen, refresh: jest.fn(), fetchedAt: null });
 }
 

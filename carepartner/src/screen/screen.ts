@@ -35,6 +35,8 @@ export type ScheduledPlay = {
 
 export type Screen = {
   awakeHours: { wake: string; bed: string };
+  /** Whether to chime before each play. Staff can switch it off per resident (#387); on unless the server says otherwise. */
+  chime: boolean;
   /** In reading order. Cells no widget covers are empty. */
   widgets: ScreenWidget[];
   /** Today and tomorrow, so playback carries on past midnight. */
@@ -112,6 +114,7 @@ export function readScreen(raw: unknown): Screen | null {
 
   return {
     awakeHours: { wake: awake_hours.wake, bed: awake_hours.bed },
+    chime: raw.chime !== false,
     widgets,
     schedule,
   };
