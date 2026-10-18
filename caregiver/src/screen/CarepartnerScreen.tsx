@@ -34,7 +34,7 @@ function Frame({ src }: { src: string }) {
     <div className="relative w-full h-full">
       <iframe
         src={src}
-        title="Her screen, as it looks on her tablet"
+        title="The carepartner's screen, as it looks on the tablet"
         onLoad={() => setLoaded(true)}
         className="block w-full h-full border-0"
       />

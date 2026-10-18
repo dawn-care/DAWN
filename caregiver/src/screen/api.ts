@@ -141,11 +141,11 @@ const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NETWORK_ERROR: "Couldn't reach the server. Check your connection and try again.",
   INVALID_REQUEST: GENERIC_ERROR,
   INTERNAL_ERROR: GENERIC_ERROR,
-  NOT_FOUND: "Something on her screen was changed somewhere else. Refresh to see the latest.",
+  NOT_FOUND: "Something on the carepartner's screen was changed somewhere else. Refresh to see the latest.",
   INVALID_TYPE: "One of the widgets can't be saved yet.",
   INVALID_CONFIG: "Check the settings of the highlighted widget.",
-  INVALID_PHOTO: "Choose a photo from her library.",
-  INVALID_POSITION: "A widget doesn't fit on her screen.",
+  INVALID_PHOTO: "Choose a photo from your library.",
+  INVALID_POSITION: "A widget doesn't fit on the carepartner's screen.",
   WIDGETS_OVERLAP: "Two widgets overlap. Move one of them.",
 };
 

@@ -3,10 +3,12 @@
  *
  * User: Caregiver
  *
- * The carepartner's 4 x 3 screen grid in the editor: dashed outlines for every
- * square, and a placeholder tile over the squares each widget covers. Read-only
- * for now; the editing controls (lit squares, pencil and bin) are added on top
- * of the same grid.
+ * The carepartner's 4 x 3 screen grid in the editor: a placeholder tile over
+ * the squares each widget covers, and dashed black outlines of every square
+ * drawn over the tiles. The outlines are see-through, so they show which squares
+ * a tile covers without hiding or being mistaken for its text. Read-only for
+ * now; the editing controls (lit squares, pencil and bin) are added on top of
+ * the same grid.
  */
 
 import { GRID, widgetArea } from "@shared";
@@ -37,23 +39,24 @@ export default function ScreenGrid({ widgets }: ScreenGridProps) {
   return (
     <div
       role="group"
-      aria-label={`Her screen, ${GRID.columns} squares across and ${GRID.rows} down`}
+      aria-label={`The carepartner's screen, ${GRID.columns} squares across and ${GRID.rows} down`}
       className="grid h-full gap-2"
       style={{
         gridTemplateColumns: `repeat(${GRID.columns}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${GRID.rows}, minmax(0, 1fr))`,
       }}
     >
+      {widgets.map((widget) => (
+        <PlaceholderTile key={widget.id} widget={widget} />
+      ))}
+      {/* Over the tiles, and never in the way of a click */}
       {CELLS.map((cell) => (
         <div
           key={`${cell.col}-${cell.row}`}
           aria-hidden="true"
-          className="border-[1.5px] border-dashed border-dawn-dash rounded-xl"
+          className="z-20 pointer-events-none border-2 border-dashed border-black/30 rounded-xl"
           style={gridPosition({ ...cell, width: 1, height: 1 })}
         />
-      ))}
-      {widgets.map((widget) => (
-        <PlaceholderTile key={widget.id} widget={widget} />
       ))}
     </div>
   );
@@ -67,7 +70,7 @@ function PlaceholderTile({ widget }: { widget: EditorWidget }) {
 
   return (
     <div
-      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl border-2 border-dawn-tile-line bg-white ${
+      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-white ${
         narrow ? "flex-col justify-end" : "items-center"
       }`}
       style={gridPosition(area)}

@@ -21,7 +21,7 @@ export type SavedLayoutState =
 // The save wording ("Two widgets overlap"...) doesn't fit a failed load, so only a lost connection keeps its own
 function loadErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.code === "NETWORK_ERROR") return friendlyError(err);
-  return "Her screen couldn't be loaded. Please try again.";
+  return "The carepartner's screen couldn't be loaded. Please try again.";
 }
 
 export function useSavedLayout(carepartnerId: number) {
