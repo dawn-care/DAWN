@@ -1,7 +1,6 @@
 package screen_widgets
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,45 +16,19 @@ import (
 )
 
 type mockWidgetService struct {
-	widget  *model.ScreenWidget
-	list    []model.ScreenWidget
-	err     error
-	created *svc.CreateInput
-	updated *svc.UpdateInput
-	moved   *svc.MoveInput
-	gotID   int
-	deleted int
+	layout *model.Layout
+	err    error
+	gotID  int
+	saved  *model.LayoutInput
 }
 
-func (m *mockWidgetService) CreateWidget(in svc.CreateInput) (*model.ScreenWidget, error) {
-	m.created = &in
-	return m.widget, m.err
-}
-func (m *mockWidgetService) ListWidgets(carepartnerID int) ([]model.ScreenWidget, error) {
+func (m *mockWidgetService) GetLayout(carepartnerID int) (*model.Layout, error) {
 	m.gotID = carepartnerID
-	return m.list, m.err
+	return m.layout, m.err
 }
-func (m *mockWidgetService) GetWidget(id int) (*model.ScreenWidget, error) {
-	m.gotID = id
-	return m.widget, m.err
-}
-func (m *mockWidgetService) UpdateWidget(id int, in svc.UpdateInput) (*model.ScreenWidget, error) {
-	m.gotID, m.updated = id, &in
-	return m.widget, m.err
-}
-func (m *mockWidgetService) MoveWidget(id int, in svc.MoveInput) (*model.ScreenWidget, error) {
-	m.gotID, m.moved = id, &in
-	return m.widget, m.err
-}
-func (m *mockWidgetService) DeleteWidget(id int) error {
-	m.deleted = id
-	return m.err
-}
-
-func withID(r *http.Request, id string) *http.Request {
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", id)
-	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+func (m *mockWidgetService) SaveLayout(carepartnerID int, in model.LayoutInput) (*model.Layout, error) {
+	m.gotID, m.saved = carepartnerID, &in
+	return m.layout, m.err
 }
 
 func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
@@ -65,41 +37,99 @@ func errorCode(t *testing.T, w *httptest.ResponseRecorder) string {
 	return e.Code
 }
 
-func TestCreateWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 9, Type: "weather", Spot: 2, Config: json.RawMessage(`{"zip":"14617"}`)}}
-	body := `{"carepartner_id":1,"type":"weather","spot":2,"config":{"zip":"14617"}}`
+var weatherLayout = &model.Layout{Widgets: []model.ScreenWidget{{
+	ID: 2, CarepartnerID: 1, Type: "weather",
+	TopLeft: model.Cell{Col: 2, Row: 0}, BottomRight: model.Cell{Col: 3, Row: 0},
+	Config: json.RawMessage(`{"zip":"14617"}`),
+}}}
+
+func TestGetLayoutHandler(t *testing.T) {
+	m := &mockWidgetService{layout: weatherLayout}
 	w := httptest.NewRecorder()
+	NewScreenWidgetController(m).GetLayoutHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-layout?carepartner_id=1", nil))
 
-	NewScreenWidgetController(m).CreateWidgetHandler(w, httptest.NewRequest(http.MethodPost, "/api/screen-widgets", strings.NewReader(body)))
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, 1, m.gotID)
+	assert.JSONEq(t, `{"widgets":[{"id":2,"carepartner_id":1,"type":"weather",
+		"top_left":{"col":2,"row":0},"bottom_right":{"col":3,"row":0},
+		"config":{"zip":"14617"},"photo_media_id":null,"photo_url":null}]}`, w.Body.String())
 
-	assert.Equal(t, http.StatusCreated, w.Code)
-	require.NotNil(t, m.created)
-	assert.Equal(t, 1, m.created.CarepartnerID)
-	assert.Equal(t, 2, *m.created.Spot)
-	assert.JSONEq(t, `{"zip":"14617"}`, string(m.created.Config))
-	assert.JSONEq(t, `{"id":9,"carepartner_id":0,"type":"weather","spot":2,"config":{"zip":"14617"},"photo_media_id":null,"photo_url":null,"hidden":false}`, w.Body.String())
+	w = httptest.NewRecorder()
+	NewScreenWidgetController(m).GetLayoutHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-layout", nil))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, CodeInvalidRequest, errorCode(t, w))
+
+	w = httptest.NewRecorder()
+	NewScreenWidgetController(&mockWidgetService{err: svc.ErrCarepartnerMissing}).GetLayoutHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-layout?carepartner_id=9", nil))
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
-func TestCreateWidgetHandler_Errors(t *testing.T) {
+func TestSaveLayoutHandler(t *testing.T) {
+	m := &mockWidgetService{layout: weatherLayout}
+	body := `{"widgets":[
+		{"id":2,"type":"weather","top_left":{"col":2,"row":0},"bottom_right":{"col":3,"row":0},"config":{"zip":"14617"}},
+		{"type":"photo","top_left":{"col":0,"row":0},"bottom_right":{"col":1,"row":1},"photo_media_id":4}
+	]}`
+	w := httptest.NewRecorder()
+	NewScreenWidgetController(m).SaveLayoutHandler(w, httptest.NewRequest(http.MethodPut, "/api/screen-layout?carepartner_id=1", strings.NewReader(body)))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, 1, m.gotID)
+	require.NotNil(t, m.saved.Widgets)
+	widgets := *m.saved.Widgets
+	require.Len(t, widgets, 2)
+	assert.Equal(t, 2, *widgets[0].ID)
+	assert.Nil(t, widgets[1].ID, "a new widget has no id")
+	assert.Equal(t, model.Cell{Col: 3, Row: 0}, *widgets[0].BottomRight)
+	assert.Equal(t, 4, *widgets[1].PhotoMediaID)
+	assert.Contains(t, w.Body.String(), `"widgets":[{"id":2`)
+}
+
+func TestSaveLayoutHandler_WidgetsKey(t *testing.T) {
+	cases := []struct {
+		body    string
+		present bool
+	}{
+		{`{"widgets":[]}`, true},
+		{`{}`, false},
+		{`{"widgets":null}`, false},
+		{`{"widget":[]}`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.body, func(t *testing.T) {
+			m := &mockWidgetService{layout: &model.Layout{Widgets: []model.ScreenWidget{}}}
+			w := httptest.NewRecorder()
+			NewScreenWidgetController(m).SaveLayoutHandler(w, httptest.NewRequest(http.MethodPut, "/api/screen-layout?carepartner_id=1", strings.NewReader(tc.body)))
+			require.NotNil(t, m.saved)
+			assert.Equal(t, tc.present, m.saved.Widgets != nil, "only an explicit list reaches the service as a list")
+		})
+	}
+}
+
+func TestSaveLayoutHandler_Errors(t *testing.T) {
 	cases := []struct {
 		err    error
 		status int
 		code   string
 	}{
+		{svc.ErrInvalidRequest, http.StatusBadRequest, CodeInvalidRequest},
+		{svc.ErrInvalidCarepartner, http.StatusBadRequest, CodeInvalidRequest},
 		{svc.ErrInvalidType, http.StatusBadRequest, CodeInvalidType},
+		{svc.ErrInvalidPosition, http.StatusBadRequest, CodeInvalidPosition},
 		{svc.ErrInvalidConfig, http.StatusBadRequest, CodeInvalidConfig},
 		{svc.ErrInvalidPhoto, http.StatusBadRequest, CodeInvalidPhoto},
-		{svc.ErrUnknownSpot, http.StatusBadRequest, CodeUnknownSpot},
-		{svc.ErrSpotTaken, http.StatusConflict, CodeSpotTaken},
+		{svc.ErrOverlap, http.StatusBadRequest, CodeOverlap},
+		{svc.ErrNotFound, http.StatusNotFound, CodeNotFound},
 		{svc.ErrCarepartnerMissing, http.StatusNotFound, CodeNotFound},
-		{svc.ErrInvalidCarepartner, http.StatusBadRequest, CodeInvalidRequest},
 		{errors.New("db down"), http.StatusInternalServerError, CodeInternal},
 	}
 	for _, tc := range cases {
 		t.Run(tc.code, func(t *testing.T) {
+			// Service errors arrive wrapped with the widget's index
+			err := errors.Join(errors.New("widgets[1]"), tc.err)
 			w := httptest.NewRecorder()
-			NewScreenWidgetController(&mockWidgetService{err: tc.err}).CreateWidgetHandler(w,
-				httptest.NewRequest(http.MethodPost, "/api/screen-widgets", strings.NewReader(`{}`)))
+			NewScreenWidgetController(&mockWidgetService{err: err}).SaveLayoutHandler(w,
+				httptest.NewRequest(http.MethodPut, "/api/screen-layout?carepartner_id=1", strings.NewReader(`{"widgets":[]}`)))
 			assert.Equal(t, tc.status, w.Code)
 			assert.Equal(t, tc.code, errorCode(t, w))
 		})
@@ -107,77 +137,12 @@ func TestCreateWidgetHandler_Errors(t *testing.T) {
 
 	m := &mockWidgetService{}
 	w := httptest.NewRecorder()
-	NewScreenWidgetController(m).CreateWidgetHandler(w, httptest.NewRequest(http.MethodPost, "/api/screen-widgets", strings.NewReader(`nope`)))
+	NewScreenWidgetController(m).SaveLayoutHandler(w, httptest.NewRequest(http.MethodPut, "/api/screen-layout?carepartner_id=1", strings.NewReader(`nope`)))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Nil(t, m.created)
-}
-
-func TestListWidgetsHandler(t *testing.T) {
-	m := &mockWidgetService{list: []model.ScreenWidget{{ID: 1, Hidden: true}}}
-	w := httptest.NewRecorder()
-	NewScreenWidgetController(m).ListWidgetsHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-widgets?carepartner_id=3", nil))
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, 3, m.gotID)
-	assert.Contains(t, w.Body.String(), `"hidden":true`)
+	assert.Nil(t, m.saved, "a body that isn't JSON never reaches the service")
 
 	w = httptest.NewRecorder()
-	NewScreenWidgetController(m).ListWidgetsHandler(w, httptest.NewRequest(http.MethodGet, "/api/screen-widgets", nil))
+	NewScreenWidgetController(m).SaveLayoutHandler(w, httptest.NewRequest(http.MethodPut, "/api/screen-layout", strings.NewReader(`{"widgets":[]}`)))
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-}
-
-func TestGetWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 4}}
-	w := httptest.NewRecorder()
-	NewScreenWidgetController(m).GetWidgetHandler(w, withID(httptest.NewRequest(http.MethodGet, "/api/screen-widgets/4", nil), "4"))
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, 4, m.gotID)
-
-	w = httptest.NewRecorder()
-	NewScreenWidgetController(&mockWidgetService{err: svc.ErrNotFound}).GetWidgetHandler(w, withID(httptest.NewRequest(http.MethodGet, "/api/screen-widgets/4", nil), "4"))
-	assert.Equal(t, http.StatusNotFound, w.Code)
-
-	w = httptest.NewRecorder()
-	NewScreenWidgetController(m).GetWidgetHandler(w, withID(httptest.NewRequest(http.MethodGet, "/api/screen-widgets/x", nil), "x"))
-	assert.Equal(t, http.StatusNotFound, w.Code)
-}
-
-func TestUpdateWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 4}}
-	w := httptest.NewRecorder()
-	NewScreenWidgetController(m).UpdateWidgetHandler(w, withID(httptest.NewRequest(http.MethodPut, "/api/screen-widgets/4",
-		strings.NewReader(`{"config":{"text":"Ana","label":"Nurse"},"photo_media_id":7}`)), "4"))
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, 4, m.gotID)
-	assert.JSONEq(t, `{"text":"Ana","label":"Nurse"}`, string(m.updated.Config))
-	assert.Equal(t, 7, *m.updated.PhotoMediaID)
-}
-
-func TestMoveWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{widget: &model.ScreenWidget{ID: 4, Spot: 1}}
-	w := httptest.NewRecorder()
-	NewScreenWidgetController(m).MoveWidgetHandler(w, withID(httptest.NewRequest(http.MethodPost, "/api/screen-widgets/4/move",
-		strings.NewReader(`{"spot":1}`)), "4"))
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, 1, *m.moved.Spot)
-
-	w = httptest.NewRecorder()
-	NewScreenWidgetController(&mockWidgetService{err: svc.ErrSpotTaken}).MoveWidgetHandler(w, withID(httptest.NewRequest(http.MethodPost, "/api/screen-widgets/4/move",
-		strings.NewReader(`{"spot":1}`)), "4"))
-	assert.Equal(t, http.StatusConflict, w.Code)
-	assert.Equal(t, CodeSpotTaken, errorCode(t, w))
-}
-
-func TestDeleteWidgetHandler(t *testing.T) {
-	m := &mockWidgetService{}
-	w := httptest.NewRecorder()
-	NewScreenWidgetController(m).DeleteWidgetHandler(w, withID(httptest.NewRequest(http.MethodDelete, "/api/screen-widgets/4", nil), "4"))
-	assert.Equal(t, http.StatusNoContent, w.Code)
-	assert.Equal(t, 4, m.deleted)
-
-	w = httptest.NewRecorder()
-	NewScreenWidgetController(&mockWidgetService{err: svc.ErrNotFound}).DeleteWidgetHandler(w, withID(httptest.NewRequest(http.MethodDelete, "/api/screen-widgets/4", nil), "4"))
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Nil(t, m.saved)
 }

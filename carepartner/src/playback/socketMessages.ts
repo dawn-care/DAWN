@@ -12,7 +12,7 @@
 export type PlaybackStatus = "acknowledged" | "started" | "finished" | "stopped" | "failed" | "expired";
 
 export type ServerMessage =
-  /** Play a media item now. The server decides whether it is still in time (see `useStaffCommands`). */
+  /** Play a media item now. The server decides whether it is still in time (see `StaffCommands`). */
   | { type: "play"; playbackId: number; mediaId: number; expiresAt: Date }
   /** Stop the play with this record. */
   | { type: "stop"; playbackId: number }

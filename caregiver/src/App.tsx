@@ -1,116 +1,43 @@
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
-import MediaFormCreate from "./pages/MediaFormCreate";
-import MediaFormUpdate from "./pages/MediaFormUpdate";
-import MediaFormDelete from "./pages/MediaFormDelete"
-import Header from "./components/Header";
-import AgendaView from "./pages/AgendaView";
-import Library from "./pages/Library";
-import PromptForm from "./pages/PromptForm"
-import CalendarView from "./pages/CalendarView";
-import WidgetForm from "./pages/WidgetForm";
-import Login from "./pages/Login"
+import Calendar from "./pages/Calendar";
+import Media from "./pages/Media";
+import Family from "./pages/Family";
+import Preview from "./pages/Preview";
+import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import AccountSetupPage from "./pages/AccountSetup";
+import SelectCarepartner from "./pages/SelectCarepartner";
 import RequireCarePartner from "./components/RequireCarepartner";
-import UserGuide from "./pages/UserGuide";
+import AppShell from "./components/AppShell";
+import ToastLayout from "./components/ToastLayout";
 
 function App() {
   return (
-    <>
-      <Header/>
-
-      <Routes>
+    <Routes>
+      {/* Pages with the left nav bar */}
+      <Route
+        element={
+          <RequireCarePartner>
+            <AppShell />
+          </RequireCarePartner>
+        }
+      >
         <Route path="/" element={<Home />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/media" element={<Media />} />
+        {/* Future implementation: reachable by URL only, not linked in the nav bar */}
+        <Route path="/family" element={<Family />} />
+      </Route>
 
-        <Route path="/guide" element={<UserGuide />} />
-
+      {/* Pages without the nav bar; ToastLayout gives them a toast viewport */}
+      <Route element={<ToastLayout />}>
+        {/* Full screen, no nav bar. Future implementation: the button that opens it is added in a later ticket */}
         <Route
-          path="/library"
+          path="/preview"
           element={
             <RequireCarePartner>
-              <Library />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/agenda"
-          element={
-            <RequireCarePartner>
-              <CalendarView />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/agenda/:date"
-          element={
-            <RequireCarePartner>
-              <AgendaView />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/media"
-          element={
-            <RequireCarePartner>
-              <MediaFormCreate onUploadSuccess={() => {}} />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/media/update"
-          element={
-            <RequireCarePartner>
-              <MediaFormUpdate />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/media/delete"
-          element={
-            <RequireCarePartner>
-              <MediaFormDelete />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/prompt"
-          element={
-            <RequireCarePartner>
-              <PromptForm />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/prompt/:moduleId"
-          element={
-            <RequireCarePartner>
-              <PromptForm />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/widget"
-          element={
-            <RequireCarePartner>
-              <WidgetForm />
-            </RequireCarePartner>
-          }
-        />
-
-        <Route
-          path="/widget/:moduleId"
-          element={
-            <RequireCarePartner>
-              <WidgetForm />
+              <Preview />
             </RequireCarePartner>
           }
         />
@@ -118,8 +45,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/setup" element={<AccountSetupPage />} />
-      </Routes>
-    </>
+        <Route path="/select-carepartner" element={<SelectCarepartner />} />
+      </Route>
+    </Routes>
   );
 }
 

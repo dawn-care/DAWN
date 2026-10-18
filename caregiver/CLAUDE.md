@@ -28,9 +28,9 @@ Single `<Routes>` tree. Two independent gates apply to most routes:
 - `AuthContext` (`src/context/AuthContext.tsx`) tracks `isAuthenticated`/`user` (Google OAuth session) and `activeCarePartnerId` — the carepartner currently being managed, persisted to `localStorage` so it survives reloads. A caregiver can manage multiple carepartners; nothing in the UI scopes data by carepartner except this one context value.
 - `RequireCarePartner` (`src/components/RequireCarepartner.tsx`) wraps almost every content route (`/library`, `/agenda`, `/agenda/:date`, `/media*`, `/prompt*`, `/widget*`) and redirects to `/setup` if `activeCarePartnerId` is falsy. It does **not** check `isAuthenticated` — a route can be "carepartner-gated" without being auth-gated, so don't assume one implies the other. `/`, `/guide`, `/login`, `/settings`, `/setup` are intentionally ungated.
 
-### No API client layer — calls are per-component
+### API calls: per-component, except the media page
 
-There is no shared `api.ts`/service module. Each page/component that talks to the backend independently reads `const API_URL = import.meta.env.VITE_API_URL` at the top of the file and calls `fetch`/`axios` directly inline (see `src/pages/Login.tsx`, `src/pages/AccountSetup.tsx`, `src/components/ConfigurationForm.tsx`). When adding a new API call, follow this existing per-file convention rather than introducing a new shared client — that would be inconsistent with everything else in the codebase.
+There is no app-wide `api.ts`/service module. Each older page/component that talks to the backend independently reads `const API_URL = import.meta.env.VITE_API_URL` at the top of the file and calls `fetch`/`axios` directly inline (see `src/pages/Login.tsx`, `src/pages/AccountSetup.tsx`, `src/components/ConfigurationForm.tsx`). The newer feature folders (so far `src/media/`) keep one `api.ts` for their feature, with typed responses, an `ApiError` carrying the server's `code`, and `friendlyError` for caregiver wording; follow that for a new feature built on the endpoints in `docs/api/screen-and-media.md`. Don't add one app-wide client, and don't move the older inline calls into these files.
 
 ### Module/Configuration types mirror the backend
 
@@ -45,9 +45,21 @@ Key pages by role:
 
 These page components are intentionally large and self-contained (state, API calls, and form UI together) — that's the established pattern here, not something to refactor apart unless asked.
 
+### Shared rules (`../shared`)
+
+Rules the tablet must agree with (awake hours, what is playing, where widgets can be placed on the grid, widget names, the weather word) live in the repo-root `shared/` folder, not here. Import them with `import { ... } from "@shared"`; the alias is in `vite.config.ts` and `tsconfig.app.json`, and the Docker build copies `shared/` beside this folder. Their tests run from `carepartner/` (`npm test`), since this package has no test runner. See `shared/README.md`.
+
 ### Styling
 
-Tailwind CSS (`tailwind.config.js` scans `index.html` and `src/**/*.{js,ts,jsx,tsx}`), no component library on top of it.
+Tailwind CSS (`tailwind.config.js` scans `index.html` and `src/**/*.{js,ts,jsx,tsx}`). The palette (`dawn-*` colors, including `dawn-accent`, `dawn-success`, `dawn-control`), the Atkinson Hyperlegible font (`font-dawn`, also set on `body`) and the popover/dialog/toast shadows are tokens in that config. Prefer them over raw hex values. If a new token doesn't show up in `npm run dev`, restart the dev server.
+
+Shared UI pieces live in `src/components/ui/` (app-specific components such as `NavBar` stay directly in `src/components/`). They are Tailwind-styled React components, with [Radix UI](https://www.radix-ui.com/) (`@radix-ui/react-popover`, `-radio-group`, `-dialog`) supplying focus, keyboard and ARIA behavior and `lucide-react` supplying icons. Gluestack is not used here: it only installs into Expo/React Native projects, not this Vite app.
+
+- `Badge`, `Dialog`, `IconButton`, `InfoPopover`, `PhotoPicker`, `SaveIndicator`, `Toast`
+- `form/`: `RadioGroup`/`RadioOption`, `SegmentedControl`, `SelectField` (native `<select>`), `TextField`, `ToggleButton`
+- `styles.ts` holds the shared focus ring (`FOCUS_RING`) and field classes; use `FOCUS_RING` on any new interactive control.
+
+Toasts: `ToastProvider` is mounted once in `main.tsx`, so any page can call `useToast()`. Each layout draws the toasts with a `ToastViewport` (top center of the page content): `AppShell` for pages with the nav bar, `ToastLayout` for the rest (login, settings, setup, preview). A new layout route needs one of the two. `show(text, { actionLabel, onAction, onDismiss })` returns an id; `dismiss(id)` closes that toast wherever it is in the stack (no id closes the top one). `onDismiss` runs when a toast closes without its action being used (timeout, its X, or `dismiss`), which lets a caller hold something back until the chance to Undo has passed; the media page uses it to delete a removed file only then. Toasts stack: a new one waits behind the one on top and its 12-second timer starts only when it reaches the top. The timer pauses while the pointer is over the toast or focus is inside it. Closing a toast with its X or action button returns focus to what had it when the toast was shown. Show a toast after a `Dialog` closes, not while it is open. Use `aria-pressed` for on/off toggles and a Radix radio group (`RadioGroup`, `SegmentedControl`, `PhotoPicker`) when exactly one option must be chosen.
 
 ### Docker
 

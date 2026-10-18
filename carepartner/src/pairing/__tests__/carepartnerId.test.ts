@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
-import { getCarepartnerId, storeCarepartnerId } from "../carepartnerId";
+import { getCarepartnerId, isPairingComplete, markPairingComplete, storeCarepartnerId } from "../carepartnerId";
 
 jest.mock("expo-secure-store", () => {
   const store = new Map<string, string>();
@@ -27,6 +27,14 @@ describe("carepartnerId", () => {
 
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith("carepartnerID", "42");
       expect(await getCarepartnerId()).toBe(42);
+    });
+
+    it("records pairing separately, and a newly stored id isn't paired", async () => {
+      await markPairingComplete();
+      expect(await isPairingComplete()).toBe(true);
+
+      await storeCarepartnerId(43);
+      expect(await isPairingComplete()).toBe(false);
     });
   });
 
