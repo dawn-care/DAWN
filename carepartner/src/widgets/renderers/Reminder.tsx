@@ -55,8 +55,9 @@ function ReminderRow({ item, next }: { item: ReminderItem; next: boolean }) {
       <Text style={styles.time} numberOfLines={1}>
         {item.timeLabel}
       </Text>
+      {/* Hidden until measured, so it doesn't show at full size and then shrink. */}
       <Text
-        style={[styles.text, { fontSize: size, lineHeight: size * LINE_HEIGHT }]}
+        style={[styles.text, { fontSize: size, lineHeight: size * LINE_HEIGHT, opacity: width ? 1 : 0 }]}
         numberOfLines={linesAt(size, TEXT_HEIGHT)}
         onLayout={onLayout}
       >

@@ -4,9 +4,11 @@ import * as SplashScreen from "expo-splash-screen";
 import RootLayout from "../../../app/_layout";
 import { useKeepAwake } from "expo-keep-awake";
 import { useAppFonts } from "../fonts";
+import { useHiddenSystemBars } from "../../display/useHiddenSystemBars";
 
 jest.mock("../fonts", () => ({ useAppFonts: jest.fn() }));
 jest.mock("expo-keep-awake", () => ({ useKeepAwake: jest.fn() }));
+jest.mock("../../display/useHiddenSystemBars", () => ({ useHiddenSystemBars: jest.fn() }));
 jest.mock("../../display/TabletDisplay", () => ({ __esModule: true, default: () => null }));
 jest.mock("expo-splash-screen", () => ({
   preventAutoHideAsync: jest.fn(),
@@ -49,12 +51,13 @@ describe("RootLayout", () => {
     expect(SplashScreen.hideAsync).toHaveBeenCalled();
   });
 
-  it("keeps the screen on from the start, before the fonts load", async () => {
+  it("keeps the screen on and hides the system bars from the start, before the fonts load", async () => {
     jest.mocked(useAppFonts).mockReturnValue([false, null]);
 
     await render(<RootLayout />);
 
     expect(useKeepAwake).toHaveBeenCalled();
+    expect(useHiddenSystemBars).toHaveBeenCalled();
   });
 
   it("carries on with the system font if the fonts fail to load", async () => {

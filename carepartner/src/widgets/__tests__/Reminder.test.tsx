@@ -25,11 +25,12 @@ describe("Reminder widget", () => {
     expect(within(screen.getByTestId("reminder-next")).getByText("Lunch")).toBeTruthy();
   });
 
-  it("shows a short reminder at full size on one line", async () => {
+  it("shows a short reminder at full size on one line, once measured", async () => {
     await render(<ReminderView items={items} now={at("09:00")} />);
+    expect(screen.getByText("Lunch")).toHaveStyle({ opacity: 0 });
     await act(async () => fireEvent(screen.getByText("Lunch"), "layout", { nativeEvent: { layout: { width: 300 } } }));
 
-    expect(screen.getByText("Lunch")).toHaveStyle({ fontSize: fontSizes.name });
+    expect(screen.getByText("Lunch")).toHaveStyle({ fontSize: fontSizes.name, opacity: 1 });
     expect(screen.getByText("Lunch").props.numberOfLines).toBe(1);
   });
 

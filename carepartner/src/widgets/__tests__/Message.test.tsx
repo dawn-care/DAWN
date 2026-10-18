@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import Message from "../renderers/Message";
 
 describe("Message widget", () => {
@@ -9,6 +9,16 @@ describe("Message widget", () => {
     expect(screen.getByText("I'll visit at 3")).toBeTruthy();
     expect(screen.getByText("Nurse")).toBeTruthy();
     expect(screen.getByTestId("message-photo")).toBeTruthy();
+  });
+
+  it("keeps the text hidden until it has been measured, so it never shrinks in view", async () => {
+    await render(<Message data={{ text: "Love you" }} />);
+    expect(screen.getByText("Love you")).toHaveStyle({ opacity: 0 });
+
+    const layout = { nativeEvent: { layout: { width: 343, height: 167 } } };
+    await act(async () => fireEvent(screen.getByTestId("message-body"), "layout", layout));
+
+    expect(screen.getByText("Love you")).toHaveStyle({ opacity: 1 });
   });
 
   it("shows just the message when it has no role or photo", async () => {

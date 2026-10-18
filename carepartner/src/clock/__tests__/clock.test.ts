@@ -72,4 +72,16 @@ describe("everyMinute", () => {
     jest.advanceTimersByTime(60_000);
     expect(ticks).toHaveLength(3);
   });
+
+  it("keeps ticking after a tick throws", () => {
+    setClock(new Date("2026-10-12T08:59:30"));
+    const tick = jest.fn(() => {
+      throw new Error("boom");
+    });
+    everyMinute(tick);
+
+    expect(() => jest.advanceTimersByTime(30_000)).toThrow("boom");
+    expect(() => jest.advanceTimersByTime(60_000)).toThrow("boom");
+    expect(tick).toHaveBeenCalledTimes(2);
+  });
 });

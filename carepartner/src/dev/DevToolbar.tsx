@@ -166,7 +166,7 @@ function SmallButton({ label, onPress }: { label: string; onPress: () => void })
 // Plain developer styling, deliberately unlike the resident's screens.
 const styles = StyleSheet.create({
   // Below the Android status bar, which the app draws under.
-  overlay: { position: "absolute", top: (StatusBar.currentHeight ?? 0) + 8, right: 12, alignItems: "flex-end", maxWidth: "70%", maxHeight: "95%" },
+  overlay: { position: "absolute", top: (StatusBar.currentHeight ?? 0), right: 16, alignItems: "flex-end", maxWidth: "70%", maxHeight: "95%" },
   buttons: { flexDirection: "row", gap: 8 },
   button: {
     width: 44,

@@ -8,8 +8,11 @@
  */
 
 export const TEXT_LIMITS = {
-  /** A message's text, with a photo and a label beside it. */
-  message: 80,
+  /**
+   * A message's text, with a photo and a label beside it. About 80 fit by
+   * average glyph width; this leaves room for lines that break early.
+   */
+  message: 64,
   /** One reminder's text, beside its icon and time. */
   reminder: 32,
 } as const;
