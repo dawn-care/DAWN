@@ -118,6 +118,7 @@ carepartner/
 
 - Group by feature. There is no shared `src/components` folder; add one only when a second feature needs the same visual.
 - Inside a feature, keep logic files (plain functions and hooks, no layout) separate from visual files (take data in and draw it; no fetching, clock reads or timers).
+- A component that draws nothing and only runs behaviour (`SchedulePlayer`, `StaffCommands`, `PlayReports`, `TabletDisplay`) holds its own logic and returns `null`. Split a hook out of it only when another component uses the hook, or it is a separate concern worth testing on its own (like `useTabletDisplay`, the screen brightness).
 - Check the shape of server responses once where they enter the app, and drop malformed items there.
 - Read the time through `src/clock` so tests can control it.
 - Rules that the caregiver app must agree on, such as night hours, time of day and the grid's size, belong in `../shared`, not in a feature folder here. They take the time as an argument.
@@ -125,9 +126,9 @@ carepartner/
 
 ### Shared code
 
-The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea`, `fitsGrid`, `areasOverlap` and the corner conversions (`widgets/grid.ts`), `WIDGET_SIZES`, `widgetSize` and `hasWidgetSize` (`widgets/widgetSizes.ts`), and `TEXT_LIMITS` (`widgets/textLimits.ts`), the longest message and reminder text the tablet shows whole. `nightHoursFromAwake` turns the screen's awake hours into night hours. See `shared/README.md`.
+The repo-root `shared/` folder holds plain TypeScript rules used by this app and the caregiver app: `NightHours`, `DEFAULT_NIGHT_HOURS` and `isNight` (`display/nightHours.ts`), `timeOfDay`, `TimeOfDay`, `dayName` and `dateLabel` (`widgets/timeOfDay.ts`), and `GRID` (column and row counts only), `GridArea`, `fitsGrid`, `areasOverlap` and the corner conversions (`widgets/grid.ts`), `WIDGET_SIZES`, `widgetSize` and `hasWidgetSize` (`widgets/widgetSizes.ts`), and `TEXT_LIMITS` (`widgets/textLimits.ts`), the longest message and reminder text the tablet shows whole. `nightHoursFromAwake` turns the screen's awake hours into night hours. It also has rules this app does not use yet: awake hours (`display/awakeHours.ts`), what is playing at a given time (`playback/currentlyPlaying.ts`), grid placement (`widgets/gridPlacement.ts`: the cells a widget can go in, using `WIDGET_SIZES`), widget names (`widgets/screenWidgets.ts`) and the weather word (`widgets/weather.ts`). See `shared/README.md`.
 
-- Import from `@shared` only (`import { isNight } from "@shared"`). The path is set in `tsconfig.json`, Metro watches the folder through `metro.config.js`, and Jest maps it through `roots` and `moduleNameMapper` in `package.json`. Names are unchanged from when this code lived in `src/`.
+- Import from `@shared` only (`import { isNight } from "@shared"`). The path is set in `tsconfig.json`, Metro watches the folder through `metro.config.js`, and Jest maps it through `roots` and `moduleNameMapper` in `package.json`. Metro's `nodeModulesPaths` and Jest's `modulePaths` point at this folder's `node_modules` so files in `shared/` can find Babel's helpers. Names are unchanged from when this code lived in `src/`.
 - Nothing in `shared/` may import React, React Native, Expo or a DOM API. Anything that needs the theme, fonts or screen size stays here: `src/widgets/layout.ts` keeps `cellRect` and builds the tablet's `GRID` from the shared one by adding padding and gap. There are two objects called `GRID`: the shared one holds only `columns` and `rows`, and the tablet's adds `gap` and `padding`. `fitsGrid` takes any `{ columns, rows }`, so either works.
 - Tests for shared code live in `shared/<feature>/__tests__/` and run with `npm test` in this folder. `npm run typecheck:shared` at the repo root checks the framework-free rule; it uses this folder's TypeScript, so run `npm install` here first.
 
@@ -135,7 +136,7 @@ The repo-root `shared/` folder holds plain TypeScript rules used by this app and
 
 - Use a shared theme (palette, Atkinson Hyperlegible font, sizes, corner radii) so the tablet matches the other apps.
 - The grid and tile are our own components: positions are data-driven and the look is fixed by the visual design.
-- Gluestack (the free, MIT-licensed library) is the intended component library for the staff and family apps. Its current version installs only into Expo and React Native projects; confirm it renders on Expo web before adopting it here.
+- Gluestack (the free, MIT-licensed library) is the intended component library for the staff and family apps. Its current version installs only into Expo and React Native projects; confirm it renders on Expo web before adopting it here. It does not install into the Vite caregiver web app (its setup is built around Metro and React Native Web), so `caregiver/` uses Radix UI instead.
 
 ### Testing
 
@@ -173,16 +174,16 @@ One state machine decides what the screen shows. Its state is three facts: `pair
 - `PlaybackProvider` (in `_layout.tsx`) reads pairing at startup (`readPairedId`, see "Pairing and identity"), and tries again every `PAIRING_RETRY_MS` while storage can't be read; `TabletDisplay` tells it when night starts and ends. The machine keeps the paired carepartner ID, so the screen and the socket take it from `usePlayback().state.carepartnerId` instead of reading storage again. After pairing succeeds, `pair.tsx` calls `checkPairing()` and returns to `/`.
 - `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `MediaPlayer` keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (dark and warm, with the day and "You're safe. Sleep well."), and `alwaysOn` renders `src/screen/AlwaysOnScreen.tsx`.
 
-### Staff commands (`src/playback/useStaffCommands.ts`, `socket.ts`, `socketMessages.ts`, `staffItem.ts`)
+### Staff commands (`src/playback/StaffCommands.tsx`, `socket.ts`, `socketMessages.ts`, `staffItem.ts`)
 
-Staff play and stop clips from their phones; the server pushes each command to the tablet over a WebSocket (`/realtime/tablet?carepartner_id=`, see the server's `internal/realtime/messages.go`). `StaffCommands`, rendered in `_layout.tsx` inside both providers, runs `useStaffCommands` and draws nothing.
+Staff play and stop clips from their phones; the server pushes each command to the tablet over a WebSocket (`/realtime/tablet?carepartner_id=`, see the server's `internal/realtime/messages.go`). `StaffCommands`, rendered in `_layout.tsx` inside both providers, handles them and draws nothing.
 
 - `socket.ts` connects once paired, reconnects after a drop (1 s, doubling to at most 30 s, back to 1 s once connected), and holds messages sent while disconnected until it reconnects. The server pings every 25 s to keep the connection open; the WebSocket answers by itself. `socketMessages.ts` checks every server message and drops malformed ones.
 - `play`: the tablet reports `acknowledged` and looks the media up (`staffItem.ts`, `GET /media/{id}`, given up after 5 s) at the same time. It plays the item with source `staff`, which pre-empts anything, only once the server's answer to the acknowledgement is `acknowledged`. The server judges expiry, since the tablet's clock (or `EXPO_PUBLIC_FAKE_TIME`) can be wrong; any other answer means the command must not start. A newer command cancels an older one still waiting and reports it `stopped`, so a slow lookup can't let an older command take over. The server pushes the latest live command on every reconnect, which is how the tablet "asks for" it; a `playback_id` already handled isn't started twice, but is acknowledged again if the server's answer never came. It reports `failed` if the media can't be looked up or played.
 - `stop` stops the play with that record, or cancels one still waiting to start. `refresh` fetches the screen again.
 - Reports follow the machine: `started` once a staff play is actually playing (a clip that never loads skips it), then `finished`, `failed` or `stopped` (also when another staff play replaces it) from `lastEnded`.
 
-### Play reports (`src/playback/usePlayReports.ts`, `src/reports/queue.ts`)
+### Play reports (`src/playback/PlayReports.tsx`, `src/reports/queue.ts`)
 
 `PlayReports` (in `_layout.tsx`, draws nothing) reports each scheduled play as a `Playback` record, following the machine like staff reports: on screen, `POST /playbacks` (source `scheduled`, the media and scheduled item ids, and `expires_at` an hour ahead in real time), then `acknowledged`; `started` once actually playing; then `finished`, `failed` or `stopped`. Only ids and statuses are sent.
 - Reports go through a report queue (`createReportQueue`): sent one at a time in order, retried after a network or server error (2 s, doubling to 60 s), and dropped with the rest of their play's reports if the server refuses one (4xx). At most 200 are kept, in memory, so an outage survives but an app restart doesn't.
