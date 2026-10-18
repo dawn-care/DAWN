@@ -13,6 +13,7 @@ Rules used by both the caregiver app and the carepartner tablet, so the caregive
 | `widgets/screenWidgets.ts` | Widget types and what to call them (`widgetName`). `day_time` is locked (`LOCKED_WIDGET_TYPES`, `isLockedWidgetType`): the caregiver can move it but not remove it or add another. `splitKnownWidgets` sets aside widgets of a type this app doesn't know, so they are not placed or checked and can be sent back unchanged when saving. |
 | `widgets/weather.ts` | The weather tile's word ("Chilly", "Sunny"...). Takes the weather widget's data as it is. The words and temperature lines are provisional. |
 | `widgets/timeOfDay.ts` | Morning, afternoon or evening, the day name and the date label. |
+| `widgets/dateLabels.ts` | Wording for the server's dates and times: `parseDate` ("YYYY-MM-DD" as a local date), `timeLabel` ("18:30" as "6:30 pm") and `ordinal` ("3rd"). |
 | `widgets/grid.ts` | The screen's 4 x 3 grid: its size, `GridArea`, `fitsGrid`, `areasOverlap`, and `cornersToArea` / `areaToCorners` for the screen layout API's inclusive corners. |
 | `widgets/widgetSizes.ts` | Each widget type's one fixed size (`WIDGET_SIZES`, `widgetSize`, `hasWidgetSize`). The tablet skips a widget that isn't its type's size. |
 | `widgets/textLimits.ts` | The longest message and reminder text the tablet shows whole (`TEXT_LIMITS`), for the caregiver's editor to enforce. |

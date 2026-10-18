@@ -1,122 +1,77 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { router } from "expo-router";
-import PairScreen from "../../../app/pair";
-import { usePlayback } from "../../playback/PlaybackProvider";
-import { getCarepartnerId, markPairingComplete, storeCarepartnerId } from "../carepartnerId";
+import PairRoute from "../../../app/pair";
+import { setClock } from "../../clock/clock";
+import PairScreen, { timeLeft } from "../PairScreen";
+import { usePairing, type PairingView } from "../usePairing";
 
-jest.mock("expo-router", () => ({
-  Stack: { Screen: () => null },
-  router: { push: jest.fn(), replace: jest.fn() },
-}));
+jest.mock("expo-router", () => ({ router: { replace: jest.fn() } }));
+jest.mock("../usePairing", () => ({ usePairing: jest.fn() }));
 
-jest.mock("../../playback/PlaybackProvider", () => ({ usePlayback: jest.fn() }));
-
-jest.mock("../carepartnerId", () => ({
-  getCarepartnerId: jest.fn(),
-  storeCarepartnerId: jest.fn(),
-  markPairingComplete: jest.fn(),
-}));
-
-/** Answers the pair screen's requests by URL suffix. */
-function mockBackend(routes: Record<string, { status?: number; body: unknown }>) {
-  const fetchMock = jest.fn(async (url: string) => {
-    const match = Object.keys(routes).find((suffix) => url.endsWith(suffix));
-    if (!match) throw new Error(`Unexpected request: ${url}`);
-    const { status = 200, body } = routes[match];
-    return { ok: status < 400, status, json: async () => body };
-  });
-  globalThis.fetch = fetchMock as unknown as typeof fetch;
-  return fetchMock;
-}
+const at = (time: string) => new Date(`2026-10-17T${time}`);
 
 describe("PairScreen", () => {
-  const realFetch = globalThis.fetch;
-  const checkPairing = jest.fn(async () => {});
-
-  beforeEach(() => {
-    jest.mocked(usePlayback).mockReturnValue({ checkPairing } as unknown as ReturnType<typeof usePlayback>);
-  });
-
+  beforeEach(() => setClock(at("10:00:00")));
   afterEach(() => {
-    globalThis.fetch = realFetch;
+    setClock(null);
     jest.clearAllMocks();
   });
 
-  it("shows a pairing code for the stored carepartner", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(12);
-    const fetchMock = mockBackend({
-      "/users/carepartner/12": { body: { id: 12 } },
-      "/users/device-pairing/code": { body: { pairing_code: "K7M4QP", expires_in_sec: 600 } },
-    });
+  it("shows the code, where to enter it and how long it lasts", async () => {
+    await render(<PairScreen view={{ kind: "showing", code: "K7M4QP", expiresAt: at("10:06:42") }} onNewCode={() => {}} />);
 
-    await render(<PairScreen />);
-
-    expect(await screen.findByText("K7M4QP")).toBeTruthy();
-    expect(screen.getByText("Expires in 10:00")).toBeTruthy();
-    expect(storeCarepartnerId).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("create-carepartner"),
-      expect.anything(),
-    );
+    expect(screen.getByText("Set up this tablet")).toBeTruthy();
+    expect(screen.getByText("Enter this code in the family app")).toBeTruthy();
+    expect(screen.getByTestId("pairing-code")).toHaveTextContent("K7M4QP");
+    expect(screen.getByText("Expires in 6:42")).toBeTruthy();
   });
 
-  it("creates and stores a carepartner when none is stored", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(null);
-    mockBackend({
-      "/users/carepartner/create-carepartner": { body: { carepartner_id: 31 } },
-      "/users/device-pairing/code": { body: { pairing_code: "ABC123", expires_in_sec: 600 } },
-    });
+  it("asks for a new code when tapped", async () => {
+    const onNewCode = jest.fn();
+    await render(<PairScreen view={{ kind: "showing", code: "K7M4QP", expiresAt: at("10:10:00") }} onNewCode={onNewCode} />);
 
-    await render(<PairScreen />);
+    fireEvent.press(screen.getByRole("button", { name: "New code" }));
 
-    expect(await screen.findByText("ABC123")).toBeTruthy();
-    expect(storeCarepartnerId).toHaveBeenCalledWith(31);
+    expect(onNewCode).toHaveBeenCalled();
   });
 
-  it("shows the server's error when a code can't be generated", async () => {
-    jest.mocked(getCarepartnerId).mockResolvedValue(12);
-    mockBackend({
-      "/users/carepartner/12": { body: { id: 12 } },
-      "/users/device-pairing/code": { status: 500, body: { error: "Code service unavailable" } },
-    });
+  it.each<[PairingView, string]>([
+    [{ kind: "starting" }, "Getting a code…"],
+    [{ kind: "offline" }, "Can't reach the server. Trying again…"],
+  ])("says what it's doing while there's no code (%o)", async (view, text) => {
+    await render(<PairScreen view={view} onNewCode={() => {}} />);
 
-    await render(<PairScreen />);
-
-    expect(await screen.findByText("Code service unavailable")).toBeTruthy();
+    expect(screen.getByText(text)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
-
-  async function verifyWith(status: { status?: number; body: unknown }) {
-    jest.mocked(getCarepartnerId).mockResolvedValue(12);
-    mockBackend({
-      "/users/carepartner/12": { body: { id: 12 } },
-      "/users/device-pairing/code": { body: { pairing_code: "K7M4QP", expires_in_sec: 600 } },
-      "/users/device-pairing/status": status,
-    });
-    await render(<PairScreen />);
-    await screen.findByText("K7M4QP");
-    // The instructions also say "Verify"; the button is the last one.
-    await fireEvent.press(screen.getAllByText("Verify").at(-1)!);
-  }
 
   it.each([
-    ["the caregiver hasn't entered the code", { body: { paired: false } }, "Not paired yet. Enter the code in the caregiver app, then tap Verify."],
-    ["the status can't be checked", { status: 500, body: {} }, "Something went wrong. Please check your connection and try again."],
-  ])("stays on the pair screen when %s", async (_name, status, message) => {
-    await verifyWith(status);
-
-    expect(await screen.findByText(message)).toBeTruthy();
-    expect(markPairingComplete).not.toHaveBeenCalled();
-    expect(checkPairing).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    ["10:06:42", "6:42"],
+    ["10:00:00.400", "0:01"],
+    ["10:00:00", "0:00"],
+    ["09:59:00", "0:00"],
+  ])("at 10:00, a code expiring at %s has %s left", (expires, shown) => {
+    expect(timeLeft(at(expires), at("10:00:00"))).toBe(shown);
   });
+});
 
-  it("records pairing, tells playback and goes home once the caregiver has paired", async () => {
-    await verifyWith({ body: { paired: true } });
+describe("PairRoute", () => {
+  afterEach(() => jest.clearAllMocks());
 
-    expect(markPairingComplete).toHaveBeenCalled();
-    expect(checkPairing).toHaveBeenCalled();
+  it("goes home once paired", async () => {
+    jest.mocked(usePairing).mockReturnValue({ view: { kind: "paired" }, newCode: jest.fn() });
+
+    await render(<PairRoute />);
+
     expect(router.replace).toHaveBeenCalledWith("/");
   });
 
+  it("stays while waiting to be paired", async () => {
+    jest.mocked(usePairing).mockReturnValue({ view: { kind: "starting" }, newCode: jest.fn() });
+
+    await render(<PairRoute />);
+
+    expect(router.replace).not.toHaveBeenCalled();
+  });
 });
