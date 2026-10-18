@@ -5,8 +5,9 @@
  *
  * Names and saves one picked file. The caregiver sees a preview (the photo
  * itself, or an icon for video and audio), a name field (starting as the
- * file name) and Save; there is no scheduling or placement here, that
- * happens from the detail panel afterwards.
+ * file name), how staff find it (see TagPicker: every situation is chosen to
+ * start with, and no family member) and Save; there is no scheduling or
+ * placement here, that happens from the detail panel afterwards.
  *
  * When several files were picked, the panel is shown for each in turn with
  * "File 2 of 5". Skip is always there. Close stops going through the rest,
@@ -20,14 +21,19 @@ import { Image, Music, Video, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
 import TextField from "../components/ui/form/TextField";
 import { friendlyError, isAbort, uploadMedia } from "./api";
-import type { Media } from "./api";
-import { ERROR_MESSAGES } from "./constants";
+import type { FamilyMember, Media } from "./api";
+import { ALL_SITUATIONS, ERROR_MESSAGES } from "./constants";
+import type { Situation } from "./constants";
 import type { PendingFile } from "./files";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
+import TagPicker from "./TagPicker";
 
 interface SavePanelProps {
   carepartnerId: number;
   pending: PendingFile;
+  /** The carepartner's family, or null if it couldn't be loaded */
+  family: FamilyMember[] | null;
+  onFamilyAdded: (member: FamilyMember) => void;
   /** 1-based place of this file among the ones picked */
   position: number;
   total: number;
@@ -53,6 +59,8 @@ function nameFromFile(fileName: string): string {
 export default function SavePanel({
   carepartnerId,
   pending,
+  family,
+  onFamilyAdded,
   position,
   total,
   notices,
@@ -62,6 +70,9 @@ export default function SavePanel({
 }: SavePanelProps) {
   const { file, kind } = pending;
   const [name, setName] = useState(() => nameFromFile(file.name));
+  // Every situation to start with; the caregiver takes out what doesn't fit
+  const [situations, setSituations] = useState<Situation[]>(ALL_SITUATIONS);
+  const [familyMemberIds, setFamilyMemberIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The last attempt reached the server and failed, as opposed to an empty name caught here
@@ -105,7 +116,14 @@ export default function SavePanel({
     upload.current = controller;
     let saved: Media;
     try {
-      saved = await uploadMedia({ carepartnerId, file, kind, displayName: name, signal: controller.signal });
+      saved = await uploadMedia({
+        carepartnerId,
+        file,
+        kind,
+        displayName: name,
+        tags: { situations, familyMemberIds },
+        signal: controller.signal,
+      });
     } catch (err) {
       // Closing the panel cancelled it; there is nothing left to update
       if (isAbort(err)) return;
@@ -176,6 +194,17 @@ export default function SavePanel({
       </div>
 
       <p className="m-0 text-[15px] text-dawn-muted break-words">{file.name}</p>
+
+      <TagPicker
+        carepartnerId={carepartnerId}
+        situations={situations}
+        familyMemberIds={familyMemberIds}
+        family={family}
+        onSituationsChange={setSituations}
+        onFamilyMemberIdsChange={setFamilyMemberIds}
+        onFamilyAdded={onFamilyAdded}
+        disabled={saving}
+      />
 
       {error && (
         <p id="save-error" role="alert" className="m-0 text-base font-bold text-dawn-accent">

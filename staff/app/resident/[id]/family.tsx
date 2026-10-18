@@ -5,14 +5,18 @@
  * caregiver-written guidance note is highlighted — that note is the whole point
  * of the screen in cases like a spouse who has died, where saying the wrong
  * thing causes real harm. Staff can read it; only caregivers can edit it.
+ *
+ * The family comes from the server; the caregiver adds people when they upload
+ * media.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getFamilyFolders } from '../../../data/mock';
+import LoadError from '../../../components/LoadError';
+import { getFamilyFolders } from '../../../data/server';
 import type { FamilyFolder } from '../../../data/types';
 import { logEvent } from '../../../lib/log';
 import { useThemeColors } from '../../../lib/theme';
@@ -26,10 +30,17 @@ export default function FamilyScreen() {
   const colors = useThemeColors();
 
   const [folders, setFolders] = useState<FamilyFolder[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    getFamilyFolders().then(setFolders);
-  }, []);
+  const load = useCallback(() => {
+    setFailed(false);
+    setFolders(null);
+    getFamilyFolders(residentId)
+      .then(setFolders)
+      .catch(() => setFailed(true));
+  }, [residentId]);
+
+  useEffect(load, [load]);
 
   const openFolder = (folder: FamilyFolder) => {
     logEvent({
@@ -48,10 +59,17 @@ export default function FamilyScreen() {
         Who are they asking for?
       </Text>
 
-      {folders === null ? (
+      {failed ? (
+        <LoadError onRetry={load} />
+      ) : folders === null ? (
         <ActivityIndicator className="mt-8" />
       ) : (
         <>
+          {folders.length === 0 && (
+            <Text className="mb-4 text-base text-ink-muted">
+              No family added yet. The caregiver adds family members when they upload media.
+            </Text>
+          )}
           {folders.map((folder) =>
             folder.guidanceNote ? (
               // Guidance note: read-only for staff, written by the caregiver.

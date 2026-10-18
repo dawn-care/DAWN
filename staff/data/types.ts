@@ -1,8 +1,9 @@
 /**
  * Domain types for the staff app.
  *
- * Residents, clips and what last played come from the server (data/server.ts). Family folders,
- * sleeping hours and ratings have no backend yet and come from data/mock.ts.
+ * Residents, clips, family folders and what last played come from the server
+ * (data/server.ts). Sleeping hours and ratings have no backend yet and come from
+ * data/mock.ts.
  */
 
 /** The six situations a staff member can report from the resident screen. */
@@ -35,7 +36,7 @@ export interface SleepingHours {
   end: string;
 }
 
-/** Family members are folders for grouping clips, not accounts. Fake for now. */
+/** Family members are folders for grouping clips, not accounts. Added by the caregiver. */
 export interface FamilyFolder {
   id: number;
   name: string;

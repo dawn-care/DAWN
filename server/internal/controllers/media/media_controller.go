@@ -24,24 +24,27 @@ const MAX_MEDIA_UPLOAD_MB = 1024
 
 // Error codes returned in the "code" field of error responses
 const (
-	CodeInvalidRequest  = "INVALID_REQUEST"
-	CodeInvalidKind     = "INVALID_KIND"
-	CodeInvalidFileType = "INVALID_FILE_TYPE"
-	CodeInvalidName     = "INVALID_NAME"
-	CodeFileTooLarge    = "FILE_TOO_LARGE"
-	CodeMediaTooLong    = "MEDIA_TOO_LONG"
-	CodeUnreadableMedia = "UNREADABLE_MEDIA"
-	CodeNotFound        = "NOT_FOUND"
-	CodeInternal        = "INTERNAL_ERROR"
+	CodeInvalidRequest   = "INVALID_REQUEST"
+	CodeInvalidKind      = "INVALID_KIND"
+	CodeInvalidFileType  = "INVALID_FILE_TYPE"
+	CodeInvalidName      = "INVALID_NAME"
+	CodeFileTooLarge     = "FILE_TOO_LARGE"
+	CodeMediaTooLong     = "MEDIA_TOO_LONG"
+	CodeUnreadableMedia  = "UNREADABLE_MEDIA"
+	CodeNotFound         = "NOT_FOUND"
+	CodeInvalidSituation = "INVALID_SITUATION"
+	CodeInvalidFamily    = "INVALID_FAMILY_MEMBER"
+	CodeInternal         = "INTERNAL_ERROR"
 )
 
 // ---- Interface ----
 type MediaServiceInterface interface {
 	Upload(ctx context.Context, in mediaSvc.UploadInput) (*models.Media, error)
 	GetMedia(id int) (*models.Media, error)
-	ListMedia(carepartnerID int, kind string) ([]models.Media, error)
+	ListMedia(carepartnerID int, filter models.ListFilter) ([]models.Media, error)
 	OpenFile(ctx context.Context, id int) (*models.Media, io.ReadSeekCloser, error)
 	Rename(id int, displayName string) (*models.Media, error)
+	SetTags(id int, tags mediaSvc.Tags) (*models.Media, error)
 	Delete(ctx context.Context, id int) error
 }
 
@@ -85,6 +88,10 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		writeMediaError(w, http.StatusUnprocessableEntity, CodeMediaTooLong, err.Error())
 	case errors.Is(err, mediaSvc.ErrUnreadableMedia):
 		writeMediaError(w, http.StatusUnprocessableEntity, CodeUnreadableMedia, err.Error())
+	case errors.Is(err, mediaSvc.ErrInvalidSituation):
+		writeMediaError(w, http.StatusBadRequest, CodeInvalidSituation, err.Error())
+	case errors.Is(err, mediaSvc.ErrInvalidFamily):
+		writeMediaError(w, http.StatusBadRequest, CodeInvalidFamily, err.Error())
 	default:
 		writeMediaError(w, http.StatusInternalServerError, CodeInternal, err.Error())
 	}
@@ -93,6 +100,19 @@ func writeServiceError(w http.ResponseWriter, err error) {
 func mediaIDParam(r *http.Request) (int, bool) {
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	return id, err == nil && id > 0
+}
+
+// parseIDs reads repeated form or query values as positive IDs
+func parseIDs(values []string) ([]int, bool) {
+	ids := make([]int, 0, len(values))
+	for _, v := range values {
+		id, err := strconv.Atoi(v)
+		if err != nil || id <= 0 {
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	return ids, true
 }
 
 /*
@@ -159,6 +179,8 @@ func isMPEGFrame(head []byte) bool {
 // @Param kind formData string true "photo, video or audio"
 // @Param carepartner_id formData int true "Carepartner ID"
 // @Param display_name formData string false "Name shown to the caregiver; defaults to the file name"
+// @Param situations formData []string false "Situations staff find it under; repeat the field for each. None means every situation" collectionFormat(multi)
+// @Param family_member_ids formData []int false "Family members it is about; repeat the field for each" collectionFormat(multi)
 // @Success 201 {object} media.Media
 // @Failure 400 {object} media.MediaError
 // @Failure 413 {object} media.MediaError
@@ -220,6 +242,12 @@ func (c *MediaController) UploadMediaHandler(w http.ResponseWriter, r *http.Requ
 		displayName = strings.TrimSuffix(handler.Filename, ext)
 	}
 
+	familyMemberIDs, ok := parseIDs(r.MultipartForm.Value["family_member_ids"])
+	if !ok {
+		writeMediaError(w, http.StatusBadRequest, CodeInvalidFamily, mediaSvc.ErrInvalidFamily.Error())
+		return
+	}
+
 	m, err := c.Services.Upload(r.Context(), mediaSvc.UploadInput{
 		CarepartnerID: carepartnerID,
 		Kind:          kind,
@@ -227,6 +255,10 @@ func (c *MediaController) UploadMediaHandler(w http.ResponseWriter, r *http.Requ
 		Extension:     ext,
 		MimeType:      mimeType,
 		File:          file,
+		Tags: mediaSvc.Tags{
+			Situations:      r.MultipartForm.Value["situations"],
+			FamilyMemberIDs: familyMemberIDs,
+		},
 	})
 	if err != nil {
 		writeServiceError(w, err)
@@ -243,18 +275,31 @@ func (c *MediaController) UploadMediaHandler(w http.ResponseWriter, r *http.Requ
 // @Produce json
 // @Param carepartner_id query int true "Carepartner ID"
 // @Param kind query string false "photo, video or audio; omit for all"
+// @Param situation query string false "Only media under this situation"
+// @Param family_member_id query int false "Only media about this family member"
 // @Success 200 {array} media.Media
 // @Failure 400 {object} media.MediaError
 // @Failure 500 {object} media.MediaError
 // @Router /media [get]
 func (c *MediaController) ListMediaHandler(w http.ResponseWriter, r *http.Request) {
-	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	query := r.URL.Query()
+	carepartnerID, err := strconv.Atoi(query.Get("carepartner_id"))
 	if err != nil || carepartnerID <= 0 {
 		writeMediaError(w, http.StatusBadRequest, CodeInvalidRequest, "invalid carepartner_id")
 		return
 	}
 
-	items, err := c.Services.ListMedia(carepartnerID, r.URL.Query().Get("kind"))
+	filter := models.ListFilter{Kind: query.Get("kind"), Situation: query.Get("situation")}
+	if raw := query.Get("family_member_id"); raw != "" {
+		ids, ok := parseIDs([]string{raw})
+		if !ok {
+			writeMediaError(w, http.StatusBadRequest, CodeInvalidFamily, mediaSvc.ErrInvalidFamily.Error())
+			return
+		}
+		filter.FamilyMemberID = ids[0]
+	}
+
+	items, err := c.Services.ListMedia(carepartnerID, filter)
 	if err != nil {
 		writeServiceError(w, err)
 		return
@@ -349,6 +394,49 @@ func (c *MediaController) RenameMediaHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	m, err := c.Services.Rename(id, req.DisplayName)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+
+	writeMediaJSON(w, http.StatusOK, m)
+}
+
+// SetMediaTagsRequest replaces both lists; an empty situations list means every situation
+type SetMediaTagsRequest struct {
+	Situations      []string `json:"situations"`
+	FamilyMemberIDs []int    `json:"family_member_ids"`
+}
+
+// SetMediaTagsHandler godoc
+// @Summary Set how staff find a media item
+// @Description Replaces its situations and family members. No situations means every situation; family members must be the carepartner's.
+// @Tags media
+// @Accept json
+// @Produce json
+// @Param id path int true "Media ID"
+// @Param body body media.SetMediaTagsRequest true "Situations and family members"
+// @Success 200 {object} media.Media
+// @Failure 400 {object} media.MediaError
+// @Failure 404 {object} media.MediaError
+// @Failure 500 {object} media.MediaError
+// @Router /media/{id}/tags [put]
+func (c *MediaController) SetMediaTagsHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := mediaIDParam(r)
+	if !ok {
+		writeMediaError(w, http.StatusNotFound, CodeNotFound, mediaSvc.ErrNotFound.Error())
+		return
+	}
+
+	var req SetMediaTagsRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		writeMediaError(w, http.StatusBadRequest, CodeInvalidRequest, "invalid request body")
+		return
+	}
+
+	m, err := c.Services.SetTags(id, mediaSvc.Tags{Situations: req.Situations, FamilyMemberIDs: req.FamilyMemberIDs})
 	if err != nil {
 		writeServiceError(w, err)
 		return

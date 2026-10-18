@@ -67,6 +67,22 @@ export const FILE_INPUT_ACCEPT = Object.values(ACCEPTED_TYPES)
   .flatMap((types) => [...types.mimeTypes, ...types.extensions])
   .join(",");
 
+// Situations staff pick from when looking for something to play, in the
+// staff app's order and wording. The server checks the values (Situations in
+// server/internal/models/media). "Asking for someone" isn't one: staff pick
+// the family member instead.
+export const SITUATIONS = [
+  { value: "wants_to_go_home", label: "Wants to go home" },
+  { value: "doesnt_know_where", label: "Doesn't know where they are" },
+  { value: "anxious_or_upset", label: "Anxious or upset" },
+  { value: "starting_the_day", label: "Starting the day" },
+  { value: "winding_down", label: "Winding down for night" },
+] as const;
+
+export type Situation = (typeof SITUATIONS)[number]["value"];
+
+export const ALL_SITUATIONS: Situation[] = SITUATIONS.map((s) => s.value);
+
 // Shown when the server gives a code we have no wording for
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
 
@@ -83,4 +99,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   FILE_TOO_LARGE: "That file is too large. Try a shorter clip.",
   MEDIA_TOO_LONG: "Videos and audio can be at most 10 minutes long.",
   UNREADABLE_MEDIA: "That file couldn't be read. Try exporting it again.",
+  INVALID_FAMILY_MEMBER: "That family member is no longer here. Refresh to see the latest.",
+  INVALID_RELATIONSHIP: "Keep the relationship under 60 characters.",
+  INVALID_GUIDANCE_NOTE: "Keep the note under 1000 characters.",
 };

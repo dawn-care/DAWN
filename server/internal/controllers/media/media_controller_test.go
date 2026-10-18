@@ -28,7 +28,9 @@ type mockMediaService struct {
 	list     []models.Media
 	file     []byte
 	uploaded *mediaSvc.UploadInput
+	filter   *models.ListFilter
 	renamed  string
+	tagged   *mediaSvc.Tags
 	deleted  int
 }
 
@@ -39,8 +41,14 @@ func (m *mockMediaService) Upload(ctx context.Context, in mediaSvc.UploadInput) 
 
 func (m *mockMediaService) GetMedia(id int) (*models.Media, error) { return m.media, m.err }
 
-func (m *mockMediaService) ListMedia(carepartnerID int, kind string) ([]models.Media, error) {
+func (m *mockMediaService) ListMedia(carepartnerID int, filter models.ListFilter) ([]models.Media, error) {
+	m.filter = &filter
 	return m.list, m.err
+}
+
+func (m *mockMediaService) SetTags(id int, tags mediaSvc.Tags) (*models.Media, error) {
+	m.tagged = &tags
+	return m.media, m.err
 }
 
 type readSeekNopCloser struct{ *bytes.Reader }
@@ -72,10 +80,20 @@ func withID(r *http.Request, id string) *http.Request {
 }
 
 func uploadRequest(t *testing.T, fields map[string]string, filename string, content []byte) *http.Request {
+	return taggedUploadRequest(t, fields, nil, filename, content)
+}
+
+// taggedUploadRequest also sends repeated fields, such as situations
+func taggedUploadRequest(t *testing.T, fields map[string]string, repeated map[string][]string, filename string, content []byte) *http.Request {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	for k, v := range fields {
 		require.NoError(t, writer.WriteField(k, v))
+	}
+	for k, values := range repeated {
+		for _, v := range values {
+			require.NoError(t, writer.WriteField(k, v))
+		}
 	}
 	if filename != "" {
 		part, err := writer.CreateFormFile("file", filename)
@@ -116,6 +134,32 @@ func TestUploadMediaHandler_Photo(t *testing.T) {
 	assert.Equal(t, "Beach Day", svc.uploaded.DisplayName, "defaults to the file name without extension")
 	data, _ := io.ReadAll(svc.uploaded.File)
 	assert.Equal(t, png, data, "service gets the whole file from the start")
+	assert.Empty(t, svc.uploaded.Tags.Situations, "no situations sent; the service defaults to every one")
+	assert.Empty(t, svc.uploaded.Tags.FamilyMemberIDs)
+}
+
+func TestUploadMediaHandler_Tags(t *testing.T) {
+	png, _ := os.ReadFile("../../utils/testFiles/test_photo.png")
+	svc := &mockMediaService{media: &models.Media{ID: 3}}
+	w := httptest.NewRecorder()
+	NewMediaController(svc).UploadMediaHandler(w, taggedUploadRequest(t,
+		map[string]string{"kind": "photo", "carepartner_id": "1"},
+		map[string][]string{"situations": {"winding_down", "wants_to_go_home"}, "family_member_ids": {"2", "5"}},
+		"a.png", png))
+
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	assert.Equal(t, []string{"winding_down", "wants_to_go_home"}, svc.uploaded.Tags.Situations)
+	assert.Equal(t, []int{2, 5}, svc.uploaded.Tags.FamilyMemberIDs)
+
+	// A family member ID that isn't a number is turned away before the service
+	svc = &mockMediaService{}
+	w = httptest.NewRecorder()
+	NewMediaController(svc).UploadMediaHandler(w, taggedUploadRequest(t,
+		map[string]string{"kind": "photo", "carepartner_id": "1"},
+		map[string][]string{"family_member_ids": {"Elena"}}, "a.png", png))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, CodeInvalidFamily, decodeError(t, w).Code)
+	assert.Nil(t, svc.uploaded)
 }
 
 func TestUploadMediaHandler_WrongTypeForKind(t *testing.T) {
@@ -162,6 +206,8 @@ func TestUploadMediaHandler_ServiceErrors(t *testing.T) {
 		{mediaSvc.ErrTooLong, http.StatusUnprocessableEntity, CodeMediaTooLong},
 		{mediaSvc.ErrUnreadableMedia, http.StatusUnprocessableEntity, CodeUnreadableMedia},
 		{mediaSvc.ErrInvalidName, http.StatusBadRequest, CodeInvalidName},
+		{mediaSvc.ErrInvalidSituation, http.StatusBadRequest, CodeInvalidSituation},
+		{mediaSvc.ErrInvalidFamily, http.StatusBadRequest, CodeInvalidFamily},
 	}
 	for _, tc := range cases {
 		w := httptest.NewRecorder()
@@ -205,6 +251,37 @@ func TestListMediaHandler(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &items))
 	assert.Equal(t, []string{"on_screen"}, items[0].Usage)
 	assert.NotContains(t, w.Body.String(), "object_key", "storage keys are never sent")
+	assert.Equal(t, models.ListFilter{Kind: "photo"}, *svc.filter)
+}
+
+func TestListMediaHandler_Filters(t *testing.T) {
+	svc := &mockMediaService{list: []models.Media{}}
+	w := httptest.NewRecorder()
+	NewMediaController(svc).ListMediaHandler(w,
+		httptest.NewRequest(http.MethodGet, "/api/media?carepartner_id=1&situation=winding_down&family_member_id=3", nil))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, models.ListFilter{Situation: "winding_down", FamilyMemberID: 3}, *svc.filter)
+
+	for _, bad := range []string{"0", "-1", "Elena"} {
+		w = httptest.NewRecorder()
+		NewMediaController(&mockMediaService{}).ListMediaHandler(w,
+			httptest.NewRequest(http.MethodGet, "/api/media?carepartner_id=1&family_member_id="+bad, nil))
+		assert.Equal(t, http.StatusBadRequest, w.Code, bad)
+		assert.Equal(t, CodeInvalidFamily, decodeError(t, w).Code)
+	}
+}
+
+func TestMediaJSON_Tags(t *testing.T) {
+	situations, family := []string{"winding_down"}, []int{}
+	tagged, _ := json.Marshal(models.Media{Situations: &situations, FamilyMemberIDs: &family})
+	assert.Contains(t, string(tagged), `"situations":["winding_down"]`)
+	assert.Contains(t, string(tagged), `"family_member_ids":[]`, "no family members is an empty list")
+
+	// Media read outside the media endpoints (e.g. on /screen) has no tags loaded
+	untagged, _ := json.Marshal(models.Media{})
+	assert.NotContains(t, string(untagged), "situations")
+	assert.NotContains(t, string(untagged), "family_member_ids")
 }
 
 func TestListMediaHandler_Errors(t *testing.T) {
@@ -269,6 +346,46 @@ func TestRenameMediaHandler_Errors(t *testing.T) {
 	NewMediaController(&mockMediaService{err: mediaSvc.ErrNotFound}).RenameMediaHandler(w,
 		withID(httptest.NewRequest(http.MethodPatch, "/api/media/1", strings.NewReader(`{"display_name":"x"}`)), "1"))
 	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestSetMediaTagsHandler(t *testing.T) {
+	svc := &mockMediaService{media: &models.Media{ID: 1}}
+	req := withID(httptest.NewRequest(http.MethodPut, "/api/media/1/tags",
+		strings.NewReader(`{"situations":["winding_down"],"family_member_ids":[2]}`)), "1")
+	w := httptest.NewRecorder()
+
+	NewMediaController(svc).SetMediaTagsHandler(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, mediaSvc.Tags{Situations: []string{"winding_down"}, FamilyMemberIDs: []int{2}}, *svc.tagged)
+}
+
+func TestSetMediaTagsHandler_Errors(t *testing.T) {
+	for _, body := range []string{`not json`, `{"situations":"winding_down"}`, `{"situations":[],"notes":"x"}`} {
+		w := httptest.NewRecorder()
+		svc := &mockMediaService{}
+		NewMediaController(svc).SetMediaTagsHandler(w,
+			withID(httptest.NewRequest(http.MethodPut, "/api/media/1/tags", strings.NewReader(body)), "1"))
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+		assert.Nil(t, svc.tagged, body)
+	}
+
+	cases := []struct {
+		err    error
+		status int
+		code   string
+	}{
+		{mediaSvc.ErrNotFound, http.StatusNotFound, CodeNotFound},
+		{mediaSvc.ErrInvalidSituation, http.StatusBadRequest, CodeInvalidSituation},
+		{mediaSvc.ErrInvalidFamily, http.StatusBadRequest, CodeInvalidFamily},
+	}
+	for _, tc := range cases {
+		w := httptest.NewRecorder()
+		NewMediaController(&mockMediaService{err: tc.err}).SetMediaTagsHandler(w,
+			withID(httptest.NewRequest(http.MethodPut, "/api/media/1/tags", strings.NewReader(`{"situations":[]}`)), "1"))
+		assert.Equal(t, tc.status, w.Code)
+		assert.Equal(t, tc.code, decodeError(t, w).Code)
+	}
 }
 
 func TestDeleteMediaHandler(t *testing.T) {

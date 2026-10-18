@@ -1,10 +1,10 @@
 /**
- * Calls to the real server. Everything without a backend yet (family folders,
- * sleeping hours, ratings, requests to the caregiver) stays in data/mock.ts.
+ * Calls to the real server. Everything without a backend yet (sleeping hours,
+ * ratings, requests to the caregiver) stays in data/mock.ts.
  */
 
 import { api, ApiError, apiWithStatus } from "../lib/api";
-import type { Clip, PlayedItem, Resident } from "./types";
+import type { Clip, FamilyFolder, PlayedItem, Resident, SituationId } from "./types";
 
 interface ServerCarepartner {
   id: number;
@@ -58,9 +58,51 @@ export async function getResident(id: number): Promise<Resident | undefined> {
   }
 }
 
-/** A resident's videos and audio, newest first. Photos aren't played as clips. */
-export async function getClips(residentId: number): Promise<Clip[]> {
-  const media = await api<ServerMedia[] | null>(`/media?carepartner_id=${residentId}`);
+interface ServerFamilyMember {
+  id: number;
+  name: string;
+  relationship: string;
+  guidance_note: string | null;
+}
+
+const toFolder = (m: ServerFamilyMember): FamilyFolder => ({
+  id: m.id,
+  name: m.name,
+  relationship: m.relationship,
+  guidanceNote: m.guidance_note ?? undefined,
+});
+
+/** A resident's family, in the order the caregiver added them. */
+export async function getFamilyFolders(residentId: number): Promise<FamilyFolder[]> {
+  const members = await api<ServerFamilyMember[] | null>(`/family-members?carepartner_id=${residentId}`);
+  return (members ?? []).map(toFolder);
+}
+
+/** "Asking for someone" isn't one of the server's situations: staff pick the family member instead. */
+const SERVER_SITUATIONS: SituationId[] = [
+  "wants_to_go_home",
+  "doesnt_know_where",
+  "anxious_or_upset",
+  "starting_the_day",
+  "winding_down",
+];
+
+/** Which clips to show: the ones about a family member, or for a situation. */
+export type ClipFilter = { familyMemberId?: number; situation?: string };
+
+/**
+ * A resident's videos and audio, newest first. Photos aren't played as clips.
+ * With a family member, only clips about them; otherwise, with a situation the
+ * caregiver can tag, only clips for it.
+ */
+export async function getClips(residentId: number, filter: ClipFilter = {}): Promise<Clip[]> {
+  let query = `carepartner_id=${residentId}`;
+  if (filter.familyMemberId) {
+    query += `&family_member_id=${filter.familyMemberId}`;
+  } else if (SERVER_SITUATIONS.includes(filter.situation as SituationId)) {
+    query += `&situation=${filter.situation}`;
+  }
+  const media = await api<ServerMedia[] | null>(`/media?${query}`);
   return (media ?? [])
     .filter((m): m is ServerMedia & { kind: "video" | "audio" } => m.kind !== "photo")
     .map((m) => ({

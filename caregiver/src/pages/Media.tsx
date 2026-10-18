@@ -24,8 +24,16 @@ import { Mic, Upload, Video } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
-import { ApiError, deleteMedia, deleteMediaOnExit, friendlyError, listMedia, listScheduledItems } from "../media/api";
-import type { Media as MediaItem, ScheduledItem } from "../media/api";
+import {
+  ApiError,
+  deleteMedia,
+  deleteMediaOnExit,
+  friendlyError,
+  listFamilyMembers,
+  listMedia,
+  listScheduledItems,
+} from "../media/api";
+import type { FamilyMember, Media as MediaItem, ScheduledItem } from "../media/api";
 import type { MediaKind } from "../media/constants";
 import DetailPanel from "../media/DetailPanel";
 import FilterPills from "../media/FilterPills";
@@ -124,6 +132,8 @@ export default function Media() {
   const [items, setItems] = useState<MediaItem[] | null>(null);
   // Null if the schedule could not be loaded; the page still works, with plainer schedule text
   const [scheduled, setScheduled] = useState<ScheduledItem[] | null>(null);
+  // Null if the family could not be loaded; media can still be saved, just not linked to anyone
+  const [family, setFamily] = useState<FamilyMember[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Bumped to fetch the list again (the "Try again" button)
   const [reloadKey, setReloadKey] = useState(0);
@@ -161,19 +171,24 @@ export default function Media() {
     }
 
     let cancelled = false;
-    // The schedule only adds detail, so a failure there must not hide the media
+    // The schedule and the family only add detail, so a failure there must not hide the media
     Promise.all([
       listMedia(activeCarePartnerId),
       listScheduledItems(activeCarePartnerId).catch((err) => {
         console.warn("Could not load the schedule; showing plainer schedule text", err);
         return null;
       }),
+      listFamilyMembers(activeCarePartnerId).catch((err) => {
+        console.warn("Could not load the family; media can't be linked to anyone for now", err);
+        return null;
+      }),
     ])
-      .then(([list, schedule]) => {
+      .then(([list, schedule, members]) => {
         if (cancelled) return;
         loadedFor.current = activeCarePartnerId;
         setItems(list.filter((item) => !pendingRemovalIds.has(item.id)));
         setScheduled(schedule);
+        setFamily(members);
         setLoadError(null);
       })
       .catch((err) => {
@@ -212,6 +227,16 @@ export default function Media() {
   const handleRenamed = (updated: MediaItem) => {
     setItems((list) => list && list.map((item) => (item.id === updated.id ? updated : item)));
     toast.show(`Renamed to "${updated.display_name}".`);
+  };
+
+  const handleTagsChanged = (updated: MediaItem) => {
+    setItems((list) => list && list.map((item) => (item.id === updated.id ? updated : item)));
+    toast.show(`Saved how staff find "${updated.display_name}".`);
+  };
+
+  // Added from either panel's picker; it was created on the server already
+  const handleFamilyAdded = (member: FamilyMember) => {
+    setFamily((members) => [...(members ?? []), member]);
   };
 
   // Hide it from the grid right away and select its neighbour. The server
@@ -387,8 +412,11 @@ export default function Media() {
                 key={selected.id}
                 media={selected}
                 scheduled={scheduled}
+                family={family}
+                onFamilyAdded={handleFamilyAdded}
                 justSaved={selected.id === justSavedId}
                 onRenamed={handleRenamed}
+                onTagsChanged={handleTagsChanged}
                 onRemoved={() => handleRemoved(selected)}
               />
             ) : items === null ? null : (
@@ -403,6 +431,8 @@ export default function Media() {
               key={queue[0].id}
               carepartnerId={activeCarePartnerId}
               pending={queue[0]}
+              family={family}
+              onFamilyAdded={handleFamilyAdded}
               position={batchSize - queue.length + 1}
               total={batchSize}
               notices={notices}

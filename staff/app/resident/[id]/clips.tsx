@@ -2,9 +2,9 @@
  * S4 · Clip picker
  *
  * Lists the resident's real media (videos and audio) from the server and plays one on
- * their tablet. Clips aren't sorted by family member or situation yet (there is
- * no backend for that), so every path here shows all of the resident's clips,
- * newest first.
+ * their tablet, newest first. Coming from a family folder, it shows the clips the
+ * caregiver linked to that person; coming from a situation, the clips the caregiver
+ * put under it (by default, everything is under every situation).
  *
  * Playing is blocked during the resident's sleeping hours. Staff can still look
  * through the list; only the Play button is disabled.
@@ -16,8 +16,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import LoadError from '../../../components/LoadError';
-import { SITUATIONS, getFamilyFolder, getSleepingHours } from '../../../data/mock';
-import { getClips, getResident, playOnTablet } from '../../../data/server';
+import { SITUATIONS, getSleepingHours } from '../../../data/mock';
+import { getClips, getFamilyFolders, getResident, playOnTablet } from '../../../data/server';
 import type { Clip, Resident, SleepingHours } from '../../../data/types';
 import { formatTime, isAsleep } from '../../../lib/sleepingHours';
 import { logEvent } from '../../../lib/log';
@@ -49,7 +49,12 @@ export default function ClipsScreen() {
   const load = useCallback(() => {
     setFailed(false);
     setClips(null);
-    Promise.all([getResident(residentId), getSleepingHours(residentId), getClips(residentId)])
+    const familyMemberId = folderId ? Number(folderId) : undefined;
+    Promise.all([
+      getResident(residentId),
+      getSleepingHours(residentId),
+      getClips(residentId, { familyMemberId, situation }),
+    ])
       .then(([r, h, c]) => {
         if (!r) throw new Error('resident not found');
         setResident(r);
@@ -58,9 +63,14 @@ export default function ClipsScreen() {
       })
       .catch(() => setFailed(true));
 
-    // The heading comes from fake data: who they're asking for, or the situation.
-    if (folderId) {
-      getFamilyFolder(Number(folderId)).then((f) => setHeading(f ? `Asking for ${f.name}` : null));
+    // The heading says who they're asking for, or the situation
+    if (familyMemberId) {
+      getFamilyFolders(residentId)
+        .then((folders) => {
+          const folder = folders.find((f) => f.id === familyMemberId);
+          setHeading(folder ? `Asking for ${folder.name}` : null);
+        })
+        .catch(() => setHeading(null));
     } else {
       setHeading(SITUATIONS.find((s) => s.id === situation)?.label ?? null);
     }
@@ -104,7 +114,7 @@ export default function ClipsScreen() {
     <ScrollView className="flex-1 bg-page" contentContainerClassName="p-4 pb-10">
       {heading && <Text className="text-base text-ink-muted">{heading}</Text>}
       <Text className="mb-5 text-3xl font-bold text-ink">
-        {clips.length === 0 ? 'No media yet' : `${firstName}'s media`}
+        {clips.length === 0 ? (folderId || situation ? 'Nothing for this yet' : 'No media yet') : `${firstName}'s media`}
       </Text>
 
       {asleep && (

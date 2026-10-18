@@ -11,6 +11,8 @@
  *  - When it plays: a video or audio file shows its schedule ("Every day at
  *    8:00 am", linking to the Calendar); a photo shows whether it is on
  *    the screen, plus its schedule if it has timed showings
+ *  - How staff find it: its situations and family members, with Edit, which
+ *    opens the same picker as the Save panel (see TagPicker)
  *  - Remove, which asks first (see RemoveMediaDialog); the page does the
  *    removing and offers Undo
  *
@@ -23,21 +25,27 @@ import type { FormEvent, KeyboardEvent, ReactNode, SyntheticEvent } from "react"
 import { Link } from "react-router-dom";
 import { Check, Image, Music, Play, Video } from "lucide-react";
 import TextField from "../components/ui/form/TextField";
-import { fileUrl, friendlyError, renameMedia } from "./api";
-import type { Media, ScheduledItem } from "./api";
-import { scheduleLine } from "./labels";
+import { fileUrl, friendlyError, renameMedia, setMediaTags } from "./api";
+import type { FamilyMember, Media, ScheduledItem } from "./api";
+import { familyLine, scheduleLine, situationsLine } from "./labels";
 import RemoveMediaDialog from "./RemoveMediaDialog";
 import { ACTION_LINK, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
+import TagPicker from "./TagPicker";
 import { FOCUS_RING } from "../components/ui/styles";
 
 interface DetailPanelProps {
   media: Media;
   /** All scheduled items, or null if they couldn't be loaded */
   scheduled: ScheduledItem[] | null;
+  /** The carepartner's family, or null if it couldn't be loaded */
+  family: FamilyMember[] | null;
+  onFamilyAdded: (member: FamilyMember) => void;
   /** The caregiver just saved this item; shows "Saved. You can use it any time." */
   justSaved?: boolean;
   /** The server accepted a new name; `updated` is the item as it is now */
   onRenamed: (updated: Media) => void;
+  /** The server accepted new situations or family members */
+  onTagsChanged: (updated: Media) => void;
   /** The caregiver confirmed removing the item */
   onRemoved: () => void;
 }
@@ -87,7 +95,16 @@ const PREVIEW_BOX = "h-[196px] flex items-center justify-center overflow-hidden 
    Component
 ============================ */
 
-export default function DetailPanel({ media, scheduled, justSaved = false, onRenamed, onRemoved }: DetailPanelProps) {
+export default function DetailPanel({
+  media,
+  scheduled,
+  family,
+  onFamilyAdded,
+  justSaved = false,
+  onRenamed,
+  onTagsChanged,
+  onRemoved,
+}: DetailPanelProps) {
   const [playing, setPlaying] = useState(false);
   // Why playing failed, worded for the caregiver; null while it hasn't
   const [playError, setPlayError] = useState<string | null>(null);
@@ -102,6 +119,13 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
   const nameField = useRef<HTMLInputElement>(null);
 
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+
+  const [editingTags, setEditingTags] = useState(false);
+  const [draftSituations, setDraftSituations] = useState(media.situations);
+  const [draftFamily, setDraftFamily] = useState(media.family_member_ids);
+  const [savingTags, setSavingTags] = useState(false);
+  const [tagsError, setTagsError] = useState<string | null>(null);
+  const editTagsButton = useRef<HTMLButtonElement>(null);
 
   const isPhoto = media.kind === "photo";
   const line = scheduleLine(media, scheduled);
@@ -164,6 +188,40 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
 
   const handleRenameKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape" && !saving) stopRename();
+  };
+
+  /* ============================
+     How staff find it
+  ============================ */
+
+  const startEditingTags = () => {
+    setDraftSituations(media.situations);
+    setDraftFamily(media.family_member_ids);
+    setTagsError(null);
+    setEditingTags(true);
+  };
+
+  const stopEditingTags = () => {
+    setEditingTags(false);
+    setTagsError(null);
+    requestAnimationFrame(() => editTagsButton.current?.focus());
+  };
+
+  const saveTags = async () => {
+    setSavingTags(true);
+    setTagsError(null);
+    let updated: Media;
+    try {
+      updated = await setMediaTags(media.id, { situations: draftSituations, familyMemberIds: draftFamily });
+    } catch (err) {
+      setTagsError(friendlyError(err));
+      setSavingTags(false);
+      return;
+    }
+    // Outside the try: a problem showing the change must not read as a failed save
+    onTagsChanged(updated);
+    setSavingTags(false);
+    stopEditingTags();
   };
 
   /* ============================
@@ -274,6 +332,52 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
         </>
       ) : (
         <ScheduleBlock line={line} />
+      )}
+
+      {/* How staff find it on their phones */}
+      {editingTags ? (
+        <div className="flex flex-col gap-3 p-3 rounded-xl border-2 border-dawn-line">
+          <TagPicker
+            carepartnerId={media.carepartner_id}
+            situations={draftSituations}
+            familyMemberIds={draftFamily}
+            family={family}
+            onSituationsChange={setDraftSituations}
+            onFamilyMemberIdsChange={setDraftFamily}
+            onFamilyAdded={onFamilyAdded}
+            disabled={savingTags}
+          />
+          {tagsError && (
+            <p role="alert" className="m-0 text-base font-bold text-dawn-accent">
+              {tagsError}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => void saveTags()} disabled={savingTags} className={`flex-1 ${PRIMARY_BUTTON}`}>
+              {savingTags ? "Saving…" : "Save"}
+            </button>
+            <button type="button" onClick={stopEditingTags} disabled={savingTags} className={`flex-1 ${SECONDARY_BUTTON}`}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[13px] font-bold uppercase tracking-[0.06em] text-dawn-muted">Staff find it</div>
+            <button ref={editTagsButton} type="button" onClick={startEditingTags} className={`${ACTION_LINK} cursor-pointer bg-transparent border-0 p-0`}>
+              Edit
+            </button>
+          </div>
+          <p className="m-0 text-base leading-snug">
+            <span className="font-bold">When: </span>
+            {situationsLine(media)}
+          </p>
+          <p className="m-0 text-base leading-snug">
+            <span className="font-bold">About: </span>
+            {familyLine(media, family)}
+          </p>
+        </div>
       )}
 
       <div className="flex gap-2">

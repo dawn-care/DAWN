@@ -12,6 +12,7 @@ import (
 	authCtrlr "server/internal/controllers/auth"
 	configurationCtrlr "server/internal/controllers/configurations"
 	exceptionCtrlr "server/internal/controllers/exceptions"
+	familyCtrlr "server/internal/controllers/family"
 	mediaCtrlr "server/internal/controllers/media"
 	modulesCtrlr "server/internal/controllers/modules"
 	playbackCtrlr "server/internal/controllers/playback"
@@ -28,6 +29,7 @@ import (
 
 	configurationRts "server/internal/routes/configurations"
 	exceptionRts "server/internal/routes/exceptions"
+	familyRts "server/internal/routes/family"
 	mediaRts "server/internal/routes/media"
 	modulesRts "server/internal/routes/modules"
 	playbackRts "server/internal/routes/playback"
@@ -45,6 +47,7 @@ import (
 	authSvc "server/internal/services/auth"
 	configurationSvc "server/internal/services/configurations"
 	exceptionSvc "server/internal/services/exceptions"
+	familySvc "server/internal/services/family"
 	mediaSvc "server/internal/services/media"
 	modulesSvc "server/internal/services/modules"
 	playbackSvc "server/internal/services/playback"
@@ -169,6 +172,7 @@ func main() {
 	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
 	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
 	mediaService := mediaSvc.NewMediaService(db, minioClient, "media")
+	familyService := familySvc.NewFamilyService(db)
 
 	// Widgets
 	openWeatherKey := getEnvOrDefault("OPENWEATHER_API_KEY", "")
@@ -218,6 +222,7 @@ func main() {
 	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
 	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
+	familyCtrl := familyCtrlr.NewFamilyController(familyService)
 
 	// Widgets
 	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
@@ -277,6 +282,7 @@ func main() {
 	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
 	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 	mediaRts.RegisterMediaRoutes(r, mediaCtrl)
+	familyRts.RegisterFamilyRoutes(r, familyCtrl)
 
 	// Widgets
 	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)

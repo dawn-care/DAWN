@@ -4,12 +4,12 @@
  * User: Caregiver
  *
  * Short wording for a media item: the badge on its card ("Video 0:48",
- * from its kind and length) and its status line ("On screen", "Not
- * scheduled", from its kind and `usage`).
+ * from its kind and length), its status line ("On screen", "Not
+ * scheduled", from its kind and `usage`) and how staff find it.
  */
 
-import { KIND_LABELS } from "./constants";
-import type { Media, ScheduledItem } from "./api";
+import { KIND_LABELS, SITUATIONS } from "./constants";
+import type { FamilyMember, Media, ScheduledItem } from "./api";
 import { describeSchedule } from "./schedule";
 
 /** Seconds as m:ss, e.g. 48 -> "0:48", 192 -> "3:12" */
@@ -59,4 +59,23 @@ export function mediaStatus(media: Media): MediaStatus {
 export function scheduleLine(media: Media, scheduled: ScheduledItem[] | null): string | null {
   const line = scheduled ? describeSchedule(scheduled, media.id) : null;
   return line ?? (media.usage.includes("scheduled") ? "Scheduled" : null);
+}
+
+/** "Every situation", or the chosen ones, e.g. "Wants to go home, Anxious or upset" */
+export function situationsLine(media: Media): string {
+  if (media.situations.length === SITUATIONS.length) return "Every situation";
+  return SITUATIONS.filter(({ value }) => media.situations.includes(value))
+    .map(({ label }) => label)
+    .join(", ");
+}
+
+/** "Elena, Daniel", "No one in particular", or a count if the family couldn't be loaded */
+export function familyLine(media: Media, family: FamilyMember[] | null): string {
+  const ids = media.family_member_ids;
+  if (ids.length === 0) return "No one in particular";
+  if (family === null) return ids.length === 1 ? "1 family member" : `${ids.length} family members`;
+  return family
+    .filter((member) => ids.includes(member.id))
+    .map((member) => member.name)
+    .join(", ");
 }
