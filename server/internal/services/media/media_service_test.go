@@ -82,6 +82,34 @@ var mediaColumns = []string{
 
 var insertMedia = regexp.QuoteMeta(`INSERT INTO "Media"`)
 
+// allSituations is media.Situations as the driver sends it
+const allSituations = `{"wants_to_go_home","doesnt_know_where","anxious_or_upset","starting_the_day","winding_down"}`
+
+// expectSetTags expects a media item's tags to be replaced. family is the driver's
+// form of the IDs ("{2,5}"); linked is how many of them belong to the carepartner.
+func expectSetTags(mock sqlmock.Sqlmock, mediaID, carepartnerID int, situations, family string, linked int64) {
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "MediaSituation" WHERE media_id = $1;`)).
+		WithArgs(mediaID).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "MediaFamilyMember" WHERE media_id = $1;`)).
+		WithArgs(mediaID).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "MediaSituation"`)).
+		WithArgs(mediaID, situations).WillReturnResult(sqlmock.NewResult(0, 1))
+	if family != "" {
+		mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "MediaFamilyMember"`)).
+			WithArgs(mediaID, family, carepartnerID).WillReturnResult(sqlmock.NewResult(0, linked))
+	}
+}
+
+// expectLoadTags expects the tags of the given media IDs to be read; each row is
+// {id, situations, family} in the driver's array form
+func expectLoadTags(mock sqlmock.Sqlmock, rows ...[3]any) {
+	result := sqlmock.NewRows([]string{"id", "situations", "family"})
+	for _, row := range rows {
+		result.AddRow(row[0], row[1], row[2])
+	}
+	mock.ExpectQuery(regexp.QuoteMeta(`FROM unnest($1::int[]) AS m(id)`)).WillReturnRows(result)
+}
+
 // ─────────────────────────────────────────────
 // Upload
 // ─────────────────────────────────────────────
@@ -90,9 +118,12 @@ func TestUpload_Photo(t *testing.T) {
 	svc, mock, store, probes := newTestService(t, 0, nil)
 	created := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(insertMedia).
 		WithArgs(1, "photo", "Beach", sqlmock.AnyArg(), "image/png", int64(5), nil).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(7, created))
+	expectSetTags(mock, 7, 1, allSituations, "", 0)
+	mock.ExpectCommit()
 
 	m, err := svc.Upload(context.Background(), UploadInput{
 		CarepartnerID: 1, Kind: "photo", DisplayName: "  Beach ", Extension: ".PNG",
@@ -101,6 +132,8 @@ func TestUpload_Photo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 7, m.ID)
+	assert.Equal(t, modelsMedia.Situations, *m.Situations, "no situations means every situation")
+	assert.Equal(t, []int{}, *m.FamilyMemberIDs)
 	assert.Equal(t, "Beach", m.DisplayName)
 	assert.Nil(t, m.DurationSeconds)
 	assert.Equal(t, []string{}, m.Usage)
@@ -117,9 +150,12 @@ func TestUpload_Photo(t *testing.T) {
 func TestUpload_VideoDurationRounded(t *testing.T) {
 	svc, mock, _, probes := newTestService(t, 600.4, nil)
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(insertMedia).
 		WithArgs(1, "video", "Clip", sqlmock.AnyArg(), "video/mp4", int64(3), 600).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(8, time.Now()))
+	expectSetTags(mock, 8, 1, allSituations, "", 0)
+	mock.ExpectCommit()
 
 	m, err := svc.Upload(context.Background(), UploadInput{
 		CarepartnerID: 1, Kind: "video", DisplayName: "Clip", Extension: ".mp4",
@@ -158,7 +194,9 @@ func TestUpload_Unreadable(t *testing.T) {
 
 func TestUpload_DBFailureRemovesFile(t *testing.T) {
 	svc, mock, store, _ := newTestService(t, 0, nil)
+	mock.ExpectBegin()
 	mock.ExpectQuery(insertMedia).WillReturnError(errors.New("db down"))
+	mock.ExpectRollback()
 
 	_, err := svc.Upload(context.Background(), UploadInput{
 		CarepartnerID: 1, Kind: "photo", DisplayName: "Beach", MimeType: "image/png", File: strings.NewReader("x"),
@@ -166,6 +204,46 @@ func TestUpload_DBFailureRemovesFile(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Equal(t, []string{store.putKey}, store.removed)
+}
+
+func TestUpload_WithTags(t *testing.T) {
+	svc, mock, _, _ := newTestService(t, 0, nil)
+	mock.ExpectBegin()
+	mock.ExpectQuery(insertMedia).WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(9, time.Now()))
+	// Situations are saved in the apps' order, family members by ID, repeats dropped
+	expectSetTags(mock, 9, 1, `{"wants_to_go_home","winding_down"}`, "{2,5}", 2)
+	mock.ExpectCommit()
+
+	m, err := svc.Upload(context.Background(), UploadInput{
+		CarepartnerID: 1, Kind: "photo", DisplayName: "Beach", MimeType: "image/png", File: strings.NewReader("x"),
+		Tags: Tags{
+			Situations:      []string{"winding_down", "wants_to_go_home", "winding_down"},
+			FamilyMemberIDs: []int{5, 2, 5},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"wants_to_go_home", "winding_down"}, *m.Situations)
+	assert.Equal(t, []int{2, 5}, *m.FamilyMemberIDs)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUpload_OtherFamilyRemovesFile(t *testing.T) {
+	svc, mock, store, _ := newTestService(t, 0, nil)
+	mock.ExpectBegin()
+	mock.ExpectQuery(insertMedia).WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(9, time.Now()))
+	// Family member 6 isn't this carepartner's, so only one of the two is linked
+	expectSetTags(mock, 9, 1, allSituations, "{2,6}", 1)
+	mock.ExpectRollback()
+
+	_, err := svc.Upload(context.Background(), UploadInput{
+		CarepartnerID: 1, Kind: "photo", DisplayName: "Beach", MimeType: "image/png", File: strings.NewReader("x"),
+		Tags: Tags{FamilyMemberIDs: []int{2, 6}},
+	})
+
+	assert.ErrorIs(t, err, ErrInvalidFamily)
+	assert.Equal(t, []string{store.putKey}, store.removed, "the stored file is removed")
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestUpload_InvalidInput(t *testing.T) {
@@ -183,6 +261,14 @@ func TestUpload_InvalidInput(t *testing.T) {
 
 	_, err = svc.Upload(ctx, UploadInput{CarepartnerID: 1, Kind: "photo", DisplayName: strings.Repeat("a", 201), File: strings.NewReader("")})
 	assert.ErrorIs(t, err, ErrInvalidName)
+
+	_, err = svc.Upload(ctx, UploadInput{CarepartnerID: 1, Kind: "photo", DisplayName: "x", File: strings.NewReader(""),
+		Tags: Tags{Situations: []string{"asking_for_someone"}}})
+	assert.ErrorIs(t, err, ErrInvalidSituation, "asking for someone goes through family members")
+
+	_, err = svc.Upload(ctx, UploadInput{CarepartnerID: 1, Kind: "photo", DisplayName: "x", File: strings.NewReader(""),
+		Tags: Tags{FamilyMemberIDs: []int{0}}})
+	assert.ErrorIs(t, err, ErrInvalidFamily)
 }
 
 // ─────────────────────────────────────────────
@@ -194,13 +280,18 @@ func TestListMedia_Usage(t *testing.T) {
 	now := time.Now()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Media" m`)).
-		WithArgs(1, "").
+		WithArgs(1, "", "", 0).
 		WillReturnRows(sqlmock.NewRows(mediaColumns).
 			AddRow(1, 1, "photo", "Beach", "k1", "image/png", 10, nil, now, true, true, true).
 			AddRow(2, 1, "audio", "Hymn", "k2", "audio/mpeg", 10, 214, now, false, false, true).
 			AddRow(3, 1, "photo", "Dog", "k3", "image/jpeg", 10, nil, now, false, false, false))
+	expectLoadTags(mock,
+		// Stored in any order; read back in the apps' order
+		[3]any{1, "{winding_down,wants_to_go_home}", "{4,2}"},
+		[3]any{2, "{}", "{}"},
+	)
 
-	items, err := svc.ListMedia(1, "")
+	items, err := svc.ListMedia(1, modelsMedia.ListFilter{})
 
 	require.NoError(t, err)
 	require.Len(t, items, 3)
@@ -209,16 +300,20 @@ func TestListMedia_Usage(t *testing.T) {
 	assert.Equal(t, 214, *items[1].DurationSeconds)
 	assert.Equal(t, []string{}, items[2].Usage, "saved items have an empty usage list")
 	assert.Equal(t, "/media/3/file", items[2].URL)
+	assert.Equal(t, []string{"wants_to_go_home", "winding_down"}, *items[0].Situations)
+	assert.Equal(t, []int{4, 2}, *items[0].FamilyMemberIDs, "family members come back in the query's order")
+	assert.Equal(t, []string{}, *items[1].Situations)
+	assert.Equal(t, []int{}, *items[2].FamilyMemberIDs, "an item with no tag rows gets empty lists")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestListMedia_ByKind(t *testing.T) {
+func TestListMedia_Filters(t *testing.T) {
 	svc, mock, _, _ := newTestService(t, 0, nil)
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Media" m`)).
-		WithArgs(1, "video").
+		WithArgs(1, "video", "winding_down", 3).
 		WillReturnRows(sqlmock.NewRows(mediaColumns))
 
-	items, err := svc.ListMedia(1, "video")
+	items, err := svc.ListMedia(1, modelsMedia.ListFilter{Kind: "video", Situation: "winding_down", FamilyMemberID: 3})
 
 	require.NoError(t, err)
 	assert.Equal(t, []modelsMedia.Media{}, items, "no rows is an empty list, not nil")
@@ -227,10 +322,14 @@ func TestListMedia_ByKind(t *testing.T) {
 
 func TestListMedia_InvalidInput(t *testing.T) {
 	svc, _, _, _ := newTestService(t, 0, nil)
-	_, err := svc.ListMedia(0, "")
+	_, err := svc.ListMedia(0, modelsMedia.ListFilter{})
 	assert.ErrorIs(t, err, ErrInvalidCarepartner)
-	_, err = svc.ListMedia(1, "gif")
+	_, err = svc.ListMedia(1, modelsMedia.ListFilter{Kind: "gif"})
 	assert.ErrorIs(t, err, ErrInvalidKind)
+	_, err = svc.ListMedia(1, modelsMedia.ListFilter{Situation: "bored"})
+	assert.ErrorIs(t, err, ErrInvalidSituation)
+	_, err = svc.ListMedia(1, modelsMedia.ListFilter{FamilyMemberID: -1})
+	assert.ErrorIs(t, err, ErrInvalidFamily)
 }
 
 func TestGetMedia_NotFound(t *testing.T) {
@@ -270,12 +369,74 @@ func TestRename(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`WHERE m.id = $1`)).WithArgs(1).
 		WillReturnRows(sqlmock.NewRows(mediaColumns).
 			AddRow(1, 1, "photo", "New name", "k1", "image/png", 8, nil, time.Now(), false, false, false))
+	expectLoadTags(mock, [3]any{1, "{winding_down}", "{}"})
 
 	m, err := svc.Rename(1, " New name ")
 
 	require.NoError(t, err)
 	assert.Equal(t, "New name", m.DisplayName)
+	assert.Equal(t, []string{"winding_down"}, *m.Situations)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ─────────────────────────────────────────────
+// Tags
+// ─────────────────────────────────────────────
+
+func TestSetTags(t *testing.T) {
+	svc, mock, _, _ := newTestService(t, 0, nil)
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT carepartner_id FROM "Media" WHERE id = $1 FOR UPDATE;`)).
+		WithArgs(4).WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}).AddRow(1))
+	expectSetTags(mock, 4, 1, allSituations, "{3}", 1)
+	mock.ExpectCommit()
+	mock.ExpectQuery(regexp.QuoteMeta(`WHERE m.id = $1`)).WithArgs(4).
+		WillReturnRows(sqlmock.NewRows(mediaColumns).
+			AddRow(4, 1, "video", "Clip", "k4", "video/mp4", 8, 30, time.Now(), false, false, false))
+	expectLoadTags(mock, [3]any{4, allSituations, "{3}"})
+
+	// No situations means every situation
+	m, err := svc.SetTags(4, Tags{FamilyMemberIDs: []int{3}})
+
+	require.NoError(t, err)
+	assert.Equal(t, modelsMedia.Situations, *m.Situations)
+	assert.Equal(t, []int{3}, *m.FamilyMemberIDs)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSetTags_Failures(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		svc, mock, _, _ := newTestService(t, 0, nil)
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT carepartner_id`)).WithArgs(4).
+			WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}))
+		mock.ExpectRollback()
+
+		_, err := svc.SetTags(4, Tags{})
+		assert.ErrorIs(t, err, ErrNotFound)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+	t.Run("another carepartner's family member", func(t *testing.T) {
+		svc, mock, _, _ := newTestService(t, 0, nil)
+		mock.ExpectBegin()
+		mock.ExpectQuery(regexp.QuoteMeta(`SELECT carepartner_id`)).WithArgs(4).
+			WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}).AddRow(1))
+		expectSetTags(mock, 4, 1, allSituations, "{8}", 0)
+		mock.ExpectRollback()
+
+		_, err := svc.SetTags(4, Tags{FamilyMemberIDs: []int{8}})
+		assert.ErrorIs(t, err, ErrInvalidFamily)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+	t.Run("invalid input", func(t *testing.T) {
+		svc, _, _, _ := newTestService(t, 0, nil)
+		_, err := svc.SetTags(0, Tags{})
+		assert.ErrorIs(t, err, ErrNotFound)
+		_, err = svc.SetTags(4, Tags{Situations: []string{"bored"}})
+		assert.ErrorIs(t, err, ErrInvalidSituation)
+		_, err = svc.SetTags(4, Tags{FamilyMemberIDs: []int{-2}})
+		assert.ErrorIs(t, err, ErrInvalidFamily)
+	})
 }
 
 func TestRename_NotFoundAndInvalid(t *testing.T) {

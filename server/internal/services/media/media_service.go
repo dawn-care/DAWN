@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -29,6 +30,8 @@ var (
 	ErrUnreadableMedia    = errors.New("could not read the length of this file")
 	ErrNotFound           = errors.New("media not found")
 	ErrInvalidCarepartner = errors.New("invalid carepartner_id")
+	ErrInvalidSituation   = errors.New("situations must come from the list of situations")
+	ErrInvalidFamily      = errors.New("family_member_ids must be this carepartner's family members")
 )
 
 // ObjectStore is the part of blob storage the media service needs
@@ -100,6 +103,42 @@ type UploadInput struct {
 	Extension     string // including the dot, e.g. ".mp4"; may be empty
 	MimeType      string
 	File          io.Reader
+	Tags          Tags
+}
+
+// Tags say how staff find a media item. No situations means every situation.
+type Tags struct {
+	Situations      []string
+	FamilyMemberIDs []int
+}
+
+/*
+cleanTags checks tags and fills in the default: no situations means every one.
+Repeats are dropped; situations end up in the order of media.Situations and family
+members by ID, as they are read back.
+*/
+func cleanTags(t Tags) (Tags, error) {
+	for _, s := range t.Situations {
+		if !media.ValidSituation(s) {
+			return Tags{}, ErrInvalidSituation
+		}
+	}
+	clean := Tags{Situations: []string{}, FamilyMemberIDs: []int{}}
+	for _, s := range media.Situations {
+		if len(t.Situations) == 0 || slices.Contains(t.Situations, s) {
+			clean.Situations = append(clean.Situations, s)
+		}
+	}
+	for _, id := range t.FamilyMemberIDs {
+		if id <= 0 {
+			return Tags{}, ErrInvalidFamily
+		}
+		if !slices.Contains(clean.FamilyMemberIDs, id) {
+			clean.FamilyMemberIDs = append(clean.FamilyMemberIDs, id)
+		}
+	}
+	slices.Sort(clean.FamilyMemberIDs)
+	return clean, nil
 }
 
 func validKind(kind string) bool {
@@ -130,6 +169,10 @@ func (s *MediaService) Upload(ctx context.Context, in UploadInput) (*media.Media
 		return nil, ErrInvalidKind
 	}
 	name, err := cleanName(in.DisplayName)
+	if err != nil {
+		return nil, err
+	}
+	tags, err := cleanTags(in.Tags)
 	if err != nil {
 		return nil, err
 	}
@@ -178,10 +221,13 @@ func (s *MediaService) Upload(ctx context.Context, in UploadInput) (*media.Media
 		return nil, fmt.Errorf("unable to upload media to blob storage: %w", err)
 	}
 
-	if err := media.CreateMediaTx(s.DB, m); err != nil {
+	if err := s.createWithTags(m, tags); err != nil {
 		// Don't leave an orphaned file behind
 		if rmErr := s.Store.Remove(context.Background(), m.ObjectKey); rmErr != nil {
 			log.Printf("media: failed to remove orphaned object %s: %v", m.ObjectKey, rmErr)
+		}
+		if errors.Is(err, ErrInvalidFamily) {
+			return nil, err
 		}
 		return nil, fmt.Errorf("failed to save media: %w", err)
 	}
@@ -189,11 +235,51 @@ func (s *MediaService) Upload(ctx context.Context, in UploadInput) (*media.Media
 	return m, nil
 }
 
+// createWithTags saves a new media row and its tags together
+func (s *MediaService) createWithTags(m *media.Media, tags Tags) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := media.CreateMediaTx(tx, m); err != nil {
+		return err
+	}
+	linked, err := media.SetTagsTx(tx, m.ID, m.CarepartnerID, tags.Situations, tags.FamilyMemberIDs)
+	if err != nil {
+		return err
+	}
+	if !linked {
+		return ErrInvalidFamily
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	m.Situations = &tags.Situations
+	m.FamilyMemberIDs = &tags.FamilyMemberIDs
+	return nil
+}
+
 // ─────────────────────────────────────────────
 // READ
 // ─────────────────────────────────────────────
 
+// GetMedia returns one media item with its tags
 func (s *MediaService) GetMedia(id int) (*media.Media, error) {
+	m, err := s.findMedia(id)
+	if err != nil {
+		return nil, err
+	}
+	items := []media.Media{*m}
+	if err := media.LoadTags(s.DB, items); err != nil {
+		return nil, fmt.Errorf("failed to get media tags: %w", err)
+	}
+	return &items[0], nil
+}
+
+// findMedia returns one media item without its tags
+func (s *MediaService) findMedia(id int) (*media.Media, error) {
 	if id <= 0 {
 		return nil, ErrNotFound
 	}
@@ -207,20 +293,34 @@ func (s *MediaService) GetMedia(id int) (*media.Media, error) {
 	return m, nil
 }
 
-// List a carepartner's media; an empty kind lists every kind
-func (s *MediaService) ListMedia(carepartnerID int, kind string) ([]media.Media, error) {
+// List a carepartner's media that matches filter, with tags; zero values don't filter
+func (s *MediaService) ListMedia(carepartnerID int, filter media.ListFilter) ([]media.Media, error) {
 	if carepartnerID <= 0 {
 		return nil, ErrInvalidCarepartner
 	}
-	if kind != "" && !validKind(kind) {
+	if filter.Kind != "" && !validKind(filter.Kind) {
 		return nil, ErrInvalidKind
 	}
-	return media.ListMedia(s.DB, carepartnerID, kind)
+	if filter.Situation != "" && !media.ValidSituation(filter.Situation) {
+		return nil, ErrInvalidSituation
+	}
+	if filter.FamilyMemberID < 0 {
+		return nil, ErrInvalidFamily
+	}
+	items, err := media.ListMedia(s.DB, carepartnerID, filter)
+	if err != nil {
+		return nil, err
+	}
+	if err := media.LoadTags(s.DB, items); err != nil {
+		return nil, fmt.Errorf("failed to get media tags: %w", err)
+	}
+	return items, nil
 }
 
-// OpenFile returns a media item and a reader for its file; the caller closes the reader
+// OpenFile returns a media item and a reader for its file; the caller closes the reader.
+// It skips the tags, since serving a file doesn't need them.
 func (s *MediaService) OpenFile(ctx context.Context, id int) (*media.Media, io.ReadSeekCloser, error) {
-	m, err := s.GetMedia(id)
+	m, err := s.findMedia(id)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -250,6 +350,45 @@ func (s *MediaService) Rename(id int, displayName string) (*media.Media, error) 
 	}
 	if !found {
 		return nil, ErrNotFound
+	}
+	return s.GetMedia(id)
+}
+
+/*
+SetTags replaces how staff find a media item. No situations means every situation;
+family members must be the item's carepartner's.
+*/
+func (s *MediaService) SetTags(id int, tags Tags) (*media.Media, error) {
+	if id <= 0 {
+		return nil, ErrNotFound
+	}
+	clean, err := cleanTags(tags)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	carepartnerID, found, err := media.CarepartnerOfMediaTx(tx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set media tags: %w", err)
+	}
+	if !found {
+		return nil, ErrNotFound
+	}
+	linked, err := media.SetTagsTx(tx, id, carepartnerID, clean.Situations, clean.FamilyMemberIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set media tags: %w", err)
+	}
+	if !linked {
+		return nil, ErrInvalidFamily
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to set media tags: %w", err)
 	}
 	return s.GetMedia(id)
 }

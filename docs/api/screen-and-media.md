@@ -118,6 +118,23 @@ export interface Media {
   created_at: string;              // RFC 3339
   usage: MediaUsage[];             // [] means saved but unused
   url: string;                     // e.g. "/media/4/file"
+  situations: Situation[];         // never empty; see "How staff find media"
+  family_member_ids: number[];     // [] when it isn't about anyone in particular
+}
+// Only the /media endpoints include situations and family_member_ids; media inside
+// /screen and the schedule doesn't.
+export type Situation =
+  | "wants_to_go_home" | "doesnt_know_where" | "anxious_or_upset"
+  | "starting_the_day" | "winding_down";
+
+// ---- Family ----
+export interface FamilyMember {
+  id: number;
+  carepartner_id: number;
+  name: string;
+  relationship: string;          // e.g. "Daughter"; may be ""
+  guidance_note: string | null;  // what staff should say or avoid
+  created_at: string;
 }
 
 // ---- Screen settings ----
@@ -253,6 +270,8 @@ Upload a file as `multipart/form-data`. Returns `201` with the new `Media`.
 | `kind` | `photo`, `video` or `audio` |
 | `carepartner_id` | |
 | `display_name` | optional; defaults to the file name without its extension |
+| `situations` | optional, repeat the field for each; none means every situation |
+| `family_member_ids` | optional, repeat the field for each; must be this carepartner's |
 
 Video and audio over 10 minutes are rejected with `MEDIA_TOO_LONG`. Files over 1 GB get `FILE_TOO_LARGE`. Accepted types: photos JPEG, PNG, GIF, WebP, HEIC; videos MP4, MOV, WebM, Ogg; audio MP3, WAV, M4A, Ogg, WebM.
 
@@ -261,13 +280,15 @@ const form = new FormData();
 form.append("file", file);              // from <input type="file">
 form.append("kind", "photo");
 form.append("carepartner_id", String(carepartnerId));
+situations.forEach((s) => form.append("situations", s));
+familyMemberIds.forEach((id) => form.append("family_member_ids", String(id)));
 const media = await api<Media>("/media", { method: "POST", body: form });
 // Don't set Content-Type yourself; the browser adds the multipart boundary.
 ```
 
 ### `GET /media?carepartner_id={id}&kind={kind}`
 
-List a carepartner's media, newest first. `kind` is optional. Use `usage` for the library badges: photos can be `on_screen`, `audio_background` and `scheduled` at once; video and audio can only be `scheduled`. An empty list means saved but unused.
+List a carepartner's media, newest first. Optional filters, which combine: `kind`, `situation` (only media under that situation) and `family_member_id` (only media about that person). Use `usage` for the library badges: photos can be `on_screen`, `audio_background` and `scheduled` at once; video and audio can only be `scheduled`. An empty list means saved but unused.
 
 ### `GET /media/{id}`
 
@@ -280,6 +301,30 @@ The file itself, with its real `Content-Type`. This is what `url` points to.
 ### `PATCH /media/{id}`
 
 Rename. Body `{"display_name": "Beach day"}`, 1 to 200 characters. The file doesn't move.
+
+### `PUT /media/{id}/tags`
+
+Replace how staff find it. Body `{"situations": ["winding_down"], "family_member_ids": [2]}`; both lists are replaced. Returns `200` with the `Media`.
+
+### How staff find media
+
+The staff app offers media by situation, or, when the resident is asking for someone, by family member:
+
+- **Situations** are a fixed list (`Situation` above). Every item is under at least one: an upload or `PUT` with no situations puts it under all of them, which is also where existing media went. "Asking for someone" isn't a situation, because staff pick the family member instead.
+- **Family members** are optional. An item can be about any number of them; staff asking for Elena see media linked to Elena, whatever its situations.
+- Unknown situations get `INVALID_SITUATION`; a family member who isn't this carepartner's gets `INVALID_FAMILY_MEMBER`, and nothing is saved.
+
+## Family members
+
+A carepartner's family members are folders for grouping media, not accounts. The guidance note tells staff what to say, or avoid, when the carepartner asks for that person.
+
+### `GET /family-members?carepartner_id={id}`
+
+Returns `FamilyMember[]` in the order they were added.
+
+### `POST /family-members`
+
+Body `{"carepartner_id": 1, "name": "Elena", "relationship": "Daughter", "guidance_note": null}`. `name` is 1 to 100 characters; `relationship` (up to 60) and `guidance_note` (up to 1000) are optional. Returns `201` with the `FamilyMember`. Editing and removing come later.
 
 ### `DELETE /media/{id}`
 
@@ -582,6 +627,14 @@ Report progress: `{"carepartner_id": 1, "status": "started"}`. Statuses move for
 
 Repeating the current status is harmless. Acknowledging or starting after `expires_at` records `expired` instead. An invalid move returns `409`.
 
+### `GET /playbacks?carepartner_id=1&limit=1`
+
+What has played on the tablet, newest first. Returns `200` with an array of `Playback` (`[]` when nothing has played).
+
+- Only playbacks that reached the screen (`started_at` is set) are listed, from any source, ordered by `started_at`. Requests that never started (expired, or failed before playing) are left out, so the first entry is what the carepartner last saw or heard.
+- `limit` is optional: 1 to 100, default 50. The staff app's "Last played" uses `limit=1`.
+- A missing or invalid `carepartner_id` or `limit` returns `400`.
+
 ### Staff play and stop
 
 `POST /playbacks/play` with `{"carepartner_id": 1, "media_id": 9}` records a `staff` playback with a 30 second deadline and pushes it to the tablet over the WebSocket at `/realtime/tablet?carepartner_id=1`. `POST /playbacks/{id}/stop` with `{"carepartner_id": 1}` stops one. `module_id` is no longer accepted (`400`).
@@ -629,10 +682,14 @@ export interface Playback {
 | `INTERNAL_ERROR` | 500 | Server or database error | Something went wrong. Please try again. |
 | `INVALID_KIND` | 400 | Media `kind` isn't photo, video or audio | Choose photo, video or audio. |
 | `INVALID_FILE_TYPE` | 400 | File isn't an accepted type for its kind | That file type isn't supported. |
-| `INVALID_NAME` | 400 | Name empty or over 200 characters | Enter a name up to 200 characters. |
+| `INVALID_NAME` | 400 | Media name empty or over 200 characters, or a family member's name empty or over 100 | Enter a name up to 200 characters. |
 | `FILE_TOO_LARGE` | 413 | Upload over 1 GB | That file is too large. Try a shorter clip. |
 | `MEDIA_TOO_LONG` | 422 | Video or audio over 10 minutes | Videos and audio can be at most 10 minutes long. |
 | `UNREADABLE_MEDIA` | 422 | The server can't read the file's length | That file couldn't be read. Try exporting it again. |
+| `INVALID_SITUATION` | 400 | A situation isn't on the list | (a frontend bug; not shown to caregivers) |
+| `INVALID_FAMILY_MEMBER` | 400 | A family member isn't this carepartner's (deleted elsewhere, or a bad ID) | That family member is no longer here. Refresh to see the latest. |
+| `INVALID_RELATIONSHIP` | 400 | Family relationship over 60 characters | Keep the relationship under 60 characters. |
+| `INVALID_GUIDANCE_NOTE` | 400 | Guidance note over 1000 characters | Keep the note under 1000 characters. |
 | `INVALID_WAKE_TIME` | 400 | Wake time outside 06:00 to 10:00 | Wake time must be between 6:00 and 10:00 AM. |
 | `INVALID_BED_TIME` | 400 | Bed time outside 19:00 to 22:00 | Bed time must be between 7:00 and 10:00 PM. |
 | `INVALID_TYPE` | 400 | Unknown widget type, or a changed type under the same `id` | Choose a widget from the list. |

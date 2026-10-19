@@ -27,6 +27,8 @@ ObjectKey - where the file is stored in MinIO; never sent to clients, who use UR
 DurationSeconds - length of a video or audio file, nil for photos
 Usage - derived when read: where the item is currently used
 URL - path the file can be fetched from, relative to the API host
+Situations, FamilyMemberIDs - how staff find it (see LoadTags). Only the media
+endpoints load them; elsewhere they are nil and left out of the JSON.
 */
 type Media struct {
 	ID              int       `json:"id"`
@@ -40,6 +42,8 @@ type Media struct {
 	CreatedAt       time.Time `json:"created_at"`
 	Usage           []string  `json:"usage"`
 	URL             string    `json:"url"`
+	Situations      *[]string `json:"situations,omitempty"`
+	FamilyMemberIDs *[]int    `json:"family_member_ids,omitempty"`
 }
 
 // selectMedia reads every column plus the derived usage flags
@@ -129,11 +133,21 @@ func GetMediaByID(exec db.QueryRower, id int) (*Media, error) {
 	return m, err
 }
 
-// List a carepartner's media, newest first. An empty kind lists every kind.
-func ListMedia(db *sql.DB, carepartnerID int, kind string) ([]Media, error) {
+// ListFilter narrows a list of media; zero values don't filter
+type ListFilter struct {
+	Kind           string
+	Situation      string
+	FamilyMemberID int
+}
+
+// List a carepartner's media that matches filter, newest first
+func ListMedia(db *sql.DB, carepartnerID int, filter ListFilter) ([]Media, error) {
 	rows, err := db.Query(
-		selectMedia+` WHERE m.carepartner_id = $1 AND ($2 = '' OR m.kind = $2) ORDER BY m.created_at DESC, m.id DESC;`,
-		carepartnerID, kind,
+		selectMedia+` WHERE m.carepartner_id = $1 AND ($2 = '' OR m.kind = $2)
+		  AND ($3 = '' OR EXISTS (SELECT 1 FROM "MediaSituation" s WHERE s.media_id = m.id AND s.situation = $3))
+		  AND ($4 = 0 OR EXISTS (SELECT 1 FROM "MediaFamilyMember" f WHERE f.media_id = m.id AND f.family_member_id = $4))
+		ORDER BY m.created_at DESC, m.id DESC;`,
+		carepartnerID, filter.Kind, filter.Situation, filter.FamilyMemberID,
 	)
 	if err != nil {
 		return nil, err

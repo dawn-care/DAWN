@@ -141,3 +141,38 @@ func TestCreateErrorResponses(t *testing.T) {
 		require.NotContains(t, response.Body.String(), "sensitive")
 	}
 }
+
+func TestListPlaybacksEndpoint(t *testing.T) {
+	r, mock := setup(t)
+	mock.ExpectQuery(`SELECT .* FROM "Playback"\s+WHERE carepartner_id = \$1 AND started_at IS NOT NULL`).
+		WithArgs(2, 1).WillReturnRows(rows("finished"))
+	response := call(r, "GET", "/api/playbacks?carepartner_id=2&limit=1", "")
+	require.Equal(t, 200, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"media_display_name":"Clip"`)
+	require.Contains(t, response.Body.String(), `"status":"finished"`)
+}
+
+func TestListPlaybacksDefaultsAndEmpty(t *testing.T) {
+	r, mock := setup(t)
+	// Without a limit, up to 50 are returned; none is [] rather than null
+	mock.ExpectQuery(`SELECT .* FROM "Playback"`).WithArgs(2, 50).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	response := call(r, "GET", "/api/playbacks?carepartner_id=2", "")
+	require.Equal(t, 200, response.Code, response.Body.String())
+	require.Equal(t, "[]\n", response.Body.String())
+}
+
+func TestListPlaybacksRejectsBadQueries(t *testing.T) {
+	for _, query := range []string{"", "?carepartner_id=0", "?carepartner_id=two", "?carepartner_id=2&limit=0", "?carepartner_id=2&limit=101", "?carepartner_id=2&limit=all"} {
+		r, _ := setup(t)
+		require.Equal(t, 400, call(r, "GET", "/api/playbacks"+query, "").Code, query)
+	}
+}
+
+func TestListPlaybacksDatabaseError(t *testing.T) {
+	r, mock := setup(t)
+	mock.ExpectQuery(`SELECT .* FROM "Playback"`).WillReturnError(errors.New("sensitive database detail"))
+	response := call(r, "GET", "/api/playbacks?carepartner_id=2", "")
+	require.Equal(t, 500, response.Code)
+	require.NotContains(t, response.Body.String(), "sensitive")
+}

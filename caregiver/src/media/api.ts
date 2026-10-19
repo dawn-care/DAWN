@@ -13,7 +13,7 @@
  */
 
 import { ERROR_MESSAGES, GENERIC_ERROR } from "./constants";
-import type { MediaKind } from "./constants";
+import type { MediaKind, Situation } from "./constants";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -34,6 +34,28 @@ export interface Media {
   usage: MediaUsage[];
   /** Path to the file, relative to the API base; use fileUrl() */
   url: string;
+  /** Situations staff find it under; never empty */
+  situations: Situation[];
+  /** Family members it is about; empty when it isn't about anyone in particular */
+  family_member_ids: number[];
+}
+
+/** Someone in the carepartner's family; a folder for grouping media, not an account */
+export interface FamilyMember {
+  id: number;
+  carepartner_id: number;
+  name: string;
+  /** e.g. "Daughter"; may be empty */
+  relationship: string;
+  /** What staff should say or avoid when the carepartner asks for them */
+  guidance_note: string | null;
+}
+
+/** How staff find a media item */
+export interface MediaTags {
+  /** Empty means every situation */
+  situations: Situation[];
+  familyMemberIds: number[];
 }
 
 export type Repeat = "once" | "daily" | "weekly" | "monthly";
@@ -131,17 +153,29 @@ interface UploadInput {
   file: File;
   kind: MediaKind;
   displayName: string;
+  tags: MediaTags;
   /** Aborting it cancels the upload; the call then rejects (see isAbort) */
   signal?: AbortSignal;
 }
 
-export function uploadMedia({ carepartnerId, file, kind, displayName, signal }: UploadInput): Promise<Media> {
+export function uploadMedia({ carepartnerId, file, kind, displayName, tags, signal }: UploadInput): Promise<Media> {
   const form = new FormData();
   form.append("file", file);
   form.append("kind", kind);
   form.append("carepartner_id", String(carepartnerId));
   form.append("display_name", displayName.trim());
+  // Repeated fields; none means every situation
+  tags.situations.forEach((situation) => form.append("situations", situation));
+  tags.familyMemberIds.forEach((id) => form.append("family_member_ids", String(id)));
   return api<Media>("/media", { method: "POST", body: form, signal });
+}
+
+/** Replaces how staff find an item; no situations means every situation */
+export function setMediaTags(id: number, tags: MediaTags): Promise<Media> {
+  return api<Media>(`/media/${id}/tags`, {
+    method: "PUT",
+    body: JSON.stringify({ situations: tags.situations, family_member_ids: tags.familyMemberIds }),
+  });
 }
 
 export function renameMedia(id: number, displayName: string): Promise<Media> {
@@ -173,6 +207,22 @@ export function deleteMediaOnExit(id: number): void {
 /** Address of the file itself, for <img>, <video> and <audio>; supports seeking */
 export function fileUrl(media: Pick<Media, "url">): string {
   return `${API_URL}${media.url}`;
+}
+
+/* ============================
+   Family members
+============================ */
+
+/** In the order they were added */
+export function listFamilyMembers(carepartnerId: number): Promise<FamilyMember[]> {
+  return api<FamilyMember[]>(`/family-members?carepartner_id=${carepartnerId}`, NO_CACHE);
+}
+
+export function createFamilyMember(carepartnerId: number, name: string, relationship: string): Promise<FamilyMember> {
+  return api<FamilyMember>("/family-members", {
+    method: "POST",
+    body: JSON.stringify({ carepartner_id: carepartnerId, name: name.trim(), relationship: relationship.trim() }),
+  });
 }
 
 /* ============================

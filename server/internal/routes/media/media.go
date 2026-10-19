@@ -15,6 +15,7 @@ func RegisterMediaRoutes(r chi.Router, mediaCtrl *media.MediaController) {
 		r.Get("/{id}", mediaCtrl.GetMediaHandler)
 		r.Get("/{id}/file", mediaCtrl.GetMediaFileHandler)
 		r.Patch("/{id}", mediaCtrl.RenameMediaHandler)
+		r.Put("/{id}/tags", mediaCtrl.SetMediaTagsHandler)
 		r.Delete("/{id}", mediaCtrl.DeleteMediaHandler)
 	})
 }

@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "StartUp Staff",
+    "slug": "startup-staff",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "startupstaff",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.suda.startupstaff"
+    },
+    "android": {
+      "package": "com.suda.startupstaff",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
