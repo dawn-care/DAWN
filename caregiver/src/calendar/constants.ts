@@ -11,7 +11,10 @@
 // Shown when the server gives a code we have no wording for
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
 
-// Wake and bed times the server accepts (EarliestWake .. LatestBed), as minutes after midnight
+// Wake and bed times the server accepts (EarliestWake .. LatestBed in screen_settings_service.go,
+// and the database checks the same), as minutes after midnight. INVALID_WAKE_TIME and
+// INVALID_BED_TIME below, and ScheduleCalendar's 6 am to 10 pm rows, say the same ranges
+// and must change with them
 export const WAKE_RANGE = { earliest: 6 * 60, latest: 10 * 60 };
 export const BED_RANGE = { earliest: 19 * 60, latest: 22 * 60 };
 

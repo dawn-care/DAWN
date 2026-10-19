@@ -30,7 +30,7 @@ interface CalendarSidebarProps {
   onSchedule?: () => void;
 }
 
-// Same hatch as the asleep hours on the grid (calendar.css)
+// A smaller, slightly darker version of the asleep hatch in calendar.css, so it still reads at legend size
 const ASLEEP_SWATCH = "repeating-linear-gradient(45deg, #E2DCD2 0 3px, #F4F0E9 3px 6px)";
 
 export default function CalendarSidebar({

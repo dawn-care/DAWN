@@ -6,8 +6,9 @@
  * The "Awake hours" card in the calendar's left column: when the carepartner
  * wakes up and goes to bed, from the screen settings. Videos and audio only
  * play between them. "Change" opens the editor in place: Wakes up and Bedtime
- * selects, a warning naming the scheduled items the new hours would stop from
- * playing, and Done to save (Cancel throws the changes away).
+ * selects, a warning naming every scheduled item still to play that would be
+ * outside the chosen hours (including any already outside the saved ones),
+ * and Done to save (Cancel throws the changes away).
  */
 
 import { formatClock, parseClock, timeLabel } from "@shared";
@@ -17,7 +18,7 @@ import { FOCUS_RING } from "../components/ui/styles";
 import { friendlyError, listScheduledItems, saveScreenSettings } from "./api";
 import type { ScheduledItem, ScreenSettings } from "./api";
 import { BED_RANGE, WAKE_RANGE } from "./constants";
-import { awakeHoursOf, awakeOptions, itemsThatWontPlay, nameList } from "./time";
+import { awakeHoursOf, awakeOptions, dateText, itemsThatWontPlay, nameList } from "./time";
 
 interface AwakeHoursCardProps {
   carepartnerId: number;
@@ -92,6 +93,8 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
   const [wake, setWake] = useState(settings.wake_time);
   const [bed, setBed] = useState(settings.bed_time);
   const [items, setItems] = useState<ScheduledItem[]>([]);
+  // The schedule couldn't be read, so the warning can't say what the new hours affect
+  const [checkFailed, setCheckFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wakeSelect = useRef<HTMLSelectElement>(null);
@@ -107,14 +110,20 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
       .then((list) => {
         if (!cancelled) setItems(list);
       })
-      .catch((err) => console.warn("Could not load the schedule for the awake-hours warning", err));
+      .catch((err) => {
+        console.warn("Could not load the schedule for the awake-hours warning", err);
+        if (!cancelled) setCheckFailed(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [carepartnerId]);
 
   const draft = awakeHoursOf({ ...settings, wake_time: wake, bed_time: bed });
-  const names = draft ? itemsThatWontPlay(items, draft).map((item) => item.media.display_name) : [];
+  // One name per file, so "is" and "are" agree with the names shown
+  const names = draft
+    ? [...new Set(itemsThatWontPlay(items, draft, dateText(new Date())).map((item) => item.media.display_name))]
+    : [];
 
   const save = async () => {
     setSaving(true);
@@ -146,6 +155,11 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
         <p role="status" className="m-0 px-2 py-1.5 rounded-lg bg-[#FBEDE3] text-[13px] leading-snug text-dawn-accent-hover">
           {nameList(names)} {names.length > 1 ? "are" : "is"} outside these hours and won't play until you move{" "}
           {names.length > 1 ? "them" : "it"}.
+        </p>
+      )}
+      {checkFailed && (
+        <p role="status" className="m-0 text-[13px] leading-snug text-dawn-muted">
+          Couldn't check which videos and audio these hours affect.
         </p>
       )}
       {error && (

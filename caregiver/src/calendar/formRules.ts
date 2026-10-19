@@ -8,13 +8,18 @@
  * date, why a time won't play, and the request body a filled-in form becomes.
  */
 
-import { dayName, formatClock, isAwakeAt, ordinal, parseClock, parseDate } from "@shared";
-import type { AwakeHours } from "@shared";
+import { dayName, formatClock, isAwakeAt, ordinal, parseClock, parseDate } from "@shared";import type { AwakeHours } from "@shared";
 import type { Media } from "../media/api";
 import type { ItemInput, Repeat, ScheduledItem } from "./api";
-import { finishesByBed, minuteLabel, timeOptions } from "./time";
+import { dateText, finishesByBed, minuteLabel, timeOptions } from "./time";
 
 export type FormKind = "video" | "audio";
+
+/** The item being edited, and the date of the occurrence it was opened from */
+export interface EditTarget {
+  item: ScheduledItem;
+  occurrenceDate: string;
+}
 
 /** Whether an audio file shows a photo while it plays ("photo"), or just the tablet's music note ("usual") */
 export type ScreenChoice = "usual" | "photo";
@@ -96,36 +101,56 @@ export function valuesForEdit(item: ScheduledItem, date: string): FormValues | n
 }
 
 /**
- * The request body for a filled-in form. Editing replaces the whole series, so
- * it keeps the series' own start date and end date unless the caregiver chose a
- * different date than the occurrence they opened.
+ * The request body for a filled-in form with its file chosen. Editing replaces
+ * the whole series, so it keeps the series' own start date and end date while
+ * the date and Repeats are both as they were. Changing either starts the item
+ * again from the date in the form, with no end date: the server works out
+ * weekly and monthly repeats from the start date, and a one-time item plays
+ * only on it, so keeping the old start date would save a different schedule
+ * than the form shows.
  */
-export function toInput(
-  values: FormValues,
-  carepartnerId: number,
-  editing: { item: ScheduledItem; occurrenceDate: string } | null
-): ItemInput {
-  const keepsSeries = editing !== null && values.date === editing.occurrenceDate;
+export function toInput(values: FormValues & { mediaId: number }, carepartnerId: number, editing: EditTarget | null): ItemInput {
+  const keepsSeries = editing !== null && values.date === editing.occurrenceDate && values.repeat === editing.item.repeat;
   const repeats = values.repeat !== "once";
+  const startTime = formatClock(values.minute);
+  if (startTime === null) throw new Error(`Can't save a start time of minute ${values.minute}`);
   return {
     carepartner_id: carepartnerId,
-    media_id: values.mediaId as number,
+    media_id: values.mediaId,
     background_photo_id: values.kind === "audio" && values.screen === "photo" ? values.photoId : null,
     display_seconds: null,
     start_date: keepsSeries ? editing.item.start_date : values.date,
-    start_time: formatClock(values.minute) ?? "00:00",
+    start_time: startTime,
     repeat: values.repeat,
     end_date: repeats && keepsSeries ? editing.item.end_date : null,
   };
 }
 
+/** The day after a "YYYY-MM-DD" date */
+function nextDate(date: string): string {
+  const day = parseDate(date);
+  day.setDate(day.getDate() + 1);
+  return dateText(day);
+}
+
 /**
- * The time the Schedule button starts the form at: the next quarter hour from
- * `nowMinute` (null when the form is for another day) if that is still awake
- * with room before bed, otherwise wake up time.
+ * Where a new form starts: on `date` (or today, if `date` has passed) at the
+ * first start time where something `durationSeconds` long finishes by bed.
+ * Today it is the first of those from `nowMinute` on, and once none is left it
+ * is tomorrow, so the form never opens on a time that has already gone by. If
+ * nothing that long fits at all, it starts at wake up and the form says why it
+ * won't play.
  */
-export function nextOpenMinute(hours: AwakeHours, nowMinute: number | null): number {
-  if (nowMinute === null) return hours.wakeMinute;
-  const next = Math.ceil(nowMinute / 15) * 15;
-  return next >= hours.wakeMinute && next < hours.bedMinute ? next : hours.wakeMinute;
+export function firstOpenSlot(
+  hours: AwakeHours,
+  durationSeconds: number,
+  date: string,
+  today: string,
+  nowMinute: number
+): { date: string; minute: number } {
+  const options = timeOptions(hours, durationSeconds);
+  if (options.length === 0) return { date: date < today ? today : date, minute: hours.wakeMinute };
+  if (date > today) return { date, minute: options[0] };
+  const later = options.find((minute) => minute >= nowMinute);
+  return later === undefined ? { date: nextDate(today), minute: options[0] } : { date: today, minute: later };
 }

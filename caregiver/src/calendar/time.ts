@@ -109,10 +109,14 @@ export function playSeconds(item: ScheduledItem): number {
  * The scheduled items that wouldn't play with these awake hours: those that
  * start before wake up or are still playing at bed time. Same rule the server
  * uses for `outside_awake_hours`, worked out here so the caregiver can be
- * warned before new hours are saved.
+ * warned before new hours are saved. Items with nothing left to play from
+ * `today` ("YYYY-MM-DD") on, a one-time item gone by or a repeat that has
+ * ended, aren't named.
  */
-export function itemsThatWontPlay(items: readonly ScheduledItem[], hours: AwakeHours): ScheduledItem[] {
+export function itemsThatWontPlay(items: readonly ScheduledItem[], hours: AwakeHours, today: string): ScheduledItem[] {
   return items.filter((item) => {
+    const lastDate = item.repeat === "once" ? item.start_date : item.end_date;
+    if (lastDate !== null && lastDate < today) return false;
     const start = parseClock(item.start_time);
     return start !== null && !finishesByBed(start, playSeconds(item), hours);
   });

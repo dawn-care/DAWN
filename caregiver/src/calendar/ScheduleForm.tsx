@@ -9,8 +9,8 @@
  * plays), tells the page where a new item would land so the calendar can draw
  * its "New" placeholder, and saves.
  *
- * Saving first checks the day for another item at the same time (the server
- * leaves overlap to this page), then creates the item or replaces the one
+ * Saving first checks the day for another item that would still be playing
+ * (the server leaves overlap to this page), then creates the item or replaces the one
  * being edited. Why a time can't be saved comes back in words, next to the
  * form.
  */
@@ -33,17 +33,15 @@ import type { Media } from "../media/api";
 import { formatDuration } from "../media/labels";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../media/styles";
 import { createScheduledItem, friendlyError, getCalendar, updateScheduledItem } from "./api";
-import type { ScheduledItem } from "./api";
+import type { DeleteScope, Occurrence, ScheduledItem } from "./api";
 import { lengthOf, minuteOptionLabel, minuteOptions, monthlyHint, repeatOptions, toInput, whyWontPlay } from "./formRules";
-import type { FormKind, FormValues, ScreenChoice } from "./formRules";
+import type { EditTarget, FormKind, FormValues, ScreenChoice } from "./formRules";
 import { minuteLabel, toPlayable } from "./time";
 
-/** What the caregiver chose to delete: one day of a repeating item ("day"), or the item with all its days ("all") */
+/** What the caregiver chose to delete: one day of a repeating item, or the item with all its days */
 export interface Removal {
-  scope: "day" | "all";
   item: ScheduledItem;
-  /** The date of the occurrence it was deleted from */
-  date: string;
+  target: DeleteScope;
 }
 
 /** Where a new item would land, for the calendar's "New" placeholder */
@@ -58,13 +56,15 @@ interface ScheduleFormProps {
   /** Photos, videos and audio; null while they load */
   library: Media[] | null;
   initial: FormValues;
-  /** The item being edited, and the date of the occurrence it was opened from; null for a new one */
-  editing: { item: ScheduledItem; occurrenceDate: string } | null;
+  /** The item being edited; null for a new one */
+  editing: EditTarget | null;
   onDraftChange: (draft: DraftSlot | null) => void;
   onClose: () => void;
   onSaved: (saved: ScheduledItem, wasEdit: boolean) => void;
   /** The page hides it and deletes it for real once its Undo toast closes */
   onRemove: (removal: Removal) => void;
+  /** Occurrences deleted but still waiting on their Undo toast; they don't count as overlapping */
+  isHidden: (occurrence: Occurrence) => boolean;
 }
 
 const KIND_SEGMENTS: { value: FormKind; label: string }[] = [
@@ -79,6 +79,9 @@ const NOTE = "m-0 px-2.5 py-2 rounded-lg bg-[#FBEDE3] text-sm leading-snug text-
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+// Close and Delete are off while a save is under way, so a late answer can't close a form opened since
+const ICON_DISABLED = "disabled:opacity-60 disabled:cursor-default disabled:hover:bg-transparent";
+
 export default function ScheduleForm({
   carepartnerId,
   hours,
@@ -89,6 +92,7 @@ export default function ScheduleForm({
   onClose,
   onSaved,
   onRemove,
+  isHidden,
 }: ScheduleFormProps) {
   const [values, setValues] = useState<FormValues>(initial);
   const [saving, setSaving] = useState(false);
@@ -142,11 +146,11 @@ export default function ScheduleForm({
     setSaving(true);
     setError(null);
     try {
-      const chosen: FormValues = { ...values, mediaId: media.id, screen, photoId: photo?.id ?? null };
+      const chosen = { ...values, mediaId: media.id, screen, photoId: photo?.id ?? null };
       const input = toInput(chosen, carepartnerId, editing);
 
-      // Nothing on the server stops two items starting together, so look at that day first
-      const day = await getCalendar(carepartnerId, values.date, values.date);
+      // Nothing on the server stops two items overlapping, so look at that day first
+      const day = (await getCalendar(carepartnerId, values.date, values.date)).filter((occurrence) => !isHidden(occurrence));
       const candidate: PlayableItem = {
         kind: values.kind === "video" ? "video" : input.background_photo_id === null ? "audio" : "audioWithPhoto",
         date: values.date,
@@ -176,8 +180,10 @@ export default function ScheduleForm({
 
   const repeats = editing !== null && editing.item.repeat !== "once";
 
-  const remove = (scope: "day" | "all") => {
-    if (editing) onRemove({ scope, item: editing.item, date: editing.occurrenceDate });
+  const remove = (scope: DeleteScope["scope"]) => {
+    if (!editing) return;
+    const target: DeleteScope = scope === "series" ? { scope } : { scope, date: editing.occurrenceDate };
+    onRemove({ item: editing.item, target });
   };
 
   // A one-time item has nothing to choose between, so it goes straight to the Undo toast
@@ -185,7 +191,7 @@ export default function ScheduleForm({
     setError(null);
     // For a repeating item the bin opens the question and pressing it again closes it
     if (repeats) setConfirmingDelete((open) => !open);
-    else remove("all");
+    else remove("series");
   };
 
   const cancelDelete = () => {
@@ -207,7 +213,8 @@ export default function ScheduleForm({
     <section
       aria-label={editing ? "Edit a scheduled video or audio" : "Schedule a video or audio"}
       onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
+        // A save under way finishes before the form can close
+        if (event.key !== "Escape" || saving) return;
         // Escape backs out of the delete question first
         if (confirmingDelete) cancelDelete();
         else onClose();
@@ -224,10 +231,18 @@ export default function ScheduleForm({
             label="Delete"
             icon={<Trash2 size={18} aria-hidden="true" />}
             onClick={askDelete}
+            disabled={saving}
+            className={ICON_DISABLED}
             aria-expanded={repeats ? confirmingDelete : undefined}
           />
         )}
-        <IconButton label="Close" icon={<X size={18} strokeWidth={2.4} aria-hidden="true" />} onClick={onClose} />
+        <IconButton
+          label="Close"
+          icon={<X size={18} strokeWidth={2.4} aria-hidden="true" />}
+          onClick={onClose}
+          disabled={saving}
+          className={ICON_DISABLED}
+        />
       </div>
 
       {confirmingDelete && (
@@ -239,14 +254,14 @@ export default function ScheduleForm({
             <button
               ref={firstChoice}
               type="button"
-              onClick={() => remove("day")}
+              onClick={() => remove("occurrence")}
               className={`h-10 px-3 rounded-[10px] border-2 border-dawn-control bg-white text-sm font-bold text-dawn-ink cursor-pointer ${FOCUS_RING}`}
             >
               Just this day
             </button>
             <button
               type="button"
-              onClick={() => remove("all")}
+              onClick={() => remove("series")}
               className={`h-10 px-3 rounded-[10px] border-0 bg-dawn-accent hover:bg-dawn-accent-hover text-sm font-bold text-white cursor-pointer ${FOCUS_RING}`}
             >
               Every time
@@ -387,7 +402,7 @@ export default function ScheduleForm({
       )}
 
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+        <button type="button" onClick={onClose} disabled={saving} className={SECONDARY_BUTTON}>
           Cancel
         </button>
         <button type="button" onClick={save} disabled={saving || !media || !dateIsValid} className={PRIMARY_BUTTON}>

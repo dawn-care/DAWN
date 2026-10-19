@@ -8,7 +8,8 @@
  * showing (the week, in week view) and darkens the day in day view. Clicking
  * a date moves the calendar there, keeping its view. The arrows beside the
  * month name browse other months without moving the calendar; the month goes
- * back to the calendar's own whenever the calendar moves.
+ * back to the calendar's own whenever the calendar moves to another date
+ * (switching views on the same date keeps the month browsed to).
  */
 
 import { ChevronLeft, ChevronRight } from "lucide-react";

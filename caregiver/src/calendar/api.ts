@@ -13,11 +13,15 @@
  * listMedia in ../media/api.
  */
 
+import { ApiError } from "../media/api";
 import type { Repeat } from "../media/api";
+import type { MediaKind } from "../media/constants";
 import { ERROR_MESSAGES, GENERIC_ERROR } from "./constants";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// One ApiError class for both, so friendlyError here also reads errors thrown by listMedia
+export { ApiError };
 export type { Repeat };
 
 /** What plays: a video, audio, audio over one photo, or a timed photo */
@@ -25,7 +29,7 @@ export type Shape = "video" | "audio" | "audio_with_background" | "photo";
 
 export interface MediaRef {
   id: number;
-  kind: "photo" | "video" | "audio";
+  kind: MediaKind;
   display_name: string;
   /** Seconds; null for photos */
   duration_seconds: number | null;
@@ -96,17 +100,6 @@ export interface ItemInput {
    Fetch helper
 ============================ */
 
-export class ApiError extends Error {
-  status: number;
-  code: string;
-
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
-
 // The calendar changes whenever something is saved or removed, so never reuse a stored response
 const NO_CACHE: RequestInit = { cache: "no-store" };
 
@@ -127,6 +120,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    // No body to read gets the generic wording. Unlike the media page, nothing here uploads, so there is no 413 to name
     const code = body?.code ?? "INTERNAL_ERROR";
     if (!ERROR_MESSAGES[code]) console.error(`${init.method ?? "GET"} ${path} failed`, res.status, body);
     throw new ApiError(res.status, code, body?.error ?? res.statusText);

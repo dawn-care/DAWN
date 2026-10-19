@@ -5,8 +5,9 @@
  *
  * Makes FullCalendar look like the calendar mockups: dawn colors, one line per
  * hour, hatched asleep hours, accent video events and teal audio events with
- * white text. Event kinds are the `cal-video`, `cal-audio` and `cal-outside`
- * classes ScheduleCalendar puts on each event.
+ * white text. ScheduleCalendar puts `cal-video` or `cal-audio` on each event,
+ * `cal-outside` on one outside the awake hours, `cal-selected` on the one being
+ * edited, and `cal-draft` on the "New" placeholder.
  */
 
 .dawn-calendar {
@@ -101,7 +102,7 @@
   color: #ffffff;
 }
 
-/* Hours the carepartner is asleep: nothing can be scheduled here */
+/* Hours the carepartner is asleep: nothing plays here */
 .dawn-calendar .fc-non-business {
   background: repeating-linear-gradient(45deg, #ede7dd 0 4px, #f7f3ec 4px 8px);
 }
@@ -129,7 +130,8 @@
   color: #ffffff;
 }
 
-/* Scheduled after bedtime: it won't play, so it is hatched with a dashed border */
+/* Outside the awake hours (starts before wake up or still playing at bedtime): it won't play,
+   so it is hatched with a dashed border */
 .dawn-calendar .fc-timegrid-event.cal-outside {
   background: repeating-linear-gradient(45deg, #f3e3d8 0 4px, #ffffff 4px 8px);
   border: 1.5px dashed theme("colors.dawn.accent");
@@ -183,6 +185,17 @@
 
 .dawn-event-dot.is-audio {
   background: theme("colors.dawn.audio");
+}
+
+/* Month view's mark for outside the awake hours: a hollow dashed dot and accent text */
+.dawn-calendar .fc-daygrid-dot-event.cal-outside .dawn-event-dot {
+  box-sizing: border-box;
+  background: transparent;
+  border: 1.5px dashed theme("colors.dawn.accent");
+}
+
+.dawn-calendar .fc-daygrid-dot-event.cal-outside .dawn-event {
+  color: theme("colors.dawn.accent-hover");
 }
 
 .dawn-calendar .fc-daygrid-dot-event .dawn-event-title {

@@ -148,6 +148,7 @@ export default function ScheduleCalendar({
     return draft ? [...list, draftEvent(draft)] : list;
   }, [occurrences, draft, selected]);
 
+  // formatClock only fails for a minute outside the day, which awake hours read by parseClock never are
   const businessHours = awakeHours
     ? {
         daysOfWeek: ALL_DAYS,
@@ -194,6 +195,8 @@ export default function ScheduleCalendar({
       navLinks
       // A bare "day" would pick the plain day grid, which has no time rows
       navLinkDayClick="timeGridDay"
+      // 6 am to 10 pm covers every wake and bed time the server allows (WAKE_RANGE and BED_RANGE
+      // in constants.ts); widen these with them, or items outside the rows won't be drawn
       slotMinTime="06:00:00"
       slotMaxTime="22:00:00"
       slotDuration="00:15:00"
