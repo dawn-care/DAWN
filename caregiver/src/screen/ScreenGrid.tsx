@@ -8,18 +8,26 @@
  * each widget covers, and dashed black outlines of every square
  * drawn over the tiles, with each tile's solid edge drawn over them in turn. The
  * outlines are see-through, so they show which squares a tile covers without
- * hiding or being mistaken for its text. Read-only for now.
- *
- * FUTURE IMPLEMENTATION (#333): the editing controls (add bar, lit squares,
- * pencil and bin) are added on top of the same grid.
+ * hiding or being mistaken for its text. While a widget type is being placed
+ * (`pendingType`), the squares it fits at (`openCells`) are lit and clickable.
+ * Each widget has a bin (to remove it) at its top right, and a pencil (to
+ * change its settings) beside it when its type has a settings panel (`hasPanel`).
+ * News has no settings and reminders aren't changed in the editor, so they have
+ * only the bin. The day and time has neither. Clicking a widget, or its pencil,
+ * selects it, and the selected widget gets a ring. While `disabled` (the draft is
+ * being saved) nothing on it can be clicked.
  */
 
-import { DAY_TIME_AREA, GRID, widgetArea } from "@shared";
-import type { GridArea } from "@shared";
+import { DAY_TIME_AREA, GRID, openCells, widgetArea, widgetName } from "@shared";
+import type { Cell, GridArea } from "@shared";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { CSSProperties } from "react";
+import { FOCUS_RING } from "../components/ui/styles";
 import type { EditorWidget } from "./layout";
 import { placeholderText } from "./placeholders";
+import type { AddableWidgetType } from "./useScreenEditor";
 import WidgetIcon from "./WidgetIcon";
+import { hasPanel } from "./widgetSettings";
 
 // Places an area on the CSS grid, which counts lines from 1
 function gridPosition(area: GridArea): CSSProperties {
@@ -45,16 +53,46 @@ const DAY_TIME_TILE: EditorWidget = {
   photoUrl: null,
 };
 
+// The pencil and bin shrink with the screen: 40px when it is large, never under 26px. The grid is a size
+// container, so cqw is a share of its width; this is set on each child, since a container's own cqw
+// refers to the container above it.
+const TOOL_SIZE = "[--tool:clamp(26px,4.4cqw,40px)]";
+
+const TOOL_BUTTON = `w-[var(--tool)] h-[var(--tool)] flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer disabled:opacity-50 disabled:cursor-default ${FOCUS_RING}`;
+
 interface ScreenGridProps {
   widgets: readonly EditorWidget[];
+  /** The widget being edited, drawn with a ring */
+  selectedId?: EditorWidget["id"] | null;
+  /** The type being placed: the squares it fits at are lit and can be clicked */
+  pendingType?: AddableWidgetType | null;
+  /** Nothing can be selected, changed, removed or placed, e.g. while the draft is being saved */
+  disabled?: boolean;
+  onPlace?: (cell: Cell) => void;
+  /** A click on a widget, or its pencil */
+  onSelect?: (id: EditorWidget["id"]) => void;
+  /** The pencil on a widget */
+  onEdit?: (id: EditorWidget["id"]) => void;
+  /** The bin on a widget */
+  onRemove?: (id: EditorWidget["id"]) => void;
 }
 
-export default function ScreenGrid({ widgets }: ScreenGridProps) {
+export default function ScreenGrid({
+  widgets,
+  selectedId = null,
+  pendingType = null,
+  disabled = false,
+  onPlace,
+  onSelect,
+  onEdit,
+  onRemove,
+}: ScreenGridProps) {
+  const lit = pendingType && !disabled ? openCells(widgets, pendingType) : [];
   return (
     <div
       role="group"
       aria-label={`The carepartner's screen, ${GRID.columns} squares across and ${GRID.rows} down`}
-      className="grid h-full gap-2"
+      className="grid h-full gap-2 [container-type:inline-size]"
       style={{
         gridTemplateColumns: `repeat(${GRID.columns}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${GRID.rows}, minmax(0, 1fr))`,
@@ -62,7 +100,14 @@ export default function ScreenGrid({ widgets }: ScreenGridProps) {
     >
       <PlaceholderTile widget={DAY_TIME_TILE} inFirstSquare />
       {widgets.map((widget) => (
-        <PlaceholderTile key={widget.id} widget={widget} />
+        <PlaceholderTile
+          key={widget.id}
+          widget={widget}
+          tools
+          selected={widget.id === selectedId}
+          disabled={disabled}
+          onSelect={() => onSelect?.(widget.id)}
+        />
       ))}
       {/* Over the tiles, and never in the way of a click */}
       {CELLS.map((cell) => (
@@ -78,10 +123,49 @@ export default function ScreenGrid({ widgets }: ScreenGridProps) {
         <div
           key={`edge-${widget.id}`}
           aria-hidden="true"
-          className="z-30 pointer-events-none rounded-xl ring-2 ring-inset ring-dawn-control"
+          className={`z-30 pointer-events-none rounded-xl ring-2 ring-inset ring-dawn-control ${
+            widget.id === selectedId ? "outline outline-[3px] outline-offset-[3px] outline-dawn-accent" : ""
+          }`}
           style={gridPosition(widgetArea(widget))}
         />
       ))}
+      {/* Above the outlines and edges, so the buttons are never drawn over; clicks pass through everywhere else */}
+      {widgets.map((widget) => {
+        const name = widgetName({ type: widget.type }).toLowerCase();
+        return (
+          <div
+            key={`tools-${widget.id}`}
+            className={`relative z-[35] pointer-events-none ${TOOL_SIZE}`}
+            style={gridPosition(widgetArea(widget))}
+          >
+            <span className="absolute top-[calc(var(--tool)*0.2)] right-[calc(var(--tool)*0.2)] flex gap-[calc(var(--tool)*0.15)] pointer-events-auto">
+              {hasPanel(widget.type) && (
+                <button type="button" onClick={() => onEdit?.(widget.id)} disabled={disabled} aria-label={`Edit ${name}`} className={TOOL_BUTTON}>
+                  <Pencil size={18} strokeWidth={2} aria-hidden="true" className="w-[45%] h-[45%]" />
+                </button>
+              )}
+              <button type="button" onClick={() => onRemove?.(widget.id)} disabled={disabled} aria-label={`Remove ${name}`} className={TOOL_BUTTON}>
+                <Trash2 size={18} strokeWidth={2} aria-hidden="true" className="w-[45%] h-[45%]" />
+              </button>
+            </span>
+          </div>
+        );
+      })}
+      {/* Above everything, so a lit square is always clickable */}
+      {pendingType &&
+        lit.map((cell) => (
+          <button
+            key={`lit-${cell.col}-${cell.row}`}
+            type="button"
+            aria-label={`Put the ${widgetName({ type: pendingType }).toLowerCase()} here, column ${cell.col + 1}, row ${cell.row + 1}`}
+            onClick={() => onPlace?.(cell)}
+            className={`z-40 flex items-center justify-center gap-1.5 rounded-xl border-[2.5px] border-dawn-accent bg-dawn-accent/[0.12] hover:bg-dawn-accent/25 text-[15px] font-bold text-dawn-accent cursor-pointer ${FOCUS_RING}`}
+            style={gridPosition({ ...cell, width: 1, height: 1 })}
+          >
+            <Plus size={18} strokeWidth={2.6} aria-hidden="true" />
+            Place here
+          </button>
+        ))}
     </div>
   );
 }
@@ -90,9 +174,22 @@ interface PlaceholderTileProps {
   widget: EditorWidget;
   /** Centers the words in the tile's top left square rather than across the whole tile */
   inFirstSquare?: boolean;
+  /** Leaves room for the pencil and bin at the tile's top right */
+  tools?: boolean;
+  /** Makes the whole tile a button that selects its widget */
+  selected?: boolean;
+  disabled?: boolean;
+  onSelect?: () => void;
 }
 
-function PlaceholderTile({ widget, inFirstSquare = false }: PlaceholderTileProps) {
+function PlaceholderTile({
+  widget,
+  inFirstSquare = false,
+  tools = false,
+  selected = false,
+  disabled = false,
+  onSelect,
+}: PlaceholderTileProps) {
   const { name, detail } = placeholderText(widget);
   const area = widgetArea(widget);
   // A tile one square wide stacks its icon over its words; wider tiles put them side by side
@@ -101,10 +198,10 @@ function PlaceholderTile({ widget, inFirstSquare = false }: PlaceholderTileProps
   const words = (
     <>
       <WidgetIcon type={widget.type} className="shrink-0 text-dawn-ink" />
-      <div className="flex flex-col min-w-0">
+      <span className="flex flex-col min-w-0">
         <span className="text-lg font-bold leading-tight">{name}</span>
         {detail && <span className="text-[15px] leading-snug text-dawn-muted truncate">{detail}</span>}
-      </div>
+      </span>
     </>
   );
 
@@ -119,19 +216,25 @@ function PlaceholderTile({ widget, inFirstSquare = false }: PlaceholderTileProps
           gridTemplateRows: `repeat(${area.height}, minmax(0, 1fr))`,
         }}
       >
-        <div className="flex items-center justify-center gap-2 p-3 min-w-0">{words}</div>
+        {/* Left aligned and centered top to bottom in the first square, and runs on to the right into the rest of the tile if it needs the room */}
+        <div className="flex items-center justify-start gap-2 p-3 min-w-full w-max whitespace-nowrap">{words}</div>
       </div>
     );
   }
 
+  // Clicking anywhere on the tile selects it, so every widget can be selected, with or without a pencil
   return (
-    <div
-      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm ${
-        narrow ? "flex-col justify-end" : "items-center"
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      disabled={disabled}
+      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left ${TOOL_SIZE} text-dawn-ink cursor-pointer disabled:cursor-default ${FOCUS_RING} ${
+        narrow ? "flex-col justify-end" : `items-center ${tools ? "pr-[calc(var(--tool)*2+var(--tool)*0.15+var(--tool)*0.4)]" : ""}`
       }`}
       style={gridPosition(area)}
     >
       {words}
-    </div>
+    </button>
   );
 }

@@ -44,8 +44,9 @@ import { ToastContext, ToastStateContext, useToast } from "./toastContext";
 import type { DismissOptions, ToastApi, ToastOptions, ToastState, ToastViewportState } from "./toastContext";
 import { FOCUS_RING } from "./styles";
 
-// Long enough to read the message and reach an Undo
-const TOAST_DURATION_MS = 12000;
+// The same for every toast, an Undo one included: long enough to read a short message and reach its
+// button, and the timer pauses while the pointer is over the toast or focus is inside it
+const TOAST_DURATION_MS = 5000;
 
 // How many waiting toasts are drawn behind the top one
 const MAX_PEEKING = 2;

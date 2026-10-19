@@ -45,8 +45,7 @@ export interface LoadedLayout {
   /**
    * Widgets the tablet can't draw either: a stored day and time, not their
    * type's size, off the grid, or overlapping the day and time or a widget
-   * before them. They aren't shown, and saving (#333) removes them from the
-   * screen.
+   * before them. They aren't shown, and saving removes them from the screen.
    */
   dropped: LayoutWidget[];
 }
@@ -97,9 +96,6 @@ export function fromLayout(loaded: readonly LayoutWidget[]): LoadedLayout {
  * The list to send with saveWidgets: every editor widget, with corners from its
  * type's size, then the unknown widgets as they came. A widget added since the
  * last save (a string id) is sent without an id, so the server creates it.
- *
- * FUTURE IMPLEMENTATION (#333): nothing calls this yet; Save changes will use it
- * to build the list for saveWidgets.
  */
 export function toLayout(widgets: readonly EditorWidget[], unknown: readonly LayoutWidget[] = []): LayoutWidgetInput[] {
   const edited = widgets.map(

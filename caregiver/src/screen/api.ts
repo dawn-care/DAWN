@@ -154,6 +154,15 @@ export function friendlyError(err: unknown): string {
 }
 
 /**
+ * Whether the server answered with success but its reply couldn't be read (not
+ * JSON, or no widgets list). The request may have done what it asked, so a save
+ * that fails this way has to be checked by loading the layout again.
+ */
+export function isUnreadableSuccess(err: unknown): boolean {
+  return err instanceof ApiError && err.status >= 200 && err.status < 300;
+}
+
+/**
  * Which widget a save error is about, from the server's "widgets[2]: ..." message,
  * so the editor can highlight it. Undefined when the error names no single widget.
  */
@@ -189,8 +198,6 @@ export async function loadWidgets(carepartnerId: number): Promise<LayoutWidget[]
  * carepartner's widgets left out are deleted. `[]` clears the screen. Nothing is
  * saved if any widget is invalid. Returns the saved widgets in the order sent, so
  * a new widget's `id` can be read from its position.
- *
- * FUTURE IMPLEMENTATION (#333): nothing calls this yet; Save changes will use it.
  */
 export async function saveWidgets(carepartnerId: number, widgets: LayoutWidgetInput[]): Promise<LayoutWidget[]> {
   const path = `/screen-layout?carepartner_id=${carepartnerId}`;
@@ -199,6 +206,27 @@ export async function saveWidgets(carepartnerId: number, widgets: LayoutWidgetIn
     body: JSON.stringify({ widgets }),
   });
   return widgetsOf(layout, path);
+}
+
+/* ============================
+   Sports teams
+============================ */
+
+export interface SportsLeague {
+  id: SportsConfig["league"];
+  /** e.g. "NFL" */
+  name: string;
+  teams: { name: string; abbr: string }[];
+}
+
+/** Every league and its teams, for the sports widget's pickers */
+export async function loadSportsLeagues(): Promise<SportsLeague[]> {
+  const path = "/widgets/sports/teams";
+  const leagues = await api<SportsLeague[]>(path, NO_CACHE);
+  // The server always sends a list; anything else would break the pickers
+  if (Array.isArray(leagues)) return leagues;
+  console.error(`${path} returned no list of leagues`, leagues);
+  throw new ApiError(200, "INTERNAL_ERROR", "response had no list of leagues");
 }
 
 /** Address of a widget's photo, for <img>; null when it has none */
