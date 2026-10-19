@@ -10,17 +10,8 @@
  * draws.
  */
 
-import {
-  areaToCorners,
-  areasOverlap,
-  cornersToArea,
-  FIXED_AREAS,
-  fitsGrid,
-  hasWidgetSize,
-  isScreenWidgetType,
-  widgetArea,
-} from "@shared";
-import type { GridArea, PlacedWidget } from "@shared";
+import { areaToCorners, cornersToArea, createDrawCheck, isScreenWidgetType, widgetArea } from "@shared";
+import type { PlacedWidget } from "@shared";
 import type { LayoutWidget, LayoutWidgetInput, WidgetConfig } from "./api";
 
 /**
@@ -53,13 +44,12 @@ export interface LoadedLayout {
 /**
  * Splits the server's widgets into what the editor shows, what it keeps aside
  * unchanged, and what it drops. Widgets are checked in the order given (the
- * server's reading order), so of two overlapping widgets the later one is
- * dropped, as on the tablet.
+ * server's reading order) by `createDrawCheck`, the same check the tablet
+ * uses, so of two overlapping widgets the later one is dropped.
  */
 export function fromLayout(loaded: readonly LayoutWidget[]): LoadedLayout {
   const result: LoadedLayout = { widgets: [], unknown: [], dropped: [] };
-  // The day and time is always in the top left, so nothing saved can be there
-  const taken: GridArea[] = [...FIXED_AREAS];
+  const drawn = createDrawCheck();
 
   for (const widget of loaded) {
     const { type } = widget;
@@ -68,17 +58,10 @@ export function fromLayout(loaded: readonly LayoutWidget[]): LoadedLayout {
       continue;
     }
     const area = cornersToArea(widget);
-    // A stored day and time is never shown: the tablet draws its own in the top left
-    const placeable =
-      type !== "day_time" &&
-      hasWidgetSize(type, area) &&
-      fitsGrid(area) &&
-      !taken.some((other) => areasOverlap(other, area));
-    if (!placeable) {
+    if (!drawn(type, area)) {
       result.dropped.push(widget);
       continue;
     }
-    taken.push(area);
     result.widgets.push({
       id: widget.id,
       type,

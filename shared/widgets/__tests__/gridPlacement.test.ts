@@ -2,6 +2,7 @@ import {
   DAY_TIME_AREA,
   FIXED_AREAS,
   canPlace,
+  createDrawCheck,
   hasRoom,
   isValidPlacement,
   openCells,
@@ -186,5 +187,36 @@ describe("widgets from the server with an unknown type", () => {
     const { known } = splitKnownWidgets(fromServer);
     expect(isValidPlacement(known)).toBe(true);
     expect(canPlace(known, "weather", { col: 0, row: 2 })).toBe(true);
+  });
+});
+
+describe("createDrawCheck", () => {
+  const area = (col: number, row: number, width = 2, height = 1) => ({ col, row, width, height });
+
+  it("draws widgets of their type's size around the day and time", () => {
+    const drawn = createDrawCheck();
+
+    expect(drawn("photo", area(2, 0, 2, 2))).toBe(true);
+    expect(drawn("weather", area(0, 2))).toBe(true);
+    expect(drawn("sports", area(2, 2))).toBe(true);
+  });
+
+  it.each([
+    ["an unknown type", "slideshow", area(2, 0)],
+    ["a day and time", "day_time", area(0, 0, 2, 2)],
+    ["the wrong size", "weather", area(2, 0, 1, 1)],
+    ["off the grid", "weather", area(3, 2)],
+    ["over the day and time", "message", area(1, 1)],
+  ])("drops %s", (_name, type, at) => {
+    expect(createDrawCheck()(type, at)).toBe(false);
+  });
+
+  it("keeps the first of two that overlap, and a dropped one takes no room", () => {
+    const drawn = createDrawCheck();
+
+    expect(drawn("weather", area(2, 0, 1, 1))).toBe(false);
+    expect(drawn("message", area(2, 0))).toBe(true);
+    expect(drawn("photo", area(2, 0, 2, 2))).toBe(false);
+    expect(drawn("reminder", area(2, 1))).toBe(true);
   });
 });

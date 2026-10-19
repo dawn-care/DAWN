@@ -51,7 +51,7 @@ export function mediaStatus(media: Media): MediaStatus {
 }
 
 /**
- * When the item plays, e.g. "Every day at 8:00 am", or null if it isn't
+ * When the item plays, e.g. "Every day at 8 AM", or null if it isn't
  * scheduled. `scheduled` is null when the schedule couldn't be loaded; the
  * item's `usage` still says it is scheduled, so fall back to a plain
  * "Scheduled".

@@ -9,7 +9,7 @@
  *    Play button that opens an inline player
  *  - Its name, which can be renamed in place
  *  - When it plays: a video or audio file shows its schedule ("Every day at
- *    8:00 am", linking to the Calendar); a photo shows whether it is on
+ *    8 AM", linking to the Calendar); a photo shows whether it is on
  *    the screen, plus its schedule if it has timed showings
  *  - How staff find it: its situations and family members, with Edit, which
  *    opens the same picker as the Save panel (see TagPicker)

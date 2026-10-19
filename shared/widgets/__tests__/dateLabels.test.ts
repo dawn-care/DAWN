@@ -18,16 +18,21 @@ describe("parseDate", () => {
 
 describe("timeLabel", () => {
   it.each([
-    ["00:00", "12:00 am"],
-    ["00:30", "12:30 am"],
-    ["08:00", "8:00 am"],
-    ["11:45", "11:45 am"],
-    ["12:00", "12:00 pm"],
-    ["12:15", "12:15 pm"],
-    ["18:30", "6:30 pm"],
-    ["23:59", "11:59 pm"],
+    ["00:00", "12 AM"],
+    ["00:30", "12:30 AM"],
+    ["08:00", "8 AM"],
+    ["08:05", "8:05 AM"],
+    ["11:45", "11:45 AM"],
+    ["12:00", "12 PM"],
+    ["12:15", "12:15 PM"],
+    ["18:30", "6:30 PM"],
+    ["23:59", "11:59 PM"],
   ])("%s is %s", (time, expected) => {
     expect(timeLabel(time)).toBe(expected);
+  });
+
+  it("returns text that isn't a time as it is", () => {
+    expect(timeLabel("noon")).toBe("noon");
   });
 });
 
