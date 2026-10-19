@@ -13,7 +13,8 @@
 
 import { formatClock, parseClock, startTimeOptions, timeLabel } from "@shared";
 import type { AwakeHours, PlayableItem, PlayableKind } from "@shared";
-import type { Occurrence, ScreenSettings, Shape } from "./api";
+import type { Occurrence, ScheduledItem, ScreenSettings, Shape } from "./api";
+import { AWAKE_STEP_MINUTES } from "./constants";
 
 /** The server's "HH:MM" wake and bed times as minutes; null if either can't be read */
 export function awakeHoursOf(settings: ScreenSettings): AwakeHours | null {
@@ -85,4 +86,42 @@ export function shortTime(minute: number): string {
 export function minuteLabel(minute: number): string {
   const text = formatClock(minute);
   return text === null ? "" : timeLabel(text);
+}
+
+/**
+ * The times a wake or bed select offers: every half hour from `earliest` to
+ * `latest`, plus the saved time if it isn't on one of those steps, so the
+ * select can always show what is saved.
+ */
+export function awakeOptions(range: { earliest: number; latest: number }, saved: number): number[] {
+  const options: number[] = [];
+  for (let minute = range.earliest; minute <= range.latest; minute += AWAKE_STEP_MINUTES) options.push(minute);
+  if (!options.includes(saved)) options.push(saved);
+  return options.sort((a, b) => a - b);
+}
+
+/** How long a scheduled item stays on screen, in seconds: a timed photo's time, else the media's length */
+export function playSeconds(item: ScheduledItem): number {
+  return item.display_seconds ?? item.media.duration_seconds ?? 0;
+}
+
+/**
+ * The scheduled items that wouldn't play with these awake hours: those that
+ * start before wake up or are still playing at bed time. Same rule the server
+ * uses for `outside_awake_hours`, worked out here so the caregiver can be
+ * warned before new hours are saved.
+ */
+export function itemsThatWontPlay(items: readonly ScheduledItem[], hours: AwakeHours): ScheduledItem[] {
+  return items.filter((item) => {
+    const start = parseClock(item.start_time);
+    return start !== null && !finishesByBed(start, playSeconds(item), hours);
+  });
+}
+
+/** Names in a sentence: "A", "A and B", "A, B and C", or "A, B, C and 2 more" past three */
+export function nameList(names: string[]): string {
+  const unique = [...new Set(names)];
+  if (unique.length > 3) return `${unique.slice(0, 3).join(", ")} and ${unique.length - 3} more`;
+  if (unique.length < 2) return unique[0] ?? "";
+  return `${unique.slice(0, -1).join(", ")} and ${unique[unique.length - 1]}`;
 }

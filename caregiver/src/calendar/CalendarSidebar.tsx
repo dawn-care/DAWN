@@ -16,8 +16,14 @@ import MiniMonth from "./MiniMonth";
 import type { VisibleRange } from "./ScheduleCalendar";
 
 interface CalendarSidebarProps {
+  carepartnerId: number;
   range: VisibleRange | null;
   settings: ScreenSettings | null;
+  /** Whether the awake-hours editor is open in place of the hours */
+  editingAwake: boolean;
+  onEditAwake: () => void;
+  onCloseAwake: () => void;
+  onAwakeSaved: (saved: ScreenSettings) => void;
   /** Moves the calendar to a date, "YYYY-MM-DD" */
   onGoToDate: (date: string) => void;
   /** Opens the schedule form; the button is off while this isn't given */
@@ -27,7 +33,17 @@ interface CalendarSidebarProps {
 // Same hatch as the asleep hours on the grid (calendar.css)
 const ASLEEP_SWATCH = "repeating-linear-gradient(45deg, #E2DCD2 0 3px, #F4F0E9 3px 6px)";
 
-export default function CalendarSidebar({ range, settings, onGoToDate, onSchedule }: CalendarSidebarProps) {
+export default function CalendarSidebar({
+  carepartnerId,
+  range,
+  settings,
+  editingAwake,
+  onEditAwake,
+  onCloseAwake,
+  onAwakeSaved,
+  onGoToDate,
+  onSchedule,
+}: CalendarSidebarProps) {
   return (
     <aside className="w-full lg:w-[290px] shrink-0 flex flex-col gap-3.5">
       <button
@@ -42,7 +58,14 @@ export default function CalendarSidebar({ range, settings, onGoToDate, onSchedul
 
       <MiniMonth range={range} onPick={onGoToDate} />
 
-      <AwakeHoursCard settings={settings} />
+      <AwakeHoursCard
+        carepartnerId={carepartnerId}
+        settings={settings}
+        editing={editingAwake}
+        onEdit={onEditAwake}
+        onClose={onCloseAwake}
+        onSaved={onAwakeSaved}
+      />
 
       <ul className="m-0 p-0 pl-1 list-none flex flex-col gap-1.5 text-sm">
         <li className="flex items-center gap-2">

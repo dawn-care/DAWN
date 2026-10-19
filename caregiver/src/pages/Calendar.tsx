@@ -66,6 +66,9 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Changes after new awake hours are saved, so the calendar asks again which items are outside them
+  const [calendarKey, setCalendarKey] = useState(0);
+  const [editingAwake, setEditingAwake] = useState(false);
   // The carepartner whose occurrences are on screen
   const loadedFor = useRef<number | null>(null);
 
@@ -107,8 +110,16 @@ export default function Calendar() {
     if (isAwakeAt(minute, awakeHours)) return;
     if (asleepToastId.current !== null) toast.dismiss(asleepToastId.current);
     asleepToastId.current = toast.show(
-      `The carepartner is asleep at ${minuteLabel(minute)}. Videos and audio can only play between ${minuteLabel(awakeHours.wakeMinute)} and ${minuteLabel(awakeHours.bedMinute)}.`
+      `The carepartner is asleep at ${minuteLabel(minute)}. Videos and audio can only play between ${minuteLabel(awakeHours.wakeMinute)} and ${minuteLabel(awakeHours.bedMinute)}.`,
+      { actionLabel: "Change awake hours", onAction: () => setEditingAwake(true) }
     );
+  };
+
+  const handleAwakeSaved = (saved: ScreenSettings) => {
+    setSettings(saved);
+    setEditingAwake(false);
+    setCalendarKey((key) => key + 1);
+    toast.show("Awake hours saved.");
   };
 
   const from = range?.from;
@@ -135,7 +146,7 @@ export default function Calendar() {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [carepartnerId, from, to, reloadKey]);
+  }, [carepartnerId, from, to, reloadKey, calendarKey]);
 
   const choice = range ? choiceOf(range.view) : "week";
 
@@ -188,8 +199,13 @@ export default function Calendar() {
 
       <div className="flex flex-col lg:flex-row gap-4 grow min-h-0">
         <CalendarSidebar
+          carepartnerId={carepartnerId}
           range={range}
           settings={settings}
+          editingAwake={editingAwake}
+          onEditAwake={() => setEditingAwake(true)}
+          onCloseAwake={() => setEditingAwake(false)}
+          onAwakeSaved={handleAwakeSaved}
           onGoToDate={(date) => calendarRef.current?.getApi().gotoDate(date)}
         />
         <div className="grow min-w-0 min-h-[600px] lg:min-h-0">
