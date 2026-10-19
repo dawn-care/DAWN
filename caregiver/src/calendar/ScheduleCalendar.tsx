@@ -15,7 +15,7 @@
 
 import { formatClock, parseClock, parseDate } from "@shared";
 import type { AwakeHours } from "@shared";
-import type { DatesSetArg, DayHeaderContentArg, EventContentArg, EventInput } from "@fullcalendar/core";
+import type { DatesSetArg, DayHeaderContentArg, EventClickArg, EventContentArg, EventInput } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -23,11 +23,19 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { useMemo } from "react";
 import type { RefObject } from "react";
-import type { Occurrence } from "./api";
+import type { Occurrence, Shape } from "./api";
+import type { DraftSlot } from "./ScheduleForm";
 import "./calendar.css";
 import { dateText, shortTime } from "./time";
 
 export type CalendarViewName = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
+
+/** An item the caregiver clicked: its scheduled item and the date of the occurrence */
+export interface ClickedItem {
+  itemId: number;
+  date: string;
+  shape: Shape;
+}
 
 export interface VisibleRange {
   /** First and last visible day, "YYYY-MM-DD" */
@@ -48,6 +56,11 @@ interface ScheduleCalendarProps {
   onRangeChange: (range: VisibleRange) => void;
   /** A click on an empty time (week and day) or on a day (month); `date` is that time or day */
   onDateClick: (arg: DateClickArg) => void;
+  onItemClick: (item: ClickedItem) => void;
+  /** Where a new item would land: drawn as a dashed "New" block */
+  draft: DraftSlot | null;
+  /** The occurrence being edited: drawn with a ring around it */
+  selected: { itemId: number; date: string } | null;
 }
 
 // Events are drawn at least this long so a 30 second video is still easy to see and click
@@ -76,8 +89,17 @@ function toEvent(occurrence: Occurrence): EventInput | null {
     start,
     end,
     classNames,
-    extendedProps: { startMinute },
+    extendedProps: { startMinute, itemId: occurrence.scheduled_item_id, date: occurrence.date, shape: occurrence.shape },
   };
+}
+
+// The dashed "New" block where the form's date and time would put a new item
+function draftEvent({ date, minute }: DraftSlot): EventInput {
+  const start = parseDate(date);
+  start.setHours(0, minute);
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + MIN_EVENT_MINUTES);
+  return { id: "draft", title: "New", start, end, classNames: ["cal-draft"], extendedProps: { startMinute: minute, draft: true } };
 }
 
 // "8am Title"
@@ -103,8 +125,26 @@ function renderDayHeader({ date, isToday, text, view }: DayHeaderContentArg) {
   );
 }
 
-export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours, onRangeChange, onDateClick }: ScheduleCalendarProps) {
-  const events = useMemo(() => occurrences.map(toEvent).filter((event) => event !== null), [occurrences]);
+export default function ScheduleCalendar({
+  calendarRef,
+  occurrences,
+  awakeHours,
+  onRangeChange,
+  onDateClick,
+  onItemClick,
+  draft,
+  selected,
+}: ScheduleCalendarProps) {
+  const events = useMemo(() => {
+    const list = occurrences
+      .map((occurrence) => {
+        const event = toEvent(occurrence);
+        const isSelected = selected?.itemId === occurrence.scheduled_item_id && selected.date === occurrence.date;
+        return event && isSelected ? { ...event, classNames: [...(event.classNames as string[]), "cal-selected"] } : event;
+      })
+      .filter((event) => event !== null);
+    return draft ? [...list, draftEvent(draft)] : list;
+  }, [occurrences, draft, selected]);
 
   const businessHours = awakeHours
     ? {
@@ -113,6 +153,15 @@ export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours,
         endTime: formatClock(awakeHours.bedMinute) ?? "21:00",
       }
     : false;
+
+  const handleEventClick = ({ event }: EventClickArg) => {
+    if (event.extendedProps.draft) return;
+    onItemClick({
+      itemId: event.extendedProps.itemId as number,
+      date: event.extendedProps.date as string,
+      shape: event.extendedProps.shape as Shape,
+    });
+  };
 
   const handleDatesSet = (arg: DatesSetArg) => {
     // `end` is the day after the last one showing
@@ -162,6 +211,8 @@ export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours,
       }}
       businessHours={businessHours}
       events={events}
+      eventInteractive
+      eventClick={handleEventClick}
       eventContent={renderEvent}
       dayHeaderFormat={{ weekday: "short" }}
       dayHeaderContent={renderDayHeader}

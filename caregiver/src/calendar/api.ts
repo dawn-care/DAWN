@@ -203,3 +203,8 @@ export function saveScreenSettings(carepartnerId: number, wakeTime: string, bedT
     body: JSON.stringify({ wake_time: wakeTime, bed_time: bedTime }),
   });
 }
+
+/** One item, as a rule. Opening an occurrence to edit needs its start date and end date, which occurrences leave out */
+export function getScheduledItem(id: number): Promise<ScheduledItem> {
+  return api<ScheduledItem>(`/scheduled-items/${id}`, NO_CACHE);
+}

@@ -210,3 +210,22 @@
 .dawn-calendar .fc-timegrid-now-indicator-line {
   border-width: 2px 0 0;
 }
+
+/* The "New" placeholder where a new item would go, and the item being edited */
+.dawn-calendar .fc-timegrid-event.cal-draft {
+  background: #fbede3;
+  border: 2px dashed theme("colors.dawn.accent");
+  color: theme("colors.dawn.accent-hover");
+}
+
+.dawn-calendar .fc-timegrid-event.cal-selected {
+  box-shadow: 0 0 0 3px theme("colors.dawn.ink");
+}
+
+.dawn-calendar .fc-event {
+  cursor: pointer;
+}
+
+.dawn-calendar .fc-event.cal-draft {
+  cursor: default;
+}

@@ -23,12 +23,19 @@ import InfoPopover from "../components/ui/InfoPopover";
 import SegmentedControl from "../components/ui/form/SegmentedControl";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
-import { friendlyError, getCalendar, getScreenSettings, isAbort } from "../calendar/api";
-import type { Occurrence, ScreenSettings } from "../calendar/api";
+import { friendlyError, getCalendar, getScheduledItem, getScreenSettings, isAbort } from "../calendar/api";
+import type { Occurrence, ScheduledItem, ScreenSettings } from "../calendar/api";
 import CalendarSidebar from "../calendar/CalendarSidebar";
 import ScheduleCalendar from "../calendar/ScheduleCalendar";
-import type { CalendarViewName, VisibleRange } from "../calendar/ScheduleCalendar";
-import { awakeHoursOf, minuteLabel } from "../calendar/time";
+import type { CalendarViewName, ClickedItem, VisibleRange } from "../calendar/ScheduleCalendar";
+import ScheduleForm from "../calendar/ScheduleForm";
+import type { DraftSlot } from "../calendar/ScheduleForm";
+import { nextOpenMinute, valuesForEdit, valuesForNew } from "../calendar/formRules";
+import type { FormValues } from "../calendar/formRules";
+import { awakeHoursOf, dateText, minuteLabel } from "../calendar/time";
+import { listMedia } from "../media/api";
+import type { Media } from "../media/api";
+import { describeScheduledItem } from "../media/schedule";
 
 const PAGE_INFO =
   "Schedule videos and audio to play on the carepartner's tablet at set times. Shaded hours are when the carepartner is asleep, and nothing plays then.";
@@ -50,6 +57,13 @@ const VIEW_SEGMENTS: { value: ViewChoice; label: string }[] = [
 const choiceOf = (view: CalendarViewName): ViewChoice =>
   view === "timeGridDay" ? "day" : view === "dayGridMonth" ? "month" : "week";
 
+// The form on screen: a new item or an existing one, and what it starts with. `key` restarts the form when another is opened
+interface OpenForm {
+  key: number;
+  initial: FormValues;
+  editing: { item: ScheduledItem; occurrenceDate: string } | null;
+}
+
 export default function Calendar() {
   // RequireCarePartner only renders this page once a carepartner is chosen
   const { activeCarePartnerId } = useAuth();
@@ -69,6 +83,13 @@ export default function Calendar() {
   // Changes after new awake hours are saved, so the calendar asks again which items are outside them
   const [calendarKey, setCalendarKey] = useState(0);
   const [editingAwake, setEditingAwake] = useState(false);
+  // Photos, videos and audio the form picks from; null until loaded
+  const [library, setLibrary] = useState<Media[] | null>(null);
+  const [libraryKey, setLibraryKey] = useState(0);
+  const [form, setForm] = useState<OpenForm | null>(null);
+  // Where a new item would land, drawn on the calendar as "New"
+  const [draft, setDraft] = useState<DraftSlot | null>(null);
+  const formCount = useRef(0);
   // The carepartner whose occurrences are on screen
   const loadedFor = useRef<number | null>(null);
 
@@ -85,6 +106,25 @@ export default function Calendar() {
 
   useEffect(() => {
     let cancelled = false;
+    setLibrary(null);
+    listMedia(carepartnerId)
+      .then((list) => {
+        if (!cancelled) setLibrary(list);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.show(`Couldn't load the photos, videos and audio to choose from. ${friendlyError(err)}`, {
+          actionLabel: "Try again",
+          onAction: () => setLibraryKey((key) => key + 1),
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [carepartnerId, libraryKey, toast]);
+
+  useEffect(() => {
+    let cancelled = false;
     setSettings(null);
     getScreenSettings(carepartnerId)
       .then((loaded) => {
@@ -98,6 +138,52 @@ export default function Calendar() {
     };
   }, [carepartnerId, reloadKey]);
 
+  const openNew = (date: string, minute: number) => {
+    formCount.current += 1;
+    setEditingAwake(false);
+    setForm({ key: formCount.current, initial: valuesForNew(date, minute), editing: null });
+  };
+
+  const closeForm = () => {
+    setForm(null);
+    setDraft(null);
+  };
+
+  // The Schedule button: the day on screen (today if it's showing), at the next time that's open
+  const openFromButton = () => {
+    if (!awakeHours || !range) return;
+    const today = dateText(new Date());
+    const date = range.view === "timeGridDay" ? range.from : today >= range.from && today <= range.to ? today : range.current;
+    openNew(date, nextOpenMinute(awakeHours, date === today ? minuteOfDay(new Date()) : null));
+  };
+
+  // Clicking an item opens it to edit; an occurrence doesn't carry the item's start and end dates, so ask for the item
+  const openEdit = async ({ itemId, date, shape }: ClickedItem) => {
+    if (shape === "photo") {
+      toast.show("A photo on the schedule can't be changed here.");
+      return;
+    }
+    try {
+      const item = await getScheduledItem(itemId);
+      const initial = valuesForEdit(item, date);
+      if (!initial) {
+        toast.show("That can't be changed here.");
+        return;
+      }
+      formCount.current += 1;
+      setEditingAwake(false);
+      setForm({ key: formCount.current, initial, editing: { item, occurrenceDate: date } });
+    } catch (err) {
+      toast.show(friendlyError(err));
+    }
+  };
+
+  const handleSaved = (saved: ScheduledItem, wasEdit: boolean) => {
+    closeForm();
+    setCalendarKey((key) => key + 1);
+    toast.show(`"${saved.media.display_name}" ${wasEdit ? "updated" : "scheduled"}. ${describeScheduledItem(saved)}.`);
+  };
+
   const handleDateClick = ({ date, view }: DateClickArg) => {
     const calendar = calendarRef.current?.getApi();
     // A day in month view opens that day
@@ -107,11 +193,20 @@ export default function Calendar() {
     }
     if (!awakeHours) return;
     const minute = minuteOfDay(date);
-    if (isAwakeAt(minute, awakeHours)) return;
+    if (isAwakeAt(minute, awakeHours)) {
+      openNew(dateText(date), minute);
+      return;
+    }
     if (asleepToastId.current !== null) toast.dismiss(asleepToastId.current);
     asleepToastId.current = toast.show(
       `The carepartner is asleep at ${minuteLabel(minute)}. Videos and audio can only play between ${minuteLabel(awakeHours.wakeMinute)} and ${minuteLabel(awakeHours.bedMinute)}.`,
-      { actionLabel: "Change awake hours", onAction: () => setEditingAwake(true) }
+      {
+        actionLabel: "Change awake hours",
+        onAction: () => {
+          closeForm();
+          setEditingAwake(true);
+        },
+      }
     );
   };
 
@@ -198,16 +293,31 @@ export default function Calendar() {
       )}
 
       <div className="flex flex-col lg:flex-row gap-4 grow min-h-0">
-        <CalendarSidebar
-          carepartnerId={carepartnerId}
-          range={range}
-          settings={settings}
-          editingAwake={editingAwake}
-          onEditAwake={() => setEditingAwake(true)}
-          onCloseAwake={() => setEditingAwake(false)}
-          onAwakeSaved={handleAwakeSaved}
-          onGoToDate={(date) => calendarRef.current?.getApi().gotoDate(date)}
-        />
+        {form && awakeHours ? (
+          <ScheduleForm
+            key={form.key}
+            carepartnerId={carepartnerId}
+            hours={awakeHours}
+            library={library}
+            initial={form.initial}
+            editing={form.editing}
+            onDraftChange={setDraft}
+            onClose={closeForm}
+            onSaved={handleSaved}
+          />
+        ) : (
+          <CalendarSidebar
+            carepartnerId={carepartnerId}
+            range={range}
+            settings={settings}
+            editingAwake={editingAwake}
+            onEditAwake={() => setEditingAwake(true)}
+            onCloseAwake={() => setEditingAwake(false)}
+            onAwakeSaved={handleAwakeSaved}
+            onGoToDate={(date) => calendarRef.current?.getApi().gotoDate(date)}
+            onSchedule={awakeHours ? openFromButton : undefined}
+          />
+        )}
         <div className="grow min-w-0 min-h-[600px] lg:min-h-0">
           <ScheduleCalendar
             calendarRef={calendarRef}
@@ -215,6 +325,9 @@ export default function Calendar() {
             awakeHours={awakeHours}
             onRangeChange={handleRangeChange}
             onDateClick={handleDateClick}
+            onItemClick={openEdit}
+            draft={draft}
+            selected={form?.editing ? { itemId: form.editing.item.id, date: form.editing.occurrenceDate } : null}
           />
         </div>
       </div>
