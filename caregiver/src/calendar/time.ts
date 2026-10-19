@@ -65,3 +65,18 @@ export function toPlayable(occurrence: Occurrence): (PlayableItem & { id: number
     durationSeconds: occurrence.duration_seconds,
   };
 }
+
+/** A local date as "YYYY-MM-DD", the server's date text. `toISOString` would shift the day in the US */
+export function dateText(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Minutes after midnight in the short calendar style: 480 is "8am", 1110 is "6:30pm" */
+export function shortTime(minute: number): string {
+  const hour = Math.floor(minute / 60);
+  const mins = minute % 60;
+  const hour12 = ((hour + 11) % 12) + 1;
+  return `${hour12}${mins ? `:${String(mins).padStart(2, "0")}` : ""}${hour < 12 ? "am" : "pm"}`;
+}
