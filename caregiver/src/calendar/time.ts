@@ -11,7 +11,7 @@
  * formatClock, startTimeOptions).
  */
 
-import { parseClock, startTimeOptions } from "@shared";
+import { formatClock, parseClock, startTimeOptions, timeLabel } from "@shared";
 import type { AwakeHours, PlayableItem, PlayableKind } from "@shared";
 import type { Occurrence, ScreenSettings, Shape } from "./api";
 
@@ -79,4 +79,10 @@ export function shortTime(minute: number): string {
   const mins = minute % 60;
   const hour12 = ((hour + 11) % 12) + 1;
   return `${hour12}${mins ? `:${String(mins).padStart(2, "0")}` : ""}${hour < 12 ? "am" : "pm"}`;
+}
+
+/** Minutes after midnight in words, e.g. 390 is "6:30 am" */
+export function minuteLabel(minute: number): string {
+  const text = formatClock(minute);
+  return text === null ? "" : timeLabel(text);
 }

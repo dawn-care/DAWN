@@ -16,6 +16,7 @@
 import { formatClock, parseClock, parseDate } from "@shared";
 import type { AwakeHours } from "@shared";
 import type { DatesSetArg, DayHeaderContentArg, EventContentArg, EventInput } from "@fullcalendar/core";
+import type { DateClickArg } from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
@@ -35,6 +36,8 @@ export interface VisibleRange {
   view: CalendarViewName;
   /** The range in words, e.g. "Oct 19 – 25, 2026" */
   title: string;
+  /** The date the calendar is on, "YYYY-MM-DD": the day in day view, the day last moved to otherwise */
+  current: string;
 }
 
 interface ScheduleCalendarProps {
@@ -43,6 +46,8 @@ interface ScheduleCalendarProps {
   /** Null until the awake hours have loaded; nothing is hatched meanwhile */
   awakeHours: AwakeHours | null;
   onRangeChange: (range: VisibleRange) => void;
+  /** A click on an empty time (week and day) or on a day (month); `date` is that time or day */
+  onDateClick: (arg: DateClickArg) => void;
 }
 
 // Events are drawn at least this long so a 30 second video is still easy to see and click
@@ -98,7 +103,7 @@ function renderDayHeader({ date, isToday, text, view }: DayHeaderContentArg) {
   );
 }
 
-export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours, onRangeChange }: ScheduleCalendarProps) {
+export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours, onRangeChange, onDateClick }: ScheduleCalendarProps) {
   const events = useMemo(() => occurrences.map(toEvent).filter((event) => event !== null), [occurrences]);
 
   const businessHours = awakeHours
@@ -118,6 +123,7 @@ export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours,
       to: dateText(last),
       view: arg.view.type as CalendarViewName,
       title: arg.view.title,
+      current: dateText(arg.view.calendar.getDate()),
     });
   };
 
@@ -159,6 +165,7 @@ export default function ScheduleCalendar({ calendarRef, occurrences, awakeHours,
       eventContent={renderEvent}
       dayHeaderFormat={{ weekday: "short" }}
       dayHeaderContent={renderDayHeader}
+      dateClick={onDateClick}
       datesSet={handleDatesSet}
     />
     </div>

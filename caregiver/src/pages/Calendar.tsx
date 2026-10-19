@@ -12,9 +12,12 @@
  * hours once, and the scheduled occurrences for whichever dates are showing.
  */
 
+import type { DateClickArg } from "@fullcalendar/interaction";
 import type FullCalendar from "@fullcalendar/react";
+import { isAwakeAt, minuteOfDay } from "@shared";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useToast } from "../components/ui/toastContext";
 import IconButton from "../components/ui/IconButton";
 import InfoPopover from "../components/ui/InfoPopover";
 import SegmentedControl from "../components/ui/form/SegmentedControl";
@@ -22,9 +25,10 @@ import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
 import { friendlyError, getCalendar, getScreenSettings, isAbort } from "../calendar/api";
 import type { Occurrence, ScreenSettings } from "../calendar/api";
+import CalendarSidebar from "../calendar/CalendarSidebar";
 import ScheduleCalendar from "../calendar/ScheduleCalendar";
 import type { CalendarViewName, VisibleRange } from "../calendar/ScheduleCalendar";
-import { awakeHoursOf } from "../calendar/time";
+import { awakeHoursOf, minuteLabel } from "../calendar/time";
 
 const PAGE_INFO =
   "Schedule videos and audio to play on the carepartner's tablet at set times. Shaded hours are when the carepartner is asleep, and nothing plays then.";
@@ -51,7 +55,10 @@ export default function Calendar() {
   const { activeCarePartnerId } = useAuth();
   const carepartnerId = activeCarePartnerId as number;
 
+  const toast = useToast();
   const calendarRef = useRef<FullCalendar>(null);
+  // The "asleep" toast on screen, so clicking around doesn't stack them
+  const asleepToastId = useRef<number | null>(null);
   // Which dates the calendar is showing; null until it has drawn the first time
   const [range, setRange] = useState<VisibleRange | null>(null);
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
@@ -67,7 +74,7 @@ export default function Calendar() {
   const handleRangeChange = (next: VisibleRange) => {
     // The calendar reports again after every redraw; only new dates need new data
     setRange((current) =>
-      current && current.from === next.from && current.to === next.to && current.view === next.view && current.title === next.title
+      current && current.from === next.from && current.to === next.to && current.view === next.view && current.title === next.title && current.current === next.current
         ? current
         : next
     );
@@ -87,6 +94,22 @@ export default function Calendar() {
       cancelled = true;
     };
   }, [carepartnerId, reloadKey]);
+
+  const handleDateClick = ({ date, view }: DateClickArg) => {
+    const calendar = calendarRef.current?.getApi();
+    // A day in month view opens that day
+    if (view.type === "dayGridMonth") {
+      calendar?.changeView("timeGridDay", date);
+      return;
+    }
+    if (!awakeHours) return;
+    const minute = minuteOfDay(date);
+    if (isAwakeAt(minute, awakeHours)) return;
+    if (asleepToastId.current !== null) toast.dismiss(asleepToastId.current);
+    asleepToastId.current = toast.show(
+      `The carepartner is asleep at ${minuteLabel(minute)}. Videos and audio can only play between ${minuteLabel(awakeHours.wakeMinute)} and ${minuteLabel(awakeHours.bedMinute)}.`
+    );
+  };
 
   const from = range?.from;
   const to = range?.to;
@@ -163,13 +186,21 @@ export default function Calendar() {
         </p>
       )}
 
-      <div className="grow min-h-[600px] lg:min-h-0">
-        <ScheduleCalendar
-          calendarRef={calendarRef}
-          occurrences={occurrences}
-          awakeHours={awakeHours}
-          onRangeChange={handleRangeChange}
+      <div className="flex flex-col lg:flex-row gap-4 grow min-h-0">
+        <CalendarSidebar
+          range={range}
+          settings={settings}
+          onGoToDate={(date) => calendarRef.current?.getApi().gotoDate(date)}
         />
+        <div className="grow min-w-0 min-h-[600px] lg:min-h-0">
+          <ScheduleCalendar
+            calendarRef={calendarRef}
+            occurrences={occurrences}
+            awakeHours={awakeHours}
+            onRangeChange={handleRangeChange}
+            onDateClick={handleDateClick}
+          />
+        </div>
       </div>
     </div>
   );
