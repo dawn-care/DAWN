@@ -28,6 +28,8 @@ interface AddBarProps {
   pendingType: AddableWidgetType | null;
   /** The type the caregiver picked that fits nowhere, or null */
   fullType: AddableWidgetType | null;
+  /** The type of an unsaved new widget the caregiver must finish before adding another, or null */
+  finishType: AddableWidgetType | null;
   onPick: (type: AddableWidgetType | null) => void;
 }
 
@@ -37,8 +39,11 @@ function hintFor({
   editing,
   pendingType,
   fullType,
-}: Pick<AddBarProps, "editing" | "pendingType" | "fullType">) {
+  finishType,
+}: Pick<AddBarProps, "editing" | "pendingType" | "fullType" | "finishType">) {
   if (!editing) return "Press Edit screen to add or change icons";
+  if (finishType)
+    return "Finish creating the icon you added first, then press Save. If you no longer want this widget, click the trash can icon.";
   if (fullType)
     return `No room for a ${lower(fullType)}. Remove something on the screen first.`;
   if (pendingType)
@@ -50,6 +55,7 @@ export default function AddBar({
   editing,
   pendingType,
   fullType,
+  finishType,
   onPick,
 }: AddBarProps) {
   // Escape puts the picked type back down
@@ -73,9 +79,9 @@ export default function AddBar({
           <InfoPopover label="About adding things">{ADD_INFO}</InfoPopover>
         </div>
         <div
-          className={`text-sm leading-snug ${fullType ? "text-dawn-accent" : "text-dawn-muted"}`}
+          className={`text-sm leading-snug ${fullType || finishType ? "text-dawn-accent" : "text-dawn-muted"}`}
         >
-          {hintFor({ editing, pendingType, fullType })}
+          {hintFor({ editing, pendingType, fullType, finishType })}
         </div>
       </div>
       {ADDABLE_WIDGET_TYPES.map((type) => {

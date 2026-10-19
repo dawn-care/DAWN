@@ -26,6 +26,7 @@ import type { ToastOptions } from "../components/ui/toastContext";
 import { useAuth } from "../context/AuthContext";
 import AddBar from "../screen/AddBar";
 import type { EditorWidget } from "../screen/layout";
+import type { AddableWidgetType } from "../screen/useScreenEditor";
 import ScreenGrid from "../screen/ScreenGrid";
 import WidgetPanel from "../screen/WidgetPanel";
 import { hasPanel, settingsChanged, settingsOf } from "../screen/widgetSettings";
@@ -58,6 +59,10 @@ export default function Home() {
     toastIds.current.forEach((id) => toast.dismiss(id));
     toastIds.current = [];
   }, [editor.editing, toast]);
+
+  // Shown after trying to add something while a new widget is unsaved, until that widget is saved or removed
+  const unfinished = editor.draft?.find((widget) => widget.id === editor.unfinishedId) ?? null;
+  const finishType = editor.finishFirst && unfinished ? (unfinished.type as AddableWidgetType) : null;
 
   const nameOf = (widget: EditorWidget) => widgetName({ type: widget.type }).toLowerCase();
 
@@ -141,6 +146,7 @@ export default function Home() {
         editing={editor.editing}
         pendingType={editor.pendingType}
         fullType={editor.fullType}
+        finishType={finishType}
         onPick={editor.pick}
       />
 
@@ -164,6 +170,7 @@ export default function Home() {
         />
         <div className="w-[330px] shrink-0 pt-2">
           <WidgetPanel
+            carepartnerId={carepartnerId}
             widget={selected && hasPanel(selected.type) ? selected : null}
             onChange={(changes) => selected && editor.update(selected.id, changes)}
             onDone={(original) => {

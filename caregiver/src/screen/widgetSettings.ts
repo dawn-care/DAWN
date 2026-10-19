@@ -10,15 +10,13 @@
 
 import type { ScreenWidgetType } from "@shared";
 import type { EditorWidget } from "./layout";
+import type { MessageConfig, SportsConfig, WeatherConfig } from "./api";
 
 /**
  * The types whose settings the editor changes in a panel. News has none, and
  * reminders are not changed in the editor.
- *
- * FUTURE IMPLEMENTATION (#333): photo and sports are added to this list when
- * their panels exist.
  */
-export const PANEL_TYPES: readonly ScreenWidgetType[] = ["message", "weather"];
+export const PANEL_TYPES: readonly ScreenWidgetType[] = ["photo", "message", "weather", "sports"];
 
 /** Whether selecting a widget of this type opens a settings panel */
 export function hasPanel(type: ScreenWidgetType): boolean {
@@ -42,4 +40,27 @@ export function settingsChanged(before: EditorWidget, after: EditorWidget): bool
 /** A weather widget's zip code: exactly five digits */
 export function isValidZip(zip: string): boolean {
   return /^\d{5}$/.test(zip);
+}
+
+/**
+ * Whether a widget has everything it needs to be saved: a message has text, a
+ * weather widget a five digit zip, a photo widget a photo, and a sports widget
+ * both its league and its team. Types without settings are always complete.
+ * The panel's Save is off until this is true, and so is saving the screen.
+ */
+export function isComplete(widget: EditorWidget): boolean {
+  switch (widget.type) {
+    case "message":
+      return ((widget.config as Partial<MessageConfig>).text ?? "").trim() !== "";
+    case "weather":
+      return isValidZip((widget.config as Partial<WeatherConfig>).zip ?? "");
+    case "photo":
+      return widget.photoMediaId !== null;
+    case "sports": {
+      const { league, team } = widget.config as Partial<SportsConfig>;
+      return !!league && !!team;
+    }
+    default:
+      return true;
+  }
 }

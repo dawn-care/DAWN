@@ -46,6 +46,8 @@ export function useScreenEditor(saved: LoadedLayout | null) {
   const [selectedId, setSelectedId] = useState<EditorWidget["id"] | null>(null);
   const [pendingType, setPendingType] = useState<AddableWidgetType | null>(null);
   const [fullType, setFullType] = useState<AddableWidgetType | null>(null);
+  // True after the caregiver tried to add something while a new widget was still unsaved
+  const [finishFirst, setFinishFirst] = useState(false);
   const [newIds, setNewIds] = useState<readonly EditorWidget["id"][]>([]);
   const nextId = useRef(0);
   // The latest draft, for actions that run later (a toast's Undo) and must not use an old copy
@@ -57,6 +59,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     setSelectedId(null);
     setPendingType(null);
     setFullType(null);
+    setFinishFirst(false);
     setNewIds([]);
   };
 
@@ -74,6 +77,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
       setSelectedId(null);
       setPendingType(null);
       setFullType(null);
+      setFinishFirst(false);
       setNewIds([]);
     }
   }, [saved]);
@@ -83,18 +87,24 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     setSelectedId(null);
     setPendingType(null);
     setFullType(null);
+    setFinishFirst(false);
     setNewIds([]);
   }, []);
 
   /**
    * Picks the type to place next, or null to stop placing. Picking the type
    * being placed again stops. A type that fits nowhere isn't picked: it is
-   * remembered as `fullType` so the add bar can say the screen is full.
+   * remembered as `fullType` so the add bar can say the screen is full. While a
+   * widget added since editing began is still unsaved, nothing new is picked:
+   * `finishFirst` is set so the add bar can say to finish that one first.
    */
   const pick = useCallback(
     (type: AddableWidgetType | null) => {
       setFullType(null);
-      if (type === null || type === pendingType) {
+      setFinishFirst(type !== null && newIds.length > 0);
+      if (type !== null && newIds.length > 0) {
+        setPendingType(null);
+      } else if (type === null || type === pendingType) {
         setPendingType(null);
       } else if (draft && !hasRoom(draft, type)) {
         setPendingType(null);
@@ -103,7 +113,7 @@ export function useScreenEditor(saved: LoadedLayout | null) {
         setPendingType(type);
       }
     },
-    [draft, pendingType],
+    [draft, pendingType, newIds],
   );
 
   /**
@@ -173,6 +183,10 @@ export function useScreenEditor(saved: LoadedLayout | null) {
     pendingType,
     /** The type the caregiver picked that fits nowhere, or null */
     fullType,
+    /** The widget added since editing began that has not been saved yet, or null; nothing else can be added until it is */
+    unfinishedId: newIds[0] ?? null,
+    /** True after the caregiver tried to add something while `unfinishedId` was set */
+    finishFirst,
     /** Whether the widget was added since editing began and its settings aren't confirmed yet */
     isNew: (id: EditorWidget["id"]) => newIds.includes(id),
     start,

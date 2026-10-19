@@ -201,6 +201,22 @@ export async function saveWidgets(carepartnerId: number, widgets: LayoutWidgetIn
   return widgetsOf(layout, path);
 }
 
+/* ============================
+   Sports teams
+============================ */
+
+export interface SportsLeague {
+  id: SportsConfig["league"];
+  /** e.g. "NFL" */
+  name: string;
+  teams: { name: string; abbr: string }[];
+}
+
+/** Every league and its teams, for the sports widget's pickers */
+export function loadSportsLeagues(): Promise<SportsLeague[]> {
+  return api<SportsLeague[]>("/widgets/sports/teams", NO_CACHE);
+}
+
 /** Address of a widget's photo, for <img>; null when it has none */
 export function photoSrc(widget: Pick<LayoutWidget, "photo_url">): string | null {
   return widget.photo_url ? `${API_URL}${widget.photo_url}` : null;

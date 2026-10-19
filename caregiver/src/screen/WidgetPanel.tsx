@@ -13,15 +13,23 @@
  */
 
 import { TEXT_LIMITS, widgetName } from "@shared";
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import PhotoPicker from "../components/ui/PhotoPicker";
+import SelectField from "../components/ui/form/SelectField";
 import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
-import type { MessageConfig, WeatherConfig } from "./api";
+import { fileUrl, friendlyError as mediaError, listMedia } from "../media/api";
+import type { Media } from "../media/api";
+import { friendlyError, loadSportsLeagues } from "./api";
+import type { MessageConfig, SportsConfig, SportsLeague, WeatherConfig } from "./api";
 import type { EditorWidget } from "./layout";
-import { isValidZip } from "./widgetSettings";
+import { isComplete, isValidZip } from "./widgetSettings";
 import type { WidgetChanges } from "./useScreenEditor";
 
 interface WidgetPanelProps {
+  /** Whose photos the photo picker lists */
+  carepartnerId: number;
   /** The widget whose settings to show, or null for an empty panel */
   widget: EditorWidget | null;
   /** Change the widget's settings in the draft */
@@ -30,19 +38,32 @@ interface WidgetPanelProps {
   onDone: (original: EditorWidget) => void;
 }
 
-export default function WidgetPanel({ widget, onChange, onDone }: WidgetPanelProps) {
+export default function WidgetPanel({ carepartnerId, widget, onChange, onDone }: WidgetPanelProps) {
   return (
     <aside
       aria-label="Settings"
       className="h-full flex flex-col gap-3 p-4 bg-white border-[1.5px] border-dawn-line rounded-[14px] text-dawn-ink overflow-y-auto"
     >
       {/* A new widget gets a new set of settings, remembering how it was when they opened */}
-      {widget && <WidgetSettings key={widget.id} widget={widget} onChange={onChange} onDone={onDone} />}
+      {widget && (
+        <WidgetSettings
+          key={widget.id}
+          carepartnerId={carepartnerId}
+          widget={widget}
+          onChange={onChange}
+          onDone={onDone}
+        />
+      )}
     </aside>
   );
 }
 
-function WidgetSettings({ widget, onChange, onDone }: Omit<WidgetPanelProps, "widget"> & { widget: EditorWidget }) {
+function WidgetSettings({
+  carepartnerId,
+  widget,
+  onChange,
+  onDone,
+}: Omit<WidgetPanelProps, "widget"> & { widget: EditorWidget }) {
   const name = widgetName({ type: widget.type });
   // The widget as it was when the panel opened; the parent mounts a new panel for each widget
   const original = useRef(widget);
@@ -54,14 +75,18 @@ function WidgetSettings({ widget, onChange, onDone }: Omit<WidgetPanelProps, "wi
         <span className="text-xl font-extrabold">{name}</span>
       </div>
 
+      {widget.type === "photo" && <PhotoSettings carepartnerId={carepartnerId} widget={widget} onChange={onChange} />}
       {widget.type === "message" && <MessageSettings widget={widget} onChange={onChange} />}
       {widget.type === "weather" && <WeatherSettings widget={widget} onChange={onChange} />}
+      {widget.type === "sports" && <SportsSettings widget={widget} onChange={onChange} />}
 
       <div className="flex justify-end mt-auto">
         <button
           type="button"
           onClick={() => onDone(original.current)}
-          className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-accent bg-dawn-accent hover:bg-dawn-accent-hover hover:border-dawn-accent-hover text-white text-base font-bold cursor-pointer ${FOCUS_RING}`}
+          // A widget can't be kept without what it needs: text, a zip, a photo, a league and team
+          disabled={!isComplete(widget)}
+          className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-accent bg-dawn-accent hover:bg-dawn-accent-hover hover:border-dawn-accent-hover text-white text-base font-bold cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-dawn-accent disabled:hover:border-dawn-accent ${FOCUS_RING}`}
         >
           Save
         </button>
@@ -116,6 +141,120 @@ function WeatherSettings({ widget, onChange }: SettingsProps) {
           Enter a 5-digit zip code.
         </div>
       )}
+    </div>
+  );
+}
+
+/** Loads something when the settings open, with a way to try again */
+function useLoad<T>(load: () => Promise<T>, describe: (err: unknown) => string) {
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "error"; message: string } | { status: "ready"; value: T }
+  >({ status: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  // The loader and its wording are the same on every render; only a retry loads again
+  const latest = useRef({ load, describe });
+  latest.current = { load, describe };
+
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    latest.current.load().then(
+      (value) => current && setState({ status: "ready", value }),
+      (err: unknown) => {
+        if (!current) return;
+        console.error("Loading the widget's settings failed", err);
+        setState({ status: "error", message: latest.current.describe(err) });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [attempt]);
+
+  return { state, retry: useCallback(() => setAttempt((n) => n + 1), []) };
+}
+
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-col items-start gap-2 text-base text-dawn-muted">
+      <p className="m-0">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-control bg-white hover:bg-dawn-page text-dawn-ink text-base font-bold cursor-pointer ${FOCUS_RING}`}
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { carepartnerId: number }) {
+  const { state, retry } = useLoad<Media[]>(() => listMedia(carepartnerId), mediaError);
+
+  if (state.status === "loading") return <p className="m-0 text-base text-dawn-muted">Loading photos…</p>;
+  if (state.status === "error") return <LoadError message={state.message} onRetry={retry} />;
+
+  const photos = state.value.filter((media) => media.kind === "photo");
+  const chosen = photos.find((media) => media.id === widget.photoMediaId);
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-base font-bold">Photo</span>
+      {photos.length === 0 ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="m-0 text-base text-dawn-muted">No photos yet.</p>
+          <Link to="/media" className="shrink-0 text-base font-bold text-dawn-accent hover:text-dawn-accent-hover">
+            Add photos
+          </Link>
+        </div>
+      ) : (
+        <PhotoPicker
+          label="Photo"
+          photos={photos.map((media) => ({ id: String(media.id), label: media.display_name, src: fileUrl(media) }))}
+          value={widget.photoMediaId === null ? "" : String(widget.photoMediaId)}
+          onChange={(id) => {
+            const picked = photos.find((media) => String(media.id) === id);
+            if (picked) onChange({ photoMediaId: picked.id, photoUrl: picked.url });
+          }}
+        />
+      )}
+      {/* The chosen photo, larger, with its name under it */}
+      {chosen && (
+        <figure className="m-0 flex flex-col gap-1.5">
+          <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-dawn-avatar" />
+          <figcaption className="text-base font-bold break-words">{chosen.display_name}</figcaption>
+        </figure>
+      )}
+    </div>
+  );
+}
+
+function SportsSettings({ widget, onChange }: SettingsProps) {
+  const config = widget.config as Partial<SportsConfig>;
+  const { state, retry } = useLoad<SportsLeague[]>(loadSportsLeagues, friendlyError);
+
+  if (state.status === "loading") return <p className="m-0 text-base text-dawn-muted">Loading teams…</p>;
+  if (state.status === "error") return <LoadError message={state.message} onRetry={retry} />;
+
+  const league = state.value.find((other) => other.id === config.league);
+  return (
+    <div className="flex flex-col gap-3">
+      <SelectField
+        label="League"
+        placeholder="Choose a league"
+        value={config.league ?? ""}
+        options={state.value.map((other) => ({ value: other.id, label: other.name }))}
+        // A team belongs to one league, so changing the league clears it
+        onChange={(event) => onChange({ config: { league: event.target.value as SportsConfig["league"], team: "" } })}
+      />
+      <SelectField
+        label="Team"
+        placeholder="Choose a team"
+        value={config.team ?? ""}
+        disabled={!league}
+        options={(league?.teams ?? []).map((team) => ({ value: team.abbr, label: team.name }))}
+        onChange={(event) => league && onChange({ config: { league: league.id, team: event.target.value } })}
+      />
     </div>
   );
 }
