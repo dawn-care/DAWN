@@ -14,7 +14,7 @@
 
 import type { DateClickArg } from "@fullcalendar/interaction";
 import type FullCalendar from "@fullcalendar/react";
-import { isAwakeAt, minuteOfDay } from "@shared";
+import { dateLabel, dayName, isAwakeAt, minuteOfDay, parseDate } from "@shared";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "../components/ui/toastContext";
@@ -23,13 +23,22 @@ import InfoPopover from "../components/ui/InfoPopover";
 import SegmentedControl from "../components/ui/form/SegmentedControl";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
-import { friendlyError, getCalendar, getScheduledItem, getScreenSettings, isAbort } from "../calendar/api";
-import type { Occurrence, ScheduledItem, ScreenSettings } from "../calendar/api";
+import {
+  ApiError,
+  deleteScheduledItem,
+  deleteScheduledItemOnExit,
+  friendlyError,
+  getCalendar,
+  getScheduledItem,
+  getScreenSettings,
+  isAbort,
+} from "../calendar/api";
+import type { DeleteScope, Occurrence, ScheduledItem, ScreenSettings } from "../calendar/api";
 import CalendarSidebar from "../calendar/CalendarSidebar";
 import ScheduleCalendar from "../calendar/ScheduleCalendar";
 import type { CalendarViewName, ClickedItem, VisibleRange } from "../calendar/ScheduleCalendar";
 import ScheduleForm from "../calendar/ScheduleForm";
-import type { DraftSlot } from "../calendar/ScheduleForm";
+import type { DraftSlot, Removal } from "../calendar/ScheduleForm";
 import { nextOpenMinute, valuesForEdit, valuesForNew } from "../calendar/formRules";
 import type { FormValues } from "../calendar/formRules";
 import { awakeHoursOf, dateText, minuteLabel } from "../calendar/time";
@@ -39,6 +48,42 @@ import { describeScheduledItem } from "../media/schedule";
 
 const PAGE_INFO =
   "Schedule videos and audio to play on the carepartner's tablet at set times. Shaded hours are when the carepartner is asleep, and nothing plays then.";
+
+// Deletes whose Undo toast is still open, keyed "item|series" or "item|date". The server is
+// told only when the toast closes, so until then they stay hidden from the calendar.
+// Module level, because the toast outlives this page. If the page is closed or
+// reloaded first, the pagehide listener sends the deletes then.
+const pendingRemovals = new Map<string, { id: number; target: DeleteScope }>();
+
+window.addEventListener("pagehide", () => pendingRemovals.forEach(({ id, target }) => deleteScheduledItemOnExit(id, target)));
+
+const removalKey = (id: number, scope: "series" | string) => `${id}|${scope}`;
+
+const isHidden = (occurrence: Occurrence) =>
+  pendingRemovals.has(removalKey(occurrence.scheduled_item_id, "series")) ||
+  pendingRemovals.has(removalKey(occurrence.scheduled_item_id, occurrence.date));
+
+// The Undo toast closed without Undo: delete for real. A failure brings it back, with a toast saying so.
+async function commitRemoval(
+  key: string,
+  name: string,
+  showToast: (text: string) => void,
+  reload: () => void
+) {
+  const removal = pendingRemovals.get(key);
+  if (!removal) return;
+  try {
+    await deleteScheduledItem(removal.id, removal.target);
+  } catch (err) {
+    // Already gone (deleted somewhere else) is the outcome the caregiver wanted
+    const alreadyGone = err instanceof ApiError && (err.status === 404 || err.code === "NOT_AN_OCCURRENCE");
+    if (!alreadyGone) showToast(`Couldn't remove "${name}". ${friendlyError(err)}`);
+  } finally {
+    pendingRemovals.delete(key);
+    // Show the server's answer: it is back if the delete failed
+    reload();
+  }
+}
 
 type ViewChoice = "day" | "week" | "month";
 
@@ -90,6 +135,8 @@ export default function Calendar() {
   // Where a new item would land, drawn on the calendar as "New"
   const [draft, setDraft] = useState<DraftSlot | null>(null);
   const formCount = useRef(0);
+  // Changes when a delete is hidden or undone, so the calendar draws again
+  const [removalsVersion, setRemovalsVersion] = useState(0);
   // The carepartner whose occurrences are on screen
   const loadedFor = useRef<number | null>(null);
 
@@ -184,6 +231,31 @@ export default function Calendar() {
     toast.show(`"${saved.media.display_name}" ${wasEdit ? "updated" : "scheduled"}. ${describeScheduledItem(saved)}.`);
   };
 
+  // Hide it right away; the server isn't told until the Undo toast closes, so Undo only has to show it again
+  const handleRemove = ({ scope, item, date }: Removal) => {
+    closeForm();
+    const key = removalKey(item.id, scope === "day" ? date : "series");
+    const target: DeleteScope = scope === "day" ? { scope: "occurrence", date } : { scope: "series" };
+    const name = item.media.display_name;
+    const day = parseDate(date);
+    const reload = () => setCalendarKey((value) => value + 1);
+
+    pendingRemovals.set(key, { id: item.id, target });
+    setRemovalsVersion((value) => value + 1);
+
+    toast.show(
+      scope === "day" ? `"${name}" removed from ${dayName(day)}, ${dateLabel(day)} only.` : `"${name}" deleted.`,
+      {
+        actionLabel: "Undo",
+        onAction: () => {
+          pendingRemovals.delete(key);
+          setRemovalsVersion((value) => value + 1);
+        },
+        onDismiss: () => void commitRemoval(key, name, toast.show, reload),
+      }
+    );
+  };
+
   const handleDateClick = ({ date, view }: DateClickArg) => {
     const calendar = calendarRef.current?.getApi();
     // A day in month view opens that day
@@ -242,6 +314,10 @@ export default function Calendar() {
       });
     return () => controller.abort();
   }, [carepartnerId, from, to, reloadKey, calendarKey]);
+
+  // pendingRemovals isn't state, so removalsVersion says when a delete was hidden or undone
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const visibleOccurrences = useMemo(() => occurrences.filter((occurrence) => !isHidden(occurrence)), [occurrences, removalsVersion]);
 
   const choice = range ? choiceOf(range.view) : "week";
 
@@ -304,6 +380,7 @@ export default function Calendar() {
             onDraftChange={setDraft}
             onClose={closeForm}
             onSaved={handleSaved}
+            onRemove={handleRemove}
           />
         ) : (
           <CalendarSidebar
@@ -321,7 +398,7 @@ export default function Calendar() {
         <div className="grow min-w-0 min-h-[600px] lg:min-h-0">
           <ScheduleCalendar
             calendarRef={calendarRef}
-            occurrences={occurrences}
+            occurrences={visibleOccurrences}
             awakeHours={awakeHours}
             onRangeChange={handleRangeChange}
             onDateClick={handleDateClick}

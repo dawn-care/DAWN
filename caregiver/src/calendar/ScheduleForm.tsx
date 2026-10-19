@@ -17,10 +17,11 @@
 
 import { formatClock, overlappingItems } from "@shared";
 import type { AwakeHours, PlayableItem } from "@shared";
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import IconButton from "../components/ui/IconButton";
+import { FOCUS_RING } from "../components/ui/styles";
 import PhotoPicker from "../components/ui/PhotoPicker";
 import RadioGroup from "../components/ui/form/RadioGroup";
 import RadioOption from "../components/ui/form/RadioOption";
@@ -36,6 +37,14 @@ import type { ScheduledItem } from "./api";
 import { lengthOf, minuteOptionLabel, minuteOptions, monthlyHint, repeatOptions, toInput, whyWontPlay } from "./formRules";
 import type { FormKind, FormValues, ScreenChoice } from "./formRules";
 import { minuteLabel, toPlayable } from "./time";
+
+/** What the caregiver chose to delete: one day of a repeating item ("day"), or the item with all its days ("all") */
+export interface Removal {
+  scope: "day" | "all";
+  item: ScheduledItem;
+  /** The date of the occurrence it was deleted from */
+  date: string;
+}
 
 /** Where a new item would land, for the calendar's "New" placeholder */
 export interface DraftSlot {
@@ -54,6 +63,8 @@ interface ScheduleFormProps {
   onDraftChange: (draft: DraftSlot | null) => void;
   onClose: () => void;
   onSaved: (saved: ScheduledItem, wasEdit: boolean) => void;
+  /** The page hides it and deletes it for real once its Undo toast closes */
+  onRemove: (removal: Removal) => void;
 }
 
 const KIND_SEGMENTS: { value: FormKind; label: string }[] = [
@@ -68,11 +79,25 @@ const NOTE = "m-0 px-2.5 py-2 rounded-lg bg-[#FBEDE3] text-sm leading-snug text-
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export default function ScheduleForm({ carepartnerId, hours, library, initial, editing, onDraftChange, onClose, onSaved }: ScheduleFormProps) {
+export default function ScheduleForm({
+  carepartnerId,
+  hours,
+  library,
+  initial,
+  editing,
+  onDraftChange,
+  onClose,
+  onSaved,
+  onRemove,
+}: ScheduleFormProps) {
   const [values, setValues] = useState<FormValues>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  // Asking "Delete which?" before anything is deleted
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteButton = useRef<HTMLButtonElement>(null);
+  const firstChoice = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     heading.current?.focus();
@@ -149,6 +174,31 @@ export default function ScheduleForm({ carepartnerId, hours, library, initial, e
     }
   };
 
+  const repeats = editing !== null && editing.item.repeat !== "once";
+
+  const remove = (scope: "day" | "all") => {
+    if (editing) onRemove({ scope, item: editing.item, date: editing.occurrenceDate });
+  };
+
+  // A one-time item has nothing to choose between, so it goes straight to the Undo toast
+  const askDelete = () => {
+    setError(null);
+    // For a repeating item the bin opens the question and pressing it again closes it
+    if (repeats) setConfirmingDelete((open) => !open);
+    else remove("all");
+  };
+
+  const cancelDelete = () => {
+    setConfirmingDelete(false);
+    setError(null);
+    deleteButton.current?.focus();
+  };
+
+  // Focus moves into the question when it appears
+  useEffect(() => {
+    if (confirmingDelete) firstChoice.current?.focus();
+  }, [confirmingDelete]);
+
   /* ============================
      Render
   ============================ */
@@ -157,7 +207,10 @@ export default function ScheduleForm({ carepartnerId, hours, library, initial, e
     <section
       aria-label={editing ? "Edit a scheduled video or audio" : "Schedule a video or audio"}
       onKeyDown={(event) => {
-        if (event.key === "Escape") onClose();
+        if (event.key !== "Escape") return;
+        // Escape backs out of the delete question first
+        if (confirmingDelete) cancelDelete();
+        else onClose();
       }}
       className="w-full lg:w-[290px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-3.5 bg-white border-[1.5px] border-dawn-line rounded-[14px]"
     >
@@ -165,8 +218,42 @@ export default function ScheduleForm({ carepartnerId, hours, library, initial, e
         <h2 ref={heading} tabIndex={-1} className="m-0 grow text-lg font-extrabold outline-none">
           {editing ? "Edit" : "Schedule"}
         </h2>
+        {editing && (
+          <IconButton
+            ref={deleteButton}
+            label="Delete"
+            icon={<Trash2 size={18} aria-hidden="true" />}
+            onClick={askDelete}
+            aria-expanded={repeats ? confirmingDelete : undefined}
+          />
+        )}
         <IconButton label="Close" icon={<X size={18} strokeWidth={2.4} aria-hidden="true" />} onClick={onClose} />
       </div>
+
+      {confirmingDelete && (
+        <div role="group" aria-labelledby="schedule-delete-question" className="flex flex-col gap-2 p-2.5 rounded-[10px] bg-[#FBEDE3] border-[1.5px] border-[#E7C3AA]">
+          <span id="schedule-delete-question" className="text-[15px] font-bold">
+            Delete which?
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              ref={firstChoice}
+              type="button"
+              onClick={() => remove("day")}
+              className={`h-10 px-3 rounded-[10px] border-2 border-dawn-control bg-white text-sm font-bold text-dawn-ink cursor-pointer ${FOCUS_RING}`}
+            >
+              Just this day
+            </button>
+            <button
+              type="button"
+              onClick={() => remove("all")}
+              className={`h-10 px-3 rounded-[10px] border-0 bg-dawn-accent hover:bg-dawn-accent-hover text-sm font-bold text-white cursor-pointer ${FOCUS_RING}`}
+            >
+              Every time
+            </button>
+          </div>
+        </div>
+      )}
 
       {wontPlay && <p className={NOTE}>{wontPlay}</p>}
 

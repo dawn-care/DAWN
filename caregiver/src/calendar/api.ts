@@ -183,10 +183,25 @@ export function updateScheduledItem(id: number, input: ItemInput): Promise<Sched
 
 export type DeleteScope = { scope: "series" } | { scope: "occurrence"; date: string };
 
+function deletePath(id: number, target: DeleteScope): string {
+  const query = target.scope === "series" ? "scope=series" : `scope=occurrence&date=${target.date}`;
+  return `/scheduled-items/${id}?${query}`;
+}
+
 /** "Every time" deletes the item; "just this day" removes one date of a repeat */
 export function deleteScheduledItem(id: number, target: DeleteScope): Promise<void> {
-  const query = target.scope === "series" ? "scope=series" : `scope=occurrence&date=${target.date}`;
-  return api<void>(`/scheduled-items/${id}?${query}`, { method: "DELETE" });
+  return api<void>(deletePath(id, target), { method: "DELETE" });
+}
+
+/**
+ * Deletes as the page is being left, when a normal request would be cancelled.
+ * `keepalive` lets the browser finish it after the page is gone, so there is no
+ * result to wait for.
+ */
+export function deleteScheduledItemOnExit(id: number, target: DeleteScope): void {
+  void fetch(`${API_URL}${deletePath(id, target)}`, { method: "DELETE", keepalive: true }).catch(() => {
+    // Nothing can be shown once the page is closing; the item is simply still there next visit
+  });
 }
 
 /* ============================
