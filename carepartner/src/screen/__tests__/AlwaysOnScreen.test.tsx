@@ -34,7 +34,7 @@ describe("AlwaysOnScreen", () => {
       awakeHours: { wake: "07:00", bed: "21:00" }, chime: true,
       widgets: [
         {
-          id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1,
+          id: 3, type: "weather", col: 2, row: 0, width: 2, height: 1,
           config: {}, photo: null, data: { temp: 48 }, error: null,
         },
       ],

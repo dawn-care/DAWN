@@ -4,7 +4,7 @@ import type { Screen, ScreenWidget } from "../screen";
 
 // Column 2 of the top row: the day and time fills columns 0 and 1 of the top two rows
 const widget = (overrides: Partial<ScreenWidget>): ScreenWidget => ({
-  id: 1, type: "weather", col: 2, row: 0, width: 1, height: 1,
+  id: 1, type: "weather", col: 2, row: 0, width: 2, height: 1,
   config: {}, photo: null, data: null, error: null,
   ...overrides,
 });
@@ -27,22 +27,32 @@ describe("placementsFor", () => {
   });
 
   it("places each widget where the caregiver put it", () => {
-    const [placement] = placed(widget({ id: 7, col: 3, row: 2, data: { temp: 48, condition: "Clouds" } }));
+    const [placement] = placed(widget({ id: 7, col: 2, row: 2, data: { temp: 48, condition: "Clouds" } }));
 
-    expect(placement).toMatchObject({ id: "7", col: 3, row: 2, width: 1, height: 1 });
+    expect(placement).toMatchObject({ id: "7", col: 2, row: 2, width: 2, height: 1 });
   });
 
-  it("shows the weather as its temperature and a plain word", () => {
-    expect(placed(widget({ data: { temp: 47.6, condition: "Clouds" } }))[0]).toMatchObject({
-      renderer: "tile",
-      data: { icon: "cloudy", word: "48°", label: "Cloudy" },
+  it("shows the weather as a plain word, its temperature, and the high and low", () => {
+    expect(placed(widget({ data: { temp: 47.6, temp_max: 53.2, temp_min: 44.5, condition: "Clouds" } }))[0]).toMatchObject({
+      renderer: "wideTile",
+      data: { icon: "cloudy", label: "Cloudy", word: "48°", detail: "High 53°, low 45°" },
     });
   });
 
-  it("shows weather it has no word for with a plain icon and no label", () => {
-    expect(placed(widget({ data: { temp: 60, condition: "Tornado" } }))[0].data).toEqual({
-      icon: "", word: "60°", label: null,
+  it("leaves out the high and low when either is missing", () => {
+    expect(placed(widget({ data: { temp: 48, temp_max: 53, condition: "Rain" } }))[0].data).toEqual({
+      icon: "rain", label: "Rainy", word: "48°", detail: null,
     });
+  });
+
+  it("shows weather it has no word for with a plain icon and \"Today\"", () => {
+    expect(placed(widget({ data: { temp: 60, condition: "Tornado" } }))[0].data).toMatchObject({
+      icon: "", label: "Today", word: "60°",
+    });
+  });
+
+  it("leaves out weather at the old one cell size", () => {
+    expect(placed(widget({ width: 1, data: { temp: 48, condition: "Clear" } }))).toEqual([]);
   });
 
   it("shows a sports result with the score and the opponent", () => {
@@ -153,7 +163,7 @@ describe("placementsFor", () => {
     ["has a sports result it doesn't know", widget({ type: "sports", width: 2, height: 1, data: { team_name: "Yankees", result: "rained out", team_score: 1, opponent_score: 0 } })],
     ["has a sports result with no score", widget({ type: "sports", width: 2, height: 1, data: { team_name: "Yankees", result: "won" } })],
   ])("leaves out a widget that %s, and says how many", (_name, bad) => {
-    const good = widget({ id: 9, col: 3, row: 2, data: { temp: 48 } });
+    const good = widget({ id: 9, col: 2, row: 2, data: { temp: 48 } });
 
     expect(placed(bad, good).map((p) => p.id)).toEqual(["9"]);
     expect(console.warn).toHaveBeenCalledWith("Left out 1 widgets the tablet can't draw");

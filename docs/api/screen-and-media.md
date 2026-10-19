@@ -318,9 +318,9 @@ The tablet's screen is a fixed grid of **4 columns × 3 rows**. Columns count 0 
 row 0  │  day and time   │      photo      │
        │  (2×2, always   │      (2×2)      │
 row 1  │   drawn here)   │                 │
-       ├─────────────────┼────────┬────────┤
-row 2  │   news (2×1)    │weather │(empty) │
-       └─────────────────┴────────┴────────┘
+       ├─────────────────┼─────────────────┤
+row 2  │   news (2×1)    │ weather (2×1)   │
+       └─────────────────┴─────────────────┘
 ```
 
 The editor and the preview see the same widget in two shapes: `/screen-layout` uses corners, and `/screen` uses `col`, `row`, `width` and `height` (the tablet's `GridArea`). Convert between them with `cornersToArea` and `areaToCorners` from `shared/widgets/grid.ts`, and check a placed widget with the rules in `shared/widgets/gridPlacement.ts` (`canPlace`, `isValidPlacement`). **Don't convert by hand:** the corners are inclusive, so `width = bottom_right.col - top_left.col + 1`, and a missing `+ 1` draws widgets one cell too small. Both apps import these from `@shared`.
@@ -339,7 +339,7 @@ Every widget in reading order (top row first, then left to right), to load the e
     },
     {
       "id": 2, "carepartner_id": 1, "type": "weather",
-      "top_left": { "col": 2, "row": 2 }, "bottom_right": { "col": 2, "row": 2 },
+      "top_left": { "col": 2, "row": 2 }, "bottom_right": { "col": 3, "row": 2 },
       "config": { "zip": "14617" }, "photo_media_id": null, "photo_url": null
     }
   ]
@@ -501,7 +501,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
       "data": { "caption": "Sarah" }, "error": null
     },
     {
-      "id": 3, "type": "weather", "col": 2, "row": 2, "width": 1, "height": 1,
+      "id": 3, "type": "weather", "col": 2, "row": 2, "width": 2, "height": 1,
       "config": { "zip": "14617" }, "photo": null,
       "data": {
         "location": "Irondequoit", "temp": 48, "feels_like": 44, "temp_min": 45, "temp_max": 51,
@@ -532,7 +532,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 ### How to render it
 
 - `widgets` is in reading order. Each widget's `col`, `row`, `width` and `height` is a `GridArea`, so it goes straight into the tablet's existing `fitsGrid` and `cellRect`. Cells no widget covers are empty; there are no `null` placeholders.
-- Each widget type has one fixed size, `WIDGET_SIZES` in `shared/widgets/widgetSizes.ts` (for example weather 1×1, photo 2×2, news 2×1). The server doesn't check it yet, so the editor should place widgets only at those sizes; the tablet leaves out a widget that isn't its type's size.
+- Each widget type has one fixed size, `WIDGET_SIZES` in `shared/widgets/widgetSizes.ts` (photo 2×2; message, reminder, news, sports and weather 2×1). The server doesn't check it yet, so the editor should place widgets only at those sizes; the tablet leaves out a widget that isn't its type's size.
 - `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").
@@ -545,7 +545,6 @@ Poll `/screen` on a timer; there's no push yet. Every 5 minutes, as the tablet d
 
 ### Not decided yet
 
-- The plain weather word ("Chilly"): use `temp` and `condition` until the temperature bands are agreed.
 - The part of the day ("Afternoon"): work it out on the tablet for now.
 - What the news widget shows long term.
 

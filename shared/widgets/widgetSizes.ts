@@ -23,7 +23,11 @@ export const WIDGET_SIZES = {
   news: { width: 2, height: 1 },
   /** Wide enough for the team, the result and score, and the opponent. */
   sports: { width: 2, height: 1 },
-  weather: { width: 1, height: 1 },
+  /**
+   * Wide enough for the condition, the temperature, and the high and low. Every
+   * type but the 2 x 2 ones is 2 x 1, so the open cells always fill evenly.
+   */
+  weather: { width: 2, height: 1 },
 } as const satisfies Record<string, WidgetSize>;
 
 export type WidgetType = keyof typeof WIDGET_SIZES;
