@@ -57,7 +57,7 @@ function InfoBlock({ heading, children }: { heading: string; children: ReactNode
 }
 
 // The schedule line is itself a link to the Calendar, with "See on calendar" beside it
-function ScheduleBlock({ line }: { line: string | null }) {
+function ScheduleBlock({ line, mediaId }: { line: string | null; mediaId: number }) {
   return (
     <InfoBlock heading="Schedule">
       {line ? (
@@ -72,7 +72,8 @@ function ScheduleBlock({ line }: { line: string | null }) {
       ) : (
         <>
           <span>Not scheduled</span>
-          <Link to="/calendar" className={ACTION_LINK}>
+          {/* The calendar opens its schedule form with this file chosen */}
+          <Link to={`/calendar?media=${mediaId}`} className={ACTION_LINK}>
             Schedule it
           </Link>
         </>
@@ -270,10 +271,10 @@ export default function DetailPanel({ media, scheduled, justSaved = false, onRen
               {onScreen ? "Remove from screen" : "Add to screen"}
             </Link>
           </InfoBlock>
-          {line && <ScheduleBlock line={line} />}
+          {line && <ScheduleBlock line={line} mediaId={media.id} />}
         </>
       ) : (
-        <ScheduleBlock line={line} />
+        <ScheduleBlock line={line} mediaId={media.id} />
       )}
 
       <div className="flex gap-2">

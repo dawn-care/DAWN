@@ -17,6 +17,7 @@ import type FullCalendar from "@fullcalendar/react";
 import { dateLabel, dayName, isAwakeAt, minuteOfDay, parseDate } from "@shared";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useToast } from "../components/ui/toastContext";
 import IconButton from "../components/ui/IconButton";
 import InfoPopover from "../components/ui/InfoPopover";
@@ -41,7 +42,7 @@ import ScheduleForm from "../calendar/ScheduleForm";
 import type { DraftSlot, Removal } from "../calendar/ScheduleForm";
 import { nextOpenMinute, valuesForEdit, valuesForNew } from "../calendar/formRules";
 import type { FormValues } from "../calendar/formRules";
-import { awakeHoursOf, dateText, minuteLabel } from "../calendar/time";
+import { awakeHoursOf, dateText, minuteLabel, timeOptions } from "../calendar/time";
 import { listMedia } from "../media/api";
 import type { Media } from "../media/api";
 import { describeScheduledItem } from "../media/schedule";
@@ -185,10 +186,10 @@ export default function Calendar() {
     };
   }, [carepartnerId, reloadKey]);
 
-  const openNew = (date: string, minute: number) => {
+  const openNew = (date: string, minute: number, media?: { kind: "video" | "audio"; id: number }) => {
     formCount.current += 1;
     setEditingAwake(false);
-    setForm({ key: formCount.current, initial: valuesForNew(date, minute), editing: null });
+    setForm({ key: formCount.current, initial: valuesForNew(date, minute, media), editing: null });
   };
 
   const closeForm = () => {
@@ -203,6 +204,22 @@ export default function Calendar() {
     const date = range.view === "timeGridDay" ? range.from : today >= range.from && today <= range.to ? today : range.current;
     openNew(date, nextOpenMinute(awakeHours, date === today ? minuteOfDay(new Date()) : null));
   };
+
+  // The media page's "Schedule it" arrives as /calendar?media=<id>: open the form with that file chosen,
+  // today at the next time it fits. The address is cleared so reloading doesn't open it again.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wantedMedia = searchParams.get("media");
+  useEffect(() => {
+    if (!wantedMedia || !library || !awakeHours) return;
+    setSearchParams({}, { replace: true });
+    const media = library.find((item) => String(item.id) === wantedMedia);
+    // A photo or an id that isn't in the library just leaves the calendar as it is
+    if (!media || (media.kind !== "video" && media.kind !== "audio")) return;
+    const options = timeOptions(awakeHours, media.duration_seconds ?? 0);
+    const wanted = nextOpenMinute(awakeHours, minuteOfDay(new Date()));
+    const minute = options.find((option) => option >= wanted) ?? options[0] ?? wanted;
+    openNew(dateText(new Date()), minute, { kind: media.kind, id: media.id });
+  }, [wantedMedia, library, awakeHours, setSearchParams]);
 
   // Clicking an item opens it to edit; an occurrence doesn't carry the item's start and end dates, so ask for the item
   const openEdit = async ({ itemId, date, shape }: ClickedItem) => {

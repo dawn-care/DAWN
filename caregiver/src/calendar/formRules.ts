@@ -74,9 +74,9 @@ export function monthlyHint(date: string): string | null {
   return day > 28 ? `Months without a ${ordinal(day)} are skipped.` : null;
 }
 
-/** The form for a new item: a video that doesn't repeat. No media is chosen yet; the form picks the first one listed */
-export function valuesForNew(date: string, minute: number): FormValues {
-  return { kind: "video", mediaId: null, date, minute, repeat: "once", screen: "usual", photoId: null };
+/** The form for a new item that doesn't repeat: a video by default, with the first one listed chosen unless `media` says which */
+export function valuesForNew(date: string, minute: number, media?: { kind: FormKind; id: number }): FormValues {
+  return { kind: media?.kind ?? "video", mediaId: media?.id ?? null, date, minute, repeat: "once", screen: "usual", photoId: null };
 }
 
 /** The form for an existing item, opened from its occurrence on `date`; null if it isn't a video or audio */
