@@ -10,10 +10,12 @@
  * outlines are see-through, so they show which squares a tile covers without
  * hiding or being mistaken for its text. While a widget type is being placed
  * (`pendingType`), the squares it fits at (`openCells`) are lit and clickable.
- * Each widget has a pencil (to change its settings, except news, which is no longer offered and has none
- * and reminders, which the editor doesn't change) and a bin (to remove it) at
- * its top right; the day and time has neither. Clicking a widget, or its pencil,
- * selects it, and the selected widget gets a ring.
+ * Each widget has a bin (to remove it) at its top right, and a pencil (to
+ * change its settings) beside it when its type has a settings panel (`hasPanel`).
+ * News has no settings and reminders aren't changed in the editor, so they have
+ * only the bin. The day and time has neither. Clicking a widget, or its pencil,
+ * selects it, and the selected widget gets a ring. While `disabled` (the draft is
+ * being saved) nothing on it can be clicked.
  */
 
 import { DAY_TIME_AREA, GRID, openCells, widgetArea, widgetName } from "@shared";
@@ -25,6 +27,7 @@ import type { EditorWidget } from "./layout";
 import { placeholderText } from "./placeholders";
 import type { AddableWidgetType } from "./useScreenEditor";
 import WidgetIcon from "./WidgetIcon";
+import { hasPanel } from "./widgetSettings";
 
 // Places an area on the CSS grid, which counts lines from 1
 function gridPosition(area: GridArea): CSSProperties {
@@ -50,15 +53,12 @@ const DAY_TIME_TILE: EditorWidget = {
   photoUrl: null,
 };
 
-// The types with settings the caregiver can change; news has none, and reminders are not edited here
-const EDITABLE_TYPES: readonly EditorWidget["type"][] = ["photo", "message", "weather", "sports"];
-
 // The pencil and bin shrink with the screen: 40px when it is large, never under 26px. The grid is a size
 // container, so cqw is a share of its width; this is set on each child, since a container's own cqw
 // refers to the container above it.
 const TOOL_SIZE = "[--tool:clamp(26px,4.4cqw,40px)]";
 
-const TOOL_BUTTON = `w-[var(--tool)] h-[var(--tool)] flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer ${FOCUS_RING}`;
+const TOOL_BUTTON = `w-[var(--tool)] h-[var(--tool)] flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer disabled:opacity-50 disabled:cursor-default ${FOCUS_RING}`;
 
 interface ScreenGridProps {
   widgets: readonly EditorWidget[];
@@ -66,6 +66,8 @@ interface ScreenGridProps {
   selectedId?: EditorWidget["id"] | null;
   /** The type being placed: the squares it fits at are lit and can be clicked */
   pendingType?: AddableWidgetType | null;
+  /** Nothing can be selected, changed, removed or placed, e.g. while the draft is being saved */
+  disabled?: boolean;
   onPlace?: (cell: Cell) => void;
   /** A click on a widget, or its pencil */
   onSelect?: (id: EditorWidget["id"]) => void;
@@ -79,12 +81,13 @@ export default function ScreenGrid({
   widgets,
   selectedId = null,
   pendingType = null,
+  disabled = false,
   onPlace,
   onSelect,
   onEdit,
   onRemove,
 }: ScreenGridProps) {
-  const lit = pendingType ? openCells(widgets, pendingType) : [];
+  const lit = pendingType && !disabled ? openCells(widgets, pendingType) : [];
   return (
     <div
       role="group"
@@ -102,6 +105,7 @@ export default function ScreenGrid({
           widget={widget}
           tools
           selected={widget.id === selectedId}
+          disabled={disabled}
           onSelect={() => onSelect?.(widget.id)}
         />
       ))}
@@ -135,12 +139,12 @@ export default function ScreenGrid({
             style={gridPosition(widgetArea(widget))}
           >
             <span className="absolute top-[calc(var(--tool)*0.2)] right-[calc(var(--tool)*0.2)] flex gap-[calc(var(--tool)*0.15)] pointer-events-auto">
-              {EDITABLE_TYPES.includes(widget.type) && (
-                <button type="button" onClick={() => onEdit?.(widget.id)} aria-label={`Edit ${name}`} className={TOOL_BUTTON}>
+              {hasPanel(widget.type) && (
+                <button type="button" onClick={() => onEdit?.(widget.id)} disabled={disabled} aria-label={`Edit ${name}`} className={TOOL_BUTTON}>
                   <Pencil size={18} strokeWidth={2} aria-hidden="true" className="w-[45%] h-[45%]" />
                 </button>
               )}
-              <button type="button" onClick={() => onRemove?.(widget.id)} aria-label={`Remove ${name}`} className={TOOL_BUTTON}>
+              <button type="button" onClick={() => onRemove?.(widget.id)} disabled={disabled} aria-label={`Remove ${name}`} className={TOOL_BUTTON}>
                 <Trash2 size={18} strokeWidth={2} aria-hidden="true" className="w-[45%] h-[45%]" />
               </button>
             </span>
@@ -174,6 +178,7 @@ interface PlaceholderTileProps {
   tools?: boolean;
   /** Makes the whole tile a button that selects its widget */
   selected?: boolean;
+  disabled?: boolean;
   onSelect?: () => void;
 }
 
@@ -182,6 +187,7 @@ function PlaceholderTile({
   inFirstSquare = false,
   tools = false,
   selected = false,
+  disabled = false,
   onSelect,
 }: PlaceholderTileProps) {
   const { name, detail } = placeholderText(widget);
@@ -222,7 +228,8 @@ function PlaceholderTile({
       type="button"
       aria-pressed={selected}
       onClick={onSelect}
-      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left ${TOOL_SIZE} text-dawn-ink cursor-pointer ${FOCUS_RING} ${
+      disabled={disabled}
+      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left ${TOOL_SIZE} text-dawn-ink cursor-pointer disabled:cursor-default ${FOCUS_RING} ${
         narrow ? "flex-col justify-end" : `items-center ${tools ? "pr-[calc(var(--tool)*2+var(--tool)*0.15+var(--tool)*0.4)]" : ""}`
       }`}
       style={gridPosition(area)}

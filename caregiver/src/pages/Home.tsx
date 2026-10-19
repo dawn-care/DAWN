@@ -18,13 +18,13 @@
 
 import { widgetName } from "@shared";
 import { Check, Pencil } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import InfoPopover from "../components/ui/InfoPopover";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import type { ToastOptions } from "../components/ui/toastContext";
 import { useAuth } from "../context/AuthContext";
-import { failedWidgetIndex, friendlyError, saveWidgets } from "../screen/api";
+import { failedWidgetIndex, friendlyError, isUnreadableSuccess, saveWidgets } from "../screen/api";
 import AddBar from "../screen/AddBar";
 import { toLayout } from "../screen/layout";
 import type { EditorWidget } from "../screen/layout";
@@ -56,11 +56,13 @@ export default function Home() {
   const announce = (text: string, options?: ToastOptions) => {
     toastIds.current.push(toast.show(text, options));
   };
-  useEffect(() => {
-    if (editor.editing) return;
+  const dismissEditToasts = useCallback(() => {
     toastIds.current.forEach((id) => toast.dismiss(id));
     toastIds.current = [];
-  }, [editor.editing, toast]);
+  }, [toast]);
+  useEffect(() => {
+    if (!editor.editing) dismissEditToasts();
+  }, [editor.editing, dismissEditToasts]);
 
   // Shown after trying to add something while a new widget is unsaved, until that widget is saved or removed
   const unfinished = editor.draft?.find((widget) => widget.id === editor.unfinishedId) ?? null;
@@ -88,6 +90,10 @@ export default function Home() {
       return;
     }
 
+    // The draft is sent as it is now, so nothing can change it until the save is done: placing stops,
+    // the screen and the panel are locked, and Undo on an edit toast is no longer offered
+    editor.pick(null);
+    dismissEditToasts();
     setSaving(true);
     try {
       await saveWidgets(carepartnerId, toLayout(draft, state.layout.unknown));
@@ -97,6 +103,14 @@ export default function Home() {
       toast.show("Changes saved.");
     } catch (err) {
       console.error(`Saving carepartner ${carepartnerId}'s screen failed`, err);
+      if (isUnreadableSuccess(err)) {
+        // The server said yes, so the save may have gone through. Keeping the draft would let another Save
+        // create its new widgets a second time, so load what the server kept instead.
+        reload();
+        setReloadKey((key) => key + 1);
+        toast.show("Your changes may have been saved. The screen was loaded again to show what was kept.");
+        return;
+      }
       setSaveError(friendlyError(err));
       // The server names the widget it rejected by its place in the list sent, which starts with the draft
       const failed = failedWidgetIndex(err);
@@ -108,15 +122,16 @@ export default function Home() {
 
   const nameOf = (widget: EditorWidget) => widgetName({ type: widget.type }).toLowerCase();
 
-  // A new widget is announced when its panel's Save is pressed
+  // Removing a widget offers Undo, which puts it back as it was, still unsaved if it was new
   const removeWidget = (id: EditorWidget["id"]) => {
     const widget = editor.draft?.find((other) => other.id === id);
     if (!widget) return;
+    const wasNew = editor.isNew(id);
     editor.remove(id);
     announce(`Removed ${nameOf(widget)}.`, {
       actionLabel: "Undo",
       onAction: () => {
-        if (!editor.restore(widget)) announce("That spot is taken now, so it couldn't be put back.");
+        if (!editor.restore(widget, wasNew)) announce("That spot is taken now, so it couldn't be put back.");
       },
     });
   };
@@ -187,6 +202,7 @@ export default function Home() {
 
       <AddBar
         editing={editor.editing}
+        saving={saving}
         pendingType={editor.pendingType}
         fullType={editor.fullType}
         finishType={finishType}
@@ -204,6 +220,7 @@ export default function Home() {
                 widgets={editor.draft}
                 selectedId={editor.selectedId}
                 pendingType={editor.pendingType}
+                disabled={saving}
                 onPlace={editor.add}
                 onSelect={selectWidget}
                 onEdit={selectWidget}
@@ -216,7 +233,9 @@ export default function Home() {
           <WidgetPanel
             carepartnerId={carepartnerId}
             widget={selected && hasPanel(selected.type) ? selected : null}
+            disabled={saving}
             onChange={(changes) => selected && editor.update(selected.id, changes)}
+            // A new widget is announced when its panel's Save is pressed, not when it is placed
             onDone={(original) => {
               if (!selected) return;
               const wasNew = editor.isNew(selected.id);

@@ -3,11 +3,11 @@
  *
  * User: Caregiver
  *
- * The "Add to her screen" bar above the screen: one button per kind of widget
+ * The "Add to the screen" bar above the screen: one button per kind of widget
  * the caregiver can add, and a line of hint text. The buttons are greyed out
- * until Edit screen is pressed. Picking one lights the squares on the screen
- * where it fits (ScreenGrid); picking it again, or pressing Escape, stops
- * placing. Picking one that fits nowhere places nothing and says the screen is
+ * until Edit screen is pressed, and again while the changes are being saved.
+ * Picking one lights the squares on the screen where it fits (ScreenGrid);
+ * picking it again, or pressing Escape, stops placing. Picking one that fits nowhere places nothing and says the screen is
  * full instead.
  */
 
@@ -24,6 +24,8 @@ const ADD_INFO =
 
 interface AddBarProps {
   editing: boolean;
+  /** True while Save changes is sending the draft; nothing can be picked until it is done */
+  saving?: boolean;
   /** The type being placed, or null */
   pendingType: AddableWidgetType | null;
   /** The type the caregiver picked that fits nowhere, or null */
@@ -37,13 +39,15 @@ const lower = (type: AddableWidgetType) => widgetName({ type }).toLowerCase();
 
 function hintFor({
   editing,
+  saving,
   pendingType,
   fullType,
   finishType,
-}: Pick<AddBarProps, "editing" | "pendingType" | "fullType" | "finishType">) {
+}: Pick<AddBarProps, "editing" | "saving" | "pendingType" | "fullType" | "finishType">) {
   if (!editing) return "Press Edit screen to add or change icons";
+  if (saving) return "Saving your changes…";
   if (finishType)
-    return "Finish creating the icon you added first, then press Save. If you no longer want this widget, click the trash can icon.";
+    return "Finish creating the widget you added first, then press Save. If you no longer want this widget, click the trash can icon.";
   if (fullType)
     return `No room for a ${lower(fullType)}. Remove something on the screen first.`;
   if (pendingType)
@@ -53,6 +57,7 @@ function hintFor({
 
 export default function AddBar({
   editing,
+  saving = false,
   pendingType,
   fullType,
   finishType,
@@ -81,20 +86,21 @@ export default function AddBar({
         <div
           className={`text-sm leading-snug ${fullType || finishType ? "text-dawn-accent" : "text-dawn-muted"}`}
         >
-          {hintFor({ editing, pendingType, fullType, finishType })}
+          {hintFor({ editing, saving, pendingType, fullType, finishType })}
         </div>
       </div>
       {ADDABLE_WIDGET_TYPES.map((type) => {
+        const off = !editing || saving;
         const picked = pendingType === type;
         return (
           <button
             key={type}
             type="button"
-            disabled={!editing}
+            disabled={off}
             aria-pressed={picked}
             onClick={() => onPick(type)}
             className={`w-[100px] h-14 flex flex-col items-center justify-center gap-[3px] p-0 rounded-[10px] text-sm font-bold ${FOCUS_RING} ${
-              !editing
+              off
                 ? "bg-dawn-sidebar border-2 border-dawn-line-strong text-dawn-control cursor-default"
                 : picked
                   ? "bg-[#FFF1E6] border-[2.5px] border-dawn-accent text-dawn-ink cursor-pointer"

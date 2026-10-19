@@ -10,10 +10,11 @@
  *
  * While editing, the caregiver can pick a widget type to place (`pendingType`;
  * `fullType` instead when it fits nowhere), place it on an open square (`add`),
- * change a widget's settings (`update`),
- * or remove it (`remove`). `selectedId` is the widget being edited. A widget
- * added since editing began stays in `newIds` until `keep` says its settings
- * were confirmed, so closing its popup with X can take it back off the screen.
+ * change a widget's settings (`update`), or remove it (`remove`). `selectedId`
+ * is the widget being edited. A widget added since editing began stays in
+ * `newIds` until `keep` says its settings were saved with the panel's Save;
+ * until then nothing else can be added, and that Save announces it as added
+ * rather than updated.
  */
 
 import { canPlace, hasRoom } from "@shared";
@@ -57,14 +58,15 @@ export function useScreenEditor(saved: LoadedLayout | null) {
   const latestDraft = useRef(draft);
   latestDraft.current = draft;
 
-  const reset = (widgets: EditorWidget[] | null) => {
+  // Starts a draft, or ends editing with null, with nothing selected, picked or new
+  const reset = useCallback((widgets: EditorWidget[] | null) => {
     setDraft(widgets);
     setSelectedId(null);
     setPendingType(null);
     setFullType(null);
     setFinishFirst(false);
     setNewIds([]);
-  };
+  }, []);
 
   // Drop the draft when the layout it was copied from is replaced. Adjusting
   // state during render like this avoids drawing one frame with the old draft.
@@ -75,24 +77,10 @@ export function useScreenEditor(saved: LoadedLayout | null) {
   }
 
   const start = useCallback(() => {
-    if (saved) {
-      setDraft(saved.widgets.map((widget) => ({ ...widget })));
-      setSelectedId(null);
-      setPendingType(null);
-      setFullType(null);
-      setFinishFirst(false);
-      setNewIds([]);
-    }
-  }, [saved]);
+    if (saved) reset(saved.widgets.map((widget) => ({ ...widget })));
+  }, [saved, reset]);
 
-  const cancel = useCallback(() => {
-    setDraft(null);
-    setSelectedId(null);
-    setPendingType(null);
-    setFullType(null);
-    setFinishFirst(false);
-    setNewIds([]);
-  }, []);
+  const cancel = useCallback(() => reset(null), [reset]);
 
   /**
    * Picks the type to place next, or null to stop placing. Picking the type
@@ -160,21 +148,23 @@ export function useScreenEditor(saved: LoadedLayout | null) {
   }, []);
 
   /**
-   * Puts a removed widget back where it was, with its settings. Returns false,
-   * and changes nothing, when editing has ended or something else now covers
-   * its place.
+   * Puts a removed widget back where it was, with its settings. `wasNew` says it
+   * was still unsaved when removed (`isNew`), so it is unsaved again and must be
+   * finished before anything else is added. Returns false, and changes nothing,
+   * when editing has ended or something else now covers its place.
    */
-  const restore = useCallback((widget: EditorWidget): boolean => {
+  const restore = useCallback((widget: EditorWidget, wasNew = false): boolean => {
     const current = latestDraft.current;
     if (!current || !canPlace(current, widget.type, widget)) return false;
     setDraft([...current, widget]);
+    if (wasNew) setNewIds((ids) => [...ids, widget.id]);
     return true;
   }, []);
 
   /** Selects a widget (the one being edited), or null to select none */
   const select = useCallback((id: EditorWidget["id"] | null) => setSelectedId(id), []);
 
-  /** Marks a new widget's settings as confirmed, so closing its popup no longer takes it back off */
+  /** Marks a new widget's settings as saved with the panel's Save, so it is no longer new */
   const keep = useCallback((id: EditorWidget["id"]) => {
     setNewIds((ids) => ids.filter((other) => other !== id));
   }, []);

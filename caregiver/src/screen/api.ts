@@ -154,6 +154,15 @@ export function friendlyError(err: unknown): string {
 }
 
 /**
+ * Whether the server answered with success but its reply couldn't be read (not
+ * JSON, or no widgets list). The request may have done what it asked, so a save
+ * that fails this way has to be checked by loading the layout again.
+ */
+export function isUnreadableSuccess(err: unknown): boolean {
+  return err instanceof ApiError && err.status >= 200 && err.status < 300;
+}
+
+/**
  * Which widget a save error is about, from the server's "widgets[2]: ..." message,
  * so the editor can highlight it. Undefined when the error names no single widget.
  */
@@ -211,8 +220,13 @@ export interface SportsLeague {
 }
 
 /** Every league and its teams, for the sports widget's pickers */
-export function loadSportsLeagues(): Promise<SportsLeague[]> {
-  return api<SportsLeague[]>("/widgets/sports/teams", NO_CACHE);
+export async function loadSportsLeagues(): Promise<SportsLeague[]> {
+  const path = "/widgets/sports/teams";
+  const leagues = await api<SportsLeague[]>(path, NO_CACHE);
+  // The server always sends a list; anything else would break the pickers
+  if (Array.isArray(leagues)) return leagues;
+  console.error(`${path} returned no list of leagues`, leagues);
+  throw new ApiError(200, "INTERNAL_ERROR", "response had no list of leagues");
 }
 
 /** Address of a widget's photo, for <img>; null when it has none */

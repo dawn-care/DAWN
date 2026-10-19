@@ -18,9 +18,9 @@
  *
  * If the carepartner app can't be reached (it isn't running), the browser would
  * fill the frame with its own "refused to connect" page, which an iframe gives
- * the page no way to detect. So the app is asked for first, and when that
- * fails "Could not connect to carepartner tablet." is shown instead, with Try
- * again.
+ * the page no way to detect. So the app is asked for first, and the frame is
+ * drawn only once it answers; when it doesn't, "Could not connect to
+ * carepartner tablet." is shown instead, with Try again.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -51,7 +51,9 @@ function Frame({ src }: { src: string }) {
   const [scale, setScale] = useState(0);
 
   // Ask for the page first. no-cors lets this work across origins: the answer can't be read, but it
-  // only fails when nothing is listening there, which is all that is needed.
+  // only fails when nothing is listening there, which is the case this is for (the app isn't running).
+  // Any answer at all counts as reachable, so an error page (404, 500), another program on that port,
+  // or a page that refuses to be framed still loads in the frame as it is.
   useEffect(() => {
     let current = true;
     fetch(src, { mode: "no-cors", cache: "no-store" }).then(
@@ -81,7 +83,9 @@ function Frame({ src }: { src: string }) {
 
   return (
     <div ref={box} className="relative w-full h-full overflow-hidden">
-      {reachable !== false && (
+      {/* Only once the app answered: a frame drawn sooner could show the browser's own error page, which
+          also fires onLoad and would take the loading message away */}
+      {reachable === true && (
         <iframe
           key={attempt}
           src={src}

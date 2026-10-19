@@ -41,7 +41,8 @@ export default function ScreenPreview({ carepartnerId, reloadKey = 0, editView }
 
   return (
     // Fills the page down to the bottom, left aligned. Its container measures the space left, and the screen
-    // takes the largest 16:10 box that fits beside the 2.75rem row and the 0.75rem gap above it under it
+    // takes the largest 16:10 box that fits while leaving 3.5rem below it: the 0.75rem gap and the 2.75rem
+    // row of buttons
     <div className="flex-1 min-w-0 min-h-[360px] pt-2 [container-type:size]">
       <div className="flex flex-col gap-3" style={{ width: "min(100cqw, calc((100cqh - 3.5rem) * 1.6))" }}>
         {/* The border shows where the carepartner's screen ends; #5B6091 is the border of the tablet's widgets (colors.day.border in carepartner/src/theme/theme.ts) */}

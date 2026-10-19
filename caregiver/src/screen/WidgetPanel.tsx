@@ -9,7 +9,8 @@
  * caregiver types changes the draft straight away, so the placeholder tile
  * shows it. Save closes the settings and keeps the widget. There is no close
  * button: a widget is removed only with its bin, and Cancel on the page undoes
- * every change.
+ * every change. While `disabled` (the draft is being saved) every field and the
+ * Save button are locked.
  */
 
 import { TEXT_LIMITS, widgetName } from "@shared";
@@ -21,7 +22,7 @@ import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { fileUrl, friendlyError as mediaError, listMedia } from "../media/api";
 import type { Media } from "../media/api";
-import { friendlyError, loadSportsLeagues } from "./api";
+import { ApiError, friendlyError, loadSportsLeagues } from "./api";
 import type { MessageConfig, SportsConfig, SportsLeague, WeatherConfig } from "./api";
 import type { EditorWidget } from "./layout";
 import { isComplete, isValidZip } from "./widgetSettings";
@@ -32,27 +33,32 @@ interface WidgetPanelProps {
   carepartnerId: number;
   /** The widget whose settings to show, or null for an empty panel */
   widget: EditorWidget | null;
+  /** Locks every field and Save, e.g. while the draft is being saved */
+  disabled?: boolean;
   /** Change the widget's settings in the draft */
   onChange: (changes: WidgetChanges) => void;
   /** Save: keep the widget and what was typed; `original` is the widget as it was when the panel opened */
   onDone: (original: EditorWidget) => void;
 }
 
-export default function WidgetPanel({ carepartnerId, widget, onChange, onDone }: WidgetPanelProps) {
+export default function WidgetPanel({ carepartnerId, widget, disabled = false, onChange, onDone }: WidgetPanelProps) {
   return (
     <aside
       aria-label="Settings"
       className="h-full flex flex-col gap-3 p-4 bg-white border-[1.5px] border-dawn-line rounded-[14px] text-dawn-ink overflow-y-auto"
     >
-      {/* A new widget gets a new set of settings, remembering how it was when they opened */}
+      {/* Each selected widget gets its own settings, which remember how it was when they opened */}
       {widget && (
-        <WidgetSettings
-          key={widget.id}
-          carepartnerId={carepartnerId}
-          widget={widget}
-          onChange={onChange}
-          onDone={onDone}
-        />
+        // A disabled fieldset locks every input, select and button inside it
+        <fieldset disabled={disabled} className="contents">
+          <WidgetSettings
+            key={widget.id}
+            carepartnerId={carepartnerId}
+            widget={widget}
+            onChange={onChange}
+            onDone={onDone}
+          />
+        </fieldset>
       )}
     </aside>
   );
@@ -63,7 +69,7 @@ function WidgetSettings({
   widget,
   onChange,
   onDone,
-}: Omit<WidgetPanelProps, "widget"> & { widget: EditorWidget }) {
+}: Omit<WidgetPanelProps, "widget" | "disabled"> & { widget: EditorWidget }) {
   const name = widgetName({ type: widget.type });
   // The widget as it was when the panel opened; the parent mounts a new panel for each widget
   const original = useRef(widget);
@@ -229,9 +235,15 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
   );
 }
 
+// The save wording ("Two widgets overlap"...) doesn't fit a failed load, so only a lost connection keeps its own
+function teamsLoadError(err: unknown): string {
+  if (err instanceof ApiError && err.code === "NETWORK_ERROR") return friendlyError(err);
+  return "The teams couldn't be loaded. Please try again.";
+}
+
 function SportsSettings({ widget, onChange }: SettingsProps) {
   const config = widget.config as Partial<SportsConfig>;
-  const { state, retry } = useLoad<SportsLeague[]>(loadSportsLeagues, friendlyError);
+  const { state, retry } = useLoad<SportsLeague[]>(loadSportsLeagues, teamsLoadError);
 
   if (state.status === "loading") return <p className="m-0 text-base text-dawn-muted">Loading teams…</p>;
   if (state.status === "error") return <LoadError message={state.message} onRetry={retry} />;

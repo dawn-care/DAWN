@@ -59,7 +59,7 @@ Tailwind CSS (`tailwind.config.js` scans `index.html` and `src/**/*.{js,ts,jsx,t
 
 Shared UI pieces live in `src/components/ui/` (app-specific components such as `NavBar` stay directly in `src/components/`). They are Tailwind-styled React components, with [Radix UI](https://www.radix-ui.com/) (`@radix-ui/react-popover`, `-radio-group`, `-dialog`) supplying focus, keyboard and ARIA behavior and `lucide-react` supplying icons. Gluestack is not used here: it only installs into Expo/React Native projects, not this Vite app.
 
-- `Badge`, `Dialog`, `IconButton`, `InfoPopover`, `PhotoPicker`, `SaveIndicator`, `Toast`
+- `Badge`, `Dialog`, `IconButton`, `InfoPopover`, `PhotoPicker`, `Toast`
 - `form/`: `RadioGroup`/`RadioOption`, `SegmentedControl`, `SelectField` (native `<select>`), `TextField`, `ToggleButton`
 - `styles.ts` holds the shared focus ring (`FOCUS_RING`) and field classes; use `FOCUS_RING` on any new interactive control.
 
