@@ -16,8 +16,7 @@ const sampleScreen: WidgetPlacement[] = [
     height: 3,
     data: { uri: "http://localhost:8080/api/media/1/file", name: "Sunset" },
   },
-  { id: "weather", renderer: "tile", col: 0, row: 2, width: 1, height: 1, data: { icon: "partly-cloudy", word: "Chilly" } },
-  { id: "sports", renderer: "tile", col: 1, row: 2, width: 1, height: 1, data: { icon: "baseball", word: "Won", label: "Yankees" } },
+  { id: "weather", renderer: "wideTile", col: 0, row: 2, width: 2, height: 1, data: { icon: "cloudy", label: "Cloudy", word: "48°" } },
 ];
 
 const SCREEN = { width: 1280, height: 800 };
@@ -32,16 +31,14 @@ describe("Grid", () => {
     expect(screen.getByText("Tuesday")).toBeTruthy();
     const photo = sampleScreen.find((w) => w.renderer === "photo")!;
     expect(screen.getByText((photo.data as { name: string }).name)).toBeTruthy();
-    expect(screen.getByText("Chilly")).toBeTruthy();
-    expect(screen.getByText("Yankees")).toBeTruthy();
+    expect(screen.getByText("48°")).toBeTruthy();
   });
 
   it("positions each widget by its grid area", async () => {
     await render(<Grid widgets={sampleScreen} initialSize={SCREEN} />);
 
     const style = (id: string) => Object.assign({}, ...[screen.getByTestId(`widget-${id}`).props.style].flat(3));
-    expect(style("weather")).toMatchObject({ left: 48, width: 272 });
-    expect(style("sports")).toMatchObject({ left: 48 + 272 + 32, width: 272 });
+    expect(style("weather")).toMatchObject({ left: 48, width: 2 * 272 + 32 });
     expect(style("photo")).toMatchObject({ left: 48 + 2 * (272 + 32), top: 48, width: 2 * 272 + 32 });
   });
 
@@ -63,12 +60,12 @@ describe("Grid", () => {
     await render(<Grid widgets={widgets} initialSize={SCREEN} />);
 
     expect(screen.queryByTestId("widget-future")).toBeNull();
-    expect(screen.getByText("Chilly")).toBeTruthy();
+    expect(screen.getByText("48°")).toBeTruthy();
   });
 
   it("skips a widget that doesn't fit the grid", async () => {
     const widgets: WidgetPlacement[] = [
-      { id: "offscreen", renderer: "tile", col: 3, row: 2, width: 2, height: 1, data: { icon: "sunny", word: "Warm" } },
+      { id: "offscreen", renderer: "wideTile", col: 3, row: 2, width: 2, height: 1, data: { icon: "sunny", label: "Sunny", word: "Warm" } },
     ];
 
     await render(<Grid widgets={widgets} initialSize={SCREEN} />);

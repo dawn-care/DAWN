@@ -14,7 +14,7 @@ const response = () => ({
       data: { caption: "Sarah" }, error: null,
     },
     {
-      id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1,
+      id: 3, type: "weather", col: 2, row: 0, width: 2, height: 1,
       config: { zip: "14617" }, photo: null, data: { temp: 48 }, error: null,
     },
     {
@@ -51,7 +51,7 @@ describe("readScreen", () => {
           data: { caption: "Sarah" }, error: null,
         },
         {
-          id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1,
+          id: 3, type: "weather", col: 2, row: 0, width: 2, height: 1,
           config: { zip: "14617" }, photo: null, data: { temp: 48 }, error: null,
         },
         {
