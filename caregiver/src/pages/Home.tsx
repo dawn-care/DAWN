@@ -17,7 +17,6 @@
  */
 
 import { widgetName } from "@shared";
-import type { Cell } from "@shared";
 import { Check, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import InfoPopover from "../components/ui/InfoPopover";
@@ -109,15 +108,7 @@ export default function Home() {
 
   const nameOf = (widget: EditorWidget) => widgetName({ type: widget.type }).toLowerCase();
 
-  // A widget with settings is announced when its panel's Save is pressed; one without, as it is placed
-  const placeWidget = (cell: Cell) => {
-    const type = editor.pendingType;
-    const id = editor.add(cell);
-    if (id === null || !type || hasPanel(type)) return;
-    editor.keep(id);
-    announce(`Added ${widgetName({ type }).toLowerCase()}.`);
-  };
-
+  // A new widget is announced when its panel's Save is pressed
   const removeWidget = (id: EditorWidget["id"]) => {
     const widget = editor.draft?.find((other) => other.id === id);
     if (!widget) return;
@@ -213,7 +204,7 @@ export default function Home() {
                 widgets={editor.draft}
                 selectedId={editor.selectedId}
                 pendingType={editor.pendingType}
-                onPlace={placeWidget}
+                onPlace={editor.add}
                 onSelect={selectWidget}
                 onEdit={selectWidget}
                 onRemove={removeWidget}

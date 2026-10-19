@@ -22,10 +22,15 @@ import { useCallback, useRef, useState } from "react";
 import type { WidgetConfig } from "./api";
 import type { EditorWidget, LoadedLayout } from "./layout";
 
-/** The types the add bar offers: reminders are out of scope, and the day and time is never added */
-export type AddableWidgetType = Exclude<ScreenWidgetType, "day_time" | "reminder">;
+/**
+ * The types the add bar offers: reminders are out of scope, the day and time is
+ * never added, and news isn't offered for now (its lookup returns no articles,
+ * so the tablet wouldn't show it). A news widget already saved is still drawn
+ * and can be removed.
+ */
+export type AddableWidgetType = Exclude<ScreenWidgetType, "day_time" | "reminder" | "news">;
 
-export const ADDABLE_WIDGET_TYPES: readonly AddableWidgetType[] = ["photo", "message", "weather", "sports", "news"];
+export const ADDABLE_WIDGET_TYPES: readonly AddableWidgetType[] = ["photo", "message", "weather", "sports"];
 
 /** The zip a new weather widget starts with (St. Ann's) */
 export const DEFAULT_WEATHER_ZIP = "14617";

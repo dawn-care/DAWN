@@ -10,7 +10,7 @@
  * outlines are see-through, so they show which squares a tile covers without
  * hiding or being mistaken for its text. While a widget type is being placed
  * (`pendingType`), the squares it fits at (`openCells`) are lit and clickable.
- * Each widget has a pencil (to change its settings, except news, which has none
+ * Each widget has a pencil (to change its settings, except news, which is no longer offered and has none
  * and reminders, which the editor doesn't change) and a bin (to remove it) at
  * its top right; the day and time has neither. Clicking a widget, or its pencil,
  * selects it, and the selected widget gets a ring.

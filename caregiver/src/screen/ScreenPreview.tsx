@@ -44,8 +44,8 @@ export default function ScreenPreview({ carepartnerId, reloadKey = 0, editView }
     // takes the largest 16:10 box that fits beside the 2.75rem row and the 0.75rem gap above it under it
     <div className="flex-1 min-w-0 min-h-[360px] pt-2 [container-type:size]">
       <div className="flex flex-col gap-3" style={{ width: "min(100cqw, calc((100cqh - 3.5rem) * 1.6))" }}>
-        {/* The border shows where the carepartner's screen ends */}
-        <div className="aspect-[16/10] rounded-xl overflow-hidden bg-dawn-preview border-2 border-dawn-accent">
+        {/* The border shows where the carepartner's screen ends; #5B6091 is the border of the tablet's widgets (colors.day.border in carepartner/src/theme/theme.ts) */}
+        <div className="aspect-[16/10] rounded-xl overflow-hidden bg-dawn-preview border-[3px] border-[#5B6091]">
           {editing ? (
             <div className="h-full p-4">{editView}</div>
           ) : src ? (
