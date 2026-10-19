@@ -5,7 +5,6 @@ import Orientation from "./renderers/Orientation";
 import Photo from "./renderers/Photo";
 import Reminder from "./renderers/Reminder";
 import WideTile from "./renderers/WideTile";
-import Tile from "./renderers/Tile";
 import type { RendererName, WidgetPlacement } from "./types";
 
 type Entry<R extends RendererName> = {
@@ -18,7 +17,6 @@ type Entry<R extends RendererName> = {
 export const registry: { [R in RendererName]: Entry<R> } = {
   orientation: { component: Orientation, framed: false },
   photo: { component: Photo, framed: false },
-  tile: { component: Tile, framed: true },
   message: { component: Message, framed: true },
   reminder: { component: Reminder, framed: true },
   headline: { component: Headline, framed: true },

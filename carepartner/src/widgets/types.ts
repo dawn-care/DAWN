@@ -18,14 +18,6 @@ export type PhotoData = {
   name?: string | null;
 };
 
-/** A small tile: one icon, one word, and an optional short label. */
-export type TileData = {
-  /** One of the icon keys in `renderers/icons.ts`; unknown keys get a plain icon. */
-  icon: string;
-  word: string;
-  label?: string | null;
-};
-
 /** A caregiver's short message, with an optional photo and a role such as "Nurse". */
 export type MessageData = {
   text: string;
@@ -73,7 +65,6 @@ type Placed<R extends string, D> = GridArea & {
 export type WidgetPlacement =
   | Placed<"orientation", OrientationData>
   | Placed<"photo", PhotoData>
-  | Placed<"tile", TileData>
   | Placed<"message", MessageData>
   | Placed<"reminder", ReminderData>
   | Placed<"headline", HeadlineData>

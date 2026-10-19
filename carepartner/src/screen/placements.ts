@@ -32,14 +32,18 @@ const text = (value: unknown): string | null => (typeof value === "string" && va
 const WEATHER: Record<string, { icon: string; word: string }> = {
   Clear: { icon: "sunny", word: "Sunny" },
   Clouds: { icon: "cloudy", word: "Cloudy" },
-  Rain: { icon: "rain", word: "Rain" },
-  Drizzle: { icon: "rain", word: "Rain" },
-  Thunderstorm: { icon: "storm", word: "Storms" },
-  Snow: { icon: "snow", word: "Snow" },
+  Rain: { icon: "rain", word: "Rainy" },
+  Drizzle: { icon: "rain", word: "Rainy" },
+  Thunderstorm: { icon: "storm", word: "Stormy" },
+  Snow: { icon: "snow", word: "Snowy" },
   Mist: { icon: "fog", word: "Foggy" },
   Fog: { icon: "fog", word: "Foggy" },
   Haze: { icon: "fog", word: "Hazy" },
 };
+
+/** "48°" for a temperature in degrees Fahrenheit, or null if it isn't a number. */
+const degrees = (value: unknown): string | null =>
+  typeof value === "number" && Number.isFinite(value) ? `${Math.round(value)}°` : null;
 
 const LEAGUE_ICONS: Record<string, string> = { nfl: "football", nba: "basketball", mlb: "baseball", nhl: "hockey" };
 const RESULTS: Record<string, string> = { won: "Won", lost: "Lost", tied: "Tied" };
@@ -94,11 +98,19 @@ const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
     return items.length ? { renderer: "reminder", data: { items } } : null;
   },
   weather: ({ data }) => {
-    if (!isObject(data) || typeof data.temp !== "number") return null;
+    const temp = isObject(data) ? degrees(data.temp) : null;
+    if (!isObject(data) || !temp) return null;
     const condition = typeof data.condition === "string" ? WEATHER[data.condition] : undefined;
+    const high = degrees(data.temp_max);
+    const low = degrees(data.temp_min);
     return {
-      renderer: "tile",
-      data: { icon: condition?.icon ?? "", word: `${Math.round(data.temp)}°`, label: condition?.word ?? null },
+      renderer: "wideTile",
+      data: {
+        icon: condition?.icon ?? "",
+        label: condition?.word ?? "Today",
+        word: temp,
+        detail: high && low ? `High ${high}, low ${low}` : null,
+      },
     };
   },
   sports: ({ data }) => {

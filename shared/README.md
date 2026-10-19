@@ -12,7 +12,6 @@ Rules used by both the caregiver app and the carepartner tablet, so the caregive
 | `preview/previewAddress.ts` | The names in the address the caregiver opens the carepartner web app at to preview a screen (`PREVIEW_ADDRESS`: `?preview=1&carepartner_id=N`). The caregiver builds it and the carepartner reads it. |
 | `widgets/gridPlacement.ts` | Where widgets can go on the 4 x 3 grid. The day and time always fills the top left 2 x 2 (`DAY_TIME_AREA`, the only one of the `FIXED_AREAS`); both apps draw it there and it isn't stored, so no widget can go over it, and `canPlace` and `isValidPlacement` reject a `day_time` anywhere. The server doesn't check either; only these rules and the tablet do. Each widget type has a fixed size (`WIDGET_SIZES` in `widgetSizes.ts`) and is placed as a type plus the `col` and `row` of its top left cell, counted from 0 at the top left. `openCells` lists the cells to highlight for the widget being placed, `canPlace` and `hasRoom` check one cell or the whole grid, and `isValidPlacement` checks the full list before it is saved. |
 | `widgets/screenWidgets.ts` | Widget types and what to call them (`widgetName`). `day_time` names the fixed day and time; it is never placed or stored, though `isScreenWidgetType` and `splitKnownWidgets` count it as known. `splitKnownWidgets` sets aside widgets of a type this app doesn't know, so they are not placed or checked and can be sent back unchanged when saving. |
-| `widgets/weather.ts` | The weather tile's word ("Chilly", "Sunny"...). Takes the weather widget's data as it is. The words and temperature lines are provisional. |
 | `widgets/timeOfDay.ts` | Morning, afternoon or evening, the day name and the date label. |
 | `widgets/dateLabels.ts` | Wording for the server's dates and times: `parseDate` ("YYYY-MM-DD" as a local date), `timeLabel` ("18:30" as "6:30 pm") and `ordinal` ("3rd"). |
 | `widgets/grid.ts` | The screen's 4 x 3 grid: its size, `GridArea`, `fitsGrid`, `areasOverlap`, and `cornersToArea` / `areaToCorners` for the screen layout API's inclusive corners. |
@@ -36,7 +35,7 @@ Rules used by both the caregiver app and the carepartner tablet, so the caregive
 Import from the barrel, never from a deep path:
 
 ```ts
-import { currentlyPlaying, isAwake, weatherWord } from "@shared";
+import { currentlyPlaying, isAwake, widgetName } from "@shared";
 ```
 
 - **Carepartner:** the `@shared` path is set in `tsconfig.json`, Metro watches this folder and looks for packages in the app's `node_modules` (`metro.config.js`), and Jest maps it and looks there too (`roots`, `moduleNameMapper` and `modulePaths` in `package.json`). Files here sit outside the app, so without that lookup they could not find Babel's helpers.

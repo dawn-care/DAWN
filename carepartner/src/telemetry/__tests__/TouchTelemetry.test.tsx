@@ -15,12 +15,12 @@ const record = jest.fn<void, [Touch]>();
 const weather: WidgetPlacement = {
   id: "12",
   widgetType: "weather",
-  renderer: "tile",
+  renderer: "wideTile",
   col: 0,
   row: 0,
-  width: 1,
+  width: 2,
   height: 1,
-  data: { icon: "sunny", word: "48°", label: "Sunny" },
+  data: { icon: "sunny", label: "Sunny", word: "48°" },
 };
 
 /** A finger going down at (x, y) and, `heldMs` later, coming up at (toX, toY). */

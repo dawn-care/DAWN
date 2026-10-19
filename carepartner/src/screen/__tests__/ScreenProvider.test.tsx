@@ -12,7 +12,7 @@ jest.mock("../../pairing/pairingState", () => ({ readPairedId: jest.fn() }));
 const screenResponse = (wake = "07:00") => ({
   awake_hours: { wake, bed: "21:00", is_awake_now: true },
   widgets: [
-    { id: 3, type: "weather", col: 3, row: 0, width: 1, height: 1, config: {}, photo: null, data: { temp: 48 }, error: null },
+    { id: 3, type: "weather", col: 2, row: 0, width: 2, height: 1, config: {}, photo: null, data: { temp: 48 }, error: null },
   ],
   schedule: [],
 });
