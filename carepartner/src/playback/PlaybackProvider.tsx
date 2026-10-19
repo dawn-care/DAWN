@@ -9,6 +9,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from "react";
 import { readPairedId } from "../pairing/pairingState";
+import { PREVIEW } from "../preview/previewMode";
 import type { MediaItem } from "./media";
 import {
   initialPlaybackState,
@@ -60,9 +61,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   // Paired means a caregiver has claimed the stored carepartner (see
   // `readPairedId`). The machine keeps the ID, so nothing else reads it from
-  // storage.
+  // storage. A preview shows the carepartner its address names and never
+  // touches the stored pairing.
   const checkPairing = useCallback(async () => {
-    dispatch({ type: "pairingChecked", carepartnerId: await readPairedId() });
+    const carepartnerId = PREVIEW ? PREVIEW.carepartnerId : await readPairedId();
+    dispatch({ type: "pairingChecked", carepartnerId });
   }, []);
 
   // Reading storage can fail on Android; until it works the screen stays

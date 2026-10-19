@@ -131,6 +131,25 @@ describe("ScreenProvider", () => {
     expect(current.screen?.awakeHours.wake).toBe("08:00");
   });
 
+  it("says a fetch failed, keeping the last good screen, until one works again", async () => {
+    mockServer({ status: 500 }, screenResponse("07:00"), { status: 500 }, screenResponse("08:00"));
+    await start();
+
+    expect(current.failed).toBe(true);
+    expect(current.screen).toBeNull();
+
+    await act(async () => current.refresh());
+    expect(current.failed).toBe(false);
+
+    await act(async () => current.refresh());
+    expect(current.failed).toBe(true);
+    expect(current.screen?.awakeHours.wake).toBe("07:00");
+
+    await act(async () => current.refresh());
+    expect(current.failed).toBe(false);
+    expect(current.screen?.awakeHours.wake).toBe("08:00");
+  });
+
   it("keeps the newer screen when an older fetch answers last", async () => {
     const answers = pendingServer();
     await start();

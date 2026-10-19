@@ -1,7 +1,13 @@
-import { SCREEN_WIDGET_TYPES, isScreenWidgetType, splitKnownWidgets, widgetName } from "../screenWidgets";
+import {
+  SCREEN_WIDGET_TYPES,
+  isScreenWidgetType,
+  splitKnownWidgets,
+  widgetName,
+} from "../screenWidgets";
 
 describe("widgetName", () => {
   it.each([
+    ["day_time", "Day and time"],
     ["photo", "Photo"],
     ["message", "Message"],
     ["reminder", "Reminder"],
@@ -42,9 +48,10 @@ describe("splitKnownWidgets", () => {
       { id: 2, type: "clock" },
       { id: 3, type: "news" },
       { id: 4, type: "map" },
+      { id: 5, type: "day_time" },
     ];
     const { known, unknown } = splitKnownWidgets(widgets);
-    expect(known.map((w) => w.id)).toEqual([1, 3]);
+    expect(known.map((w) => w.id)).toEqual([1, 3, 5]);
     expect(unknown.map((w) => w.id)).toEqual([2, 4]);
   });
 

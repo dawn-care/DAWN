@@ -353,20 +353,22 @@ Replace both settings; both fields are required. Wake time must be 06:00 to 10:0
 
 ## Screen layout
 
-The tablet's screen is a fixed grid of **4 columns × 3 rows**. Columns count 0 to 3 from the left and rows 0 to 2 from the top. The caregiver places each widget by its **top-left and bottom-right cells, both inclusive**, so a widget can cover several cells: a 2×2 photo in the corner is `top_left {col 0, row 0}` to `bottom_right {col 1, row 1}`, and a 1×1 widget has the same cell for both. A widget can go anywhere on the grid. The server accepts any size, but each type has one fixed size (`WIDGET_SIZES` in `shared/widgets/widgetSizes.ts`), and the tablet leaves out a widget at another size. Cells no widget covers are empty. A new carepartner has no widgets.
+The tablet's screen is a fixed grid of **4 columns × 3 rows**. Columns count 0 to 3 from the left and rows 0 to 2 from the top. The caregiver places each widget by its **top-left and bottom-right cells, both inclusive**, so a widget can cover several cells: a 2×2 photo in the top right is `top_left {col 2, row 0}` to `bottom_right {col 3, row 1}`, and a 1×1 widget has the same cell for both. The server accepts any size, but each type has one fixed size (`WIDGET_SIZES` in `shared/widgets/widgetSizes.ts`), and the tablet leaves out a widget at another size. Cells no widget covers are empty. A new carepartner has no widgets.
+
+**The top left 2×2 is always the day and time** (`DAY_TIME_AREA` in `shared/widgets/gridPlacement.ts`). It isn't a widget the server stores: the tablet and the caregiver's editor both draw it there. The server doesn't stop a widget being saved over it, but the tablet leaves such a widget out and the editor drops it (removing it on its next save), so don't put widgets there.
 
 ```
           col 0    col 1    col 2    col 3
        ┌─────────────────┬─────────────────┐
-row 0  │      photo      │ reminder (2×1)  │
-       │      (2×2)      ├────────┬────────┤
-row 1  │                 │weather │(empty) │
-       ├─────────────────┼────────┴────────┤
-row 2  │  sports (2×1)   │     (empty)     │
-       └─────────────────┴─────────────────┘
+row 0  │  day and time   │      photo      │
+       │  (2×2, always   │      (2×2)      │
+row 1  │   drawn here)   │                 │
+       ├─────────────────┼────────┬────────┤
+row 2  │   news (2×1)    │weather │(empty) │
+       └─────────────────┴────────┴────────┘
 ```
 
-The editor and the preview see the same widget in two shapes: `/screen-layout` uses corners, and `/screen` uses `col`, `row`, `width` and `height` (the tablet's `GridArea`). Convert between them with `cornersToArea` and `areaToCorners` from `shared/widgets/grid.ts`, and check a dragged widget with `fitsGrid` and the `GRID` size from the same file. **Don't convert by hand:** the corners are inclusive, so `width = bottom_right.col - top_left.col + 1`, and a missing `+ 1` draws widgets one cell too small. The caregiver app can't import `@shared` yet (#354); until it can, copy those functions and their tests across.
+The editor and the preview see the same widget in two shapes: `/screen-layout` uses corners, and `/screen` uses `col`, `row`, `width` and `height` (the tablet's `GridArea`). Convert between them with `cornersToArea` and `areaToCorners` from `shared/widgets/grid.ts`, and check a placed widget with the rules in `shared/widgets/gridPlacement.ts` (`canPlace`, `isValidPlacement`). **Don't convert by hand:** the corners are inclusive, so `width = bottom_right.col - top_left.col + 1`, and a missing `+ 1` draws widgets one cell too small. Both apps import these from `@shared`.
 
 ### `GET /screen-layout?carepartner_id={id}`
 
@@ -377,12 +379,12 @@ Every widget in reading order (top row first, then left to right), to load the e
   "widgets": [
     {
       "id": 1, "carepartner_id": 1, "type": "photo",
-      "top_left": { "col": 0, "row": 0 }, "bottom_right": { "col": 1, "row": 1 },
+      "top_left": { "col": 2, "row": 0 }, "bottom_right": { "col": 3, "row": 1 },
       "config": { "caption": "Sarah" }, "photo_media_id": 4, "photo_url": "/media/4/file"
     },
     {
       "id": 2, "carepartner_id": 1, "type": "weather",
-      "top_left": { "col": 3, "row": 0 }, "bottom_right": { "col": 3, "row": 0 },
+      "top_left": { "col": 2, "row": 2 }, "bottom_right": { "col": 2, "row": 2 },
       "config": { "zip": "14617" }, "photo_media_id": null, "photo_url": null
     }
   ]
@@ -400,9 +402,9 @@ Save the whole screen at once, from the editor's save button. Send **every** wid
 ```json
 {
   "widgets": [
-    { "id": 1, "type": "photo", "top_left": { "col": 0, "row": 0 }, "bottom_right": { "col": 1, "row": 1 },
+    { "id": 1, "type": "photo", "top_left": { "col": 2, "row": 0 }, "bottom_right": { "col": 3, "row": 1 },
       "config": { "caption": "Sarah" }, "photo_media_id": 4 },
-    { "type": "news", "top_left": { "col": 2, "row": 1 }, "bottom_right": { "col": 3, "row": 1 }, "config": {} }
+    { "type": "news", "top_left": { "col": 0, "row": 2 }, "bottom_right": { "col": 1, "row": 2 }, "config": {} }
   ]
 }
 ```
@@ -418,7 +420,7 @@ Returns `200` with the saved layout, in the same shape as `GET`, with the widget
 
 Unknown fields are rejected (`INVALID_CONFIG`), which catches typos. Text is trimmed.
 
-Any type can be any size and go anywhere on the grid.
+The server lets any type be any size and go anywhere on the grid, but see [Screen layout](#screen-layout) for the fixed sizes and the day and time in the top left.
 
 | Type | `config` | Photo |
 |---|---|---|
@@ -539,17 +541,12 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
   "awake_hours": { "wake": "07:00", "bed": "21:00", "is_awake_now": true },
   "widgets": [
     {
-      "id": 1, "type": "photo", "col": 0, "row": 0, "width": 2, "height": 2, "config": {},
+      "id": 1, "type": "photo", "col": 2, "row": 0, "width": 2, "height": 2, "config": {},
       "photo": { "id": 1, "display_name": "Sarah", "url": "/media/1/file" },
       "data": { "caption": "Sarah" }, "error": null
     },
     {
-      "id": 2, "type": "reminder", "col": 2, "row": 0, "width": 1, "height": 1,
-      "config": { "items": [{ "icon": "meal", "text": "Lunch", "time": "12:00" }] },
-      "photo": null, "data": null, "error": null
-    },
-    {
-      "id": 3, "type": "weather", "col": 3, "row": 0, "width": 1, "height": 1,
+      "id": 3, "type": "weather", "col": 2, "row": 2, "width": 1, "height": 1,
       "config": { "zip": "14617" }, "photo": null,
       "data": {
         "location": "Irondequoit", "temp": 48, "feels_like": 44, "temp_min": 45, "temp_max": 51,
@@ -558,7 +555,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
       "error": null
     },
     {
-      "id": 4, "type": "news", "col": 2, "row": 1, "width": 2, "height": 1, "config": {}, "photo": null,
+      "id": 4, "type": "news", "col": 0, "row": 2, "width": 2, "height": 1, "config": {}, "photo": null,
       "data": null, "error": "UPSTREAM_UNAVAILABLE"
     }
   ],

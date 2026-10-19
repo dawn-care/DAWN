@@ -31,6 +31,8 @@ type ScreenContextValue = {
   refresh: () => Promise<void>;
   /** When the last good screen arrived, or null before the first. For developer tools. */
   fetchedAt: Date | null;
+  /** Whether the latest fetch failed. A preview with no screen yet says so rather than look like an empty one. */
+  failed: boolean;
 };
 
 const ScreenContext = createContext<ScreenContextValue | null>(null);
@@ -50,6 +52,7 @@ export function ScreenProvider({ children }: { children: React.ReactNode }) {
   const latest = useRef(0);
   /** Re-reads the clock at each check, so stale data hides even when no fetch succeeds. */
   const [checkedAt, setCheckedAt] = useState(() => now());
+  const [failed, setFailed] = useState(false);
 
   const refresh = useCallback(async () => {
     if (id == null) return;
@@ -60,9 +63,13 @@ export function ScreenProvider({ children }: { children: React.ReactNode }) {
       if (request !== latest.current) return;
       if (!screen) throw new Error("Screen response is malformed");
       setFetched({ screen, at: now() });
+      setFailed(false);
     } catch (error) {
       // Keep the last good screen; the next check tries again.
-      if (request === latest.current) console.warn("Couldn't refresh the screen", error);
+      if (request === latest.current) {
+        console.warn("Couldn't refresh the screen", error);
+        setFailed(true);
+      }
     }
   }, [id]);
 
@@ -70,6 +77,7 @@ export function ScreenProvider({ children }: { children: React.ReactNode }) {
     // Drops a fetch still in flight for the previous carepartner.
     latest.current++;
     setFetched(null);
+    setFailed(false);
     if (id == null) return;
     refresh();
     const timer = setInterval(() => {
@@ -83,6 +91,6 @@ export function ScreenProvider({ children }: { children: React.ReactNode }) {
 
   const screen = useMemo(() => fetched && hideStaleWidgets(fetched.screen, fetched.at, checkedAt), [fetched, checkedAt]);
   const fetchedAt = fetched?.at ?? null;
-  const value = useMemo(() => ({ screen, refresh, fetchedAt }), [screen, refresh, fetchedAt]);
+  const value = useMemo(() => ({ screen, refresh, fetchedAt, failed }), [screen, refresh, fetchedAt, failed]);
   return <ScreenContext.Provider value={value}>{children}</ScreenContext.Provider>;
 }
