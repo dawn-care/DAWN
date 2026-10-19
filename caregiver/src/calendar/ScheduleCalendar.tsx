@@ -102,10 +102,12 @@ function draftEvent({ date, minute }: DraftSlot): EventInput {
   return { id: "draft", title: "New", start, end, classNames: ["cal-draft"], extendedProps: { startMinute: minute, draft: true } };
 }
 
-// "8am Title"
-function renderEvent({ event }: EventContentArg) {
+// "8am Title"; month view puts a dot in the item's color first, since it has no filled block
+function renderEvent({ event, view }: EventContentArg) {
+  const isAudio = event.classNames.includes("cal-audio");
   return (
     <div className="dawn-event">
+      {view.type === "dayGridMonth" && <span className={`dawn-event-dot${isAudio ? " is-audio" : ""}`} aria-hidden="true" />}
       <span className="dawn-event-time">{shortTime(event.extendedProps.startMinute as number)}</span>
       <span className="dawn-event-title">{event.title}</span>
     </div>

@@ -16,7 +16,7 @@
   --fc-today-bg-color: transparent;
   --fc-now-indicator-color: theme("colors.dawn.accent");
   --fc-event-border-color: transparent;
-  --dawn-slot-height: 16px;
+  --dawn-slot-height: 24px;
 
   font-family: theme("fontFamily.dawn");
   color: theme("colors.dawn.ink");
@@ -32,8 +32,9 @@
   border: 0;
 }
 
-/* One row per quarter hour, but only the hour lines show */
-.dawn-calendar .fc-timegrid-slot {
+/* One row per quarter hour, but only the hour lines show. FullCalendar's own rule has the same
+   weight as ours and loads after it, so this one is a step more specific to win */
+.dawn-calendar .fc .fc-timegrid-slot {
   height: var(--dawn-slot-height);
 }
 
@@ -105,6 +106,11 @@
   background: repeating-linear-gradient(45deg, #ede7dd 0 4px, #f7f3ec 4px 8px);
 }
 
+/* FullCalendar makes the text inside an event white; each kind below sets its own color instead */
+.dawn-calendar .fc-timegrid-event .fc-event-main {
+  color: inherit;
+}
+
 /* Video and audio events: white text on the accent or teal fill */
 .dawn-calendar .fc-timegrid-event {
   border-radius: 6px;
@@ -167,12 +173,20 @@
   font-weight: 700;
 }
 
-.dawn-calendar .fc-daygrid-event-dot {
-  border-color: theme("colors.dawn.accent");
+.dawn-event-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: theme("colors.dawn.accent");
 }
 
-.dawn-calendar .cal-audio .fc-daygrid-event-dot {
-  border-color: theme("colors.dawn.audio");
+.dawn-event-dot.is-audio {
+  background: theme("colors.dawn.audio");
+}
+
+.dawn-calendar .fc-daygrid-dot-event .dawn-event-title {
+  font-weight: 400;
 }
 
 .dawn-calendar .fc-daygrid-day-number {
