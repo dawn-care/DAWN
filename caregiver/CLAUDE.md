@@ -45,6 +45,10 @@ Key pages by role:
 
 These page components are intentionally large and self-contained (state, API calls, and form UI together) — that's the established pattern here, not something to refactor apart unless asked.
 
+### Screen editor (`src/screen/`, shown by `src/pages/Home.tsx`)
+
+The home page shows the carepartner's screen as the carepartner web app in an iframe (`CarepartnerScreen`). Edit screen swaps it for a draft of the saved layout held by `useScreenEditor`: the add bar (`AddBar`) picks a widget type, `openCells` lights where it fits, the pencil, bin or a click on a tile selects a widget (`ScreenGrid`), and the settings panel beside the screen (`WidgetPanel`) changes the selected widget. A widget needs its settings before it can be kept (`isComplete` in `widgetSettings.ts`), and a newly added one must be saved with the panel's Save before another can be added. Save changes runs `saveProblem`, sends the whole list with `saveWidgets`, then loads the layout again; the draft is thrown away by Cancel or a failed load, never by a failed save. Reminders aren't edited here (existing ones are kept and sent back unchanged), and the day and time is never added, edited or removed. Wording for toasts and hints lives in `Home.tsx` and `AddBar.tsx`.
+
 ### Shared rules (`../shared`)
 
 Rules the tablet must agree with (awake hours, what is playing, where widgets can be placed on the grid, widget names, the weather word) live in the repo-root `shared/` folder, not here. Import them with `import { ... } from "@shared"`; the alias is in `vite.config.ts` and `tsconfig.app.json`, and the Docker build copies `shared/` beside this folder. Their tests run from `carepartner/` (`npm test`), since this package has no test runner. See `shared/README.md`.
