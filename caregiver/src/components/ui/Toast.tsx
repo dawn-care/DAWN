@@ -45,7 +45,7 @@ import type { DismissOptions, ToastApi, ToastOptions, ToastState, ToastViewportS
 import { FOCUS_RING } from "./styles";
 
 // Long enough to read the message and reach an Undo
-const TOAST_DURATION_MS = 12000;
+const TOAST_DURATION_MS = 5000;
 
 // How many waiting toasts are drawn behind the top one
 const MAX_PEEKING = 2;

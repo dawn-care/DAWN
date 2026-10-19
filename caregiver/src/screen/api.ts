@@ -189,8 +189,6 @@ export async function loadWidgets(carepartnerId: number): Promise<LayoutWidget[]
  * carepartner's widgets left out are deleted. `[]` clears the screen. Nothing is
  * saved if any widget is invalid. Returns the saved widgets in the order sent, so
  * a new widget's `id` can be read from its position.
- *
- * FUTURE IMPLEMENTATION (#333): nothing calls this yet; Save changes will use it.
  */
 export async function saveWidgets(carepartnerId: number, widgets: LayoutWidgetInput[]): Promise<LayoutWidget[]> {
   const path = `/screen-layout?carepartner_id=${carepartnerId}`;

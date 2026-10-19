@@ -8,6 +8,7 @@
  * and again before saving.
  */
 
+import { isValidPlacement } from "@shared";
 import type { ScreenWidgetType } from "@shared";
 import type { EditorWidget } from "./layout";
 import type { MessageConfig, SportsConfig, WeatherConfig } from "./api";
@@ -35,6 +36,17 @@ export function settingsChanged(before: EditorWidget, after: EditorWidget): bool
     before.photoUrl !== after.photoUrl ||
     JSON.stringify(before.config) !== JSON.stringify(after.config)
   );
+}
+
+/**
+ * What stops the screen from being saved, or null when it can be. A widget
+ * missing what it needs is named by `widgetId`, so the editor can select it.
+ */
+export function saveProblem(widgets: readonly EditorWidget[]): { message: string; widgetId?: EditorWidget["id"] } | null {
+  const incomplete = widgets.find((widget) => !isComplete(widget));
+  if (incomplete) return { message: "Finish the settings of the selected widget before saving.", widgetId: incomplete.id };
+  if (!isValidPlacement(widgets)) return { message: "A widget doesn't fit on the carepartner's screen." };
+  return null;
 }
 
 /** A weather widget's zip code: exactly five digits */

@@ -24,7 +24,6 @@ import ScreenUnavailable from "./ScreenUnavailable";
 
 const SCREEN_INFO =
   "This is what the carepartner's idle screen looks like. Click Edit screen to change it, or Full screen to enlarge it.";
-// FUTURE IMPLEMENTATION (#333): say how to change, remove and save widgets once the pencil, bin and Save changes exist
 const EDIT_INFO =
   "Each square shows where something sits on the carepartner's screen. Pick something to add above the screen, then click a lit square to place it. Nothing changes on the tablet until you save. Click Cancel to undo all of your changes.";
 

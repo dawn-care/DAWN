@@ -14,8 +14,6 @@
  * or remove it (`remove`). `selectedId` is the widget being edited. A widget
  * added since editing began stays in `newIds` until `keep` says its settings
  * were confirmed, so closing its popup with X can take it back off the screen.
- *
- * FUTURE IMPLEMENTATION (#333): saving the draft is added in a later step.
  */
 
 import { canPlace, hasRoom } from "@shared";

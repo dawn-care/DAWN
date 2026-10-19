@@ -15,9 +15,16 @@
  *
  * "Loading carepartner screen…" covers the frame until it has loaded, and again
  * each time it loads anew (another carepartner, or `reloadKey` after a save).
+ *
+ * If the carepartner app can't be reached (it isn't running), the browser would
+ * fill the frame with its own "refused to connect" page, which an iframe gives
+ * the page no way to detect. So the app is asked for first, and when that
+ * fails "Could not connect to carepartner tablet." is shown instead, with Try
+ * again.
  */
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { FOCUS_RING } from "../components/ui/styles";
 
 /** The tablet's screen in layout units: 1280 x 800, the shape of the visual design */
 const TABLET_SIZE = { width: 1280, height: 800 };
@@ -36,8 +43,29 @@ export default function CarepartnerScreen({ src, reloadKey = 0 }: CarepartnerScr
 
 function Frame({ src }: { src: string }) {
   const [loaded, setLoaded] = useState(false);
+  // null while checking, then whether the carepartner app answered
+  const [reachable, setReachable] = useState<boolean | null>(null);
+  // Counts tries, so Try again loads the frame and asks again
+  const [attempt, setAttempt] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
+
+  // Ask for the page first. no-cors lets this work across origins: the answer can't be read, but it
+  // only fails when nothing is listening there, which is all that is needed.
+  useEffect(() => {
+    let current = true;
+    fetch(src, { mode: "no-cors", cache: "no-store" }).then(
+      () => current && setReachable(true),
+      (err: unknown) => {
+        if (!current) return;
+        console.warn("The carepartner app could not be reached", err);
+        setReachable(false);
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [src, attempt]);
 
   // Follow the container's size, so the tablet always fits it whole
   useLayoutEffect(() => {
@@ -53,18 +81,40 @@ function Frame({ src }: { src: string }) {
 
   return (
     <div ref={box} className="relative w-full h-full overflow-hidden">
-      <iframe
-        src={src}
-        title="The carepartner's screen, as it looks on the tablet"
-        onLoad={() => setLoaded(true)}
-        className="absolute left-1/2 top-1/2 block border-0"
-        style={{
-          width: TABLET_SIZE.width,
-          height: TABLET_SIZE.height,
-          transform: `translate(-50%, -50%) scale(${scale})`,
-        }}
-      />
-      {!loaded && (
+      {reachable !== false && (
+        <iframe
+          key={attempt}
+          src={src}
+          title="The carepartner's screen, as it looks on the tablet"
+          onLoad={() => setLoaded(true)}
+          className="absolute left-1/2 top-1/2 block border-0"
+          style={{
+            width: TABLET_SIZE.width,
+            height: TABLET_SIZE.height,
+            transform: `translate(-50%, -50%) scale(${scale})`,
+          }}
+        />
+      )}
+      {reachable === false && (
+        <div
+          role="alert"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-dawn-preview text-2xl font-bold text-dawn-muted text-center"
+        >
+          Could not connect to carepartner tablet.
+          <button
+            type="button"
+            onClick={() => {
+              setReachable(null);
+              setLoaded(false);
+              setAttempt((n) => n + 1);
+            }}
+            className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-control bg-white hover:bg-dawn-page text-dawn-ink text-base font-bold cursor-pointer ${FOCUS_RING}`}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      {reachable !== false && !loaded && (
         <div
           role="status"
           className="absolute inset-0 flex items-center justify-center p-6 bg-dawn-preview text-2xl font-bold text-dawn-muted text-center"

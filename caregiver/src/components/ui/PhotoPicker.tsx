@@ -52,18 +52,23 @@ export default function PhotoPicker({
       className="flex gap-2 p-1 -m-1 overflow-x-auto"
     >
       {photos.map((photo) => (
-        <RadixRadioGroup.Item
-          key={photo.id}
-          value={photo.id}
-          aria-label={photo.label}
-          className={`relative flex-1 min-w-[72px] h-[54px] p-0 overflow-hidden rounded-lg border-2 border-dawn-line-strong bg-dawn-avatar bg-cover bg-center cursor-pointer data-[state=checked]:border-[3px] data-[state=checked]:border-dawn-accent ${FOCUS_RING}`}
-          // JSON.stringify quotes the URL so spaces and parentheses can't break the CSS
-          style={{ backgroundImage: `url(${JSON.stringify(photo.src)})` }}
-        >
-          <RadixRadioGroup.Indicator className="absolute right-[3px] bottom-[3px] w-5 h-5 rounded-full bg-dawn-accent text-white flex items-center justify-center">
-            <Check size={12} strokeWidth={3.4} aria-hidden="true" />
-          </RadixRadioGroup.Indicator>
-        </RadixRadioGroup.Item>
+        <div key={photo.id} className="flex-1 min-w-[72px] flex flex-col gap-1">
+          <RadixRadioGroup.Item
+            value={photo.id}
+            aria-label={photo.label}
+            className={`relative w-full h-[54px] p-0 overflow-hidden rounded-lg border-2 border-dawn-line-strong bg-dawn-avatar bg-cover bg-center cursor-pointer data-[state=checked]:border-[3px] data-[state=checked]:border-dawn-accent ${FOCUS_RING}`}
+            // JSON.stringify quotes the URL so spaces and parentheses can't break the CSS
+            style={{ backgroundImage: `url(${JSON.stringify(photo.src)})` }}
+          >
+            <RadixRadioGroup.Indicator className="absolute right-[3px] bottom-[3px] w-5 h-5 rounded-full bg-dawn-accent text-white flex items-center justify-center">
+              <Check size={12} strokeWidth={3.4} aria-hidden="true" />
+            </RadixRadioGroup.Indicator>
+          </RadixRadioGroup.Item>
+          {/* The name is already the button's accessible name, so it is only drawn here */}
+          <span aria-hidden="true" title={photo.label} className="text-sm leading-tight text-center truncate">
+            {photo.label}
+          </span>
+        </div>
       ))}
     </RadixRadioGroup.Root>
   );

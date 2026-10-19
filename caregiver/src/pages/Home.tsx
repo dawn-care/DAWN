@@ -11,25 +11,28 @@
  *
  * Selecting a widget with settings shows them in the panel (WidgetPanel) beside the screen.
  *
- * FUTURE IMPLEMENTATION (#333): the photo and sports panels, and Save changes,
- * are added in later steps.
+ * Save changes checks the draft, sends the whole list in one request and loads
+ * the screen again. If the check or the save fails it says why and stays in edit
+ * mode with the draft as it was.
  */
 
 import { widgetName } from "@shared";
 import type { Cell } from "@shared";
 import { Check, Pencil } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import InfoPopover from "../components/ui/InfoPopover";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import type { ToastOptions } from "../components/ui/toastContext";
 import { useAuth } from "../context/AuthContext";
+import { failedWidgetIndex, friendlyError, saveWidgets } from "../screen/api";
 import AddBar from "../screen/AddBar";
+import { toLayout } from "../screen/layout";
 import type { EditorWidget } from "../screen/layout";
 import type { AddableWidgetType } from "../screen/useScreenEditor";
 import ScreenGrid from "../screen/ScreenGrid";
 import WidgetPanel from "../screen/WidgetPanel";
-import { hasPanel, settingsChanged, settingsOf } from "../screen/widgetSettings";
+import { hasPanel, saveProblem, settingsChanged, settingsOf } from "../screen/widgetSettings";
 import ScreenPreview from "../screen/ScreenPreview";
 import { useSavedLayout } from "../screen/useSavedLayout";
 import { useScreenEditor } from "../screen/useScreenEditor";
@@ -63,6 +66,46 @@ export default function Home() {
   // Shown after trying to add something while a new widget is unsaved, until that widget is saved or removed
   const unfinished = editor.draft?.find((widget) => widget.id === editor.unfinishedId) ?? null;
   const finishType = editor.finishFirst && unfinished ? (unfinished.type as AddableWidgetType) : null;
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Changes each save, so the screen's iframe loads what was just saved
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // An error belongs to the edit it came from
+  useEffect(() => {
+    if (!editor.editing) setSaveError(null);
+  }, [editor.editing]);
+
+  const saveChanges = async () => {
+    const draft = editor.draft;
+    if (state.status !== "ready" || !draft || saving) return;
+    setSaveError(null);
+
+    const problem = saveProblem(draft);
+    if (problem) {
+      setSaveError(problem.message);
+      if (problem.widgetId !== undefined) selectWidget(problem.widgetId);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await saveWidgets(carepartnerId, toLayout(draft, state.layout.unknown));
+      // Loading the saved screen again ends editing, so the draft is replaced by what the server kept
+      reload();
+      setReloadKey((key) => key + 1);
+      toast.show("Changes saved.");
+    } catch (err) {
+      console.error(`Saving carepartner ${carepartnerId}'s screen failed`, err);
+      setSaveError(friendlyError(err));
+      // The server names the widget it rejected by its place in the list sent, which starts with the draft
+      const failed = failedWidgetIndex(err);
+      if (failed !== undefined && draft[failed]) selectWidget(draft[failed].id);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const nameOf = (widget: EditorWidget) => widgetName({ type: widget.type }).toLowerCase();
 
@@ -106,8 +149,11 @@ export default function Home() {
           {editor.editing ? (
             <>
               <span className="text-base text-dawn-accent">Not saved yet</span>
-              <button type="button" onClick={editor.cancel} className={SECONDARY_BUTTON}>
+              <button type="button" onClick={editor.cancel} disabled={saving} className={SECONDARY_BUTTON}>
                 Cancel
+              </button>
+              <button type="button" onClick={saveChanges} disabled={saving} className={PRIMARY_BUTTON}>
+                {saving ? "Saving…" : "Save changes"}
               </button>
             </>
           ) : (
@@ -133,6 +179,12 @@ export default function Home() {
         </div>
       </div>
 
+      {saveError && (
+        <div role="alert" className="text-base text-dawn-accent">
+          {saveError}
+        </div>
+      )}
+
       {state.status === "error" && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-base text-dawn-muted">
           <p className="m-0">{state.message}</p>
@@ -154,6 +206,7 @@ export default function Home() {
       <div className="flex flex-1 min-h-0 gap-6">
         <ScreenPreview
           carepartnerId={carepartnerId}
+          reloadKey={reloadKey}
           editView={
             editor.draft ? (
               <ScreenGrid
@@ -191,12 +244,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* FUTURE IMPLEMENTATION (#333): add that saving removes them, once Save changes exists */}
       {state.status === "ready" && state.layout.dropped.length > 0 && (
         <p className="m-0 text-center text-[15px] text-dawn-muted">
           {state.layout.dropped.length === 1
             ? "1 thing saved on the carepartner's screen can't be shown on the tablet."
             : `${state.layout.dropped.length} things saved on the carepartner's screen can't be shown on the tablet.`}
+          {editor.editing && " Saving removes it from the screen."}
         </p>
       )}
     </div>
