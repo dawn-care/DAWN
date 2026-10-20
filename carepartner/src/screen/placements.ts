@@ -17,7 +17,7 @@
  *   malformed.
  */
 
-import { createDrawCheck, DAY_TIME_AREA, parseClock, timeLabel, type ScreenWidgetType } from "@shared";
+import { createDrawCheck, DAY_TIME_AREA, parseClock, type ScreenWidgetType } from "@shared";
 import { resolveApiUri } from "../api/resolveApiUri";
 import type { ReminderItem, WidgetPlacement } from "../widgets/types";
 import type { Screen, ScreenWidget } from "./screen";
@@ -47,13 +47,24 @@ const degrees = (value: unknown): string | null =>
 const LEAGUE_ICONS: Record<string, string> = { nfl: "football", nba: "basketball", mlb: "baseball", nhl: "hockey" };
 const RESULTS: Record<string, string> = { won: "Won", lost: "Lost", tied: "Tied" };
 
+/**
+ * A minute after midnight as "8:30 AM", or "8 AM" on the hour: shorter than the
+ * caregiver's "8:00 am" (`timeLabel` in `@shared`), so reminders fit the tile.
+ */
+function reminderTime(minute: number): string {
+  const hours = Math.floor(minute / 60);
+  const minutes = minute % 60;
+  const hour12 = hours % 12 || 12;
+  const suffix = hours < 12 ? "AM" : "PM";
+  return minutes ? `${hour12}:${String(minutes).padStart(2, "0")} ${suffix}` : `${hour12} ${suffix}`;
+}
+
 function readReminderItem(value: unknown): ReminderItem | null {
   if (!isObject(value)) return null;
-  const time = typeof value.time === "string" ? value.time : "";
-  const minute = parseClock(time);
+  const minute = typeof value.time === "string" ? parseClock(value.time) : null;
   const words = text(value.text);
   if (minute == null || !words) return null;
-  return { minute, timeLabel: timeLabel(time), text: words, icon: typeof value.icon === "string" ? value.icon : "other" };
+  return { minute, timeLabel: reminderTime(minute), text: words, icon: typeof value.icon === "string" ? value.icon : "other" };
 }
 
 /** The day and time of day, in the top left of every screen. */

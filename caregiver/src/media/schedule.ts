@@ -4,14 +4,14 @@
  * User: Caregiver
  *
  * Turns scheduled items into the plain-English line shown on a media item's
- * detail panel, e.g. "Every day at 8 AM". Day and date names come from
+ * detail panel, e.g. "Every day at 8:00 am". Day and date names come from
  * @shared so they match the rest of the app.
  */
 
 import { dateLabel, dayName, ordinal, parseDate, timeLabel } from "@shared";
 import type { ScheduledItem } from "./api";
 
-/** One item, e.g. "Every week on Sunday at 6 PM" or "Saturday, October 3 at 10 AM" */
+/** One item, e.g. "Every week on Sunday at 6:00 pm" or "Saturday, October 3 at 10:00 am" */
 export function describeScheduledItem(item: ScheduledItem): string {
   const start = parseDate(item.start_date);
   const time = timeLabel(item.start_time);
