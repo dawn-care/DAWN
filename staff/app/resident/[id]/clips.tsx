@@ -1,17 +1,17 @@
 /**
  * S4 · Clip picker
  *
- * Lists the resident's real media (videos and audio) from the server and plays one on
- * their tablet, newest first. Coming from a family folder, it shows the clips the
+ * Lists the resident's real media (videos, audio and photos) from the server and plays
+ * one on their tablet, newest first. A photo shows on the tablet for 30 seconds. Coming from a family folder, it shows the clips the
  * caregiver linked to that person; coming from a situation, the clips the caregiver
- * put under it (by default, everything is under every situation).
+ * put under it. Clips the caregiver tagged with neither never show here.
  *
  * Playing is blocked during the resident's sleeping hours. Staff can still look
  * through the list; only the Play button is disabled.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -25,6 +25,8 @@ import { useThemeColors } from '../../../lib/theme';
 
 const formatDuration = (seconds: number | null) =>
   seconds === null ? '' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+const KIND_LABELS: Record<Clip['kind'], string> = { video: 'Video', audio: 'Audio', photo: 'Photo' };
 
 const formatAdded = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -143,12 +145,21 @@ export default function ClipsScreen() {
             className="mb-4 overflow-hidden rounded-2xl border border-border bg-surface"
           >
             <View className="h-32 items-center justify-center bg-nav">
-              <Ionicons
-                name={clip.kind === 'video' ? 'videocam' : 'musical-notes'}
-                size={44}
-                color={colors.onNav}
-              />
-              {clip.duration !== null && (
+              {clip.kind === 'photo' ? (
+                <Image
+                  source={{ uri: clip.fileUrl }}
+                  accessibilityLabel={clip.title}
+                  resizeMode="cover"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              ) : (
+                <Ionicons
+                  name={clip.kind === 'video' ? 'videocam' : 'musical-notes'}
+                  size={44}
+                  color={colors.onNav}
+                />
+              )}
+              {clip.kind !== 'photo' && clip.duration !== null && (
                 <Text className="absolute bottom-3 right-4 text-base font-semibold text-on-nav">
                   {formatDuration(clip.duration)}
                 </Text>
@@ -158,7 +169,7 @@ export default function ClipsScreen() {
             <View className="p-4">
               <Text className="text-xl font-bold text-ink">{clip.title}</Text>
               <Text className="mt-1 text-base text-ink-muted">
-                {clip.kind === 'video' ? 'Video' : 'Audio'} · Added {formatAdded(clip.addedAt)}
+                {KIND_LABELS[clip.kind]} · Added {formatAdded(clip.addedAt)}
               </Text>
 
               <Pressable
@@ -178,7 +189,11 @@ export default function ClipsScreen() {
                     asleep ? 'text-status-gray-text' : 'text-on-accent'
                   }`}
                 >
-                  {asleep ? 'Playing paused' : sending ? 'Sending…' : `Play on ${firstName}'s tablet`}
+                  {asleep
+                    ? 'Playing paused'
+                    : sending
+                      ? 'Sending…'
+                      : `${clip.kind === 'photo' ? 'Show' : 'Play'} on ${firstName}'s tablet`}
                 </Text>
               </Pressable>
             </View>

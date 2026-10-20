@@ -34,7 +34,7 @@ export interface Media {
   usage: MediaUsage[];
   /** Path to the file, relative to the API base; use fileUrl() */
   url: string;
-  /** Situations staff find it under; never empty */
+  /** Situations staff find it under; with no family members either, staff don't see it */
   situations: Situation[];
   /** Family members it is about; empty when it isn't about anyone in particular */
   family_member_ids: number[];
@@ -53,7 +53,7 @@ export interface FamilyMember {
 
 /** How staff find a media item */
 export interface MediaTags {
-  /** Empty means every situation */
+  /** With no family members either, staff don't see it */
   situations: Situation[];
   familyMemberIds: number[];
 }
@@ -164,13 +164,13 @@ export function uploadMedia({ carepartnerId, file, kind, displayName, tags, sign
   form.append("kind", kind);
   form.append("carepartner_id", String(carepartnerId));
   form.append("display_name", displayName.trim());
-  // Repeated fields; none means every situation
+  // Repeated fields; with neither, staff don't see the item
   tags.situations.forEach((situation) => form.append("situations", situation));
   tags.familyMemberIds.forEach((id) => form.append("family_member_ids", String(id)));
   return api<Media>("/media", { method: "POST", body: form, signal });
 }
 
-/** Replaces how staff find an item; no situations means every situation */
+/** Replaces how staff find an item; with both empty, staff don't see it */
 export function setMediaTags(id: number, tags: MediaTags): Promise<Media> {
   return api<Media>(`/media/${id}/tags`, {
     method: "PUT",

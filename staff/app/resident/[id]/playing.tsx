@@ -185,7 +185,9 @@ export default function PlayingScreen() {
               <Text className="text-base text-ink-muted">{formatDuration(position)}</Text>
               <Text className="text-base text-ink-muted">{formatDuration(duration)}</Text>
             </View>
-            <Text className="mt-1 text-sm text-ink-muted">Estimated from the clip&apos;s length</Text>
+            <Text className="mt-1 text-sm text-ink-muted">
+              {clip.kind === 'photo' ? 'Photos show for 30 seconds' : 'Estimated from the clip’s length'}
+            </Text>
           </>
         ) : null}
 

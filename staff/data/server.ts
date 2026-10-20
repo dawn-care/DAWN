@@ -3,7 +3,7 @@
  * ratings, requests to the caregiver) stays in data/mock.ts.
  */
 
-import { api, ApiError, apiWithStatus } from "../lib/api";
+import { api, ApiError, apiWithStatus, mediaUrl } from "../lib/api";
 import type { Clip, FamilyFolder, PlayedItem, Resident, SituationId } from "./types";
 
 interface ServerCarepartner {
@@ -19,6 +19,8 @@ interface ServerMedia {
   duration_seconds: number | null;
   created_at: string;
   url: string;
+  situations: string[];
+  family_member_ids: number[];
 }
 
 /** The parts of the server's Playback record the staff app uses. */
@@ -91,7 +93,7 @@ const SERVER_SITUATIONS: SituationId[] = [
 export type ClipFilter = { familyMemberId?: number; situation?: string };
 
 /**
- * A resident's videos and audio, newest first. Photos aren't played as clips.
+ * A resident's videos, audio and photos, newest first.
  * With a family member, only clips about them; otherwise, with a situation the
  * caregiver can tag, only clips for it.
  */
@@ -104,21 +106,26 @@ export async function getClips(residentId: number, filter: ClipFilter = {}): Pro
   }
   const media = await api<ServerMedia[] | null>(`/media?${query}`);
   return (media ?? [])
-    .filter((m): m is ServerMedia & { kind: "video" | "audio" } => m.kind !== "photo")
-    .map((m) => ({
-      id: m.id,
-      kind: m.kind,
-      title: m.display_name,
-      duration: m.duration_seconds,
-      addedAt: m.created_at,
-    }));
+    // With no situation and no family member, the caregiver kept it out of the staff app
+    .filter((m) => m.situations.length > 0 || m.family_member_ids.length > 0)
+    .map(toClip);
 }
+
+/** How long the tablet shows a photo staff play (DEFAULT_DURATION_SECONDS in carepartner/src/playback/media.ts). */
+const PHOTO_SECONDS = 30;
+
+const toClip = (m: ServerMedia): Clip => ({
+  id: m.id,
+  kind: m.kind,
+  title: m.display_name,
+  duration: m.kind === "photo" ? PHOTO_SECONDS : m.duration_seconds,
+  fileUrl: mediaUrl(m.url),
+  addedAt: m.created_at,
+});
 
 export async function getClip(id: number): Promise<Clip | undefined> {
   try {
-    const m = await api<ServerMedia>(`/media/${id}`);
-    if (m.kind === "photo") return undefined;
-    return { id: m.id, kind: m.kind, title: m.display_name, duration: m.duration_seconds, addedAt: m.created_at };
+    return toClip(await api<ServerMedia>(`/media/${id}`));
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return undefined;
     throw err;

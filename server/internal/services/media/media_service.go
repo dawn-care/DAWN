@@ -106,16 +106,15 @@ type UploadInput struct {
 	Tags          Tags
 }
 
-// Tags say how staff find a media item. No situations means every situation.
+// Tags say how staff find a media item. With neither, staff don't see it at all.
 type Tags struct {
 	Situations      []string
 	FamilyMemberIDs []int
 }
 
 /*
-cleanTags checks tags and fills in the default: no situations means every one.
-Repeats are dropped; situations end up in the order of media.Situations and family
-members by ID, as they are read back.
+cleanTags checks tags. Repeats are dropped; situations end up in the order of
+media.Situations and family members by ID, as they are read back.
 */
 func cleanTags(t Tags) (Tags, error) {
 	for _, s := range t.Situations {
@@ -125,7 +124,7 @@ func cleanTags(t Tags) (Tags, error) {
 	}
 	clean := Tags{Situations: []string{}, FamilyMemberIDs: []int{}}
 	for _, s := range media.Situations {
-		if len(t.Situations) == 0 || slices.Contains(t.Situations, s) {
+		if slices.Contains(t.Situations, s) {
 			clean.Situations = append(clean.Situations, s)
 		}
 	}
@@ -355,8 +354,8 @@ func (s *MediaService) Rename(id int, displayName string) (*media.Media, error) 
 }
 
 /*
-SetTags replaces how staff find a media item. No situations means every situation;
-family members must be the item's carepartner's.
+SetTags replaces how staff find a media item; family members must be the item's
+carepartner's. Empty lists take it out of the staff app.
 */
 func (s *MediaService) SetTags(id int, tags Tags) (*media.Media, error) {
 	if id <= 0 {

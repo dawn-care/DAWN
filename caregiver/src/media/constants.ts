@@ -81,8 +81,6 @@ export const SITUATIONS = [
 
 export type Situation = (typeof SITUATIONS)[number]["value"];
 
-export const ALL_SITUATIONS: Situation[] = SITUATIONS.map((s) => s.value);
-
 // Shown when the server gives a code we have no wording for
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
 

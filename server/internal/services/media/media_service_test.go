@@ -85,6 +85,9 @@ var insertMedia = regexp.QuoteMeta(`INSERT INTO "Media"`)
 // allSituations is media.Situations as the driver sends it
 const allSituations = `{"wants_to_go_home","doesnt_know_where","anxious_or_upset","starting_the_day","winding_down"}`
 
+// noSituations is how expectSetTags is told none are saved
+const noSituations = ""
+
 // expectSetTags expects a media item's tags to be replaced. family is the driver's
 // form of the IDs ("{2,5}"); linked is how many of them belong to the carepartner.
 func expectSetTags(mock sqlmock.Sqlmock, mediaID, carepartnerID int, situations, family string, linked int64) {
@@ -92,8 +95,10 @@ func expectSetTags(mock sqlmock.Sqlmock, mediaID, carepartnerID int, situations,
 		WithArgs(mediaID).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "MediaFamilyMember" WHERE media_id = $1;`)).
 		WithArgs(mediaID).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "MediaSituation"`)).
-		WithArgs(mediaID, situations).WillReturnResult(sqlmock.NewResult(0, 1))
+	if situations != noSituations {
+		mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "MediaSituation"`)).
+			WithArgs(mediaID, situations).WillReturnResult(sqlmock.NewResult(0, 1))
+	}
 	if family != "" {
 		mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "MediaFamilyMember"`)).
 			WithArgs(mediaID, family, carepartnerID).WillReturnResult(sqlmock.NewResult(0, linked))
@@ -122,7 +127,7 @@ func TestUpload_Photo(t *testing.T) {
 	mock.ExpectQuery(insertMedia).
 		WithArgs(1, "photo", "Beach", sqlmock.AnyArg(), "image/png", int64(5), nil).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(7, created))
-	expectSetTags(mock, 7, 1, allSituations, "", 0)
+	expectSetTags(mock, 7, 1, noSituations, "", 0)
 	mock.ExpectCommit()
 
 	m, err := svc.Upload(context.Background(), UploadInput{
@@ -132,7 +137,7 @@ func TestUpload_Photo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 7, m.ID)
-	assert.Equal(t, modelsMedia.Situations, *m.Situations, "no situations means every situation")
+	assert.Equal(t, []string{}, *m.Situations, "nothing chosen stays nothing: staff don't see it")
 	assert.Equal(t, []int{}, *m.FamilyMemberIDs)
 	assert.Equal(t, "Beach", m.DisplayName)
 	assert.Nil(t, m.DurationSeconds)
@@ -154,7 +159,7 @@ func TestUpload_VideoDurationRounded(t *testing.T) {
 	mock.ExpectQuery(insertMedia).
 		WithArgs(1, "video", "Clip", sqlmock.AnyArg(), "video/mp4", int64(3), 600).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(8, time.Now()))
-	expectSetTags(mock, 8, 1, allSituations, "", 0)
+	expectSetTags(mock, 8, 1, noSituations, "", 0)
 	mock.ExpectCommit()
 
 	m, err := svc.Upload(context.Background(), UploadInput{
@@ -233,7 +238,7 @@ func TestUpload_OtherFamilyRemovesFile(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(insertMedia).WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(9, time.Now()))
 	// Family member 6 isn't this carepartner's, so only one of the two is linked
-	expectSetTags(mock, 9, 1, allSituations, "{2,6}", 1)
+	expectSetTags(mock, 9, 1, noSituations, "{2,6}", 1)
 	mock.ExpectRollback()
 
 	_, err := svc.Upload(context.Background(), UploadInput{
@@ -395,8 +400,7 @@ func TestSetTags(t *testing.T) {
 			AddRow(4, 1, "video", "Clip", "k4", "video/mp4", 8, 30, time.Now(), false, false, false))
 	expectLoadTags(mock, [3]any{4, allSituations, "{3}"})
 
-	// No situations means every situation
-	m, err := svc.SetTags(4, Tags{FamilyMemberIDs: []int{3}})
+	m, err := svc.SetTags(4, Tags{Situations: modelsMedia.Situations, FamilyMemberIDs: []int{3}})
 
 	require.NoError(t, err)
 	assert.Equal(t, modelsMedia.Situations, *m.Situations)
@@ -421,7 +425,7 @@ func TestSetTags_Failures(t *testing.T) {
 		mock.ExpectBegin()
 		mock.ExpectQuery(regexp.QuoteMeta(`SELECT carepartner_id`)).WithArgs(4).
 			WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}).AddRow(1))
-		expectSetTags(mock, 4, 1, allSituations, "{8}", 0)
+		expectSetTags(mock, 4, 1, noSituations, "{8}", 0)
 		mock.ExpectRollback()
 
 		_, err := svc.SetTags(4, Tags{FamilyMemberIDs: []int{8}})
@@ -512,4 +516,25 @@ func TestFFProbeDuration(t *testing.T) {
 
 	_, err := FFProbeDuration(ctx, "../../utils/testFiles/test_photo.png")
 	assert.Error(t, err, "a still image has no duration")
+}
+
+func TestSetTags_NoneTakesItOutOfTheStaffApp(t *testing.T) {
+	svc, mock, _, _ := newTestService(t, 0, nil)
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT carepartner_id`)).WithArgs(4).
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}).AddRow(1))
+	// The old tags are removed and nothing is inserted
+	expectSetTags(mock, 4, 1, noSituations, "", 0)
+	mock.ExpectCommit()
+	mock.ExpectQuery(regexp.QuoteMeta(`WHERE m.id = $1`)).WithArgs(4).
+		WillReturnRows(sqlmock.NewRows(mediaColumns).
+			AddRow(4, 1, "photo", "Dog", "k4", "image/png", 8, nil, time.Now(), false, false, false))
+	expectLoadTags(mock, [3]any{4, "{}", "{}"})
+
+	m, err := svc.SetTags(4, Tags{})
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{}, *m.Situations)
+	assert.Equal(t, []int{}, *m.FamilyMemberIDs)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }

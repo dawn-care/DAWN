@@ -45,14 +45,19 @@ export interface FamilyFolder {
   guidanceNote?: string;
 }
 
-/** A video or audio clip from the resident's media library on the server. */
+/** A video, audio or photo from the resident's media library on the server. */
 export interface Clip {
   /** The server's media ID, which is what the play command sends. */
   id: number;
-  kind: 'video' | 'audio';
+  kind: 'video' | 'audio' | 'photo';
   title: string;
-  /** Seconds, or null if the server hasn't measured it. */
+  /**
+   * Seconds on the tablet, or null if the server hasn't measured it. A photo
+   * shows for the tablet's default time.
+   */
   duration: number | null;
+  /** The file, for a photo's thumbnail. */
+  fileUrl: string;
   /** RFC 3339, when it was uploaded. */
   addedAt: string;
 }
