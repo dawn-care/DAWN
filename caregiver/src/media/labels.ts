@@ -61,8 +61,9 @@ export function scheduleLine(media: Media, scheduled: ScheduledItem[] | null): s
   return line ?? (media.usage.includes("scheduled") ? "Scheduled" : null);
 }
 
-/** "Every situation", or the chosen ones, e.g. "Wants to go home, Anxious or upset" */
+/** "Every situation", "None", or the chosen ones, e.g. "Wants to go home, Anxious or upset" */
 export function situationsLine(media: Media): string {
+  if (media.situations.length === 0) return "None";
   if (media.situations.length === SITUATIONS.length) return "Every situation";
   return SITUATIONS.filter(({ value }) => media.situations.includes(value))
     .map(({ label }) => label)

@@ -179,7 +179,7 @@ func isMPEGFrame(head []byte) bool {
 // @Param kind formData string true "photo, video or audio"
 // @Param carepartner_id formData int true "Carepartner ID"
 // @Param display_name formData string false "Name shown to the caregiver; defaults to the file name"
-// @Param situations formData []string false "Situations staff find it under; repeat the field for each. None means every situation" collectionFormat(multi)
+// @Param situations formData []string false "Situations staff find it under; repeat the field for each" collectionFormat(multi)
 // @Param family_member_ids formData []int false "Family members it is about; repeat the field for each" collectionFormat(multi)
 // @Success 201 {object} media.Media
 // @Failure 400 {object} media.MediaError
@@ -402,7 +402,7 @@ func (c *MediaController) RenameMediaHandler(w http.ResponseWriter, r *http.Requ
 	writeMediaJSON(w, http.StatusOK, m)
 }
 
-// SetMediaTagsRequest replaces both lists; an empty situations list means every situation
+// SetMediaTagsRequest replaces both lists; with both empty, staff don't see the item
 type SetMediaTagsRequest struct {
 	Situations      []string `json:"situations"`
 	FamilyMemberIDs []int    `json:"family_member_ids"`
@@ -410,7 +410,7 @@ type SetMediaTagsRequest struct {
 
 // SetMediaTagsHandler godoc
 // @Summary Set how staff find a media item
-// @Description Replaces its situations and family members. No situations means every situation; family members must be the carepartner's.
+// @Description Replaces its situations and family members; family members must be the carepartner's. With both empty, staff don't see it.
 // @Tags media
 // @Accept json
 // @Produce json

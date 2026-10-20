@@ -5,10 +5,12 @@
  *
  * Chooses how staff find a media item:
  *
- *  - When to use it: the situations staff pick from on their phone. With
- *    none chosen it shows under every situation, which the hint says.
+ *  - When to use it: the situations staff pick from on their phone.
  *  - Who it's about: the carepartner's family members, so staff find it when
- *    the carepartner asks for that person. Optional.
+ *    the carepartner asks for that person.
+ *
+ * Nothing is chosen to start with. With neither chosen, staff never see the
+ * item, which a note under the picker says.
  *
  * Someone with a guidance note can't be chosen for now: staff see the note
  * instead of media for them (the staff app's family screen).
@@ -110,11 +112,7 @@ export default function TagPicker({
           <h3 id={situationsId} className={HEADING}>
             When should staff use it?
           </h3>
-          <p className={HINT}>
-            {situations.length === 0
-              ? "None picked, so staff will see it in every situation."
-              : "Staff see it when they pick one of these."}
-          </p>
+          <p className={HINT}>Staff see it when they pick one of these.</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {SITUATIONS.map(({ value, label }) => (
@@ -135,7 +133,7 @@ export default function TagPicker({
           <h3 id={familyId} className={HEADING}>
             Who is it about?
           </h3>
-          <p className={HINT}>Optional. Staff see it when they're asked for this person.</p>
+          <p className={HINT}>Staff see it when they're asked for this person.</p>
           {family?.some((member) => member.guidance_note !== null) && (
             <p className={HINT}>Greyed out: staff see your guidance note for them instead of media.</p>
           )}
@@ -215,6 +213,12 @@ export default function TagPicker({
           </div>
         )}
       </div>
+
+      {situations.length === 0 && familyMemberIds.length === 0 && (
+        <p role="status" className="m-0 px-2.5 py-2 rounded-lg bg-dawn-avatar text-[15px] font-bold text-dawn-ink">
+          Nothing picked, so staff won't see this in their app.
+        </p>
+      )}
     </div>
   );
 }
