@@ -140,8 +140,8 @@ export interface FamilyMember {
 // ---- Screen settings ----
 export interface ScreenSettings {
   carepartner_id: number;
-  wake_time: string; // "HH:MM", 06:00 to 10:00
-  bed_time: string;  // "HH:MM", 19:00 to 22:00
+  wake_time: string; // "HH:MM"
+  bed_time: string;  // "HH:MM", later than wake_time
 }
 export type WidgetType = "photo" | "message" | "reminder" | "weather" | "sports" | "news";
 
@@ -345,7 +345,7 @@ Returns `ScreenSettings`.
 
 ### `PUT /screen-settings?carepartner_id={id}`
 
-Replace both settings; both fields are required. Wake time must be 06:00 to 10:00 and bed time 19:00 to 22:00, inclusive. `"6:30"` is accepted and stored as `"06:30"`.
+Replace both settings; both fields are required. Any times in one day are allowed as long as bed time is later than wake time, so awake hours never cross midnight. `"6:30"` is accepted and stored as `"06:30"`.
 
 ```json
 { "wake_time": "07:00", "bed_time": "21:00" }
@@ -690,8 +690,8 @@ export interface Playback {
 | `INVALID_FAMILY_MEMBER` | 400 | A family member isn't this carepartner's (deleted elsewhere, or a bad ID) | That family member is no longer here. Refresh to see the latest. |
 | `INVALID_RELATIONSHIP` | 400 | Family relationship over 60 characters | Keep the relationship under 60 characters. |
 | `INVALID_GUIDANCE_NOTE` | 400 | Guidance note over 1000 characters | Keep the note under 1000 characters. |
-| `INVALID_WAKE_TIME` | 400 | Wake time outside 06:00 to 10:00 | Wake time must be between 6:00 and 10:00 AM. |
-| `INVALID_BED_TIME` | 400 | Bed time outside 19:00 to 22:00 | Bed time must be between 7:00 and 10:00 PM. |
+| `INVALID_WAKE_TIME` | 400 | Wake time missing or not "HH:MM" | Choose a wake-up time. |
+| `INVALID_BED_TIME` | 400 | Bed time missing, not "HH:MM", or not later than wake time | Bedtime must be later than wake-up time. |
 | `INVALID_TYPE` | 400 | Unknown widget type, or a changed type under the same `id` | Choose a widget from the list. |
 | `INVALID_CONFIG` | 400 | Widget settings fail a rule (see `error`) | Check the highlighted fields. |
 | `INVALID_PHOTO` | 400 | Photo missing, not a photo, or another carepartner's | Choose a photo from this person's library. |

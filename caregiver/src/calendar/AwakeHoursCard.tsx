@@ -6,18 +6,19 @@
  * The "Awake hours" card in the calendar's left column: when the carepartner
  * wakes up and goes to bed, from the screen settings. Videos and audio only
  * play between them. "Change" opens the editor in place: Wakes up and Bedtime
- * selects, a warning naming every scheduled item still to play that would be
+ * selects (any half hour of the day, with bedtime later than waking), a warning
+ * naming every scheduled item still to play that would be
  * outside the chosen hours (including any already outside the saved ones),
  * and Done to save (Cancel throws the changes away).
  */
 
-import { formatClock, parseClock, timeLabel } from "@shared";
+import { formatClock, isValidAwakeHours, parseClock, timeLabel } from "@shared";
 import { useEffect, useRef, useState } from "react";
 import SelectField from "../components/ui/form/SelectField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { friendlyError, listScheduledItems, saveScreenSettings } from "./api";
 import type { ScheduledItem, ScreenSettings } from "./api";
-import { BED_RANGE, WAKE_RANGE } from "./constants";
+import { AWAKE_RANGE, BED_AFTER_WAKE } from "./constants";
 import { awakeHoursOf, awakeOptions, dateText, itemsThatWontPlay, nameList } from "./time";
 
 interface AwakeHoursCardProps {
@@ -120,6 +121,8 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
   }, [carepartnerId]);
 
   const draft = awakeHoursOf({ ...settings, wake_time: wake, bed_time: bed });
+  // Awake hours are within one day, so bedtime has to come after waking
+  const bedAfterWake = draft !== null && isValidAwakeHours(draft);
   // One name per file, so "is" and "are" agree with the names shown
   const names = draft
     ? [...new Set(itemsThatWontPlay(items, draft, dateText(new Date())).map((item) => item.media.display_name))]
@@ -143,15 +146,20 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
         label="Wakes up"
         value={wake}
         onChange={(event) => setWake(event.target.value)}
-        options={optionsFor(WAKE_RANGE, settings.wake_time)}
+        options={optionsFor(AWAKE_RANGE, settings.wake_time)}
       />
       <SelectField
         label="Bedtime"
         value={bed}
         onChange={(event) => setBed(event.target.value)}
-        options={optionsFor(BED_RANGE, settings.bed_time)}
+        options={optionsFor(AWAKE_RANGE, settings.bed_time)}
       />
-      {names.length > 0 && (
+      {!bedAfterWake && (
+        <p role="alert" className="m-0 text-sm text-dawn-accent">
+          {BED_AFTER_WAKE}
+        </p>
+      )}
+      {bedAfterWake && names.length > 0 && (
         <p role="status" className="m-0 px-2 py-1.5 rounded-lg bg-[#FBEDE3] text-[13px] leading-snug text-dawn-accent-hover">
           {nameList(names)} {names.length > 1 ? "are" : "is"} outside these hours and won't play until you move{" "}
           {names.length > 1 ? "them" : "it"}.
@@ -174,7 +182,7 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
         <button
           type="button"
           onClick={save}
-          disabled={saving}
+          disabled={saving || !bedAfterWake}
           className={`h-10 px-4 rounded-[10px] border-0 bg-dawn-accent hover:bg-dawn-accent-hover text-[15px] font-bold text-white cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
         >
           Done

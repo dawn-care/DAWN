@@ -9,19 +9,13 @@ import (
 	"server/internal/models/screen_settings"
 )
 
-// Allowed awake hours, inclusive. The database enforces the same ranges.
-const (
-	EarliestWake = "06:00"
-	LatestWake   = "10:00"
-	EarliestBed  = "19:00"
-	LatestBed    = "22:00"
-)
-
 var (
 	ErrInvalidCarepartner = errors.New("invalid carepartner_id")
 	ErrNotFound           = errors.New("screen settings not found")
-	ErrInvalidWakeTime    = fmt.Errorf("wake_time must be HH:MM between %s and %s", EarliestWake, LatestWake)
-	ErrInvalidBedTime     = fmt.Errorf("bed_time must be HH:MM between %s and %s", EarliestBed, LatestBed)
+	ErrInvalidWakeTime    = errors.New("wake_time must be HH:MM")
+	// Awake hours are within one day, so bed time can't be at or before wake time.
+	// The database checks the same.
+	ErrInvalidBedTime = errors.New("bed_time must be HH:MM, later than wake_time")
 )
 
 type ScreenSettingsService struct {
@@ -38,15 +32,13 @@ type UpdateInput struct {
 	BedTime  string `json:"bed_time"`
 }
 
-// normalizeTime parses "HH:MM" and returns it zero-padded if it falls in [earliest, latest]
-func normalizeTime(value, earliest, latest string) (string, bool) {
+// normalizeTime parses "HH:MM" and returns it zero-padded
+func normalizeTime(value string) (string, bool) {
 	t, err := time.Parse("15:04", value)
 	if err != nil {
 		return "", false
 	}
-	normalized := t.Format("15:04")
-	// Zero-padded HH:MM strings compare in time order
-	return normalized, normalized >= earliest && normalized <= latest
+	return t.Format("15:04"), true
 }
 
 // ─────────────────────────────────────────────
@@ -75,12 +67,13 @@ func (s *ScreenSettingsService) UpdateScreenSettings(carepartnerID int, in Updat
 	if carepartnerID <= 0 {
 		return nil, ErrInvalidCarepartner
 	}
-	wake, ok := normalizeTime(in.WakeTime, EarliestWake, LatestWake)
+	wake, ok := normalizeTime(in.WakeTime)
 	if !ok {
 		return nil, ErrInvalidWakeTime
 	}
-	bed, ok := normalizeTime(in.BedTime, EarliestBed, LatestBed)
-	if !ok {
+	bed, ok := normalizeTime(in.BedTime)
+	// Zero-padded HH:MM strings compare in time order
+	if !ok || bed <= wake {
 		return nil, ErrInvalidBedTime
 	}
 

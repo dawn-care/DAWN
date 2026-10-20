@@ -104,7 +104,7 @@ export default function AccountSetupPage() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          code: pairingCode,
+          code: pairingCode.trim(),
           caregiver_id: user.id, 
           carepartner_name: carePartnerName,
         }),
@@ -189,8 +189,13 @@ export default function AccountSetupPage() {
           <input
             type="text"
             value={pairingCode}
-            onChange={(e) => setPairingCode(e.target.value)}
-            className="w-full mt-2 p-3 border rounded bg-purple-50"
+            // Codes are always capitals, so typing in lowercase still shows (and sends) them that way
+            onChange={(e) => setPairingCode(e.target.value.toUpperCase())}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            className="w-full mt-2 p-3 border rounded bg-purple-50 uppercase"
             placeholder="Enter pairing code"
           />
         </div>

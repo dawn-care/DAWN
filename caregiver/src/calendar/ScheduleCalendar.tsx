@@ -5,7 +5,8 @@
  *
  * The calendar grid: FullCalendar showing the carepartner's scheduled videos
  * and audio as day, week or month views. Week is the default, with rows every
- * 15 minutes from 6 am to 10 pm. Hours the carepartner is asleep are hatched.
+ * 15 minutes across the whole day, scrolled to wake time. Hours the carepartner
+ * is asleep are hatched.
  *
  * FullCalendar only draws what it is given: the page above passes the
  * server's occurrences for the visible dates (it asks for them when
@@ -195,10 +196,10 @@ export default function ScheduleCalendar({
       navLinks
       // A bare "day" would pick the plain day grid, which has no time rows
       navLinkDayClick="timeGridDay"
-      // 6 am to 10 pm covers every wake and bed time the server allows (WAKE_RANGE and BED_RANGE
-      // in constants.ts); widen these with them, or items outside the rows won't be drawn
-      slotMinTime="06:00:00"
-      slotMaxTime="22:00:00"
+      // The whole day, since awake hours can be any times (AWAKE_RANGE in constants.ts); items
+      // outside the rows wouldn't be drawn. scrollTime below starts the view at wake time
+      slotMinTime="00:00:00"
+      slotMaxTime="24:00:00"
       slotDuration="00:15:00"
       slotLabelInterval="01:00"
       slotLabelFormat={{ hour: "numeric", meridiem: "short" }}

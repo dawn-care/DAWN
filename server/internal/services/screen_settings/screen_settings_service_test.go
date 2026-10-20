@@ -101,15 +101,14 @@ func TestUpdateScreenSettings_Validation(t *testing.T) {
 		edit func(*UpdateInput)
 		want error
 	}{
-		{"wake before 6:00", func(in *UpdateInput) { in.WakeTime = "05:59" }, ErrInvalidWakeTime},
-		{"wake after 10:00", func(in *UpdateInput) { in.WakeTime = "10:01" }, ErrInvalidWakeTime},
-		{"wake in the evening", func(in *UpdateInput) { in.WakeTime = "20:00" }, ErrInvalidWakeTime},
 		{"wake not a time", func(in *UpdateInput) { in.WakeTime = "seven" }, ErrInvalidWakeTime},
 		{"wake with seconds", func(in *UpdateInput) { in.WakeTime = "07:00:00" }, ErrInvalidWakeTime},
+		{"wake past midnight", func(in *UpdateInput) { in.WakeTime = "24:00" }, ErrInvalidWakeTime},
 		{"missing wake", func(in *UpdateInput) { in.WakeTime = "" }, ErrInvalidWakeTime},
-		{"bed before 19:00", func(in *UpdateInput) { in.BedTime = "18:59" }, ErrInvalidBedTime},
-		{"bed after 22:00", func(in *UpdateInput) { in.BedTime = "22:01" }, ErrInvalidBedTime},
-		{"bed as 12 hour time", func(in *UpdateInput) { in.BedTime = "9:00" }, ErrInvalidBedTime},
+		{"missing bed", func(in *UpdateInput) { in.BedTime = "" }, ErrInvalidBedTime},
+		{"bed at wake", func(in *UpdateInput) { in.BedTime = "07:00" }, ErrInvalidBedTime},
+		{"bed before wake", func(in *UpdateInput) { in.BedTime = "06:59" }, ErrInvalidBedTime},
+		{"bed past midnight", func(in *UpdateInput) { in.WakeTime, in.BedTime = "20:00", "01:00" }, ErrInvalidBedTime},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -131,15 +130,16 @@ func TestUpdateScreenSettings_Bounds(t *testing.T) {
 	service := NewScreenSettingsService(db)
 
 	for _, in := range []UpdateInput{
-		{WakeTime: "06:00", BedTime: "19:00"},
-		{WakeTime: "10:00", BedTime: "22:00"},
+		{WakeTime: "00:00", BedTime: "23:59"},
+		{WakeTime: "05:00", BedTime: "05:01"},
+		{WakeTime: "11:00", BedTime: "23:30"},
 	} {
 		mock.ExpectQuery(updateSettings).
 			WithArgs(in.WakeTime, in.BedTime, 1).
 			WillReturnRows(sqlmock.NewRows([]string{"wake_time", "bed_time"}).
 				AddRow(in.WakeTime, in.BedTime))
 		_, err := service.UpdateScreenSettings(1, in)
-		assert.NoError(t, err, "%+v is inside the allowed range", in)
+		assert.NoError(t, err, "%+v has bed after wake", in)
 	}
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

@@ -99,7 +99,7 @@ func (c *ScreenSettingsController) GetScreenSettingsHandler(w http.ResponseWrite
 
 // UpdateScreenSettingsHandler godoc
 // @Summary Replace a carepartner's screen settings
-// @Description Both fields are required. Wake time must be 06:00 to 10:00 and bed time 19:00 to 22:00.
+// @Description Both fields are required, as "HH:MM". Bed time must be later than wake time on the same day.
 // @Tags screen-settings
 // @Accept json
 // @Produce json
