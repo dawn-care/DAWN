@@ -100,11 +100,13 @@ func SetTagsTx(tx *sql.Tx, mediaID, carepartnerID int, situations []string, fami
 	if _, err := tx.Exec(`DELETE FROM "MediaFamilyMember" WHERE media_id = $1;`, mediaID); err != nil {
 		return false, err
 	}
-	if _, err := tx.Exec(
-		`INSERT INTO "MediaSituation" (media_id, situation) SELECT $1, unnest($2::text[]);`,
-		mediaID, pq.Array(situations),
-	); err != nil {
-		return false, err
+	if len(situations) > 0 {
+		if _, err := tx.Exec(
+			`INSERT INTO "MediaSituation" (media_id, situation) SELECT $1, unnest($2::text[]);`,
+			mediaID, pq.Array(situations),
+		); err != nil {
+			return false, err
+		}
 	}
 	if len(familyMemberIDs) == 0 {
 		return true, nil

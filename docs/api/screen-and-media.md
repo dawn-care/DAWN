@@ -118,7 +118,7 @@ export interface Media {
   created_at: string;              // RFC 3339
   usage: MediaUsage[];             // [] means saved but unused
   url: string;                     // e.g. "/media/4/file"
-  situations: Situation[];         // never empty; see "How staff find media"
+  situations: Situation[];         // [] when staff shouldn't find it by situation
   family_member_ids: number[];     // [] when it isn't about anyone in particular
 }
 // Only the /media endpoints include situations and family_member_ids; media inside
@@ -270,7 +270,7 @@ Upload a file as `multipart/form-data`. Returns `201` with the new `Media`.
 | `kind` | `photo`, `video` or `audio` |
 | `carepartner_id` | |
 | `display_name` | optional; defaults to the file name without its extension |
-| `situations` | optional, repeat the field for each; none means every situation |
+| `situations` | optional, repeat the field for each |
 | `family_member_ids` | optional, repeat the field for each; must be this carepartner's |
 
 Video and audio over 10 minutes are rejected with `MEDIA_TOO_LONG`. Files over 1 GB get `FILE_TOO_LARGE`. Accepted types: photos JPEG, PNG, GIF, WebP, HEIC; videos MP4, MOV, WebM, Ogg; audio MP3, WAV, M4A, Ogg, WebM.
@@ -310,8 +310,9 @@ Replace how staff find it. Body `{"situations": ["winding_down"], "family_member
 
 The staff app offers media by situation, or, when the resident is asking for someone, by family member:
 
-- **Situations** are a fixed list (`Situation` above). Every item is under at least one: an upload or `PUT` with no situations puts it under all of them, which is also where existing media went. "Asking for someone" isn't a situation, because staff pick the family member instead.
-- **Family members** are optional. An item can be about any number of them; staff asking for Elena see media linked to Elena, whatever its situations.
+- **Situations** are a fixed list (`Situation` above). An item can be under any number of them, including none. "Asking for someone" isn't a situation, because staff pick the family member instead.
+- **Family members** work the same way. Staff asking for Elena see media linked to Elena, whatever its situations.
+- **Nothing chosen means staff never see it.** An upload starts with neither, so the caregiver opts each item in. Media from before tags existed was put under every situation (migration 7) and stays there until the caregiver changes it.
 - Unknown situations get `INVALID_SITUATION`; a family member who isn't this carepartner's gets `INVALID_FAMILY_MEMBER`, and nothing is saved.
 
 ## Family members

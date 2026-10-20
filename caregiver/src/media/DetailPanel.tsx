@@ -370,14 +370,20 @@ export default function DetailPanel({
               Edit
             </button>
           </div>
-          <p className="m-0 text-base leading-snug">
-            <span className="font-bold">When: </span>
-            {situationsLine(media)}
-          </p>
-          <p className="m-0 text-base leading-snug">
-            <span className="font-bold">About: </span>
-            {familyLine(media, family)}
-          </p>
+          {media.situations.length === 0 && media.family_member_ids.length === 0 ? (
+            <p className="m-0 text-base leading-snug">Not in the staff app. Edit to choose when staff should use it.</p>
+          ) : (
+            <>
+              <p className="m-0 text-base leading-snug">
+                <span className="font-bold">When: </span>
+                {situationsLine(media)}
+              </p>
+              <p className="m-0 text-base leading-snug">
+                <span className="font-bold">About: </span>
+                {familyLine(media, family)}
+              </p>
+            </>
+          )}
         </div>
       )}
 

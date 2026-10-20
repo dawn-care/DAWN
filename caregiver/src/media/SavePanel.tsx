@@ -5,8 +5,8 @@
  *
  * Names and saves one picked file. The caregiver sees a preview (the photo
  * itself, or an icon for video and audio), a name field (starting as the
- * file name), how staff find it (see TagPicker: every situation is chosen to
- * start with, and no family member) and Save; there is no scheduling or
+ * file name), how staff find it (see TagPicker: nothing is chosen to start
+ * with, so staff don't see it until the caregiver picks) and Save; there is no scheduling or
  * placement here, that happens from the detail panel afterwards.
  *
  * When several files were picked, the panel is shown for each in turn with
@@ -22,7 +22,7 @@ import IconButton from "../components/ui/IconButton";
 import TextField from "../components/ui/form/TextField";
 import { friendlyError, isAbort, uploadMedia } from "./api";
 import type { FamilyMember, Media } from "./api";
-import { ALL_SITUATIONS, ERROR_MESSAGES } from "./constants";
+import { ERROR_MESSAGES } from "./constants";
 import type { Situation } from "./constants";
 import type { PendingFile } from "./files";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
@@ -70,8 +70,8 @@ export default function SavePanel({
 }: SavePanelProps) {
   const { file, kind } = pending;
   const [name, setName] = useState(() => nameFromFile(file.name));
-  // Every situation to start with; the caregiver takes out what doesn't fit
-  const [situations, setSituations] = useState<Situation[]>(ALL_SITUATIONS);
+  // Nothing to start with: the caregiver opts each item into the staff app
+  const [situations, setSituations] = useState<Situation[]>([]);
   const [familyMemberIds, setFamilyMemberIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
