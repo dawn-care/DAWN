@@ -34,16 +34,6 @@ import { useAuth } from "../context/AuthContext";
 const SUGGESTIONS = ["Mom", "Dad", "Grandma", "Grandpa", "Friend"];
 
 /**
- * Pairing codes are 6 capital letters and numbers (generateCode in the server's
- * device_pairing_service.go)
- */
-const PAIRING_CODE_LENGTH = 6;
-
-/** What's typed, as a code: capitals, letters and numbers only, at most 6 */
-const toPairingCode = (typed: string) =>
-  typed.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, PAIRING_CODE_LENGTH);
-
-/**
  * Base API URL from environment config
  */
 const API_URL = import.meta.env.VITE_API_URL;
@@ -88,12 +78,8 @@ export default function AccountSetupPage() {
     }
 
     // Ensure pairing code is entered
-    if (!pairingCode) {
+    if (!pairingCode.trim()) {
       setSubmitError("Pairing code is required.");
-      return;
-    }
-    if (pairingCode.length !== PAIRING_CODE_LENGTH) {
-      setSubmitError(`The pairing code is ${PAIRING_CODE_LENGTH} letters and numbers.`);
       return;
     }
 
@@ -203,15 +189,8 @@ export default function AccountSetupPage() {
           <input
             type="text"
             value={pairingCode}
-            // Codes are always capitals, so typing in lowercase still shows (and sends) them that
-            // way; anything but letters and numbers, and anything past 6, is left out
-            onChange={(e) => setPairingCode(toPairingCode(e.target.value))}
-            maxLength={PAIRING_CODE_LENGTH}
-            autoCapitalize="characters"
-            autoCorrect="off"
-            autoComplete="off"
-            spellCheck={false}
-            className="w-full mt-2 p-3 border rounded bg-purple-50 uppercase"
+            onChange={(e) => setPairingCode(e.target.value)}
+            className="w-full mt-2 p-3 border rounded bg-purple-50"
             placeholder="Enter pairing code"
           />
         </div>

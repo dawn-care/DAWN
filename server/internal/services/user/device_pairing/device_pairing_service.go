@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"math/rand"
-	"strings"
 	"time"
 
 	"server/internal/models/user/device_pairing"
@@ -149,15 +148,8 @@ func (s *DevicePairingService) GeneratePairingCode(carepartnerID int) (*device_p
 // Verify pairing code
 //
 
-// normalizeCode makes a typed code match the stored one: codes are uppercase
-// (generateCode), so case and surrounding spaces don't matter.
-func normalizeCode(code string) string {
-	return strings.ToUpper(strings.TrimSpace(code))
-}
-
 func (s *DevicePairingService) VerifyPairingCode(code string, caregiverID int, carepartnerName string) (int, error) {
 
-	code = normalizeCode(code)
 	if code == "" {
 		return 0, errors.New("pairing code cannot be empty")
 	}
