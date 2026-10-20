@@ -20,6 +20,8 @@ export default {
           // Brighter than the mockup's #3F6B3A, which read as near-black; 5.3:1 on dawn-page
           success: "#25772B",
           control: "#8A7F70",
+          // Audio events and their legend dot on the calendar; 6.1:1 against white text
+          audio: "#2E6B6B",
         },
       },
       fontFamily: {

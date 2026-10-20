@@ -1,0 +1,258 @@
+/*
+ * calendar.css
+ *
+ * User: Caregiver
+ *
+ * Makes FullCalendar look like the calendar mockups: dawn colors, one line per
+ * hour, hatched asleep hours, accent video events and teal audio events with
+ * white text. ScheduleCalendar puts `cal-video` or `cal-audio` on each event,
+ * `cal-outside` on one outside the awake hours, `cal-selected` on the one being
+ * edited, and `cal-draft` on the "New" placeholder.
+ */
+
+.dawn-calendar {
+  --fc-border-color: theme("colors.dawn.line");
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: theme("colors.dawn.sidebar");
+  --fc-today-bg-color: transparent;
+  --fc-now-indicator-color: theme("colors.dawn.accent");
+  --fc-event-border-color: transparent;
+  --dawn-slot-height: 24px;
+
+  font-family: theme("fontFamily.dawn");
+  color: theme("colors.dawn.ink");
+
+  /* The grid sits in one rounded card, as in the mockups */
+  border: 1.5px solid theme("colors.dawn.line");
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.dawn-calendar .fc-scrollgrid {
+  border: 0;
+}
+
+/* One row per quarter hour, but only the hour lines show. FullCalendar's own rule has the same
+   weight as ours and loads after it, so this one is a step more specific to win */
+.dawn-calendar .fc .fc-timegrid-slot {
+  height: var(--dawn-slot-height);
+}
+
+.dawn-calendar .fc-timegrid-slot-minor {
+  border-top-style: none;
+}
+
+.dawn-calendar .fc-timegrid-slot-label-cushion {
+  font-size: 11px;
+  color: theme("colors.dawn.muted");
+}
+
+.dawn-calendar .fc-timegrid-slot-label {
+  vertical-align: top;
+  border-color: transparent;
+}
+
+/* Day names above the columns */
+.dawn-calendar .fc-col-header-cell {
+  border-color: theme("colors.dawn.line");
+}
+
+.dawn-calendar .fc-col-header-cell-cushion {
+  padding: 4px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dawn-calendar .fc-col-header-cell-cushion:hover .dawn-day-number {
+  background: theme("colors.dawn.sidebar");
+}
+
+.dawn-day-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.dawn-day-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: theme("colors.dawn.muted");
+}
+
+.dawn-day-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.dawn-day-head[data-today="true"] .dawn-day-name {
+  color: theme("colors.dawn.accent");
+}
+
+.dawn-day-head[data-today="true"] .dawn-day-number {
+  background: theme("colors.dawn.accent");
+  color: #ffffff;
+}
+
+/* Hours the carepartner is asleep: nothing plays here */
+.dawn-calendar .fc-non-business {
+  background: repeating-linear-gradient(45deg, #ede7dd 0 4px, #f7f3ec 4px 8px);
+}
+
+/* FullCalendar makes the text inside an event white; each kind below sets its own color instead */
+.dawn-calendar .fc-timegrid-event .fc-event-main {
+  color: inherit;
+}
+
+/* Video and audio events: white text on the accent or teal fill */
+.dawn-calendar .fc-timegrid-event {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.dawn-calendar .fc-timegrid-event.cal-video {
+  background: theme("colors.dawn.accent");
+  border: 1.5px solid theme("colors.dawn.accent");
+  color: #ffffff;
+}
+
+.dawn-calendar .fc-timegrid-event.cal-audio {
+  background: theme("colors.dawn.audio");
+  border: 1.5px solid theme("colors.dawn.audio");
+  color: #ffffff;
+}
+
+/* Outside the awake hours (starts before wake up or still playing at bedtime): it won't play,
+   so it is hatched with a dashed border */
+.dawn-calendar .fc-timegrid-event.cal-outside {
+  background: repeating-linear-gradient(45deg, #f3e3d8 0 4px, #ffffff 4px 8px);
+  border: 1.5px dashed theme("colors.dawn.accent");
+  color: theme("colors.dawn.accent-hover");
+}
+
+.dawn-event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  height: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.dawn-event-time {
+  flex-shrink: 0;
+  font-weight: 400;
+}
+
+.dawn-event-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Month view: a colored dot, the time, then the title */
+.dawn-calendar .fc-daygrid-dot-event {
+  font-size: 11px;
+}
+
+.dawn-calendar .fc-daygrid-dot-event .dawn-event {
+  padding: 0;
+  height: auto;
+  color: theme("colors.dawn.ink");
+}
+
+.dawn-calendar .fc-daygrid-dot-event .dawn-event-time {
+  font-weight: 700;
+}
+
+.dawn-event-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: theme("colors.dawn.accent");
+}
+
+.dawn-event-dot.is-audio {
+  background: theme("colors.dawn.audio");
+}
+
+/* Month view's mark for outside the awake hours: a hollow dashed dot and accent text */
+.dawn-calendar .fc-daygrid-dot-event.cal-outside .dawn-event-dot {
+  box-sizing: border-box;
+  background: transparent;
+  border: 1.5px dashed theme("colors.dawn.accent");
+}
+
+.dawn-calendar .fc-daygrid-dot-event.cal-outside .dawn-event {
+  color: theme("colors.dawn.accent-hover");
+}
+
+.dawn-calendar .fc-daygrid-dot-event .dawn-event-title {
+  font-weight: 400;
+}
+
+.dawn-calendar .fc-daygrid-day-number {
+  color: theme("colors.dawn.ink");
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dawn-calendar .fc-day-today .fc-daygrid-day-number {
+  background: theme("colors.dawn.accent");
+  color: #ffffff;
+  border-radius: 13px;
+  min-width: 26px;
+  text-align: center;
+  margin: 4px 5px 0;
+}
+
+.dawn-calendar .fc-day-other .fc-daygrid-day-number {
+  color: #a99c88;
+}
+
+.dawn-calendar .fc-daygrid-more-link {
+  font-size: 11px;
+  font-weight: 700;
+  color: theme("colors.dawn.muted");
+}
+
+.dawn-calendar .fc-col-header-cell.fc-day-today,
+.dawn-calendar .fc-daygrid-day.fc-day-today {
+  background: transparent;
+}
+
+/* The "now" line */
+.dawn-calendar .fc-timegrid-now-indicator-line {
+  border-width: 2px 0 0;
+}
+
+/* The "New" placeholder where a new item would go, and the item being edited */
+.dawn-calendar .fc-timegrid-event.cal-draft {
+  background: #fbede3;
+  border: 2px dashed theme("colors.dawn.accent");
+  color: theme("colors.dawn.accent-hover");
+}
+
+.dawn-calendar .fc-timegrid-event.cal-selected {
+  box-shadow: 0 0 0 3px theme("colors.dawn.ink");
+}
+
+.dawn-calendar .fc-event {
+  cursor: pointer;
+}
+
+.dawn-calendar .fc-event.cal-draft {
+  cursor: default;
+}
