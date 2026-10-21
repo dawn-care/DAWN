@@ -9,16 +9,15 @@
  * server's widgets can't go there.
  *
  * A widget is left out, so its cells stay empty, when:
- * - its type is unknown to this version, or it isn't its type's fixed size
- *   (`WIDGET_SIZES` in `@shared`);
- * - it doesn't fit on the grid, or it overlaps the day and time or a widget
- *   before it (the server checks the grid and overlaps, so this only guards
- *   against a bad layout);
+ * - its type is unknown to this version, or `createDrawCheck` in `@shared`
+ *   drops it: it isn't its type's fixed size, doesn't fit on the grid, or
+ *   overlaps the day and time or a widget before it (the same check as the
+ *   caregiver's editor);
  * - its outside service is down (`error`), or the data it needs is missing or
  *   malformed.
  */
 
-import { areasOverlap, DAY_TIME_AREA, fitsGrid, hasWidgetSize, type GridArea } from "@shared";
+import { createDrawCheck, DAY_TIME_AREA, parseClock, type ScreenWidgetType } from "@shared";
 import { resolveApiUri } from "../api/resolveApiUri";
 import type { ReminderItem, WidgetPlacement } from "../widgets/types";
 import type { Screen, ScreenWidget } from "./screen";
@@ -48,25 +47,24 @@ const degrees = (value: unknown): string | null =>
 const LEAGUE_ICONS: Record<string, string> = { nfl: "football", nba: "basketball", mlb: "baseball", nhl: "hockey" };
 const RESULTS: Record<string, string> = { won: "Won", lost: "Lost", tied: "Tied" };
 
-const HH_MM = /^(\d{2}):(\d{2})$/;
-
-/** "08:30" as minutes after midnight and "8:30 AM", or null if it isn't a time. */
-function readTime(value: unknown): { minute: number; timeLabel: string } | null {
-  const match = typeof value === "string" ? HH_MM.exec(value) : null;
-  if (!match) return null;
-  const [hours, minutes] = [Number(match[1]), Number(match[2])];
-  if (hours > 23 || minutes > 59) return null;
+/**
+ * A minute after midnight as "8:30 AM", or "8 AM" on the hour: shorter than the
+ * caregiver's "8:00 am" (`timeLabel` in `@shared`), so reminders fit the tile.
+ */
+function reminderTime(minute: number): string {
+  const hours = Math.floor(minute / 60);
+  const minutes = minute % 60;
   const hour12 = hours % 12 || 12;
   const suffix = hours < 12 ? "AM" : "PM";
-  return { minute: hours * 60 + minutes, timeLabel: minutes ? `${hour12}:${match[2]} ${suffix}` : `${hour12} ${suffix}` };
+  return minutes ? `${hour12}:${String(minutes).padStart(2, "0")} ${suffix}` : `${hour12} ${suffix}`;
 }
 
 function readReminderItem(value: unknown): ReminderItem | null {
   if (!isObject(value)) return null;
-  const time = readTime(value.time);
+  const minute = typeof value.time === "string" ? parseClock(value.time) : null;
   const words = text(value.text);
-  if (!time || !words) return null;
-  return { ...time, text: words, icon: typeof value.icon === "string" ? value.icon : "other" };
+  if (minute == null || !words) return null;
+  return { minute, timeLabel: reminderTime(minute), text: words, icon: typeof value.icon === "string" ? value.icon : "other" };
 }
 
 /** The day and time of day, in the top left of every screen. */
@@ -78,7 +76,7 @@ export const DAY_TIME_PLACEMENT: WidgetPlacement = {
 };
 
 /** How each widget type is drawn, or null when it has nothing to show. */
-const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
+const LOOKS: Record<Exclude<ScreenWidgetType, "day_time">, (widget: ScreenWidget) => Look | null> = {
   photo: ({ photo, data }) =>
     photo && {
       renderer: "photo",
@@ -142,15 +140,15 @@ const LOOKS: Record<string, (widget: ScreenWidget) => Look | null> = {
  */
 export function placementsFor(screen: Screen): WidgetPlacement[] {
   let undrawable = 0;
-  const taken: GridArea[] = [DAY_TIME_AREA];
+  const drawn = createDrawCheck();
   const placements = screen.widgets.flatMap((widget): WidgetPlacement[] => {
-    const lookFor = Object.prototype.hasOwnProperty.call(LOOKS, widget.type) ? LOOKS[widget.type] : undefined;
-    const placeable = fitsGrid(widget) && !taken.some((area) => areasOverlap(area, widget));
-    if (!lookFor || !hasWidgetSize(widget.type, widget) || !placeable) {
+    const lookFor = Object.prototype.hasOwnProperty.call(LOOKS, widget.type)
+      ? LOOKS[widget.type as keyof typeof LOOKS]
+      : undefined;
+    if (!lookFor || !drawn(widget.type, widget)) {
       undrawable++;
       return [];
     }
-    taken.push(widget);
     // An outside service being down is expected; the widget just isn't shown.
     if (widget.error) return [];
     const look = lookFor(widget);

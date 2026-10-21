@@ -16,7 +16,7 @@
 import { areasOverlap, fitsGrid, GRID } from "./grid";
 import type { GridArea } from "./grid";
 import type { ScreenWidgetType } from "./screenWidgets";
-import { WIDGET_SIZES } from "./widgetSizes";
+import { hasWidgetSize, WIDGET_SIZES } from "./widgetSizes";
 
 /** A cell on the grid. Columns and rows count from 0. */
 export type Cell = { col: number; row: number };
@@ -104,4 +104,25 @@ export function isValidPlacement(widgets: readonly PlacedWidget[]): boolean {
       widgets.slice(index + 1).every((other) => !areasOverlap(area, widgetArea(other)))
     );
   });
+}
+
+/**
+ * Checks a saved layout's widgets one at a time, in the server's order, for
+ * whether the screen draws them, so the tablet and the caregiver's editor drop
+ * the same ones. A widget is drawn if its type is known and isn't `day_time`,
+ * it is its type's size, and it is on the grid, off the fixed areas and clear
+ * of every widget drawn before it, so of two that overlap the first wins. Make
+ * a new check for each layout.
+ */
+export function createDrawCheck(): (type: string, area: GridArea) => boolean {
+  const drawn: GridArea[] = [];
+  return (type, area) => {
+    const ok =
+      type !== "day_time" &&
+      hasWidgetSize(type, area) &&
+      fitsScreen(area) &&
+      drawn.every((other) => !areasOverlap(area, other));
+    if (ok) drawn.push(area);
+    return ok;
+  };
 }
