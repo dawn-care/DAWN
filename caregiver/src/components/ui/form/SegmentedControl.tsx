@@ -41,7 +41,7 @@ export default function SegmentedControl<T extends string>({
         <RadixRadioGroup.Item
           key={segment.value}
           value={segment.value}
-          className={`flex-1 h-11 px-3 rounded-[10px] border-2 text-base font-bold cursor-pointer bg-white text-dawn-ink border-dawn-control data-[state=checked]:bg-dawn-accent data-[state=checked]:text-white data-[state=checked]:border-dawn-accent ${FOCUS_RING}`}
+          className={`flex-1 h-11 px-3 rounded-[10px] border-2 text-base font-bold cursor-pointer bg-surface text-ink border-ink-muted data-[state=checked]:bg-accent data-[state=checked]:text-on-accent data-[state=checked]:border-accent ${FOCUS_RING}`}
         >
           {segment.label}
         </RadixRadioGroup.Item>

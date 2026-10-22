@@ -31,7 +31,7 @@ interface CalendarSidebarProps {
 }
 
 // A smaller, slightly darker version of the asleep hatch in calendar.css, so it still reads at legend size
-const ASLEEP_SWATCH = "repeating-linear-gradient(45deg, #E2DCD2 0 3px, #F4F0E9 3px 6px)";
+const ASLEEP_SWATCH = "repeating-linear-gradient(45deg, rgb(var(--color-border)) 0 3px, rgb(var(--color-page)) 3px 6px)";
 
 export default function CalendarSidebar({
   carepartnerId,
@@ -50,9 +50,9 @@ export default function CalendarSidebar({
         type="button"
         onClick={onSchedule}
         disabled={!onSchedule}
-        className={`self-start flex items-center gap-2.5 h-[52px] pl-4 pr-5 bg-white border-[1.5px] border-dawn-line rounded-2xl shadow-[0_2px_6px_rgba(30,26,21,0.15)] text-base font-bold text-dawn-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
+        className={`self-start flex items-center gap-2.5 h-[52px] pl-4 pr-5 bg-surface border-[1.5px] border-border rounded-2xl shadow-[0_2px_6px_rgba(30,33,64,0.15)] text-base font-bold text-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
       >
-        <Plus size={22} strokeWidth={2.6} className="text-dawn-accent" aria-hidden="true" />
+        <Plus size={22} strokeWidth={2.6} className="text-link" aria-hidden="true" />
         Schedule
       </button>
 
@@ -69,16 +69,16 @@ export default function CalendarSidebar({
 
       <ul className="m-0 p-0 pl-1 list-none flex flex-col gap-1.5 text-sm">
         <li className="flex items-center gap-2">
-          <span className="w-3.5 h-3.5 rounded-[3px] bg-dawn-accent" aria-hidden="true" />
+          <span className="w-3.5 h-3.5 rounded-[3px] bg-accent" aria-hidden="true" />
           Video, plays full screen
         </li>
         <li className="flex items-center gap-2">
-          <span className="w-3.5 h-3.5 rounded-[3px] bg-dawn-audio" aria-hidden="true" />
+          <span className="w-3.5 h-3.5 rounded-[3px] bg-ink" aria-hidden="true" />
           Audio
         </li>
         <li className="flex items-center gap-2">
           <span
-            className="w-3.5 h-3.5 rounded-[3px] border border-dawn-line-strong box-border"
+            className="w-3.5 h-3.5 rounded-[3px] border border-border box-border"
             style={{ background: ASLEEP_SWATCH }}
             aria-hidden="true"
           />

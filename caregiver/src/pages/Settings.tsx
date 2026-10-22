@@ -263,7 +263,7 @@ export default function SettingsPage() {
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Settings</h1>
 
-      <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+      <div className="border p-10 max-w-3xl w-full rounded-lg bg-surface shadow">
         
         {/* Caregiver Name */}
         <div className="mb-6">
@@ -274,7 +274,7 @@ export default function SettingsPage() {
             onChange={(e) =>
               setCaregiver({ ...caregiver, name: e.target.value })
             }
-            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
+            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
           />
         </div>
 
@@ -284,7 +284,7 @@ export default function SettingsPage() {
           <select
             value={activeCarePartnerId ?? ""}
             onChange={(e) => setActiveCarePartnerId(Number(e.target.value))}
-            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
+            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
             disabled={carepartners.length === 0}
           >
             {carepartners.length === 0 ? (
@@ -305,7 +305,7 @@ export default function SettingsPage() {
           <input
             type="text"
             value={caregiver.role}
-            className="w-full mt-2 p-3 border rounded bg-gray-200 text-gray-700"
+            className="w-full mt-2 p-3 border rounded bg-border text-ink"
             readOnly
           />
         </div>
@@ -317,14 +317,14 @@ export default function SettingsPage() {
             type="time"
             value={autoStart}
             onChange={(e) => setAutoStart(e.target.value)}
-            className="w-full mt-2 p-3 border rounded bg-white text-gray-900"
+            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
           />
         </div>
 
         {/* Update & Logout */}
         <div className="flex gap-4 mt-4">
           <button
-            className="mt-4 flex-1 bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+            className="mt-4 flex-1 bg-accent hover:brightness-95 text-on-accent font-semibold py-3 rounded"
             onClick={async () => {
               await handleUpdate();          // Caregiver update
               await handleUpdateAutoStart(); // Carepartner auto start update
@@ -334,14 +334,14 @@ export default function SettingsPage() {
           </button>
 
           <button
-            className="mt-4 flex-1 bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-semibold py-3 rounded"
+            className="mt-4 flex-1 bg-status-yellow-bg hover:brightness-95 text-status-yellow-text font-semibold py-3 rounded"
             onClick={() => navigate("/setup")}
           >
             Pair New Device
           </button>
 
           <button
-            className="mt-4 flex-1 bg-red-500 hover:bg-red-600 text-gray-800 font-semibold py-3 rounded"
+            className="mt-4 flex-1 bg-status-red-bg hover:brightness-95 text-status-red-text font-semibold py-3 rounded"
             onClick={handleLogout}
           >
             Logout
@@ -350,10 +350,10 @@ export default function SettingsPage() {
 
         {/* Status messages */}
         {updateStatus && (
-          <p className="mt-2 text-sm text-gray-800">{updateStatus}</p>
+          <p className="mt-2 text-sm text-ink">{updateStatus}</p>
         )}
         {logoutError && (
-          <p className="mt-2 text-sm text-red-500">{logoutError}</p>
+          <p className="mt-2 text-sm text-status-red-text">{logoutError}</p>
         )}
       </div>
     </div>

@@ -57,12 +57,12 @@ export default function AwakeHoursCard({ carepartnerId, settings, editing, onEdi
   return (
     <section
       aria-label="Awake hours"
-      className={`flex flex-col gap-1.5 p-3 bg-white border-[1.5px] rounded-xl ${isEditing ? "border-dawn-accent" : "border-dawn-line"}`}
+      className={`flex flex-col gap-1.5 p-3 bg-surface border-[1.5px] rounded-xl ${isEditing ? "border-accent" : "border-border"}`}
     >
       <div className="flex items-center justify-between">
         <h2 className="m-0 text-[15px] font-extrabold">Awake hours</h2>
         {!isEditing && settings && (
-          <button ref={changeButton} type="button" onClick={onEdit} className={`${TEXT_BUTTON} text-dawn-accent`}>
+          <button ref={changeButton} type="button" onClick={onEdit} className={`${TEXT_BUTTON} text-link`}>
             Change
           </button>
         )}
@@ -74,7 +74,7 @@ export default function AwakeHoursCard({ carepartnerId, settings, editing, onEdi
           <p className="m-0 text-[17px] font-bold">
             {settings ? `${timeLabel(settings.wake_time)} – ${timeLabel(settings.bed_time)}` : "—"}
           </p>
-          <p className="m-0 text-sm leading-snug text-dawn-muted">Videos and audio only play while the carepartner is awake.</p>
+          <p className="m-0 text-sm leading-snug text-ink-muted">Videos and audio only play while the carepartner is awake.</p>
         </>
       )}
     </section>
@@ -152,30 +152,30 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
         options={optionsFor(BED_RANGE, settings.bed_time)}
       />
       {names.length > 0 && (
-        <p role="status" className="m-0 px-2 py-1.5 rounded-lg bg-[#FBEDE3] text-[13px] leading-snug text-dawn-accent-hover">
+        <p role="status" className="m-0 px-2 py-1.5 rounded-lg bg-status-orange-bg text-[13px] leading-snug text-status-orange-text">
           {nameList(names)} {names.length > 1 ? "are" : "is"} outside these hours and won't play until you move{" "}
           {names.length > 1 ? "them" : "it"}.
         </p>
       )}
       {checkFailed && (
-        <p role="status" className="m-0 text-[13px] leading-snug text-dawn-muted">
+        <p role="status" className="m-0 text-[13px] leading-snug text-ink-muted">
           Couldn't check which videos and audio these hours affect.
         </p>
       )}
       {error && (
-        <p role="alert" className="m-0 text-sm text-dawn-accent">
+        <p role="alert" className="m-0 text-sm text-link">
           {error}
         </p>
       )}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} disabled={saving} className={`${TEXT_BUTTON} text-dawn-ink`}>
+        <button type="button" onClick={onCancel} disabled={saving} className={`${TEXT_BUTTON} text-ink`}>
           Cancel
         </button>
         <button
           type="button"
           onClick={save}
           disabled={saving}
-          className={`h-10 px-4 rounded-[10px] border-0 bg-dawn-accent hover:bg-dawn-accent-hover text-[15px] font-bold text-white cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
+          className={`h-10 px-4 rounded-[10px] border-0 bg-accent hover:brightness-95 text-[15px] font-bold text-on-accent cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
         >
           Done
         </button>

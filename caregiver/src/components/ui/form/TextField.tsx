@@ -29,11 +29,11 @@ const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextFiel
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-base font-bold text-dawn-ink">
+      <label htmlFor={inputId} className="text-base font-bold text-ink">
         {label}
       </label>
       {hint && (
-        <span id={hintId} className="text-[15px] font-normal text-dawn-muted">
+        <span id={hintId} className="text-[15px] font-normal text-ink-muted">
           {hint}
         </span>
       )}

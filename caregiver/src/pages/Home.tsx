@@ -36,8 +36,8 @@ import ScreenPreview from "../screen/ScreenPreview";
 import { useSavedLayout } from "../screen/useSavedLayout";
 import { useScreenEditor } from "../screen/useScreenEditor";
 
-const PRIMARY_BUTTON = `flex items-center gap-2 h-11 px-[18px] rounded-[10px] border-2 border-dawn-accent bg-dawn-accent hover:bg-dawn-accent-hover hover:border-dawn-accent-hover text-white text-base font-bold cursor-pointer disabled:opacity-50 disabled:cursor-default ${FOCUS_RING}`;
-const SECONDARY_BUTTON = `h-11 px-[18px] rounded-[10px] border-2 border-dawn-control bg-white hover:bg-dawn-page text-dawn-ink text-base font-bold cursor-pointer ${FOCUS_RING}`;
+const PRIMARY_BUTTON = `flex items-center gap-2 h-11 px-[18px] rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold cursor-pointer disabled:opacity-50 disabled:cursor-default ${FOCUS_RING}`;
+const SECONDARY_BUTTON = `h-11 px-[18px] rounded-[10px] border-2 border-ink-muted bg-surface hover:bg-page text-ink text-base font-bold cursor-pointer ${FOCUS_RING}`;
 
 const PAGE_INFO =
   "This is where you configure what the carepartner's idle screen will look like. Click Edit screen to change what it looks like.";
@@ -154,7 +154,7 @@ export default function Home() {
         <div className="flex flex-wrap items-center gap-3">
           {editor.editing ? (
             <>
-              <span className="text-base text-dawn-accent">Not saved yet</span>
+              <span className="text-base text-link">Not saved yet</span>
               <button type="button" onClick={editor.cancel} disabled={saving} className={SECONDARY_BUTTON}>
                 Cancel
               </button>
@@ -165,7 +165,7 @@ export default function Home() {
           ) : (
             <>
               {state.status === "ready" && (
-                <span className="flex items-center gap-1.5 text-base text-dawn-success">
+                <span className="flex items-center gap-1.5 text-base text-status-green-text">
                   <Check size={18} strokeWidth={2.4} aria-hidden="true" />
                   Saved
                 </span>
@@ -186,13 +186,13 @@ export default function Home() {
       </div>
 
       {saveError && (
-        <div role="alert" className="text-base text-dawn-accent">
+        <div role="alert" className="text-base text-link">
           {saveError}
         </div>
       )}
 
       {state.status === "error" && (
-        <div role="alert" className="flex flex-wrap items-center gap-3 text-base text-dawn-muted">
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-base text-ink-muted">
           <p className="m-0">{state.message}</p>
           <button type="button" onClick={reload} className={PRIMARY_BUTTON}>
             Try again
@@ -255,7 +255,7 @@ export default function Home() {
       </div>
 
       {state.status === "ready" && state.layout.dropped.length > 0 && (
-        <p className="m-0 text-center text-[15px] text-dawn-muted">
+        <p className="m-0 text-center text-[15px] text-ink-muted">
           {state.layout.dropped.length === 1
             ? "1 thing saved on the carepartner's screen can't be shown on the tablet."
             : `${state.layout.dropped.length} things saved on the carepartner's screen can't be shown on the tablet.`}

@@ -3,30 +3,30 @@
  *
  * User: Caregiver
  *
- * Makes FullCalendar look like the calendar mockups: dawn colors, one line per
+ * Makes FullCalendar look like the calendar mockups: brand colors, one line per
  * hour, hatched asleep hours, accent video events and teal audio events with
- * white text. ScheduleCalendar puts `cal-video` or `cal-audio` on each event,
+ * on-accent text. ScheduleCalendar puts `cal-video` or `cal-audio` on each event,
  * `cal-outside` on one outside the awake hours, `cal-selected` on the one being
  * edited, and `cal-draft` on the "New" placeholder.
  */
 
 .dawn-calendar {
-  --fc-border-color: theme("colors.dawn.line");
-  --fc-page-bg-color: #ffffff;
-  --fc-neutral-bg-color: theme("colors.dawn.sidebar");
+  --fc-border-color: theme("colors.border");
+  --fc-page-bg-color: theme("colors.surface");
+  --fc-neutral-bg-color: theme("colors.page");
   --fc-today-bg-color: transparent;
-  --fc-now-indicator-color: theme("colors.dawn.accent");
+  --fc-now-indicator-color: theme("colors.accent");
   --fc-event-border-color: transparent;
   --dawn-slot-height: 24px;
 
   font-family: theme("fontFamily.dawn");
-  color: theme("colors.dawn.ink");
+  color: theme("colors.ink");
 
   /* The grid sits in one rounded card, as in the mockups */
-  border: 1.5px solid theme("colors.dawn.line");
+  border: 1.5px solid theme("colors.border");
   border-radius: 14px;
   overflow: hidden;
-  background: #ffffff;
+  background: theme("colors.surface");
 }
 
 .dawn-calendar .fc-scrollgrid {
@@ -45,7 +45,7 @@
 
 .dawn-calendar .fc-timegrid-slot-label-cushion {
   font-size: 11px;
-  color: theme("colors.dawn.muted");
+  color: theme("colors.ink-muted");
 }
 
 .dawn-calendar .fc-timegrid-slot-label {
@@ -55,7 +55,7 @@
 
 /* Day names above the columns */
 .dawn-calendar .fc-col-header-cell {
-  border-color: theme("colors.dawn.line");
+  border-color: theme("colors.border");
 }
 
 .dawn-calendar .fc-col-header-cell-cushion {
@@ -65,7 +65,7 @@
 }
 
 .dawn-calendar .fc-col-header-cell-cushion:hover .dawn-day-number {
-  background: theme("colors.dawn.sidebar");
+  background: theme("colors.page");
 }
 
 .dawn-day-head {
@@ -79,7 +79,7 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: theme("colors.dawn.muted");
+  color: theme("colors.ink-muted");
 }
 
 .dawn-day-number {
@@ -94,17 +94,17 @@
 }
 
 .dawn-day-head[data-today="true"] .dawn-day-name {
-  color: theme("colors.dawn.accent");
+  color: theme("colors.accent");
 }
 
 .dawn-day-head[data-today="true"] .dawn-day-number {
-  background: theme("colors.dawn.accent");
-  color: #ffffff;
+  background: theme("colors.accent");
+  color: theme("colors.on-accent");
 }
 
 /* Hours the carepartner is asleep: nothing plays here */
 .dawn-calendar .fc-non-business {
-  background: repeating-linear-gradient(45deg, #ede7dd 0 4px, #f7f3ec 4px 8px);
+  background: repeating-linear-gradient(45deg, theme("colors.border") 0 4px, theme("colors.page") 4px 8px);
 }
 
 /* FullCalendar makes the text inside an event white; each kind below sets its own color instead */
@@ -112,30 +112,30 @@
   color: inherit;
 }
 
-/* Video and audio events: white text on the accent or teal fill */
+/* Video and audio events: on-accent text on the accent or teal fill */
 .dawn-calendar .fc-timegrid-event {
   border-radius: 6px;
   box-shadow: none;
 }
 
 .dawn-calendar .fc-timegrid-event.cal-video {
-  background: theme("colors.dawn.accent");
-  border: 1.5px solid theme("colors.dawn.accent");
-  color: #ffffff;
+  background: theme("colors.accent");
+  border: 1.5px solid theme("colors.accent");
+  color: theme("colors.on-accent");
 }
 
 .dawn-calendar .fc-timegrid-event.cal-audio {
-  background: theme("colors.dawn.audio");
-  border: 1.5px solid theme("colors.dawn.audio");
-  color: #ffffff;
+  background: theme("colors.ink");
+  border: 1.5px solid theme("colors.ink");
+  color: theme("colors.page");
 }
 
 /* Outside the awake hours (starts before wake up or still playing at bedtime): it won't play,
    so it is hatched with a dashed border */
 .dawn-calendar .fc-timegrid-event.cal-outside {
-  background: repeating-linear-gradient(45deg, #f3e3d8 0 4px, #ffffff 4px 8px);
-  border: 1.5px dashed theme("colors.dawn.accent");
-  color: theme("colors.dawn.accent-hover");
+  background: repeating-linear-gradient(45deg, theme("colors.status.orange-bg") 0 4px, theme("colors.surface") 4px 8px);
+  border: 1.5px dashed theme("colors.accent");
+  color: theme("colors.status.orange-text");
 }
 
 .dawn-event {
@@ -168,7 +168,7 @@
 .dawn-calendar .fc-daygrid-dot-event .dawn-event {
   padding: 0;
   height: auto;
-  color: theme("colors.dawn.ink");
+  color: theme("colors.ink");
 }
 
 .dawn-calendar .fc-daygrid-dot-event .dawn-event-time {
@@ -180,22 +180,22 @@
   height: 8px;
   flex-shrink: 0;
   border-radius: 4px;
-  background: theme("colors.dawn.accent");
+  background: theme("colors.accent");
 }
 
 .dawn-event-dot.is-audio {
-  background: theme("colors.dawn.audio");
+  background: theme("colors.ink");
 }
 
 /* Month view's mark for outside the awake hours: a hollow dashed dot and accent text */
 .dawn-calendar .fc-daygrid-dot-event.cal-outside .dawn-event-dot {
   box-sizing: border-box;
   background: transparent;
-  border: 1.5px dashed theme("colors.dawn.accent");
+  border: 1.5px dashed theme("colors.accent");
 }
 
 .dawn-calendar .fc-daygrid-dot-event.cal-outside .dawn-event {
-  color: theme("colors.dawn.accent-hover");
+  color: theme("colors.status.orange-text");
 }
 
 .dawn-calendar .fc-daygrid-dot-event .dawn-event-title {
@@ -203,15 +203,15 @@
 }
 
 .dawn-calendar .fc-daygrid-day-number {
-  color: theme("colors.dawn.ink");
+  color: theme("colors.ink");
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }
 
 .dawn-calendar .fc-day-today .fc-daygrid-day-number {
-  background: theme("colors.dawn.accent");
-  color: #ffffff;
+  background: theme("colors.accent");
+  color: theme("colors.on-accent");
   border-radius: 13px;
   min-width: 26px;
   text-align: center;
@@ -219,13 +219,13 @@
 }
 
 .dawn-calendar .fc-day-other .fc-daygrid-day-number {
-  color: #a99c88;
+  color: theme("colors.ink-muted");
 }
 
 .dawn-calendar .fc-daygrid-more-link {
   font-size: 11px;
   font-weight: 700;
-  color: theme("colors.dawn.muted");
+  color: theme("colors.ink-muted");
 }
 
 .dawn-calendar .fc-col-header-cell.fc-day-today,
@@ -240,13 +240,13 @@
 
 /* The "New" placeholder where a new item would go, and the item being edited */
 .dawn-calendar .fc-timegrid-event.cal-draft {
-  background: #fbede3;
-  border: 2px dashed theme("colors.dawn.accent");
-  color: theme("colors.dawn.accent-hover");
+  background: theme("colors.status.orange-bg");
+  border: 2px dashed theme("colors.accent");
+  color: theme("colors.status.orange-text");
 }
 
 .dawn-calendar .fc-timegrid-event.cal-selected {
-  box-shadow: 0 0 0 3px theme("colors.dawn.ink");
+  box-shadow: 0 0 0 3px theme("colors.ink");
 }
 
 .dawn-calendar .fc-event {

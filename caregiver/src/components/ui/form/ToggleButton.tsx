@@ -26,8 +26,8 @@ export default function ToggleButton({
 }: ToggleButtonProps) {
   const radius = shape === "pill" ? "rounded-full px-4" : "rounded-[10px] px-3";
   const tone = pressed
-    ? "bg-dawn-accent text-white border-dawn-accent"
-    : "bg-white text-dawn-ink border-dawn-control";
+    ? "bg-accent text-on-accent border-accent"
+    : "bg-surface text-ink border-ink-muted";
 
   return (
     <button

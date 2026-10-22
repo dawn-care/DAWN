@@ -44,11 +44,11 @@ export default function MediaCard({ media, selected, isNew = false, onSelect }: 
       type="button"
       aria-pressed={selected}
       onClick={onSelect}
-      className={`flex flex-col gap-1.5 px-1.5 pt-1.5 pb-2.5 bg-white rounded-xl border-[3px] text-left text-dawn-ink cursor-pointer ${
-        selected ? "border-dawn-accent" : "border-dawn-line"
+      className={`flex flex-col gap-1.5 px-1.5 pt-1.5 pb-2.5 bg-surface rounded-xl border-[3px] text-left text-ink cursor-pointer ${
+        selected ? "border-accent" : "border-border"
       } ${FOCUS_RING}`}
     >
-      <span className="relative h-[92px] flex items-center justify-center overflow-hidden rounded-lg bg-dawn-avatar text-dawn-avatar-ink">
+      <span className="relative h-[92px] flex items-center justify-center overflow-hidden rounded-lg bg-border text-ink-muted">
         {showPhoto ? (
           <img
             src={fileUrl(media)}
@@ -74,7 +74,7 @@ export default function MediaCard({ media, selected, isNew = false, onSelect }: 
       </span>
       <span className="px-1 text-[15px] font-bold leading-tight break-words">{media.display_name}</span>
       <span
-        className={`px-1 text-sm leading-tight ${status.active ? "text-dawn-success" : "text-dawn-muted"}`}
+        className={`px-1 text-sm leading-tight ${status.active ? "text-status-green-text" : "text-ink-muted"}`}
       >
         {status.text}
       </span>

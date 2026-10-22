@@ -153,7 +153,7 @@ const Login = () => {
     <div className="w-full flex flex-col items-center mt-8 px-6">
       <h1 className="text-3xl font-semibold mb-6">Welcome!</h1>
 
-      <div className="border p-10 max-w-3xl w-full rounded-lg bg-white shadow">
+      <div className="border p-10 max-w-3xl w-full rounded-lg bg-surface shadow">
 
         {/* Description */}
         <div className="mb-6 text-center">

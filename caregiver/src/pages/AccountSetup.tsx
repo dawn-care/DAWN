@@ -165,7 +165,7 @@ export default function AccountSetupPage() {
         Pair New Device
       </h1>
 
-      <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow">
+      <div className="border p-8 max-w-3xl w-full rounded-lg bg-surface shadow">
 
         {/* ============================
             Care Partner Name
@@ -177,7 +177,7 @@ export default function AccountSetupPage() {
             type="text"
             value={carePartnerName}
             onChange={(e) => setCarePartnerName(e.target.value)}
-            className="w-full mt-2 p-3 border rounded bg-purple-50"
+            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
             placeholder="Enter name"
           />
 
@@ -187,7 +187,7 @@ export default function AccountSetupPage() {
               <button
                 key={s}
                 onClick={() => setCarePartnerName(s)}
-                className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm hover:bg-gray-300"
+                className="px-3 py-1 bg-border text-ink-muted rounded-full text-sm hover:brightness-95"
               >
                 {s}
               </button>
@@ -211,7 +211,7 @@ export default function AccountSetupPage() {
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            className="w-full mt-2 p-3 border rounded bg-purple-50 uppercase"
+            className="w-full mt-2 p-3 border rounded bg-surface text-ink uppercase"
             placeholder="Enter pairing code"
           />
         </div>
@@ -221,7 +221,7 @@ export default function AccountSetupPage() {
         ============================ */}
         <div className="mb-6">
           <label className="text-lg font-medium">Consent Statement:</label>
-          <div className="mt-2 p-4 border rounded bg-gray-50 max-h-48 overflow-y-auto text-sm text-gray-700">
+          <div className="mt-2 p-4 border rounded bg-page max-h-48 overflow-y-auto text-sm text-ink">
             <p>
               By checking this box, you acknowledge that your photos and videos will be
               stored on the StartUp server. Your data will not be sold to third parties.
@@ -239,7 +239,7 @@ export default function AccountSetupPage() {
               checked={consentChecked}
               onChange={(e) => setConsentChecked(e.target.checked)}
             />
-            <label htmlFor="consentCheckbox" className="text-sm text-gray-700">
+            <label htmlFor="consentCheckbox" className="text-sm text-ink">
               I agree to the consent statement
             </label>
           </div>
@@ -249,7 +249,7 @@ export default function AccountSetupPage() {
             Error Message
         ============================ */}
         {submitError && (
-          <p className="text-red-500 mb-4">{submitError}</p>
+          <p className="text-status-red-text mb-4">{submitError}</p>
         )}
 
         {/* ============================
@@ -257,7 +257,7 @@ export default function AccountSetupPage() {
         ============================ */}
         <button
           onClick={handleSubmit}
-          className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+          className="mt-4 w-full bg-accent hover:brightness-95 text-on-accent font-semibold py-3 rounded"
         >
           Pair Device
         </button>

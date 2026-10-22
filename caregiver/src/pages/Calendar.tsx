@@ -406,7 +406,7 @@ export default function Calendar() {
           {range?.title}
         </h2>
         {loading && (
-          <span role="status" className="text-sm text-dawn-muted">
+          <span role="status" className="text-sm text-ink-muted">
             Loading…
           </span>
         )}
@@ -423,12 +423,12 @@ export default function Calendar() {
       </div>
 
       {loadError && (
-        <p role="alert" className="m-0 flex items-center gap-3 text-base text-dawn-accent">
+        <p role="alert" className="m-0 flex items-center gap-3 text-base text-link">
           {loadError}
           <button
             type="button"
             onClick={() => setReloadKey((key) => key + 1)}
-            className={`h-10 px-2 bg-transparent font-bold text-dawn-accent underline cursor-pointer ${FOCUS_RING}`}
+            className={`h-10 px-2 bg-transparent font-bold text-link underline cursor-pointer ${FOCUS_RING}`}
           >
             Try again
           </button>

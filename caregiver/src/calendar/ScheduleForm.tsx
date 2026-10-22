@@ -73,9 +73,9 @@ const KIND_SEGMENTS: { value: FormKind; label: string }[] = [
 ];
 
 const SMALL_LINK =
-  "text-sm font-bold text-dawn-accent hover:text-dawn-accent-hover focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-dawn-accent";
+  "text-sm font-bold text-link hover:underline focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-const NOTE = "m-0 px-2.5 py-2 rounded-lg bg-[#FBEDE3] text-sm leading-snug text-dawn-accent-hover";
+const NOTE = "m-0 px-2.5 py-2 rounded-lg bg-status-orange-bg text-sm leading-snug text-status-orange-text";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -219,7 +219,7 @@ export default function ScheduleForm({
         if (confirmingDelete) cancelDelete();
         else onClose();
       }}
-      className="w-full lg:w-[290px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-3.5 bg-white border-[1.5px] border-dawn-line rounded-[14px]"
+      className="w-full lg:w-[290px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-3.5 bg-surface border-[1.5px] border-border rounded-[14px]"
     >
       <div className="flex items-center gap-0.5">
         <h2 ref={heading} tabIndex={-1} className="m-0 grow text-lg font-extrabold outline-none">
@@ -246,7 +246,7 @@ export default function ScheduleForm({
       </div>
 
       {confirmingDelete && (
-        <div role="group" aria-labelledby="schedule-delete-question" className="flex flex-col gap-2 p-2.5 rounded-[10px] bg-[#FBEDE3] border-[1.5px] border-[#E7C3AA]">
+        <div role="group" aria-labelledby="schedule-delete-question" className="flex flex-col gap-2 p-2.5 rounded-[10px] bg-status-orange-bg border-[1.5px] border-accent">
           <span id="schedule-delete-question" className="text-[15px] font-bold">
             Delete which?
           </span>
@@ -255,14 +255,14 @@ export default function ScheduleForm({
               ref={firstChoice}
               type="button"
               onClick={() => remove("occurrence")}
-              className={`h-10 px-3 rounded-[10px] border-2 border-dawn-control bg-white text-sm font-bold text-dawn-ink cursor-pointer ${FOCUS_RING}`}
+              className={`h-10 px-3 rounded-[10px] border-2 border-ink-muted bg-surface text-sm font-bold text-ink cursor-pointer ${FOCUS_RING}`}
             >
               Just this day
             </button>
             <button
               type="button"
               onClick={() => remove("series")}
-              className={`h-10 px-3 rounded-[10px] border-0 bg-dawn-accent hover:bg-dawn-accent-hover text-sm font-bold text-white cursor-pointer ${FOCUS_RING}`}
+              className={`h-10 px-3 rounded-[10px] border-0 bg-accent hover:brightness-95 text-sm font-bold text-on-accent cursor-pointer ${FOCUS_RING}`}
             >
               Every time
             </button>
@@ -309,11 +309,11 @@ export default function ScheduleForm({
           </Link>
         </div>
         {library === null ? (
-          <p role="status" className="m-0 text-sm text-dawn-muted">
+          <p role="status" className="m-0 text-sm text-ink-muted">
             Loading…
           </p>
         ) : ofKind.length === 0 ? (
-          <p className="m-0 text-sm text-dawn-muted">No {noun} in the library yet. Add one, then come back.</p>
+          <p className="m-0 text-sm text-ink-muted">No {noun} in the library yet. Add one, then come back.</p>
         ) : (
           <RadioGroup
             aria-labelledby="schedule-which"
@@ -323,7 +323,7 @@ export default function ScheduleForm({
             {ofKind.map((item) => (
               <RadioOption key={item.id} value={String(item.id)}>
                 <span className="grow min-w-0 truncate text-[15px] font-normal">{item.display_name}</span>
-                <span className="text-[13px] font-normal text-dawn-muted">
+                <span className="text-[13px] font-normal text-ink-muted">
                   {item.duration_seconds === null ? "" : formatDuration(item.duration_seconds)}
                 </span>
               </RadioOption>
@@ -338,7 +338,7 @@ export default function ScheduleForm({
         onChange={(event) => patch({ repeat: event.target.value as FormValues["repeat"] })}
         options={repeatOptions(labelDate)}
       />
-      {monthly && values.repeat === "monthly" && <p className="m-0 -mt-1.5 text-sm text-dawn-muted">{monthly}</p>}
+      {monthly && values.repeat === "monthly" && <p className="m-0 -mt-1.5 text-sm text-ink-muted">{monthly}</p>}
 
       {values.kind === "audio" && (
         <>
@@ -359,7 +359,7 @@ export default function ScheduleForm({
               </RadioOption>
             </RadioGroup>
             {photos.length === 0 && (
-              <p className="m-0 text-sm text-dawn-muted">
+              <p className="m-0 text-sm text-ink-muted">
                 Add a photo to the library to show one.{" "}
                 <Link to="/media" className={SMALL_LINK}>
                   Add new
@@ -387,7 +387,7 @@ export default function ScheduleForm({
         </>
       )}
 
-      <p className="m-0 text-[13px] leading-snug text-dawn-muted">
+      <p className="m-0 text-[13px] leading-snug text-ink-muted">
         {values.kind === "audio"
           ? "Plays once at this time."
           : "Plays full screen once at this time, then the carepartner's usual screen comes back."}{" "}
@@ -396,7 +396,7 @@ export default function ScheduleForm({
       </p>
 
       {error && (
-        <p role="alert" className="m-0 text-sm font-bold text-dawn-accent">
+        <p role="alert" className="m-0 text-sm font-bold text-link">
           {error}
         </p>
       )}
