@@ -13,16 +13,19 @@
  *  - Update global AuthContext
  *  - Redirect user based on account state
  * 
- * Redirect logic:
+ * Redirect logic (pathAfterLogin in context/session.ts):
  *  - No carepartners → Account setup page
- *  - Has carepartners → Home page (`/`)
+ *  - Has carepartners → the page RequireLogin sent them here from, or home (`/`)
+ *  - Already signed in (checked with GET /me on arrival) → straight there
  */
 
 import { GoogleLogin } from "@react-oauth/google";
-import { useState } from "react";
+import type { CredentialResponse } from "@react-oauth/google";
+import { useEffect, useState } from "react";
 import { Calendar, Image, Monitor, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { fetchCurrentUser, pathAfterLogin, useSignIn } from "../context/session";
 
 const FEATURES = [
   { icon: Monitor, text: "Choose what your carepartner sees every day" },
@@ -49,8 +52,10 @@ const Login = () => {
      Routing / Context
   ============================ */
 
-  const navigate = useNavigate();
-  const { setUser, setIsAuthenticated, setActiveCarePartnerId } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const signIn = useSignIn();
+  // RequireLogin sends the page the caregiver was trying to open
+  const from = (useLocation().state as { from?: string } | null)?.from;
 
   /**
    * Base API URL
@@ -71,6 +76,33 @@ const Login = () => {
    */
   const [loading, setLoading] = useState(false);
 
+  /**
+   * True until GET /me has said whether someone is already signed in (a
+   * reload or a bookmark of /login), so the page doesn't flash before moving on
+   */
+  const [checking, setChecking] = useState(!isAuthenticated);
+
+  /* ============================
+     Effects
+  ============================ */
+
+  useEffect(() => {
+    if (isAuthenticated) return;
+
+    let current = true;
+    fetchCurrentUser()
+      .then((signedIn) => {
+        if (!current) return;
+        if (signedIn) signIn(signedIn);
+        else setChecking(false);
+      })
+      .catch(() => current && setChecking(false));
+
+    return () => {
+      current = false;
+    };
+  }, [isAuthenticated, signIn]);
+
   /* ============================
      Handlers
   ============================ */
@@ -82,10 +114,9 @@ const Login = () => {
    *  1. Send Google ID token to backend
    *  2. Backend verifies and creates session
    *  3. Fetch authenticated user data
-   *  4. Store user in global context
-   *  5. Redirect based on carepartner state
+   *  4. Store user in global context, which redirects (see the render)
    */
-  const handleSuccess = async (credentialResponse: any) => {
+  const handleSuccess = async (credentialResponse: CredentialResponse) => {
     setStatus("idle");
     setLoading(true);
 
@@ -111,33 +142,18 @@ const Login = () => {
       /* ============================
          Step 2: Fetch User
       ============================ */
-      const meRes = await fetch(`${API_URL}/me`, {
-        credentials: "include",
-      });
+      const signedIn = await fetchCurrentUser();
 
-      if (!meRes.ok) {
+      if (!signedIn) {
         setStatus("error");
         setLoading(false);
         return;
       }
 
-      const user = await meRes.json();
-
       /* ============================
-         Step 3: Update Context
+         Step 3: Update Context (the render below then redirects)
       ============================ */
-      setUser(user);
-      setIsAuthenticated(true);
-
-      /* ============================
-         Step 4: Redirect Logic
-      ============================ */
-      if (!user.carepartners || user.carepartners.length === 0) {
-        navigate("/setup");
-      } else {
-        setActiveCarePartnerId(user.carepartners[0].id);
-        navigate("/");
-      }
+      signIn(signedIn);
 
       setStatus("success");
     } catch (err) {
@@ -158,6 +174,9 @@ const Login = () => {
   /* ============================
      Render
   ============================ */
+  if (isAuthenticated && user) return <Navigate to={pathAfterLogin(user, from)} replace />;
+  if (checking) return null;
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-page text-ink font-dawn">
       {/* Brand panel */}
@@ -187,7 +206,7 @@ const Login = () => {
           </ul>
         </div>
 
-        {/* A sun rising over the horizon, drawn only in the brand's accent colors */}
+        {/* A sun rising over the horizon, drawn in the brand's apricot and gold over the nav color */}
         <svg
           aria-hidden="true"
           viewBox="0 0 800 200"
@@ -196,7 +215,7 @@ const Login = () => {
         >
           <circle cx="400" cy="170" r="120" className="fill-accent/25" />
           <circle cx="400" cy="170" r="84" className="fill-accent/60" />
-          <circle cx="400" cy="170" r="48" style={{ fill: "rgb(var(--color-sun))" }} />
+          <circle cx="400" cy="170" r="48" className="fill-sun" />
           <rect x="0" y="170" width="800" height="30" className="fill-nav" />
           <g className="stroke-on-nav/30" strokeWidth="2">
             <line x1="0" y1="170" x2="800" y2="170" />

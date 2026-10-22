@@ -50,7 +50,7 @@ export default function CalendarSidebar({
         type="button"
         onClick={onSchedule}
         disabled={!onSchedule}
-        className={`self-start flex items-center gap-2.5 h-[52px] pl-4 pr-5 bg-surface border-[1.5px] border-border rounded-2xl shadow-[0_2px_6px_rgba(30,33,64,0.15)] text-base font-bold text-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
+        className={`self-start flex items-center gap-2.5 h-[52px] pl-4 pr-5 bg-surface border-[1.5px] border-border rounded-2xl shadow-raised text-base font-bold text-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
       >
         <Plus size={22} strokeWidth={2.6} className="text-link" aria-hidden="true" />
         Schedule

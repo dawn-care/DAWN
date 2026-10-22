@@ -142,8 +142,8 @@ export function isAbort(err: unknown): boolean {
    Media
 ============================ */
 
-// The server leaves out `situations` and `family_member_ids` when an item has none (or, on an older
-// build, always); the page reads them as lists, so fill them in here rather than crash on undefined
+// Older server builds leave out `situations` and `family_member_ids` (and may send `usage` as null);
+// the page reads all three as lists, so default them here rather than crash on undefined
 function withTags(media: Media): Media {
   return { ...media, usage: media.usage ?? [], situations: media.situations ?? [], family_member_ids: media.family_member_ids ?? [] };
 }

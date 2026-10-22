@@ -11,11 +11,15 @@
       href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700;800&display=swap"
     />
     <script>
-      // Apply the saved theme before the first paint (see src/theme/theme.ts)
+      // Apply the saved theme before the first paint, as src/theme/theme.ts does
+      var theme = null;
       try {
-        var theme = localStorage.getItem("theme");
-        if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-theme", theme);
-      } catch (e) {}
+        theme = localStorage.getItem("theme");
+      } catch (e) {
+        // Storage can be blocked; follow the operating system then
+      }
+      var dark = theme === "dark" || (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     </script>
     <title>caregiver</title>
   </head>

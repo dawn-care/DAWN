@@ -21,6 +21,8 @@ export default {
         "on-accent": tw("on-accent"),
         border: tw("border"),
         focus: tw("focus"),
+        // Gold, for the login page's sun
+        sun: tw("sun"),
         status: Object.fromEntries(
           STATUSES.flatMap((name) => [
             [`${name}-bg`, tw(`status-${name}-bg`)],
@@ -33,9 +35,11 @@ export default {
         dawn: ["Atkinson Hyperlegible Next", "Atkinson Hyperlegible", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        toast: "0 8px 24px rgba(30, 33, 64, 0.3)",
-        popover: "0 8px 24px rgba(30, 33, 64, 0.18)",
-        dialog: "0 12px 32px rgba(30, 33, 64, 0.25)",
+        // --color-shadow is night in light mode and black in dark mode, where night wouldn't show
+        toast: "0 8px 24px rgb(var(--color-shadow) / 0.3)",
+        popover: "0 8px 24px rgb(var(--color-shadow) / 0.18)",
+        dialog: "0 12px 32px rgb(var(--color-shadow) / 0.25)",
+        raised: "0 2px 6px rgb(var(--color-shadow) / 0.15)",
       },
     },
   },

@@ -1,18 +1,20 @@
 /**
  * Settings.tsx
- * 
+ *
  * User: Caregiver
- * 
+ *
  * This component allows users to manage account and care partner settings.
- * 
+ *
  * Responsibilities:
- *  - View and update caregiver profile information
- *  - View active carepartner details
- *  - Logout user and clear session
- *  - Navigate to device repair/setup flow
+ *  - Change the caregiver's name (its own Save button; a success shows a toast, an error stays under it)
+ *  - Switch the active carepartner (applies as soon as it is picked)
+ *  - Log out
+ *  - Go to the pairing page to pair another tablet
+ *
+ * The caregiver comes from AuthContext, which RequireLogin has already loaded.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft, LogOut, Smartphone } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import SelectField from "../components/ui/form/SelectField";
@@ -20,32 +22,30 @@ import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import { useAuth } from "../context/AuthContext";
+import { useLogout } from "../context/session";
 
 // The same two buttons as the rest of the app: one filled (the main action), one outlined (everything else)
 const PRIMARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`;
 const SECONDARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-ink-muted bg-surface hover:bg-page text-ink text-base font-bold cursor-pointer ${FOCUS_RING}`;
 
-/* ============================
-   Types
-============================ */
-
 /**
- * Caregiver profile structure
+ * Base API URL
  */
-interface Caregiver {
-  id: number;
-  name: string;
-  role: string;
+const API_URL = import.meta.env.VITE_API_URL;
+
+/** The caregiver's wording for a failed save, from the server's { "error": ... } body */
+async function saveNameError(res: Response): Promise<string> {
+  const text = await res.text();
+  let message = text;
+  try {
+    message = JSON.parse(text).error ?? text;
+  } catch {
+    // Not JSON (e.g. a proxy's error page); keep the text for the console
+  }
+  console.error(`PUT /caregivers answered ${res.status}:`, message);
+  if (message === "name cannot be empty") return "Enter your name before saving.";
+  return "Couldn't save your name. Please try again.";
 }
-
-/**
- * Default fallback caregiver state
- */
-const DEFAULT_CAREGIVER: Caregiver = {
-  id: 0,
-  name: "Your Name",
-  role: "Primary Caregiver",
-};
 
 /* ============================
    Component
@@ -53,9 +53,9 @@ const DEFAULT_CAREGIVER: Caregiver = {
 
 /**
  * SettingsPage Component
- * 
+ *
  * Provides account settings, carepartner configuration,
- * and session management actions. Results show as toasts.
+ * and session management actions.
  */
 export default function SettingsPage() {
 
@@ -65,153 +65,88 @@ export default function SettingsPage() {
 
   const navigate = useNavigate();
   const toast = useToast();
+  const logout = useLogout();
 
-  const {
-    user,
-    setIsAuthenticated,
-    setUser,
-    activeCarePartnerId,
-    setActiveCarePartnerId,
-  } = useAuth();
+  const { user, setUser, activeCarePartnerId, setActiveCarePartnerId } = useAuth();
 
   const carepartners = user?.carepartners ?? [];
-
-  /**
-   * Base API URL
-   */
-  const API_URL = import.meta.env.VITE_API_URL;
 
   /* ============================
      State
   ============================ */
 
   /**
-   * Caregiver profile data
+   * The name as typed
    */
-  const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
+  const [name, setName] = useState(user?.name ?? "");
 
   /**
    * True while Save is under way
    */
   const [saving, setSaving] = useState(false);
 
+  /**
+   * Why the last save failed; stays until the next save, unlike a toast
+   */
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   /* ============================
-     Effects
+     Derived Values
   ============================ */
 
   /**
-   * Fetch caregiver and carepartner settings on load
+   * Option labels; a carepartner who shares a name with another gets their ID
+   * too, so the two can be told apart
    */
-  useEffect(() => {
-    const fetchCaregiverAndCarepartner = async () => {
-      try {
-        /* ============================
-           Fetch caregiver profile
-        ============================ */
-        const resCg = await fetch(`${API_URL}/me`, { method: "GET", credentials: "include" });
-        if (!resCg.ok) return;
-
-        const cgData = await resCg.json();
-        setCaregiver(cgData);
-        setUser(cgData);
-
-        const connectedCarepartners = Array.isArray(cgData.carepartners) ? cgData.carepartners : [];
-
-        if (connectedCarepartners.length === 0) {
-          setActiveCarePartnerId(null);
-          return;
-        }
-
-        const hasActiveCarepartner = activeCarePartnerId !== null
-          && connectedCarepartners.some((cp: { id: number }) => cp.id === activeCarePartnerId);
-
-        if (!hasActiveCarepartner) {
-          setActiveCarePartnerId(connectedCarepartners[0].id);
-        }
-      } catch (err) {
-        console.error("Error fetching data:", err);
-      }
+  const carepartnerOptions = carepartners.map((carepartner) => {
+    const shared = carepartners.filter((other) => other.name === carepartner.name).length > 1;
+    return {
+      value: String(carepartner.id),
+      label: shared ? `${carepartner.name} (ID ${carepartner.id})` : carepartner.name,
     };
-
-    fetchCaregiverAndCarepartner();
-  }, [activeCarePartnerId]);
-
+  });
 
   /* ============================
      Handlers
   ============================ */
 
   /**
-   * Logs the user out and clears authentication state
+   * Saves the caregiver's name
    */
-  const handleLogout = async () => {
-    try {
-      // Call the backend to clear the cookie
-      const res = await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
+  const handleSave = async () => {
+    if (!user) return;
 
-      if (!res.ok) {
-        throw new Error("Failed to logout");
-      }
-
-      // Update global auth state
-      setIsAuthenticated(false);
-      setUser(null);
-      setActiveCarePartnerId(null);
-
-      // Redirect to login
-      navigate("/login");
-    } catch (err) {
-      toast.show("Logout failed: " + (err instanceof Error ? err.message : String(err)));
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setSaveError("Enter your name before saving.");
+      return;
     }
-  };
 
-  /**
-   * Updates caregiver profile information; returns an error message, or null when it worked
-   */
-  const handleUpdate = async (): Promise<string | null> => {
+    setSaving(true);
+    setSaveError(null);
     try {
       const res = await fetch(`${API_URL}/caregivers`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...caregiver,
-        }),
+        // The server sets the role from this too, so send the one it gave us
+        body: JSON.stringify({ id: user.id, name: trimmed, role: user.role ?? "" }),
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        return "Update failed: " + text;
+        setSaveError(await saveNameError(res));
+        return;
       }
 
-      setUser((currentUser) => {
-        if (!currentUser) {
-          return { ...caregiver, carepartners: [] };
-        }
-
-        return {
-          ...currentUser,
-          name: caregiver.name,
-          role: caregiver.role,
-        };
-      });
-      return null;
+      setUser((currentUser) => (currentUser ? { ...currentUser, name: trimmed } : currentUser));
+      setName(trimmed);
+      toast.show("Name saved.");
     } catch (err) {
-      return "Update failed: " + (err instanceof Error ? err.message : String(err));
+      console.error("Saving the name failed:", err);
+      setSaveError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setSaving(false);
     }
-  };
-
-  /**
-   * Saves the caregiver's profile and says how it went
-   */
-  const handleSave = async () => {
-    setSaving(true);
-    const error = await handleUpdate();
-    setSaving(false);
-    toast.show(error ?? "Settings saved.");
   };
 
   /* ============================
@@ -241,13 +176,26 @@ export default function SettingsPage() {
           </h2>
           <TextField
             label="Name"
-            value={caregiver.name}
-            onChange={(e) => setCaregiver({ ...caregiver, name: e.target.value })}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+            }}
           />
-          <button type="button" onClick={handleLogout} className={`${SECONDARY_BUTTON} self-start`}>
-            <LogOut size={18} aria-hidden="true" />
-            Log out
-          </button>
+          {saveError && (
+            <p role="alert" className="m-0 px-3 py-2.5 rounded-lg bg-status-red-bg text-base font-bold text-status-red-text">
+              {saveError}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button type="button" onClick={handleSave} disabled={saving} className={PRIMARY_BUTTON}>
+              {saving ? "Saving…" : "Save name"}
+            </button>
+            <button type="button" onClick={logout} className={SECONDARY_BUTTON}>
+              <LogOut size={18} aria-hidden="true" />
+              Log out
+            </button>
+          </div>
         </section>
 
         {/* Carepartner */}
@@ -266,7 +214,7 @@ export default function SettingsPage() {
             options={
               carepartners.length === 0
                 ? [{ value: "", label: "No connected carepartners" }]
-                : carepartners.map((carepartner) => ({ value: String(carepartner.id), label: carepartner.name }))
+                : carepartnerOptions
             }
           />
           <button
@@ -278,12 +226,6 @@ export default function SettingsPage() {
             Pair a new device
           </button>
         </section>
-
-        <div className="flex justify-end">
-          <button type="button" onClick={handleSave} disabled={saving} className={PRIMARY_BUTTON}>
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-        </div>
       </div>
     </div>
   );

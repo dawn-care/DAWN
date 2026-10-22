@@ -9,10 +9,11 @@
  * previewUrl first and show something else when it's null.
  *
  * The iframe is laid out at the tablet's own size (TABLET_SIZE) and scaled
- * to fit its container, keeping its shape and centered (or, with fit="cover", to fill it, trimming a
- * few pixels at the edges so a rounded border leaves no gap), so the tablet app lays
- * out and sizes its text just as it does on the tablet instead of squeezing it
- * into a small frame.
+ * to its container, keeping its shape and centered, so the tablet app lays out
+ * and sizes its text just as it does on the tablet instead of squeezing it into
+ * a small frame. fit="contain" shows the whole screen; fit="cover" fills the
+ * container and crops whatever doesn't fit, which in a box that is already
+ * 16:10 is only a few pixels, so a rounded border leaves no gap.
  *
  * "Loading carepartner screen…" covers the frame until it has loaded, and again
  * each time it loads anew (another carepartner, or `reloadKey` after a save).
@@ -35,7 +36,7 @@ interface CarepartnerScreenProps {
   src: string;
   /** Change it (e.g. after a save) to load the screen again */
   reloadKey?: number;
-  /** "cover" fills the container (trimming a few pixels at the edges); "contain" (the default) always shows the whole screen */
+  /** "cover" fills the container, cropping whatever doesn't fit; "contain" (the default) always shows the whole screen */
   fit?: "cover" | "contain";
 }
 
@@ -72,7 +73,7 @@ function Frame({ src, fit }: { src: string; fit: "cover" | "contain" }) {
     };
   }, [src, attempt]);
 
-  // Follow the container's size, so the tablet always fits it
+  // Rescale whenever the container's size changes
   useLayoutEffect(() => {
     const element = box.current;
     if (!element) return;

@@ -4,8 +4,8 @@
  * User: Caregiver
  *
  * Makes FullCalendar look like the calendar mockups: brand colors, one line per
- * hour, hatched asleep hours, accent video events and teal audio events with
- * on-accent text. ScheduleCalendar puts `cal-video` or `cal-audio` on each event,
+ * hour, hatched asleep hours, accent video events with on-accent text and ink
+ * audio events with page text. ScheduleCalendar puts `cal-video` or `cal-audio` on each event,
  * `cal-outside` on one outside the awake hours, `cal-selected` on the one being
  * edited, and `cal-draft` on the "New" placeholder.
  */
@@ -112,7 +112,7 @@
   color: inherit;
 }
 
-/* Video and audio events: on-accent text on the accent or teal fill */
+/* Video events: on-accent text on accent. Audio events: page text on ink */
 .dawn-calendar .fc-timegrid-event {
   border-radius: 6px;
   box-shadow: none;

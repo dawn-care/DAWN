@@ -3,11 +3,12 @@
 @tailwind utilities;
 
 /*
- * Semantic color tokens (values are RGB channels; tailwind.config.js wraps them in rgb()).
- * Brand palette: night #1E2140, cream #FFF8EF, dusk #5B6091, ember #B4533A, apricot #E07A5F,
- * gold #F2B84B, lavender #8A8FB5. Components use these tokens, never the brand values or raw hex.
- * Dark values apply when the caregiver picks Dark or, on System, when the OS is dark. The light status values are not from the
- * brand sheet: each is a pale tint of its hue with dark text.
+ * Semantic color tokens, as RGB channels: tailwind.config.js wraps them in rgb() so opacity modifiers
+ * (bg-accent/10) work. Brand palette: night #1E2140, cream #FFF8EF, dusk #5B6091, ember #B4533A,
+ * apricot #E07A5F, gold #F2B84B, lavender #8A8FB5. Components use these tokens, never the brand values
+ * or raw hex. The status colors are not from the brand sheet: each is a pale tint of its hue with dark
+ * text in light mode, and a deep shade with light text in dark mode. `shadow` is the color of the
+ * popover, dialog, toast and raised shadows.
  */
 :root {
   color-scheme: light;
@@ -24,6 +25,7 @@
   --color-border: 237 227 214;
   --color-focus: 224 122 95;
   --color-sun: 242 184 75;
+  --color-shadow: 30 33 64;
   --color-status-gray-bg: 238 240 245;
   --color-status-gray-text: 59 63 92;
   --color-status-blue-bg: 227 234 251;
@@ -42,41 +44,7 @@
   --color-status-pink-text: 155 42 94;
 }
 
-/* The OS setting decides unless the caregiver picked a theme (html[data-theme], see theme/theme.ts) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --color-page: 20 22 43;
-    --color-surface: 30 33 64;
-    --color-surface-raised: 39 42 79;
-    --color-nav: 15 17 36;
-    --color-on-nav: 243 237 228;
-    --color-ink: 243 237 228;
-    --color-ink-muted: 169 173 208;
-    --color-link: 242 164 136;
-    --color-accent: 224 122 95;
-    --color-on-accent: 30 33 64;
-    --color-border: 58 62 107;
-    --color-focus: 224 122 95;
-    --color-status-gray-bg: 46 49 80;
-    --color-status-gray-text: 212 214 232;
-    --color-status-blue-bg: 35 48 94;
-    --color-status-blue-text: 191 203 245;
-    --color-status-green-bg: 31 61 44;
-    --color-status-green-text: 174 221 188;
-    --color-status-yellow-bg: 61 52 25;
-    --color-status-yellow-text: 242 217 140;
-    --color-status-purple-bg: 52 41 90;
-    --color-status-purple-text: 213 198 242;
-    --color-status-orange-bg: 69 42 31;
-    --color-status-orange-text: 245 191 166;
-    --color-status-red-bg: 74 34 38;
-    --color-status-red-text: 244 180 180;
-    --color-status-pink-bg: 69 35 55;
-    --color-status-pink-text: 242 184 210;
-  }
-}
-
+/* Dark: theme.ts sets data-theme to "dark" for Dark, or for System when the OS is dark */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-page: 20 22 43;
@@ -91,6 +59,7 @@
   --color-on-accent: 30 33 64;
   --color-border: 58 62 107;
   --color-focus: 224 122 95;
+  --color-shadow: 0 0 0;
   --color-status-gray-bg: 46 49 80;
   --color-status-gray-text: 212 214 232;
   --color-status-blue-bg: 35 48 94;

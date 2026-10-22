@@ -14,9 +14,8 @@
  * /family exists as a stub route but is intentionally not linked here yet.
  */
 
-import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import ThemeMenu from "./ThemeMenu";
 import { Calendar, Image, Monitor, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -84,44 +83,8 @@ export default function NavBar() {
      Context
   ============================ */
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
-  const { user, setUser, activeCarePartnerId } = useAuth();
-  const navigate = useNavigate();
-
-  // True once the /me request has settled, so names can show a
-  // placeholder while it is in flight instead of blank text
-  const [meSettled, setMeSettled] = useState(false);
-
-  /* ============================
-     Effects
-  ============================ */
-
-  /**
-   * Reload the caregiver after a page refresh, since the auth context
-   * only holds the user until the page reloads. A 401 means the session
-   * has expired, so send the caregiver back to login.
-   */
-  useEffect(() => {
-    if (user) return;
-
-    const fetchCaregiver = async () => {
-      try {
-        const res = await fetch(`${API_URL}/me`, { credentials: "include" });
-        if (res.ok) {
-          setUser(await res.json());
-        } else if (res.status === 401) {
-          navigate("/login", { replace: true });
-          return;
-        }
-      } catch (err) {
-        console.error("Error fetching caregiver:", err);
-      }
-      setMeSettled(true);
-    };
-
-    fetchCaregiver();
-  }, [user, setUser, API_URL, navigate]);
+  // RequireLogin has loaded the caregiver before this renders
+  const { user, activeCarePartnerId } = useAuth();
 
   /* ============================
      Derived Values
@@ -129,7 +92,6 @@ export default function NavBar() {
 
   const carepartner = user?.carepartners?.find((cp) => cp.id === activeCarePartnerId);
   const carepartnerName = carepartner?.name ?? "";
-  const loading = !user && !meSettled;
 
   /* ============================
      Render
@@ -153,11 +115,7 @@ export default function NavBar() {
           {carepartnerName ? getInitials(carepartnerName) : <User size={24} />}
         </div>
         <div className="flex flex-col min-w-0">
-          {loading ? (
-            <div className="h-[22px] w-28 rounded bg-on-nav/20 animate-pulse" />
-          ) : (
-            <div className="text-[17px] font-bold truncate">{carepartnerName}</div>
-          )}
+          <div className="text-[17px] font-bold truncate">{carepartnerName}</div>
           <div className="text-base text-on-nav/70">{FACILITY}</div>
         </div>
       </div>
@@ -189,11 +147,7 @@ export default function NavBar() {
           className="flex-1 min-w-0 flex items-center gap-2.5 h-12 px-2.5 rounded-[10px] text-base hover:bg-on-nav/10"
         >
           <User size={22} aria-hidden="true" className="shrink-0" />
-          {loading ? (
-            <span className="h-5 w-24 rounded bg-on-nav/20 animate-pulse" />
-          ) : (
-            <span className="truncate">{user?.name}</span>
-          )}
+          <span className="truncate">{user?.name}</span>
         </Link>
         <ThemeMenu />
       </div>

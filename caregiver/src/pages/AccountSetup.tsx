@@ -18,14 +18,19 @@
  * API interactions:
  *  - POST /users/device-pairing/verify (validate pairing code)
  *  - GET /me (refresh user data)
+ *
+ * A caregiver who came from Settings gets a back arrow; one with no carepartner
+ * yet (straight after signing up) gets Log out instead, since nothing else is
+ * open to them.
  */
 
-import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
+import { fetchCurrentUser, useLogout } from "../context/session";
 
 /* ============================
    Static Data
@@ -46,6 +51,31 @@ const toPairingCode = (typed: string) =>
  */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/**
+ * The caregiver's wording for a failed verify, from the server's { "error": ... }
+ * body (VerifyPairingCode in device_pairing_service.go)
+ */
+async function pairingError(res: Response): Promise<string> {
+  const text = await res.text();
+  let message = text;
+  try {
+    message = JSON.parse(text).error ?? text;
+  } catch {
+    // Not JSON (e.g. a proxy's error page); keep the text for the console
+  }
+  console.error(`POST /users/device-pairing/verify answered ${res.status}:`, message);
+  switch (message) {
+    case "pairing code not found":
+      return "That code didn't work. Check the code on the tablet and try again.";
+    case "pairing code already used":
+      return "That code has already been used. Get a new code on the tablet.";
+    case "pairing code expired":
+      return "That code has expired. Get a new code on the tablet.";
+    default:
+      return "Couldn't pair the tablet. Please try again.";
+  }
+}
+
 /* ============================
    Component
 ============================ */
@@ -60,6 +90,7 @@ export default function AccountSetupPage() {
   // Settings sends its state along, so the page can offer a way back (a new caregiver arrives with none)
   const cameFromSettings = (useLocation().state as { from?: string } | null)?.from === "settings";
   const { user, setUser, setActiveCarePartnerId } = useAuth();
+  const logout = useLogout();
 
   /* ============================
      State
@@ -69,6 +100,10 @@ export default function AccountSetupPage() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [carePartnerName, setCarePartnerName] = useState("");
+  // True while pairing is under way, so a second click can't send the code again. The ref
+  // blocks a click before the disabled button has rendered; the state draws it
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   /* ============================
      Handlers
@@ -81,6 +116,8 @@ export default function AccountSetupPage() {
    * - Refreshes user data
    */
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
+
     // Ensure name is typed
     if (!carePartnerName.trim()) {
       setSubmitError("Please enter who this is for.");
@@ -110,6 +147,8 @@ export default function AccountSetupPage() {
     }
 
     setSubmitError("");
+    submittingRef.current = true;
+    setSubmitting(true);
 
     try {
       // Verify that the pairing code matches one in the pairing code table
@@ -120,38 +159,49 @@ export default function AccountSetupPage() {
         body: JSON.stringify({
           code: pairingCode,
           caregiver_id: user.id, 
-          carepartner_name: carePartnerName,
+          carepartner_name: carePartnerName.trim(),
         }),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        setSubmitError(errText || "Failed to verify pairing code. Please try again.");
+        setSubmitError(await pairingError(res));
         return;
       }
 
-      const verifyData = await res.json();
+      const verifyData: { carepartner_id: number } = await res.json();
 
       // Set the active carepartner from the pairing response
       setActiveCarePartnerId(verifyData.carepartner_id);
 
-      const meRes = await fetch(`${API_URL}/me`, {
-        credentials: "include",
-      });
-
-      if (!meRes.ok) {
-        setSubmitError("Pairing succeeded, but failed to refresh account data.");
-        return;
+      // The code is used up now, so go on even if the refresh fails: add the new
+      // carepartner here instead (the next reload loads the real list)
+      try {
+        const refreshedUser = await fetchCurrentUser();
+        if (!refreshedUser) throw new Error("GET /me answered 401");
+        setUser(refreshedUser);
+      } catch (err) {
+        console.error("Pairing worked, but refreshing the caregiver failed:", err);
+        setUser((currentUser) =>
+          currentUser
+            ? {
+                ...currentUser,
+                carepartners: [
+                  ...(currentUser.carepartners ?? []),
+                  { id: verifyData.carepartner_id, name: carePartnerName.trim() },
+                ],
+              }
+            : currentUser
+        );
       }
-
-      const refreshedUser = await meRes.json();
-      setUser(refreshedUser);
 
       // Pairing succeeded
       navigate("/");
     } catch (err) {
-      console.error(err);
-      setSubmitError("Something went wrong. Please try again.");
+      console.error("Pairing failed:", err);
+      setSubmitError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -173,6 +223,16 @@ export default function AccountSetupPage() {
             </Link>
           )}
           <h1 className="m-0 text-3xl font-extrabold">Pair a new device</h1>
+          {!cameFromSettings && (
+            <button
+              type="button"
+              onClick={logout}
+              className={`ml-auto h-11 px-3.5 flex items-center gap-2 rounded-[10px] border-0 bg-transparent text-base font-bold text-ink cursor-pointer hover:bg-border/60 ${FOCUS_RING}`}
+            >
+              <LogOut size={18} aria-hidden="true" />
+              Log out
+            </button>
+          )}
         </header>
 
         <div className="flex flex-col gap-6 p-8 bg-surface border-[1.5px] border-border rounded-[14px]">
@@ -252,9 +312,10 @@ export default function AccountSetupPage() {
           <button
             type="button"
             onClick={handleSubmit}
-            className={`h-12 w-full rounded-[10px] border-2 border-accent bg-accent text-base font-bold text-on-accent cursor-pointer hover:brightness-95 ${FOCUS_RING}`}
+            disabled={submitting}
+            className={`h-12 w-full rounded-[10px] border-2 border-accent bg-accent text-base font-bold text-on-accent cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
           >
-            Pair device
+            {submitting ? "Pairing…" : "Pair device"}
           </button>
         </div>
       </div>

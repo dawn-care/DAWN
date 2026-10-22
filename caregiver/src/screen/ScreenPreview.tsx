@@ -45,7 +45,7 @@ export default function ScreenPreview({ carepartnerId, reloadKey = 0, editView }
     // row of buttons
     <div className="flex-1 min-w-0 min-h-[360px] pt-2 [container-type:size]">
       <div className="flex flex-col gap-3" style={{ width: "min(100cqw, calc((100cqh - 3.5rem) * 1.6))" }}>
-        {/* The border shows where the carepartner's screen ends; ink-muted is the border of the tablet's widgets (colors.day.border in carepartner/src/theme/theme.ts) */}
+        {/* The border shows where the carepartner's screen ends; in the light theme, ink-muted is the tablet's widget border (#5B6091, colors.day.border in carepartner/src/theme/theme.ts) */}
         <div className="aspect-[16/10] rounded-xl overflow-hidden bg-page border-[3px] border-ink-muted">
           {editing ? (
             <div className="h-full p-4">{editView}</div>
