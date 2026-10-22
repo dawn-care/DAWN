@@ -22,7 +22,8 @@
   --color-accent: 224 122 95;
   --color-on-accent: 30 33 64;
   --color-border: 237 227 214;
-  --color-focus: 242 184 75;
+  --color-focus: 224 122 95;
+  --color-sun: 242 184 75;
   --color-status-gray-bg: 238 240 245;
   --color-status-gray-text: 59 63 92;
   --color-status-blue-bg: 227 234 251;
@@ -56,7 +57,7 @@
     --color-accent: 224 122 95;
     --color-on-accent: 30 33 64;
     --color-border: 58 62 107;
-    --color-focus: 242 184 75;
+    --color-focus: 224 122 95;
     --color-status-gray-bg: 46 49 80;
     --color-status-gray-text: 212 214 232;
     --color-status-blue-bg: 35 48 94;
@@ -89,7 +90,7 @@
   --color-accent: 224 122 95;
   --color-on-accent: 30 33 64;
   --color-border: 58 62 107;
-  --color-focus: 242 184 75;
+  --color-focus: 224 122 95;
   --color-status-gray-bg: 46 49 80;
   --color-status-gray-text: 212 214 232;
   --color-status-blue-bg: 35 48 94;
@@ -106,6 +107,30 @@
   --color-status-red-text: 244 180 180;
   --color-status-pink-bg: 69 35 55;
   --color-status-pink-text: 242 184 210;
+}
+
+/* Every keyboard focus outline is the focus color, including controls with no FOCUS_RING of their own
+   (native checkboxes, inputs, selects, links). Classes on a control still win over this default. */
+@layer base {
+  :focus-visible {
+    outline: 3px solid rgb(var(--color-focus));
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline-offset: 1px;
+  }
+
+  /* Native checkboxes, radios and ranges, and the text selection highlight */
+  :root {
+    accent-color: rgb(var(--color-accent));
+  }
+
+  ::selection {
+    background: rgb(var(--color-accent) / 0.35);
+  }
 }
 
 /* OPTIONAL GLOBAL RESET — but very Tailwind friendly */

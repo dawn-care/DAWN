@@ -335,7 +335,7 @@ export default function SettingsPage() {
 
           <button
             className="mt-4 flex-1 bg-status-yellow-bg hover:brightness-95 text-status-yellow-text font-semibold py-3 rounded"
-            onClick={() => navigate("/setup")}
+            onClick={() => navigate("/setup", { state: { from: "settings" } })}
           >
             Pair New Device
           </button>

@@ -21,17 +21,15 @@
  */
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import TextField from "../components/ui/form/TextField";
+import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
 
 /* ============================
    Static Data
 ============================ */
-
-/**
- * Suggested names for care partner input
- */
-const SUGGESTIONS = ["Mom", "Dad", "Grandma", "Grandpa", "Friend"];
 
 /**
  * Pairing codes are 6 capital letters and numbers (generateCode in the server's
@@ -59,6 +57,8 @@ export default function AccountSetupPage() {
   ============================ */
 
   const navigate = useNavigate();
+  // Settings sends its state along, so the page can offer a way back (a new caregiver arrives with none)
+  const cameFromSettings = (useLocation().state as { from?: string } | null)?.from === "settings";
   const { user, setUser, setActiveCarePartnerId } = useAuth();
 
   /* ============================
@@ -160,48 +160,48 @@ export default function AccountSetupPage() {
   ============================ */
 
   return (
-    <div className="w-full flex flex-col items-center mt-8 px-6">
-      <h1 className="text-3xl font-semibold mb-6">
-        Pair New Device
-      </h1>
+    <div className="min-h-screen flex flex-col items-center px-6 py-10 bg-page text-ink font-dawn">
+      <div className="w-full max-w-xl flex flex-col gap-6">
+        <header className="flex items-center gap-3">
+          {cameFromSettings && (
+            <Link
+              to="/settings"
+              aria-label="Back to settings"
+              className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink hover:bg-border/60 ${FOCUS_RING}`}
+            >
+              <ArrowLeft size={24} aria-hidden="true" />
+            </Link>
+          )}
+          <div>
+            <div className="text-2xl font-extrabold">D.A.W.N.</div>
+            <div className="text-base text-ink-muted">Caregiver</div>
+          </div>
+        </header>
 
-      <div className="border p-8 max-w-3xl w-full rounded-lg bg-surface shadow">
+        <div className="flex flex-col gap-6 p-8 bg-surface border-[1.5px] border-border rounded-[14px] shadow-popover">
+          <div className="flex flex-col gap-2">
+            <h1 className="m-0 text-3xl font-extrabold">Pair a new device</h1>
+            <p className="m-0 text-lg text-ink-muted">
+              Connect your carepartner's tablet to your account so you can choose what it shows.
+            </p>
+          </div>
 
-        {/* ============================
-            Care Partner Name
-        ============================ */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Who is this for?</label>
-
-          <input
-            type="text"
+          {/* ============================
+              Care Partner Name
+          ============================ */}
+          <TextField
+            label="Who is this for?"
             value={carePartnerName}
             onChange={(e) => setCarePartnerName(e.target.value)}
-            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
             placeholder="Enter name"
           />
 
-          {/* Suggestions */}
-          <div className="flex gap-2 mt-2 flex-wrap">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setCarePartnerName(s)}
-                className="px-3 py-1 bg-border text-ink-muted rounded-full text-sm hover:brightness-95"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ============================
-            Pairing Code
-        ============================ */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Enter Care Partner Pairing Code:</label>
-          <input
-            type="text"
+          {/* ============================
+              Pairing Code
+          ============================ */}
+          <TextField
+            label="Pairing code"
+            hint="Shown on your carepartner's tablet"
             value={pairingCode}
             // Codes are always capitals, so typing in lowercase still shows (and sends) them that
             // way; anything but letters and numbers, and anything past 6, is left out
@@ -211,56 +211,58 @@ export default function AccountSetupPage() {
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            className="w-full mt-2 p-3 border rounded bg-surface text-ink uppercase"
-            placeholder="Enter pairing code"
+            className="uppercase tracking-[0.3em] text-xl font-bold"
+            placeholder="ABC123"
           />
-        </div>
 
-        {/* ============================
-            Consent Statement
-        ============================ */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Consent Statement:</label>
-          <div className="mt-2 p-4 border rounded bg-page max-h-48 overflow-y-auto text-sm text-ink">
-            <p>
-              By checking this box, you acknowledge that your photos and videos will be
-              stored on the StartUp server. Your data will not be sold to third parties.
-            </p>
-            <p className="mt-2">
-              Please make sure you have discussed this with your care partner before
-              proceeding. You must agree to this statement to complete account setup.
-            </p>
-          </div>
+          {/* ============================
+              Consent Statement
+          ============================ */}
+          <div className="flex flex-col gap-2.5">
+            <div className="text-base font-bold">Consent statement</div>
+            <div className="flex flex-col gap-2 p-4 bg-page border-[1.5px] border-border rounded-[10px] max-h-48 overflow-y-auto text-[15px] leading-snug">
+              <p className="m-0">
+                By checking this box, you acknowledge that your photos and videos will be
+                stored on the StartUp server. Your data will not be sold to third parties.
+              </p>
+              <p className="m-0">
+                Please make sure you have discussed this with your care partner before
+                proceeding. You must agree to this statement to complete account setup.
+              </p>
+            </div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="consentCheckbox"
-              checked={consentChecked}
-              onChange={(e) => setConsentChecked(e.target.checked)}
-            />
-            <label htmlFor="consentCheckbox" className="text-sm text-ink">
+            <label htmlFor="consentCheckbox" className="flex items-center gap-3 min-h-11 text-base cursor-pointer">
+              <input
+                type="checkbox"
+                id="consentCheckbox"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                className={`w-5 h-5 shrink-0 accent-accent cursor-pointer ${FOCUS_RING}`}
+              />
               I agree to the consent statement
             </label>
           </div>
+
+          {/* ============================
+              Error Message
+          ============================ */}
+          {submitError && (
+            <p role="alert" className="m-0 px-3 py-2.5 rounded-lg bg-status-red-bg text-base font-bold text-status-red-text">
+              {submitError}
+            </p>
+          )}
+
+          {/* ============================
+              Submit Button
+          ============================ */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className={`h-12 w-full rounded-[10px] border-2 border-accent bg-accent text-base font-bold text-on-accent cursor-pointer hover:brightness-95 ${FOCUS_RING}`}
+          >
+            Pair device
+          </button>
         </div>
-
-        {/* ============================
-            Error Message
-        ============================ */}
-        {submitError && (
-          <p className="text-status-red-text mb-4">{submitError}</p>
-        )}
-
-        {/* ============================
-            Submit Button
-        ============================ */}
-        <button
-          onClick={handleSubmit}
-          className="mt-4 w-full bg-accent hover:brightness-95 text-on-accent font-semibold py-3 rounded"
-        >
-          Pair Device
-        </button>
       </div>
     </div>
   );

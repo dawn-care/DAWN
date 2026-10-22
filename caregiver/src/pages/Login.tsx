@@ -196,7 +196,7 @@ const Login = () => {
         >
           <circle cx="400" cy="170" r="120" className="fill-accent/25" />
           <circle cx="400" cy="170" r="84" className="fill-accent/60" />
-          <circle cx="400" cy="170" r="48" className="fill-focus" />
+          <circle cx="400" cy="170" r="48" style={{ fill: "rgb(var(--color-sun))" }} />
           <rect x="0" y="170" width="800" height="30" className="fill-nav" />
           <g className="stroke-on-nav/30" strokeWidth="2">
             <line x1="0" y1="170" x2="800" y2="170" />
