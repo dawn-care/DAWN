@@ -142,9 +142,16 @@ export function isAbort(err: unknown): boolean {
    Media
 ============================ */
 
+// The server leaves out `situations` and `family_member_ids` when an item has none (or, on an older
+// build, always); the page reads them as lists, so fill them in here rather than crash on undefined
+function withTags(media: Media): Media {
+  return { ...media, usage: media.usage ?? [], situations: media.situations ?? [], family_member_ids: media.family_member_ids ?? [] };
+}
+
 /** Newest first */
-export function listMedia(carepartnerId: number): Promise<Media[]> {
-  return api<Media[]>(`/media?carepartner_id=${carepartnerId}`, NO_CACHE);
+export async function listMedia(carepartnerId: number): Promise<Media[]> {
+  const items = await api<Media[]>(`/media?carepartner_id=${carepartnerId}`, NO_CACHE);
+  return items.map(withTags);
 }
 
 interface UploadInput {
@@ -167,7 +174,7 @@ export function uploadMedia({ carepartnerId, file, kind, displayName, tags, sign
   // Repeated fields; with neither, staff don't see the item
   tags.situations.forEach((situation) => form.append("situations", situation));
   tags.familyMemberIds.forEach((id) => form.append("family_member_ids", String(id)));
-  return api<Media>("/media", { method: "POST", body: form, signal });
+  return api<Media>("/media", { method: "POST", body: form, signal }).then(withTags);
 }
 
 /** Replaces how staff find an item; with both empty, staff don't see it */
@@ -175,14 +182,14 @@ export function setMediaTags(id: number, tags: MediaTags): Promise<Media> {
   return api<Media>(`/media/${id}/tags`, {
     method: "PUT",
     body: JSON.stringify({ situations: tags.situations, family_member_ids: tags.familyMemberIds }),
-  });
+  }).then(withTags);
 }
 
 export function renameMedia(id: number, displayName: string): Promise<Media> {
   return api<Media>(`/media/${id}`, {
     method: "PATCH",
     body: JSON.stringify({ display_name: displayName.trim() }),
-  });
+  }).then(withTags);
 }
 
 /**
