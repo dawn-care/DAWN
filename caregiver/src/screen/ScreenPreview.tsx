@@ -45,12 +45,12 @@ export default function ScreenPreview({ carepartnerId, reloadKey = 0, editView }
     // row of buttons
     <div className="flex-1 min-w-0 min-h-[360px] pt-2 [container-type:size]">
       <div className="flex flex-col gap-3" style={{ width: "min(100cqw, calc((100cqh - 3.5rem) * 1.6))" }}>
-        {/* The border shows where the carepartner's screen ends; #5B6091 is the border of the tablet's widgets (colors.day.border in carepartner/src/theme/theme.ts) */}
-        <div className="aspect-[16/10] rounded-xl overflow-hidden bg-dawn-preview border-[3px] border-[#5B6091]">
+        {/* The border shows where the carepartner's screen ends; ink-muted is the border of the tablet's widgets (colors.day.border in carepartner/src/theme/theme.ts) */}
+        <div className="aspect-[16/10] rounded-xl overflow-hidden bg-page border-[3px] border-ink-muted">
           {editing ? (
             <div className="h-full p-4">{editView}</div>
           ) : src ? (
-            <CarepartnerScreen src={src} reloadKey={reloadKey} />
+            <CarepartnerScreen src={src} reloadKey={reloadKey} fit="cover" />
           ) : (
             <ScreenUnavailable />
           )}
@@ -60,7 +60,7 @@ export default function ScreenPreview({ carepartnerId, reloadKey = 0, editView }
           {!editing && (
             <Link
               to="/preview"
-              className={`flex items-center gap-2 h-11 px-[18px] rounded-[10px] border-2 border-dawn-accent bg-dawn-accent hover:bg-dawn-accent-hover hover:border-dawn-accent-hover text-white text-base font-bold ${FOCUS_RING}`}
+              className={`flex items-center gap-2 h-11 px-[18px] rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold ${FOCUS_RING}`}
             >
               <Maximize size={18} strokeWidth={2.2} aria-hidden="true" />
               Full screen
