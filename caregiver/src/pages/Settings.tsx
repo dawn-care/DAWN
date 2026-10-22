@@ -8,14 +8,22 @@
  * Responsibilities:
  *  - View and update caregiver profile information
  *  - View active carepartner details
- *  - Configure carepartner auto-start time
  *  - Logout user and clear session
  *  - Navigate to device repair/setup flow
  */
 
 import { useEffect, useState } from "react";
+import { ArrowLeft, LogOut, Smartphone } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import SelectField from "../components/ui/form/SelectField";
+import TextField from "../components/ui/form/TextField";
+import { FOCUS_RING } from "../components/ui/styles";
+import { useToast } from "../components/ui/toastContext";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+
+// The same two buttons as the rest of the app: one filled (the main action), one outlined (everything else)
+const PRIMARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`;
+const SECONDARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-ink-muted bg-surface hover:bg-page text-ink text-base font-bold cursor-pointer ${FOCUS_RING}`;
 
 /* ============================
    Types
@@ -47,7 +55,7 @@ const DEFAULT_CAREGIVER: Caregiver = {
  * SettingsPage Component
  * 
  * Provides account settings, carepartner configuration,
- * and session management actions.
+ * and session management actions. Results show as toasts.
  */
 export default function SettingsPage() {
 
@@ -56,6 +64,7 @@ export default function SettingsPage() {
   ============================ */
 
   const navigate = useNavigate();
+  const toast = useToast();
 
   const {
     user,
@@ -82,19 +91,9 @@ export default function SettingsPage() {
   const [caregiver, setCaregiver] = useState<Caregiver>(DEFAULT_CAREGIVER);
 
   /**
-   * Carepartner auto-start time (HH:mm format)
+   * True while Save is under way
    */
-  const [autoStart, setAutoStart] = useState<string>("08:00");
-
-  /**
-   * UI status messages for updates
-   */
-  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-
-  /**
-   * Logout error message
-   */
-  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   /* ============================
      Effects
@@ -120,7 +119,6 @@ export default function SettingsPage() {
 
         if (connectedCarepartners.length === 0) {
           setActiveCarePartnerId(null);
-          setAutoStart("08:00");
           return;
         }
 
@@ -129,24 +127,6 @@ export default function SettingsPage() {
 
         if (!hasActiveCarepartner) {
           setActiveCarePartnerId(connectedCarepartners[0].id);
-          return;
-        }
-
-        /* ============================
-           Fetch carepartner settings
-        ============================ */
-        if (!activeCarePartnerId) return;
-        const resCp = await fetch(`${API_URL}/users/carepartner/${activeCarePartnerId}`, {
-          method: "GET",
-          credentials: "include",
-        });
-        if (!resCp.ok) return;
-
-        const cpData = await resCp.json();
-
-        if (cpData.auto_start) {
-          const [hour, minute] = cpData.auto_start.split(":");
-          setAutoStart(`${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`);
         }
       } catch (err) {
         console.error("Error fetching data:", err);
@@ -184,14 +164,14 @@ export default function SettingsPage() {
       // Redirect to login
       navigate("/login");
     } catch (err) {
-      setLogoutError("Logout failed: " + (err instanceof Error ? err.message : String(err)));
+      toast.show("Logout failed: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
   /**
-   * Updates caregiver profile information
+   * Updates caregiver profile information; returns an error message, or null when it worked
    */
-  const handleUpdate = async () => {
+  const handleUpdate = async (): Promise<string | null> => {
     try {
       const res = await fetch(`${API_URL}/caregivers`, {
         method: "PUT",
@@ -204,11 +184,9 @@ export default function SettingsPage() {
 
       if (!res.ok) {
         const text = await res.text();
-        setUpdateStatus("Update failed: " + text);
-        return;
+        return "Update failed: " + text;
       }
 
-      const result = await res.json();
       setUser((currentUser) => {
         if (!currentUser) {
           return { ...caregiver, carepartners: [] };
@@ -220,141 +198,92 @@ export default function SettingsPage() {
           role: caregiver.role,
         };
       });
-      setUpdateStatus(result.message || "Settings updated!");
+      return null;
     } catch (err) {
-      setUpdateStatus("Update failed: " + (err instanceof Error ? err.message : String(err)));
+      return "Update failed: " + (err instanceof Error ? err.message : String(err));
     }
   };
 
   /**
-   * Updates carepartner auto-start configuration
+   * Saves the caregiver's profile and says how it went
    */
-  const handleUpdateAutoStart = async () => {
-    if (!activeCarePartnerId) return;
-
-    try {
-      const res = await fetch(`${API_URL}/users/carepartner/update`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: activeCarePartnerId,
-          auto_start: autoStart + ":00", // backend expects HH:MM:SS
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        setUpdateStatus("Update failed: " + text);
-        return;
-      }
-
-      const result = await res.json();
-      setUpdateStatus(result.message || "Carepartner settings updated!");
-    } catch (err) {
-      setUpdateStatus("Update failed: " + (err instanceof Error ? err.message : String(err)));
-    }
+  const handleSave = async () => {
+    setSaving(true);
+    const error = await handleUpdate();
+    setSaving(false);
+    toast.show(error ?? "Settings saved.");
   };
 
   /* ============================
      Render
   ============================ */
   return (
-    <div className="w-full flex flex-col items-center mt-8 px-6">
-      <h1 className="text-3xl font-semibold mb-6">Settings</h1>
+    <div className="min-h-screen flex flex-col items-center px-6 py-10 bg-page text-ink font-dawn">
+      <div className="w-full max-w-xl flex flex-col gap-6">
+        <header className="flex items-center gap-3">
+          <Link
+            to="/"
+            aria-label="Back to the carepartner screen"
+            className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink hover:bg-border/60 ${FOCUS_RING}`}
+          >
+            <ArrowLeft size={24} aria-hidden="true" />
+          </Link>
+          <h1 className="m-0 text-3xl font-extrabold">Settings</h1>
+        </header>
 
-      <div className="border p-10 max-w-3xl w-full rounded-lg bg-surface shadow">
-        
-        {/* Caregiver Name */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Name:</label>
-          <input
-            type="text"
+        {/* Account */}
+        <section
+          aria-labelledby="settings-account"
+          className="flex flex-col gap-5 p-6 bg-surface border-[1.5px] border-border rounded-[14px]"
+        >
+          <h2 id="settings-account" className="m-0 text-xl font-extrabold">
+            Your account
+          </h2>
+          <TextField
+            label="Name"
             value={caregiver.name}
-            onChange={(e) =>
-              setCaregiver({ ...caregiver, name: e.target.value })
-            }
-            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
+            onChange={(e) => setCaregiver({ ...caregiver, name: e.target.value })}
           />
-        </div>
+          <button type="button" onClick={handleLogout} className={`${SECONDARY_BUTTON} self-start`}>
+            <LogOut size={18} aria-hidden="true" />
+            Log out
+          </button>
+        </section>
 
-        {/* Active Care Partner */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Active Care Partner:</label>
-          <select
+        {/* Carepartner */}
+        <section
+          aria-labelledby="settings-carepartner"
+          className="flex flex-col gap-5 p-6 bg-surface border-[1.5px] border-border rounded-[14px]"
+        >
+          <h2 id="settings-carepartner" className="m-0 text-xl font-extrabold">
+            Your carepartner
+          </h2>
+          <SelectField
+            label="Active carepartner"
             value={activeCarePartnerId ?? ""}
             onChange={(e) => setActiveCarePartnerId(Number(e.target.value))}
-            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
             disabled={carepartners.length === 0}
-          >
-            {carepartners.length === 0 ? (
-              <option value="">No connected care partners</option>
-            ) : (
-              carepartners.map((carepartner) => (
-                <option key={carepartner.id} value={carepartner.id}>
-                  {carepartner.name} (ID: {carepartner.id})
-                </option>
-              ))
-            )}
-          </select>
-        </div>
-
-        {/* Role */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Role:</label>
-          <input
-            type="text"
-            value={caregiver.role}
-            className="w-full mt-2 p-3 border rounded bg-border text-ink"
-            readOnly
+            options={
+              carepartners.length === 0
+                ? [{ value: "", label: "No connected carepartners" }]
+                : carepartners.map((carepartner) => ({ value: String(carepartner.id), label: carepartner.name }))
+            }
           />
-        </div>
-
-        {/* Auto Start Time */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Auto Start Time:</label>
-          <input
-            type="time"
-            value={autoStart}
-            onChange={(e) => setAutoStart(e.target.value)}
-            className="w-full mt-2 p-3 border rounded bg-surface text-ink"
-          />
-        </div>
-
-        {/* Update & Logout */}
-        <div className="flex gap-4 mt-4">
           <button
-            className="mt-4 flex-1 bg-accent hover:brightness-95 text-on-accent font-semibold py-3 rounded"
-            onClick={async () => {
-              await handleUpdate();          // Caregiver update
-              await handleUpdateAutoStart(); // Carepartner auto start update
-            }}
-          >
-            Save
-          </button>
-
-          <button
-            className="mt-4 flex-1 bg-status-yellow-bg hover:brightness-95 text-status-yellow-text font-semibold py-3 rounded"
+            type="button"
             onClick={() => navigate("/setup", { state: { from: "settings" } })}
+            className={`${SECONDARY_BUTTON} self-start`}
           >
-            Pair New Device
+            <Smartphone size={18} aria-hidden="true" />
+            Pair a new device
           </button>
+        </section>
 
-          <button
-            className="mt-4 flex-1 bg-status-red-bg hover:brightness-95 text-status-red-text font-semibold py-3 rounded"
-            onClick={handleLogout}
-          >
-            Logout
+        <div className="flex justify-end">
+          <button type="button" onClick={handleSave} disabled={saving} className={PRIMARY_BUTTON}>
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
-
-        {/* Status messages */}
-        {updateStatus && (
-          <p className="mt-2 text-sm text-ink">{updateStatus}</p>
-        )}
-        {logoutError && (
-          <p className="mt-2 text-sm text-status-red-text">{logoutError}</p>
-        )}
       </div>
     </div>
   );

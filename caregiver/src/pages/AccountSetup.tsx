@@ -172,19 +172,13 @@ export default function AccountSetupPage() {
               <ArrowLeft size={24} aria-hidden="true" />
             </Link>
           )}
-          <div>
-            <div className="text-2xl font-extrabold">D.A.W.N.</div>
-            <div className="text-base text-ink-muted">Caregiver</div>
-          </div>
+          <h1 className="m-0 text-3xl font-extrabold">Pair a new device</h1>
         </header>
 
-        <div className="flex flex-col gap-6 p-8 bg-surface border-[1.5px] border-border rounded-[14px] shadow-popover">
-          <div className="flex flex-col gap-2">
-            <h1 className="m-0 text-3xl font-extrabold">Pair a new device</h1>
-            <p className="m-0 text-lg text-ink-muted">
-              Connect your carepartner's tablet to your account so you can choose what it shows.
-            </p>
-          </div>
+        <div className="flex flex-col gap-6 p-8 bg-surface border-[1.5px] border-border rounded-[14px]">
+          <p className="m-0 text-lg text-ink-muted">
+            Connect your carepartner's tablet to your account so you can choose what it shows.
+          </p>
 
           {/* ============================
               Care Partner Name
