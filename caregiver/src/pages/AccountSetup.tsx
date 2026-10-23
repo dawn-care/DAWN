@@ -31,6 +31,7 @@ import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
 import { fetchCurrentUser, useLogout } from "../context/session";
+import { pairingErrorWording } from "./pairingErrors";
 
 /* ============================
    Static Data
@@ -64,16 +65,7 @@ async function pairingError(res: Response): Promise<string> {
     // Not JSON (e.g. a proxy's error page); keep the text for the console
   }
   console.error(`POST /users/device-pairing/verify answered ${res.status}:`, message);
-  switch (message) {
-    case "pairing code not found":
-      return "That code didn't work. Check the code on the tablet and try again.";
-    case "pairing code already used":
-      return "That code has already been used. Get a new code on the tablet.";
-    case "pairing code expired":
-      return "That code has expired. Get a new code on the tablet.";
-    default:
-      return "Couldn't pair the tablet. Please try again.";
-  }
+  return pairingErrorWording(message);
 }
 
 /* ============================
@@ -277,7 +269,7 @@ export default function AccountSetupPage() {
             <div className="flex flex-col gap-2 p-4 bg-page border-[1.5px] border-border rounded-[10px] max-h-48 overflow-y-auto text-[15px] leading-snug">
               <p className="m-0">
                 By checking this box, you acknowledge that your photos and videos will be
-                stored on the StartUp server. Your data will not be sold to third parties.
+                stored on the D.A.W.N. server. Your data will not be sold to third parties.
               </p>
               <p className="m-0">
                 Please make sure you have discussed this with your care partner before

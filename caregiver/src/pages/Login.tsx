@@ -231,7 +231,7 @@ const Login = () => {
           <div className="flex flex-col gap-2">
             <h1 className="m-0 text-3xl font-extrabold">Welcome</h1>
             <p className="m-0 text-lg text-ink-muted">
-              Log in or sign up with Google to support a carepartner with dementia, even when you can't be there in person.
+              Log in or sign up with Google.
             </p>
           </div>
 
@@ -255,7 +255,7 @@ const Login = () => {
           )}
 
           <p className="m-0 pt-4 border-t border-border text-sm text-ink-muted">
-            New here? Signing in with Google creates your account, and you'll pair your carepartner's tablet next.
+            New here? Signing in with Google creates your account.
           </p>
         </div>
       </main>
