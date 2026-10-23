@@ -26,7 +26,6 @@ import { useLogout } from "../context/session";
 
 // The same two buttons as the rest of the app: one filled (the main action), one outlined (everything else)
 const PRIMARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`;
-const SECONDARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-ink-muted bg-surface hover:bg-page text-ink text-base font-bold cursor-pointer ${FOCUS_RING}`;
 
 /**
  * Base API URL
@@ -191,7 +190,7 @@ export default function SettingsPage() {
             <button type="button" onClick={handleSave} disabled={saving} className={PRIMARY_BUTTON}>
               {saving ? "Saving…" : "Save name"}
             </button>
-            <button type="button" onClick={logout} className={SECONDARY_BUTTON}>
+            <button type="button" onClick={logout} className={PRIMARY_BUTTON}>
               <LogOut size={18} aria-hidden="true" />
               Log out
             </button>
@@ -220,7 +219,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => navigate("/setup", { state: { from: "settings" } })}
-            className={`${SECONDARY_BUTTON} self-start`}
+            className={`${PRIMARY_BUTTON} self-start`}
           >
             <Smartphone size={18} aria-hidden="true" />
             Pair a new device
