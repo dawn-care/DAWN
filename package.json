@@ -1,5 +1,5 @@
 {
-  "name": "startup",
+  "name": "dawn",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -14,14 +14,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp.git"
+    "url": "git+https://github.com/dawn-care/DAWN.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp/issues"
+    "url": "https://github.com/dawn-care/DAWN/issues"
   },
-  "homepage": "https://github.com/SUDA-Start-Up-Dementia-Assistance/StartUp#readme",
+  "homepage": "https://github.com/dawn-care/DAWN#readme",
   "dependencies": {
     "lucide-react": "^0.563.0"
   }

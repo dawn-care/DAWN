@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-The caregiver-facing web app for StartUp (SUDA-Start-Up-Dementia-Assistance). React + TypeScript + Vite SPA where a caregiver manages media/prompts/widgets and schedules them into a carepartner's daily agenda. See the repo-root `CLAUDE.md` for the full monorepo picture (backend, carepartner app, Docker/data model); this file covers only what's specific to working in `caregiver/`.
+The caregiver-facing web app for DAWN. React + TypeScript + Vite SPA where a caregiver manages media/prompts/widgets and schedules them into a carepartner's daily agenda. See the repo-root `CLAUDE.md` for the full monorepo picture (backend, carepartner app, Docker/data model); this file covers only what's specific to working in `caregiver/`.
 
 ## Commands
 

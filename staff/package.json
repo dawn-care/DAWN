@@ -2,7 +2,7 @@
   "name": "staff",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "description": "Staff app for StartUp - Dementia Assistance",
+  "description": "Staff app for DAWN (Daily Awareness and Well-being Navigator)",
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",

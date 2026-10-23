@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "StartUp Staff",
-    "slug": "startup-staff",
+    "name": "DAWN Staff",
+    "slug": "dawn-staff",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "startupstaff",
+    "scheme": "dawnstaff",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.suda.startupstaff"
+      "bundleIdentifier": "com.dawncare.staff"
     },
     "android": {
-      "package": "com.suda.startupstaff",
+      "package": "com.dawncare.staff",
       "edgeToEdgeEnabled": true
     },
     "web": {
