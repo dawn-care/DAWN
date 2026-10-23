@@ -27,18 +27,18 @@ export default function InfoPopover({ label, children }: InfoPopoverProps) {
         <IconButton
           label={label}
           icon={<Info size={22} aria-hidden="true" />}
-          className="text-dawn-muted data-[state=open]:text-dawn-accent"
+          className="text-ink-muted data-[state=open]:text-link"
         />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           align="start"
           sideOffset={8}
-          className="z-50 w-[300px] max-w-[calc(100vw-32px)] flex flex-col gap-2 p-3.5 bg-white border-[1.5px] border-dawn-line-strong rounded-xl shadow-popover text-base leading-snug text-dawn-ink"
+          className="z-50 w-[300px] max-w-[calc(100vw-32px)] flex flex-col gap-2 p-3.5 bg-surface border-[1.5px] border-border rounded-xl shadow-popover text-base leading-snug text-ink"
         >
           <p className="m-0">{children}</p>
           <Popover.Close
-            className={`self-end h-10 px-2.5 bg-transparent text-[15px] font-bold text-dawn-accent cursor-pointer ${FOCUS_RING}`}
+            className={`self-end h-10 px-2.5 bg-transparent text-[15px] font-bold text-link cursor-pointer ${FOCUS_RING}`}
           >
             Close
           </Popover.Close>

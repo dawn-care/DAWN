@@ -6,6 +6,9 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.tsx';
 import { ToastProvider } from './components/ui/Toast.tsx';
+import { watchTheme } from './theme/theme.ts';
+
+watchTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

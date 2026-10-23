@@ -52,7 +52,7 @@ const TOAST_DURATION_MS = 5000;
 const MAX_PEEKING = 2;
 
 const CARD_CLASSES =
-  "col-start-1 row-start-1 bg-dawn-avatar border-[1.5px] border-dawn-control rounded-[10px] shadow-toast";
+  "col-start-1 row-start-1 bg-surface-raised border-[1.5px] border-ink-muted rounded-[10px] shadow-toast";
 
 /* ============================
    Helpers
@@ -206,7 +206,7 @@ export function ToastViewport() {
                 // Moving between the toast's own buttons doesn't count as leaving
                 if (!e.currentTarget.contains(e.relatedTarget)) setFocusId(null);
               }}
-              className={`${CARD_CLASSES} flex items-center gap-3.5 py-2.5 pl-4 pr-3 text-[15px] leading-snug text-dawn-ink`}
+              className={`${CARD_CLASSES} flex items-center gap-3.5 py-2.5 pl-4 pr-3 text-[15px] leading-snug text-ink`}
             >
               <span>{toast.text}</span>
               {toast.actionLabel && (
@@ -214,7 +214,7 @@ export function ToastViewport() {
                 <button
                   type="button"
                   onClick={() => close(toast, true, toast.onAction)}
-                  className={`shrink-0 h-9 px-2.5 bg-transparent text-[15px] font-bold text-dawn-accent hover:text-dawn-accent-hover cursor-pointer ${FOCUS_RING}`}
+                  className={`shrink-0 h-9 px-2.5 bg-transparent text-[15px] font-bold text-link hover:underline cursor-pointer ${FOCUS_RING}`}
                 >
                   {toast.actionLabel}
                 </button>

@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import AccountSetupPage from "./pages/AccountSetup";
 import SelectCarepartner from "./pages/SelectCarepartner";
+import RequireLogin from "./components/RequireLogin";
 import RequireCarePartner from "./components/RequireCarepartner";
 import AppShell from "./components/AppShell";
 import ToastLayout from "./components/ToastLayout";
@@ -15,6 +16,13 @@ import ToastLayout from "./components/ToastLayout";
 function App() {
   return (
     <Routes>
+      {/* The only page open to someone who isn't logged in */}
+      <Route element={<ToastLayout />}>
+        <Route path="/login" element={<Login />} />
+      </Route>
+
+      {/* Everything else needs a login; RequireLogin sends anyone else to /login */}
+      <Route element={<RequireLogin />}>
       {/* Pages with the left nav bar */}
       <Route
         element={
@@ -42,10 +50,10 @@ function App() {
           }
         />
 
-        <Route path="/login" element={<Login />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/setup" element={<AccountSetupPage />} />
         <Route path="/select-carepartner" element={<SelectCarepartner />} />
+      </Route>
       </Route>
     </Routes>
   );

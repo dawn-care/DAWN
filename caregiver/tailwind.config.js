@@ -1,36 +1,45 @@
+const STATUSES = ["gray", "blue", "green", "yellow", "purple", "orange", "red", "pink"];
+const tw = (name) => `rgb(var(--color-${name}) / <alpha-value>)`;
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
-      // Palette and font from the caregiver mockups
+      // Semantic tokens only: their light and dark values are CSS variables in src/index.css,
+      // stored as space-separated RGB channels so opacity modifiers (bg-accent/10) work
       colors: {
-        dawn: {
-          page: "#FAF8F4",
-          preview: "#F2EADB",
-          sidebar: "#F1ECE3",
-          line: "#E2DCD2",
-          "line-strong": "#D6CEC1",
-          ink: "#1E1A15",
-          muted: "#5A5147",
-          avatar: "#E8DDCB",
-          "avatar-ink": "#6B5E4E",
-          accent: "#9A3412",
-          "accent-hover": "#7C2D12",
-          // Brighter than the mockup's #3F6B3A, which read as near-black; 5.3:1 on dawn-page
-          success: "#25772B",
-          control: "#8A7F70",
-          // Audio events and their legend dot on the calendar; 6.1:1 against white text
-          audio: "#2E6B6B",
-        },
+        page: tw("page"),
+        surface: tw("surface"),
+        "surface-raised": tw("surface-raised"),
+        nav: tw("nav"),
+        "on-nav": tw("on-nav"),
+        ink: tw("ink"),
+        "ink-muted": tw("ink-muted"),
+        link: tw("link"),
+        accent: tw("accent"),
+        "on-accent": tw("on-accent"),
+        border: tw("border"),
+        focus: tw("focus"),
+        // Gold, for the login page's sun
+        sun: tw("sun"),
+        status: Object.fromEntries(
+          STATUSES.flatMap((name) => [
+            [`${name}-bg`, tw(`status-${name}-bg`)],
+            [`${name}-text`, tw(`status-${name}-text`)],
+          ]),
+        ),
       },
+      borderColor: { DEFAULT: tw("border") },
       fontFamily: {
         dawn: ["Atkinson Hyperlegible Next", "Atkinson Hyperlegible", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        toast: "0 8px 24px rgba(30, 26, 21, 0.3)",
-        popover: "0 8px 24px rgba(30, 26, 21, 0.18)",
-        dialog: "0 12px 32px rgba(30, 26, 21, 0.25)",
+        // --color-shadow is night in light mode and black in dark mode, where night wouldn't show
+        toast: "0 8px 24px rgb(var(--color-shadow) / 0.3)",
+        popover: "0 8px 24px rgb(var(--color-shadow) / 0.18)",
+        dialog: "0 12px 32px rgb(var(--color-shadow) / 0.25)",
+        raised: "0 2px 6px rgb(var(--color-shadow) / 0.15)",
       },
     },
   },

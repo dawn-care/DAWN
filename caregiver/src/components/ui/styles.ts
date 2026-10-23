@@ -9,7 +9,7 @@
 
 // Visible keyboard focus ring for every interactive control
 export const FOCUS_RING =
-  "focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-dawn-accent";
+  "focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focus";
 
 // Bordered, 44px-tall field used by text inputs and selects
-export const FIELD_CLASSES = `h-11 px-3 rounded-[10px] border-2 border-dawn-control bg-white text-base text-dawn-ink ${FOCUS_RING}`;
+export const FIELD_CLASSES = `h-11 px-3 rounded-[10px] border-2 border-ink-muted bg-surface text-base text-ink ${FOCUS_RING}`;

@@ -58,7 +58,7 @@ interface DetailPanelProps {
 function InfoBlock({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-[13px] font-bold uppercase tracking-[0.06em] text-dawn-muted">{heading}</div>
+      <div className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-muted">{heading}</div>
       <div className="flex items-center justify-between gap-2 text-base leading-snug">{children}</div>
     </div>
   );
@@ -70,7 +70,7 @@ function ScheduleBlock({ line, mediaId }: { line: string | null; mediaId: number
     <InfoBlock heading="Schedule">
       {line ? (
         <>
-          <Link to="/calendar" className={`inline-flex items-center min-h-11 text-dawn-ink underline underline-offset-2 hover:text-dawn-accent ${FOCUS_RING}`}>
+          <Link to="/calendar" className={`inline-flex items-center min-h-11 text-ink underline underline-offset-2 hover:text-link ${FOCUS_RING}`}>
             {line}
           </Link>
           <Link to="/calendar" className={ACTION_LINK}>
@@ -90,7 +90,7 @@ function ScheduleBlock({ line, mediaId }: { line: string | null; mediaId: number
   );
 }
 
-const PREVIEW_BOX = "h-[196px] flex items-center justify-center overflow-hidden rounded-xl bg-dawn-avatar text-dawn-avatar-ink";
+const PREVIEW_BOX = "h-[196px] flex items-center justify-center overflow-hidden rounded-xl bg-border text-ink-muted";
 
 /* ============================
    Component
@@ -234,7 +234,7 @@ export default function DetailPanel({
       {justSaved && (
         <p
           role="status"
-          className="m-0 flex items-center gap-2 px-2.5 py-2 rounded-lg bg-dawn-success/10 text-[15px] font-bold text-dawn-success"
+          className="m-0 flex items-center gap-2 px-2.5 py-2 rounded-lg bg-status-green-bg text-[15px] font-bold text-status-green-text"
         >
           <Check size={18} strokeWidth={2.6} aria-hidden="true" />
           Saved. You can use it any time.
@@ -272,7 +272,7 @@ export default function DetailPanel({
         <audio src={fileUrl(media)} controls autoPlay onError={handlePlayError} className="w-full" />
       )}
       {playError && (
-        <p role="alert" className="m-0 text-base font-bold text-dawn-accent">
+        <p role="alert" className="m-0 text-base font-bold text-link">
           {playError}
         </p>
       )}
@@ -284,7 +284,7 @@ export default function DetailPanel({
             setPlayError(null);
             setPlaying(true);
           }}
-          className={`self-start h-11 px-4 flex items-center gap-2 rounded-[10px] bg-dawn-ink text-base font-bold text-white cursor-pointer ${FOCUS_RING}`}
+          className={`self-start h-11 px-4 flex items-center gap-2 rounded-[10px] bg-ink text-base font-bold text-page cursor-pointer ${FOCUS_RING}`}
         >
           <Play size={16} fill="currentColor" aria-hidden="true" />
           Play
@@ -303,7 +303,7 @@ export default function DetailPanel({
             aria-describedby={renameError ? "rename-error" : undefined}
           />
           {renameError && (
-            <p id="rename-error" role="alert" className="m-0 text-base font-bold text-dawn-accent">
+            <p id="rename-error" role="alert" className="m-0 text-base font-bold text-link">
               {renameError}
             </p>
           )}
@@ -337,7 +337,7 @@ export default function DetailPanel({
 
       {/* How staff find it on their phones */}
       {editingTags ? (
-        <div className="flex flex-col gap-3 p-3 rounded-xl border-2 border-dawn-line">
+        <div className="flex flex-col gap-3 p-3 rounded-xl border-2 border-border">
           <TagPicker
             carepartnerId={media.carepartner_id}
             situations={draftSituations}
@@ -349,7 +349,7 @@ export default function DetailPanel({
             disabled={savingTags}
           />
           {tagsError && (
-            <p role="alert" className="m-0 text-base font-bold text-dawn-accent">
+            <p role="alert" className="m-0 text-base font-bold text-link">
               {tagsError}
             </p>
           )}
@@ -365,7 +365,7 @@ export default function DetailPanel({
       ) : (
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[13px] font-bold uppercase tracking-[0.06em] text-dawn-muted">Staff find it</div>
+            <div className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-muted">Staff find it</div>
             <button ref={editTagsButton} type="button" onClick={startEditingTags} className={`${ACTION_LINK} cursor-pointer bg-transparent border-0 p-0`}>
               Edit
             </button>

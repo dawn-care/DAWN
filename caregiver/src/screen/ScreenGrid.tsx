@@ -58,7 +58,7 @@ const DAY_TIME_TILE: EditorWidget = {
 // refers to the container above it.
 const TOOL_SIZE = "[--tool:clamp(26px,4.4cqw,40px)]";
 
-const TOOL_BUTTON = `w-[var(--tool)] h-[var(--tool)] flex items-center justify-center p-0 rounded-full bg-white border-[1.5px] border-dawn-control shadow-sm text-dawn-ink cursor-pointer disabled:opacity-50 disabled:cursor-default ${FOCUS_RING}`;
+const TOOL_BUTTON = `w-[var(--tool)] h-[var(--tool)] flex items-center justify-center p-0 rounded-full bg-surface border-[1.5px] border-ink-muted shadow-sm text-ink cursor-pointer disabled:opacity-50 disabled:cursor-default ${FOCUS_RING}`;
 
 interface ScreenGridProps {
   widgets: readonly EditorWidget[];
@@ -114,7 +114,7 @@ export default function ScreenGrid({
         <div
           key={`${cell.col}-${cell.row}`}
           aria-hidden="true"
-          className="z-20 pointer-events-none border-2 border-dashed border-black/30 rounded-xl"
+          className="z-20 pointer-events-none border-2 border-dashed border-ink/30 rounded-xl"
           style={gridPosition({ ...cell, width: 1, height: 1 })}
         />
       ))}
@@ -123,8 +123,8 @@ export default function ScreenGrid({
         <div
           key={`edge-${widget.id}`}
           aria-hidden="true"
-          className={`z-30 pointer-events-none rounded-xl ring-2 ring-inset ring-dawn-control ${
-            widget.id === selectedId ? "outline outline-[3px] outline-offset-[3px] outline-dawn-accent" : ""
+          className={`z-30 pointer-events-none rounded-xl ring-2 ring-inset ring-ink-muted ${
+            widget.id === selectedId ? "outline outline-[3px] outline-offset-[3px] outline-focus" : ""
           }`}
           style={gridPosition(widgetArea(widget))}
         />
@@ -159,7 +159,7 @@ export default function ScreenGrid({
             type="button"
             aria-label={`Put the ${widgetName({ type: pendingType }).toLowerCase()} here, column ${cell.col + 1}, row ${cell.row + 1}`}
             onClick={() => onPlace?.(cell)}
-            className={`z-40 flex items-center justify-center gap-1.5 rounded-xl border-[2.5px] border-dawn-accent bg-dawn-accent/[0.12] hover:bg-dawn-accent/25 text-[15px] font-bold text-dawn-accent cursor-pointer ${FOCUS_RING}`}
+            className={`z-40 flex items-center justify-center gap-1.5 rounded-xl border-[2.5px] border-accent bg-accent/[0.12] hover:bg-accent/25 text-[15px] font-bold text-link cursor-pointer ${FOCUS_RING}`}
             style={gridPosition({ ...cell, width: 1, height: 1 })}
           >
             <Plus size={18} strokeWidth={2.6} aria-hidden="true" />
@@ -197,10 +197,10 @@ function PlaceholderTile({
 
   const words = (
     <>
-      <WidgetIcon type={widget.type} className="shrink-0 text-dawn-ink" />
+      <WidgetIcon type={widget.type} className="shrink-0 text-ink" />
       <span className="flex flex-col min-w-0">
         <span className="text-lg font-bold leading-tight">{name}</span>
-        {detail && <span className="text-[15px] leading-snug text-dawn-muted truncate">{detail}</span>}
+        {detail && <span className="text-[15px] leading-snug text-ink-muted truncate">{detail}</span>}
       </span>
     </>
   );
@@ -209,7 +209,7 @@ function PlaceholderTile({
     // The tile's own squares, with the outer grid's gap, so the first one lines up with the dashed square under it
     return (
       <div
-        className="relative z-10 grid gap-2 min-w-0 min-h-0 rounded-xl bg-dawn-avatar shadow-sm"
+        className="relative z-10 grid gap-2 min-w-0 min-h-0 rounded-xl bg-border shadow-sm"
         style={{
           ...gridPosition(area),
           gridTemplateColumns: `repeat(${area.width}, minmax(0, 1fr))`,
@@ -229,7 +229,7 @@ function PlaceholderTile({
       aria-pressed={selected}
       onClick={onSelect}
       disabled={disabled}
-      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-dawn-avatar shadow-sm text-left ${TOOL_SIZE} text-dawn-ink cursor-pointer disabled:cursor-default ${FOCUS_RING} ${
+      className={`relative z-10 flex min-w-0 min-h-0 gap-2 p-3 rounded-xl bg-border shadow-sm text-left ${TOOL_SIZE} text-ink cursor-pointer disabled:cursor-default ${FOCUS_RING} ${
         narrow ? "flex-col justify-end" : `items-center ${tools ? "pr-[calc(var(--tool)*2+var(--tool)*0.15+var(--tool)*0.4)]" : ""}`
       }`}
       style={gridPosition(area)}

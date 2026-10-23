@@ -47,8 +47,8 @@ interface TagPickerProps {
   disabled?: boolean;
 }
 
-const HEADING = "m-0 text-base font-bold text-dawn-ink";
-const HINT = "m-0 text-[15px] text-dawn-muted";
+const HEADING = "m-0 text-base font-bold text-ink";
+const HINT = "m-0 text-[15px] text-ink-muted";
 
 // Adds `value` to the list, or takes it out if it's there
 function toggled<T>(list: T[], value: T): T[] {
@@ -164,7 +164,7 @@ export default function TagPicker({
                 type="button"
                 onClick={openAdd}
                 disabled={disabled}
-                className={`h-11 px-4 flex items-center gap-1.5 rounded-full border-2 border-dashed border-dawn-control bg-white text-base font-bold text-dawn-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
+                className={`h-11 px-4 flex items-center gap-1.5 rounded-full border-2 border-dashed border-ink-muted bg-surface text-base font-bold text-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
               >
                 <Plus size={16} strokeWidth={2.6} aria-hidden="true" />
                 Add family member
@@ -176,7 +176,7 @@ export default function TagPicker({
         {adding && (
           // Not a <form>: this sits inside the Save panel's form, and forms can't nest
           <div
-            className="flex flex-col gap-2 p-3 rounded-xl border-2 border-dawn-line"
+            className="flex flex-col gap-2 p-3 rounded-xl border-2 border-border"
             onKeyDown={(event) => {
               if (event.key === "Enter") void addMember(event);
               if (event.key === "Escape" && !saving) setAdding(false);
@@ -198,7 +198,7 @@ export default function TagPicker({
               disabled={saving}
             />
             {addError && (
-              <p role="alert" className="m-0 text-base font-bold text-dawn-accent">
+              <p role="alert" className="m-0 text-base font-bold text-link">
                 {addError}
               </p>
             )}
@@ -215,7 +215,7 @@ export default function TagPicker({
       </div>
 
       {situations.length === 0 && familyMemberIds.length === 0 && (
-        <p role="status" className="m-0 px-2.5 py-2 rounded-lg bg-dawn-avatar text-[15px] font-bold text-dawn-ink">
+        <p role="status" className="m-0 px-2.5 py-2 rounded-lg bg-border text-[15px] font-bold text-ink">
           Nothing picked, so staff won't see this in their app.
         </p>
       )}

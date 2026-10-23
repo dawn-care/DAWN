@@ -28,7 +28,7 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconB
       ref={ref}
       type={type}
       aria-label={label}
-      className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-transparent text-dawn-ink cursor-pointer hover:bg-dawn-line/60 ${FOCUS_RING} ${className}`}
+      className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-transparent text-ink cursor-pointer hover:bg-border/60 ${FOCUS_RING} ${className}`}
       {...buttonProps}
     >
       {icon}

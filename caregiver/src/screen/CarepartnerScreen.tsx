@@ -8,10 +8,12 @@
  * carepartner without pairing and never acts as a tablet. Callers check
  * previewUrl first and show something else when it's null.
  *
- * The iframe is laid out at the tablet's own size (TABLET_SIZE) and scaled down
- * to fit its container, keeping its shape and centered, so the tablet app lays
- * out and sizes its text just as it does on the tablet instead of squeezing it
- * into a small frame.
+ * The iframe is laid out at the tablet's own size (TABLET_SIZE) and scaled
+ * to its container, keeping its shape and centered, so the tablet app lays out
+ * and sizes its text just as it does on the tablet instead of squeezing it into
+ * a small frame. fit="contain" shows the whole screen; fit="cover" fills the
+ * container and crops whatever doesn't fit, which in a box that is already
+ * 16:10 is only a few pixels, so a rounded border leaves no gap.
  *
  * "Loading carepartner screen…" covers the frame until it has loaded, and again
  * each time it loads anew (another carepartner, or `reloadKey` after a save).
@@ -34,14 +36,16 @@ interface CarepartnerScreenProps {
   src: string;
   /** Change it (e.g. after a save) to load the screen again */
   reloadKey?: number;
+  /** "cover" fills the container, cropping whatever doesn't fit; "contain" (the default) always shows the whole screen */
+  fit?: "cover" | "contain";
 }
 
-export default function CarepartnerScreen({ src, reloadKey = 0 }: CarepartnerScreenProps) {
+export default function CarepartnerScreen({ src, reloadKey = 0, fit = "contain" }: CarepartnerScreenProps) {
   // A new key starts a new frame, with its own loading message
-  return <Frame key={`${src}#${reloadKey}`} src={src} />;
+  return <Frame key={`${src}#${reloadKey}`} src={src} fit={fit} />;
 }
 
-function Frame({ src }: { src: string }) {
+function Frame({ src, fit }: { src: string; fit: "cover" | "contain" }) {
   const [loaded, setLoaded] = useState(false);
   // null while checking, then whether the carepartner app answered
   const [reachable, setReachable] = useState<boolean | null>(null);
@@ -69,17 +73,18 @@ function Frame({ src }: { src: string }) {
     };
   }, [src, attempt]);
 
-  // Follow the container's size, so the tablet always fits it whole
+  // Rescale whenever the container's size changes
   useLayoutEffect(() => {
     const element = box.current;
     if (!element) return;
-    const fit = () =>
-      setScale(Math.min(element.clientWidth / TABLET_SIZE.width, element.clientHeight / TABLET_SIZE.height));
-    fit();
-    const observer = new ResizeObserver(fit);
+    const pick = fit === "cover" ? Math.max : Math.min;
+    const update = () =>
+      setScale(pick(element.clientWidth / TABLET_SIZE.width, element.clientHeight / TABLET_SIZE.height));
+    update();
+    const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [fit]);
 
   return (
     <div ref={box} className="relative w-full h-full overflow-hidden">
@@ -102,7 +107,7 @@ function Frame({ src }: { src: string }) {
       {reachable === false && (
         <div
           role="alert"
-          className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-dawn-preview text-2xl font-bold text-dawn-muted text-center"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-page text-2xl font-bold text-ink-muted text-center"
         >
           Could not connect to carepartner tablet.
           <button
@@ -112,7 +117,7 @@ function Frame({ src }: { src: string }) {
               setLoaded(false);
               setAttempt((n) => n + 1);
             }}
-            className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-control bg-white hover:bg-dawn-page text-dawn-ink text-base font-bold cursor-pointer ${FOCUS_RING}`}
+            className={`h-11 px-[18px] rounded-[10px] border-2 border-ink-muted bg-surface hover:bg-page text-ink text-base font-bold cursor-pointer ${FOCUS_RING}`}
           >
             Try again
           </button>
@@ -121,7 +126,7 @@ function Frame({ src }: { src: string }) {
       {reachable !== false && !loaded && (
         <div
           role="status"
-          className="absolute inset-0 flex items-center justify-center p-6 bg-dawn-preview text-2xl font-bold text-dawn-muted text-center"
+          className="absolute inset-0 flex items-center justify-center p-6 bg-page text-2xl font-bold text-ink-muted text-center"
         >
           Loading carepartner screen…
         </div>
