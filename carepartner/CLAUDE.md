@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-The carepartner-facing app for StartUp (SUDA-Start-Up-Dementia-Assistance): an Expo Router / React Native app that pairs to a caregiver's account and plays back the carepartner's daily agenda. It is deployed as a **React Native app on an Android tablet**; the web build (`npm run web`) is mainly a development convenience. (An earlier Electron/Raspberry Pi kiosk build was removed — don't reintroduce it.) See the repo-root `CLAUDE.md` for the full monorepo picture (backend, caregiver app, data model). This file covers only what's specific to `carepartner/`.
+The carepartner-facing app for DAWN: an Expo Router / React Native app that pairs to a caregiver's account and plays back the carepartner's daily agenda. It is deployed as a **React Native app on an Android tablet**; the web build (`npm run web`) is mainly a development convenience. (An earlier Electron/Raspberry Pi kiosk build was removed — don't reintroduce it.) See the repo-root `CLAUDE.md` for the full monorepo picture (backend, caregiver app, data model). This file covers only what's specific to `carepartner/`.
 
 This app is being **replaced outright**. "What is being built" describes the target, "Redesign" records the agreed decisions and governs new work, and "Current architecture" describes the code that still exists until each piece is replaced; update it as pieces land.
 

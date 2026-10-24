@@ -1,7 +1,7 @@
 # Shared Claude Code commands
 
 Slash commands in this directory are checked into the repo, so anyone who
-clones StartUp and opens it with Claude Code gets them automatically — no
+clones DAWN and opens it with Claude Code gets them automatically — no
 per-machine setup required.
 
 ## Adding a command

@@ -1,5 +1,5 @@
 # Smoke test: the app starts, and with no stored pairing it opens the pair screen by itself.
-appId: com.anonymous.carepartner
+appId: org.dawncare.carepartner
 ---
 - launchApp:
     clearState: true

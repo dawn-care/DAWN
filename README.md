@@ -1,9 +1,9 @@
-# StartUp
+# DAWN
 
 ## Background
-For a patient with Alzheimer's or similar type of dementia who feels unsettled by their surroundings, who wants to know where they are and not feel abandoned when they wake up, StartUp is a dementia assistance tool acting as a surrogate for a loved one, reducing the physiological anxiety of the person with dementia and improving the customer’s quality of life. Unlike face-to-face interactions in real-time, our project is more scalable and available, allowing customers to feel connected despite the caregiver's busy schedules.
+For a patient with Alzheimer's or similar type of dementia who feels unsettled by their surroundings, who wants to know where they are and not feel abandoned when they wake up, DAWN (Daily Awareness and Well-being Navigator) is a dementia assistance tool acting as a surrogate for a loved one, reducing the physiological anxiety of the person with dementia and improving the customer’s quality of life. Unlike face-to-face interactions in real-time, our project is more scalable and available, allowing customers to feel connected despite the caregiver's busy schedules.
 
-StartUp enables caregivers to create, manage, and deliver personalized content for carepartners. The system supports multiple module types including media (photo, video, audio), prompts (messages), and widgets (weather, news, sports), all displayed through a simple and accessible interface.
+DAWN enables caregivers to create, manage, and deliver personalized content for carepartners. The system supports multiple module types including media (photo, video, audio), prompts (messages), and widgets (weather, news, sports), all displayed through a simple and accessible interface.
 
 ---
 

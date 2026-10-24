@@ -68,7 +68,7 @@ npm run e2e
 
 `build:emulator` builds for the emulator's processor only. A real tablet needs `arm64-v8a`; use `npx expo run:android --variant release` with the tablet connected.
 
-The emulator starts at Android's home screen and doesn't open the app by itself. Open it from the app drawer (swipe up, tap **carepartner**) or with `adb shell am start -n com.anonymous.carepartner/.MainActivity`. The app stays installed across emulator restarts; reinstall only after code changes.
+The emulator starts at Android's home screen and doesn't open the app by itself. Open it from the app drawer (swipe up, tap **carepartner**) or with `adb shell am start -n org.dawncare.carepartner/.MainActivity`. The app stays installed across emulator restarts; reinstall only after code changes.
 
 ### Known issue: emulator sound
 

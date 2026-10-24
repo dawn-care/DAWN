@@ -2,10 +2,10 @@
   "name": "carepartner",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "description": "Carepartner companion app for StartUp - Dementia Assistance",
+  "description": "Carepartner companion app for DAWN (Daily Awareness and Well-being Navigator)",
   "author": {
-    "name": "Ethan - SUDA Team Member",
-    "email": "ea8251@rit.edu.com"
+    "name": "Tess - DAWN Team Member",
+    "email": "esh7943@rit.edu"
   },
   "homepage": "https://ucp4496.github.io/",
   "scripts": {

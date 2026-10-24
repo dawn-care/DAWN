@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-StartUp is a dementia-assistance product for SUDA (SUDA-Start-Up-Dementia-Assistance). A caregiver creates content (media, prompts, widgets) and schedules it into a daily agenda; a carepartner (the person with dementia) views that agenda on a paired device. The repo is a monorepo with three independently-run pieces and a folder of code they share:
+DAWN (Daily Awareness and Well-being Navigator) is a dementia-assistance product, developed under the `dawn-care` GitHub org. A caregiver creates content (media, prompts, widgets) and schedules it into a daily agenda; a carepartner (the person with dementia) views that agenda on a paired device. The repo is a monorepo with three independently-run pieces and a folder of code they share:
 
 - `server/` — Go backend (chi router), the only piece talking to Postgres/MinIO/external APIs.
 - `caregiver/` — React + TypeScript + Vite web app used by caregivers to manage content.
