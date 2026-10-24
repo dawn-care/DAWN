@@ -9,10 +9,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "org.dawndementiacare.staff"
+      "bundleIdentifier": "org.dawncare.staff"
     },
     "android": {
-      "package": "org.dawndementiacare.staff",
+      "package": "org.dawncare.staff",
       "edgeToEdgeEnabled": true
     },
     "web": {
