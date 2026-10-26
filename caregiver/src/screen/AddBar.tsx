@@ -76,7 +76,7 @@ export default function AddBar({
   return (
     <section
       aria-label="Add to the screen"
-      className="flex flex-wrap items-center gap-2 min-h-[76px] px-3.5 py-2 bg-white border-[1.5px] border-dawn-line rounded-[14px]"
+      className="flex flex-wrap items-center gap-2 min-h-[76px] px-3.5 py-2 bg-surface border-[1.5px] border-border rounded-[14px]"
     >
       <div className="w-[250px] shrink-0 flex flex-col gap-0.5">
         <div className="flex items-center gap-0.5 h-7">
@@ -84,7 +84,7 @@ export default function AddBar({
           <InfoPopover label="About adding things">{ADD_INFO}</InfoPopover>
         </div>
         <div
-          className={`text-sm leading-snug ${fullType || finishType ? "text-dawn-accent" : "text-dawn-muted"}`}
+          className={`text-sm leading-snug ${fullType || finishType ? "text-link" : "text-ink-muted"}`}
         >
           {hintFor({ editing, saving, pendingType, fullType, finishType })}
         </div>
@@ -101,10 +101,10 @@ export default function AddBar({
             onClick={() => onPick(type)}
             className={`w-[100px] h-14 flex flex-col items-center justify-center gap-[3px] p-0 rounded-[10px] text-sm font-bold ${FOCUS_RING} ${
               off
-                ? "bg-dawn-sidebar border-2 border-dawn-line-strong text-dawn-control cursor-default"
+                ? "bg-page border-2 border-border text-ink-muted cursor-default"
                 : picked
-                  ? "bg-[#FFF1E6] border-[2.5px] border-dawn-accent text-dawn-ink cursor-pointer"
-                  : "bg-white border-2 border-dawn-control hover:bg-dawn-page text-dawn-ink cursor-pointer"
+                  ? "bg-accent/15 border-[2.5px] border-accent text-ink cursor-pointer"
+                  : "bg-surface border-2 border-ink-muted hover:bg-page text-ink cursor-pointer"
             }`}
           >
             <WidgetIcon type={type} size={20} />

@@ -15,7 +15,7 @@ import { ToastViewport } from "./ui/Toast";
 
 export default function AppShell() {
   return (
-    <div className="flex min-h-screen bg-dawn-page text-dawn-ink font-dawn">
+    <div className="flex min-h-screen bg-page text-ink font-dawn">
       <NavBar />
       {/* tabIndex -1 lets a closing toast return focus here, without adding a tab stop */}
       <main tabIndex={-1} className="grow min-w-0 outline-none">

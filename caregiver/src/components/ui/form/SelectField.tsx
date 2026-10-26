@@ -32,7 +32,7 @@ const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(function Sel
   ref
 ) {
   return (
-    <label className="flex flex-col gap-1.5 text-base font-bold text-dawn-ink">
+    <label className="flex flex-col gap-1.5 text-base font-bold text-ink">
       {label}
       <select ref={ref} className={`${FIELD_CLASSES} font-normal ${className}`} {...selectProps}>
         {placeholder && (

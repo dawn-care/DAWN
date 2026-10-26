@@ -96,10 +96,10 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         className={`h-[300px] flex flex-col items-center justify-center gap-3 p-4 text-center rounded-[14px] border-[3px] border-dashed ${
-          dragging ? "border-dawn-accent bg-dawn-accent/10" : "border-dawn-control"
+          dragging ? "border-accent bg-accent/10" : "border-ink-muted"
         }`}
       >
-        <Upload size={40} strokeWidth={2} className="text-dawn-accent" aria-hidden="true" />
+        <Upload size={40} strokeWidth={2} className="text-link" aria-hidden="true" />
         <div className="text-lg font-extrabold">Drag photos, videos or audio here</div>
         <input
           ref={input}
@@ -120,7 +120,7 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
         >
           {checking ? "Checking files…" : "Choose files"}
         </button>
-        <div className="text-[15px] text-dawn-muted">
+        <div className="text-[15px] text-ink-muted">
           Photos, videos up to 10 minutes, or audio and songs. You can pick several.
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function UploadPanel({ onClose, onChosen }: UploadPanelProps) {
       </p>
 
       {rejected.length > 0 && (
-        <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-dawn-accent">
+        <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-link">
           {rejected.map((message) => (
             <li key={message}>{message}</li>
           ))}

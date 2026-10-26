@@ -108,14 +108,14 @@ function AddButton({ icon, title, subtitle, open, disabled = false, onClick, ref
       aria-pressed={open}
       disabled={disabled}
       onClick={onClick}
-      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-dawn-ink ${
+      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-ink ${
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-      } ${open ? "bg-dawn-accent/10 border-dawn-accent" : "bg-white border-dawn-line-strong"} ${FOCUS_RING}`}
+      } ${open ? "bg-accent/10 border-accent" : "bg-surface border-border"} ${FOCUS_RING}`}
     >
-      <span className="shrink-0 text-dawn-accent">{icon}</span>
+      <span className="shrink-0 text-link">{icon}</span>
       <span className="flex flex-col gap-0.5">
         <span className="text-lg font-extrabold">{title}</span>
-        <span className="text-[15px] text-dawn-muted">{subtitle}</span>
+        <span className="text-[15px] text-ink-muted">{subtitle}</span>
       </span>
     </button>
   );
@@ -375,17 +375,17 @@ export default function Media() {
                 <button
                   type="button"
                   onClick={retry}
-                  className={`h-11 px-4 rounded-[10px] border-2 border-dawn-control bg-white font-bold text-dawn-ink cursor-pointer ${FOCUS_RING}`}
+                  className={`h-11 px-4 rounded-[10px] border-2 border-ink-muted bg-surface font-bold text-ink cursor-pointer ${FOCUS_RING}`}
                 >
                   Try again
                 </button>
               </div>
             ) : items === null ? (
-              <p role="status" className="m-0 text-base text-dawn-muted">
+              <p role="status" className="m-0 text-base text-ink-muted">
                 Loading…
               </p>
             ) : visible.length === 0 ? (
-              <p className="m-0 text-base text-dawn-muted">{FILTERS.find((f) => f.value === filter)?.empty}</p>
+              <p className="m-0 text-base text-ink-muted">{FILTERS.find((f) => f.value === filter)?.empty}</p>
             ) : (
               <div className="grid grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3 content-start">
                 {visible.map((item) => (
@@ -404,7 +404,7 @@ export default function Media() {
 
         <aside
           aria-label={panel === "detail" ? "Selected item" : "Upload a file"}
-          className="w-full lg:w-[420px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-[18px] bg-white border-[1.5px] border-dawn-line rounded-2xl"
+          className="w-full lg:w-[420px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-[18px] bg-surface border-[1.5px] border-border rounded-2xl"
         >
           {panel === "detail" ? (
             selected ? (
@@ -420,7 +420,7 @@ export default function Media() {
                 onRemoved={() => handleRemoved(selected)}
               />
             ) : items === null ? null : (
-              <p className="m-auto text-center text-2xl font-bold text-dawn-muted">
+              <p className="m-auto text-center text-2xl font-bold text-ink-muted">
                 {all.length === 0 ? "Add a media file to see it here." : "Pick something to see it here."}
               </p>
             )

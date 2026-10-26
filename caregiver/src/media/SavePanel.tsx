@@ -154,13 +154,13 @@ export default function SavePanel({
       </div>
 
       {total > 1 && (
-        <p className="m-0 text-base font-bold text-dawn-muted">
+        <p className="m-0 text-base font-bold text-ink-muted">
           File {position} of {total}
         </p>
       )}
 
       {position === 1 && notices.length > 0 && (
-        <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-dawn-accent">
+        <ul role="alert" className="m-0 pl-5 flex flex-col gap-1 text-base font-bold text-link">
           {notices.map((message) => (
             <li key={message}>{message}</li>
           ))}
@@ -168,7 +168,7 @@ export default function SavePanel({
       )}
 
       <div className="flex items-center gap-3">
-        <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-dawn-avatar text-dawn-avatar-ink">
+        <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-border text-ink-muted">
           {previewUrl && !previewBroken ? (
             <img
               src={previewUrl}
@@ -193,7 +193,7 @@ export default function SavePanel({
         </div>
       </div>
 
-      <p className="m-0 text-[15px] text-dawn-muted break-words">{file.name}</p>
+      <p className="m-0 text-[15px] text-ink-muted break-words">{file.name}</p>
 
       <TagPicker
         carepartnerId={carepartnerId}
@@ -207,7 +207,7 @@ export default function SavePanel({
       />
 
       {error && (
-        <p id="save-error" role="alert" className="m-0 text-base font-bold text-dawn-accent">
+        <p id="save-error" role="alert" className="m-0 text-base font-bold text-link">
           {error}
         </p>
       )}

@@ -40,15 +40,24 @@ export const AuthProvider = ({ children }: { children: JSX.Element | JSX.Element
   const [user, setUser] = useState<User | null>(null);
 
   const [activeCarePartnerId, setActiveCarePartnerId] = useState<number | null>(() => {
-    const saved = localStorage.getItem("activeCarePartnerId");
-    return saved ? Number(saved) : null;
+    try {
+      const saved = localStorage.getItem("activeCarePartnerId");
+      return saved ? Number(saved) : null;
+    } catch {
+      // Storage can be blocked; RequireLogin then picks the first carepartner
+      return null;
+    }
   });
 
   useEffect(() => {
-    if (activeCarePartnerId !== null) {
-      localStorage.setItem("activeCarePartnerId", activeCarePartnerId.toString());
-    } else {
-      localStorage.removeItem("activeCarePartnerId");
+    try {
+      if (activeCarePartnerId !== null) {
+        localStorage.setItem("activeCarePartnerId", activeCarePartnerId.toString());
+      } else {
+        localStorage.removeItem("activeCarePartnerId");
+      }
+    } catch {
+      // Storage can be blocked; the choice then lasts until the page closes
     }
   }, [activeCarePartnerId]);
 

@@ -23,11 +23,11 @@ export default function Preview() {
   const src = previewUrl(activeCarePartnerId as number);
 
   return (
-    <div className="relative h-screen bg-dawn-preview text-dawn-ink font-dawn">
+    <div className="relative h-screen bg-page text-ink font-dawn">
       {src ? <CarepartnerScreen src={src} /> : <ScreenUnavailable />}
       <Link
         to="/"
-        className={`absolute right-6 top-6 flex items-center gap-2 h-12 px-[18px] rounded-[10px] bg-dawn-accent hover:bg-dawn-accent-hover text-white text-base font-bold ${FOCUS_RING}`}
+        className={`absolute right-6 top-6 flex items-center gap-2 h-12 px-[18px] rounded-[10px] bg-accent hover:brightness-95 text-on-accent text-base font-bold ${FOCUS_RING}`}
       >
         <Minimize size={20} strokeWidth={2.2} aria-hidden="true" />
         Exit full screen

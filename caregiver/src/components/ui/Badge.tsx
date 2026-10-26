@@ -15,10 +15,10 @@ interface BadgeProps {
 }
 
 export default function Badge({ tone = "dark", children }: BadgeProps) {
-  const toneClasses = tone === "accent" ? "bg-dawn-accent font-extrabold" : "bg-dawn-avatar-ink font-bold";
+  const toneClasses = tone === "accent" ? "bg-accent text-on-accent font-extrabold" : "bg-ink text-page font-bold";
 
   return (
-    <span className={`inline-block px-[7px] py-0.5 rounded-md text-xs text-white ${toneClasses}`}>
+    <span className={`inline-block px-[7px] py-0.5 rounded-md text-xs ${toneClasses}`}>
       {children}
     </span>
   );

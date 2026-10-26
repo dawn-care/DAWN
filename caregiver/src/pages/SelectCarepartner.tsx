@@ -70,13 +70,13 @@ export default function SelectCarePartnerPage() {
         Who is this for?
       </h1>
 
-      <div className="border p-8 max-w-xl w-full rounded-lg bg-white shadow">
+      <div className="border p-8 max-w-xl w-full rounded-lg bg-surface shadow">
 
         {/* Carepartner Selection Dropdown */}
         <select
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
-          className="w-full p-3 border rounded bg-purple-50"
+          className="w-full p-3 border rounded bg-surface text-ink"
         >
           <option value="">Select care partner</option>
           {user?.carepartners?.map((cp: any) => (
@@ -87,7 +87,7 @@ export default function SelectCarePartnerPage() {
         </select>
 
         {/* Info text */}
-        <p className="mt-4 text-sm text-gray-600 italic text-center">
+        <p className="mt-4 text-sm text-ink-muted italic text-center">
           You will be able to switch this in{" "}
           <span className="italic font-medium">Agenda</span>
         </p>
@@ -95,7 +95,7 @@ export default function SelectCarePartnerPage() {
         {/* Continue Button */}
         <button
           onClick={handleContinue}
-          className="mt-6 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
+          className="mt-6 w-full bg-accent hover:brightness-95 text-on-accent font-semibold py-3 rounded"
         >
           Continue
         </button>

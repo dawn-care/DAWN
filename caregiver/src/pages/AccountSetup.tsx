@@ -18,20 +18,24 @@
  * API interactions:
  *  - POST /users/device-pairing/verify (validate pairing code)
  *  - GET /me (refresh user data)
+ *
+ * A caregiver who came from Settings gets a back arrow; one with no carepartner
+ * yet (straight after signing up) gets Log out instead, since nothing else is
+ * open to them.
  */
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
+import { ArrowLeft, LogOut } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import TextField from "../components/ui/form/TextField";
+import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
+import { fetchCurrentUser, useLogout } from "../context/session";
+import { pairingErrorWording } from "./pairingErrors";
 
 /* ============================
    Static Data
 ============================ */
-
-/**
- * Suggested names for care partner input
- */
-const SUGGESTIONS = ["Mom", "Dad", "Grandma", "Grandpa", "Friend"];
 
 /**
  * Pairing codes are 6 capital letters and numbers (generateCode in the server's
@@ -48,6 +52,22 @@ const toPairingCode = (typed: string) =>
  */
 const API_URL = import.meta.env.VITE_API_URL;
 
+/**
+ * The caregiver's wording for a failed verify, from the server's { "error": ... }
+ * body (VerifyPairingCode in device_pairing_service.go)
+ */
+async function pairingError(res: Response): Promise<string> {
+  const text = await res.text();
+  let message = text;
+  try {
+    message = JSON.parse(text).error ?? text;
+  } catch {
+    // Not JSON (e.g. a proxy's error page); keep the text for the console
+  }
+  console.error(`POST /users/device-pairing/verify answered ${res.status}:`, message);
+  return pairingErrorWording(message);
+}
+
 /* ============================
    Component
 ============================ */
@@ -59,7 +79,10 @@ export default function AccountSetupPage() {
   ============================ */
 
   const navigate = useNavigate();
+  // Settings sends its state along, so the page can offer a way back (a new caregiver arrives with none)
+  const cameFromSettings = (useLocation().state as { from?: string } | null)?.from === "settings";
   const { user, setUser, setActiveCarePartnerId } = useAuth();
+  const logout = useLogout();
 
   /* ============================
      State
@@ -69,6 +92,10 @@ export default function AccountSetupPage() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [carePartnerName, setCarePartnerName] = useState("");
+  // True while pairing is under way, so a second click can't send the code again. The ref
+  // blocks a click before the disabled button has rendered; the state draws it
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   /* ============================
      Handlers
@@ -81,6 +108,8 @@ export default function AccountSetupPage() {
    * - Refreshes user data
    */
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
+
     // Ensure name is typed
     if (!carePartnerName.trim()) {
       setSubmitError("Please enter who this is for.");
@@ -110,6 +139,8 @@ export default function AccountSetupPage() {
     }
 
     setSubmitError("");
+    submittingRef.current = true;
+    setSubmitting(true);
 
     try {
       // Verify that the pairing code matches one in the pairing code table
@@ -120,38 +151,49 @@ export default function AccountSetupPage() {
         body: JSON.stringify({
           code: pairingCode,
           caregiver_id: user.id, 
-          carepartner_name: carePartnerName,
+          carepartner_name: carePartnerName.trim(),
         }),
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        setSubmitError(errText || "Failed to verify pairing code. Please try again.");
+        setSubmitError(await pairingError(res));
         return;
       }
 
-      const verifyData = await res.json();
+      const verifyData: { carepartner_id: number } = await res.json();
 
       // Set the active carepartner from the pairing response
       setActiveCarePartnerId(verifyData.carepartner_id);
 
-      const meRes = await fetch(`${API_URL}/me`, {
-        credentials: "include",
-      });
-
-      if (!meRes.ok) {
-        setSubmitError("Pairing succeeded, but failed to refresh account data.");
-        return;
+      // The code is used up now, so go on even if the refresh fails: add the new
+      // carepartner here instead (the next reload loads the real list)
+      try {
+        const refreshedUser = await fetchCurrentUser();
+        if (!refreshedUser) throw new Error("GET /me answered 401");
+        setUser(refreshedUser);
+      } catch (err) {
+        console.error("Pairing worked, but refreshing the caregiver failed:", err);
+        setUser((currentUser) =>
+          currentUser
+            ? {
+                ...currentUser,
+                carepartners: [
+                  ...(currentUser.carepartners ?? []),
+                  { id: verifyData.carepartner_id, name: carePartnerName.trim() },
+                ],
+              }
+            : currentUser
+        );
       }
-
-      const refreshedUser = await meRes.json();
-      setUser(refreshedUser);
 
       // Pairing succeeded
       navigate("/");
     } catch (err) {
-      console.error(err);
-      setSubmitError("Something went wrong. Please try again.");
+      console.error("Pairing failed:", err);
+      setSubmitError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -160,48 +202,52 @@ export default function AccountSetupPage() {
   ============================ */
 
   return (
-    <div className="w-full flex flex-col items-center mt-8 px-6">
-      <h1 className="text-3xl font-semibold mb-6">
-        Pair New Device
-      </h1>
+    <div className="min-h-screen flex flex-col items-center px-6 py-10 bg-page text-ink font-dawn">
+      <div className="w-full max-w-xl flex flex-col gap-6">
+        <header className="flex items-center gap-3">
+          {cameFromSettings && (
+            <Link
+              to="/settings"
+              aria-label="Back to settings"
+              className={`w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-ink hover:bg-border/60 ${FOCUS_RING}`}
+            >
+              <ArrowLeft size={24} aria-hidden="true" />
+            </Link>
+          )}
+          <h1 className="m-0 text-3xl font-extrabold">Pair a new device</h1>
+          {!cameFromSettings && (
+            <button
+              type="button"
+              onClick={logout}
+              className={`ml-auto h-11 px-3.5 flex items-center gap-2 rounded-[10px] border-0 bg-transparent text-base font-bold text-ink cursor-pointer hover:bg-border/60 ${FOCUS_RING}`}
+            >
+              <LogOut size={18} aria-hidden="true" />
+              Log out
+            </button>
+          )}
+        </header>
 
-      <div className="border p-8 max-w-3xl w-full rounded-lg bg-white shadow">
+        <div className="flex flex-col gap-6 p-8 bg-surface border-[1.5px] border-border rounded-[14px]">
+          <p className="m-0 text-lg text-ink-muted">
+            Connect your carepartner's tablet to your account so you can choose what it shows.
+          </p>
 
-        {/* ============================
-            Care Partner Name
-        ============================ */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Who is this for?</label>
-
-          <input
-            type="text"
+          {/* ============================
+              Care Partner Name
+          ============================ */}
+          <TextField
+            label="Who is this for?"
             value={carePartnerName}
             onChange={(e) => setCarePartnerName(e.target.value)}
-            className="w-full mt-2 p-3 border rounded bg-purple-50"
             placeholder="Enter name"
           />
 
-          {/* Suggestions */}
-          <div className="flex gap-2 mt-2 flex-wrap">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setCarePartnerName(s)}
-                className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm hover:bg-gray-300"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ============================
-            Pairing Code
-        ============================ */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Enter Care Partner Pairing Code:</label>
-          <input
-            type="text"
+          {/* ============================
+              Pairing Code
+          ============================ */}
+          <TextField
+            label="Pairing code"
+            hint="Shown on your carepartner's tablet"
             value={pairingCode}
             // Codes are always capitals, so typing in lowercase still shows (and sends) them that
             // way; anything but letters and numbers, and anything past 6, is left out
@@ -211,56 +257,59 @@ export default function AccountSetupPage() {
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            className="w-full mt-2 p-3 border rounded bg-purple-50 uppercase"
-            placeholder="Enter pairing code"
+            className="uppercase tracking-[0.3em] text-xl font-bold"
+            placeholder="ABC123"
           />
-        </div>
 
-        {/* ============================
-            Consent Statement
-        ============================ */}
-        <div className="mb-6">
-          <label className="text-lg font-medium">Consent Statement:</label>
-          <div className="mt-2 p-4 border rounded bg-gray-50 max-h-48 overflow-y-auto text-sm text-gray-700">
-            <p>
-              By checking this box, you acknowledge that your photos and videos will be
-              stored on the StartUp server. Your data will not be sold to third parties.
-            </p>
-            <p className="mt-2">
-              Please make sure you have discussed this with your care partner before
-              proceeding. You must agree to this statement to complete account setup.
-            </p>
-          </div>
+          {/* ============================
+              Consent Statement
+          ============================ */}
+          <div className="flex flex-col gap-2.5">
+            <div className="text-base font-bold">Consent statement</div>
+            <div className="flex flex-col gap-2 p-4 bg-page border-[1.5px] border-border rounded-[10px] max-h-48 overflow-y-auto text-[15px] leading-snug">
+              <p className="m-0">
+                By checking this box, you acknowledge that your photos and videos will be
+                stored on the D.A.W.N. server. Your data will not be sold to third parties.
+              </p>
+              <p className="m-0">
+                Please make sure you have discussed this with your care partner before
+                proceeding. You must agree to this statement to complete account setup.
+              </p>
+            </div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="consentCheckbox"
-              checked={consentChecked}
-              onChange={(e) => setConsentChecked(e.target.checked)}
-            />
-            <label htmlFor="consentCheckbox" className="text-sm text-gray-700">
+            <label htmlFor="consentCheckbox" className="flex items-center gap-3 min-h-11 text-base cursor-pointer">
+              <input
+                type="checkbox"
+                id="consentCheckbox"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                className={`w-5 h-5 shrink-0 accent-accent cursor-pointer ${FOCUS_RING}`}
+              />
               I agree to the consent statement
             </label>
           </div>
+
+          {/* ============================
+              Error Message
+          ============================ */}
+          {submitError && (
+            <p role="alert" className="m-0 px-3 py-2.5 rounded-lg bg-status-red-bg text-base font-bold text-status-red-text">
+              {submitError}
+            </p>
+          )}
+
+          {/* ============================
+              Submit Button
+          ============================ */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className={`h-12 w-full rounded-[10px] border-2 border-accent bg-accent text-base font-bold text-on-accent cursor-pointer hover:brightness-95 disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
+          >
+            {submitting ? "Pairing…" : "Pair device"}
+          </button>
         </div>
-
-        {/* ============================
-            Error Message
-        ============================ */}
-        {submitError && (
-          <p className="text-red-500 mb-4">{submitError}</p>
-        )}
-
-        {/* ============================
-            Submit Button
-        ============================ */}
-        <button
-          onClick={handleSubmit}
-          className="mt-4 w-full bg-teal-200 hover:bg-teal-300 text-gray-800 font-semibold py-3 rounded"
-        >
-          Pair Device
-        </button>
       </div>
     </div>
   );

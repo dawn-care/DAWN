@@ -38,7 +38,7 @@ export default function FilterPills<T extends string>({ pills, value, onChange, 
         <RadixRadioGroup.Item
           key={pill.value}
           value={pill.value}
-          className={`h-11 px-4 rounded-full border-2 text-base font-bold cursor-pointer bg-white text-dawn-ink border-dawn-control data-[state=checked]:bg-dawn-ink data-[state=checked]:text-white data-[state=checked]:border-dawn-ink ${FOCUS_RING}`}
+          className={`h-11 px-4 rounded-full border-2 text-base font-bold cursor-pointer bg-surface text-ink border-ink-muted data-[state=checked]:bg-ink data-[state=checked]:text-page data-[state=checked]:border-ink ${FOCUS_RING}`}
         >
           {pill.label} ({pill.count})
         </RadixRadioGroup.Item>

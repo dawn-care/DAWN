@@ -10,7 +10,7 @@
 
 export default function ScreenUnavailable() {
   return (
-    <p className="m-0 h-full flex items-center justify-center p-6 text-lg text-dawn-muted text-center">
+    <p className="m-0 h-full flex items-center justify-center p-6 text-lg text-ink-muted text-center">
       Carepartner screen can't be shown here.
     </p>
   );

@@ -26,9 +26,9 @@ interface MiniMonthProps {
 
 const WEEKDAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
-const ARROW = "w-8 h-8 flex items-center justify-center rounded-full border-0 bg-transparent text-dawn-ink cursor-pointer hover:bg-dawn-line/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-dawn-ink";
+const ARROW = "w-8 h-8 flex items-center justify-center rounded-full border-0 bg-transparent text-ink cursor-pointer hover:bg-border/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus";
 
-const DAY_BASE = "h-7 rounded-full border-0 text-[13px] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-dawn-ink";
+const DAY_BASE = "h-7 rounded-full border-0 text-[13px] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus";
 
 export default function MiniMonth({ range, onPick }: MiniMonthProps) {
   // Before the calendar has drawn, show the month around today
@@ -54,11 +54,11 @@ export default function MiniMonth({ range, onPick }: MiniMonthProps) {
   const title = firstOfMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const styleOf = (day: Date, text: string) => {
-    if (text === today) return "bg-dawn-accent text-white font-bold";
-    if (range?.view === "timeGridDay" && text === range.from) return "bg-dawn-ink text-white";
-    if (range?.view === "timeGridWeek" && text >= range.from && text <= range.to) return "bg-dawn-sidebar text-dawn-ink";
-    if (day.getMonth() === firstOfMonth.getMonth()) return "bg-transparent text-dawn-ink";
-    return "bg-transparent text-dawn-control";
+    if (text === today) return "bg-accent text-on-accent font-bold";
+    if (range?.view === "timeGridDay" && text === range.from) return "bg-ink text-page";
+    if (range?.view === "timeGridWeek" && text >= range.from && text <= range.to) return "bg-border text-ink";
+    if (day.getMonth() === firstOfMonth.getMonth()) return "bg-transparent text-ink";
+    return "bg-transparent text-ink-muted";
   };
 
   return (
@@ -76,7 +76,7 @@ export default function MiniMonth({ range, onPick }: MiniMonthProps) {
       </div>
       <div className="grid grid-cols-7 gap-px text-center">
         {WEEKDAY_LETTERS.map((letter, i) => (
-          <span key={i} aria-hidden="true" className="h-[22px] leading-[22px] text-xs font-bold text-dawn-muted">
+          <span key={i} aria-hidden="true" className="h-[22px] leading-[22px] text-xs font-bold text-ink-muted">
             {letter}
           </span>
         ))}

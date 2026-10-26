@@ -45,7 +45,7 @@ export default function WidgetPanel({ carepartnerId, widget, disabled = false, o
   return (
     <aside
       aria-label="Settings"
-      className="h-full flex flex-col gap-3 p-4 bg-white border-[1.5px] border-dawn-line rounded-[14px] text-dawn-ink overflow-y-auto"
+      className="h-full flex flex-col gap-3 p-4 bg-surface border-[1.5px] border-border rounded-[14px] text-ink overflow-y-auto"
     >
       {/* Each selected widget gets its own settings, which remember how it was when they opened */}
       {widget && (
@@ -77,7 +77,7 @@ function WidgetSettings({
   return (
     <>
       <div className="flex flex-col gap-0.5">
-        <span className="text-[13px] font-bold uppercase tracking-[0.06em] text-dawn-muted">{name}</span>
+        <span className="text-[13px] font-bold uppercase tracking-[0.06em] text-ink-muted">{name}</span>
         <span className="text-xl font-extrabold">{name}</span>
       </div>
 
@@ -92,7 +92,7 @@ function WidgetSettings({
           onClick={() => onDone(original.current)}
           // A widget can't be kept without what it needs: text, a zip, a photo, a league and team
           disabled={!isComplete(widget)}
-          className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-accent bg-dawn-accent hover:bg-dawn-accent-hover hover:border-dawn-accent-hover text-white text-base font-bold cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-dawn-accent disabled:hover:border-dawn-accent ${FOCUS_RING}`}
+          className={`h-11 px-[18px] rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold cursor-pointer disabled:opacity-50 disabled:cursor-default disabled:hover:bg-accent disabled:hover:border-accent ${FOCUS_RING}`}
         >
           Save
         </button>
@@ -118,7 +118,7 @@ function MessageSettings({ widget, onChange }: SettingsProps) {
         autoFocus
         onChange={(event) => onChange({ config: { ...config, text: event.target.value } })}
       />
-      <div className="self-end text-sm text-dawn-muted" aria-live="polite">
+      <div className="self-end text-sm text-ink-muted" aria-live="polite">
         {text.length} / {TEXT_LIMITS.message}
       </div>
     </div>
@@ -143,7 +143,7 @@ function WeatherSettings({ widget, onChange }: SettingsProps) {
         onChange={(event) => onChange({ config: { ...config, zip: event.target.value.replace(/\D/g, "") } })}
       />
       {invalid && (
-        <div id="weather-zip-help" className="text-[15px] leading-snug text-dawn-accent">
+        <div id="weather-zip-help" className="text-[15px] leading-snug text-link">
           Enter a 5-digit zip code.
         </div>
       )}
@@ -182,12 +182,12 @@ function useLoad<T>(load: () => Promise<T>, describe: (err: unknown) => string) 
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-start gap-2 text-base text-dawn-muted">
+    <div role="alert" className="flex flex-col items-start gap-2 text-base text-ink-muted">
       <p className="m-0">{message}</p>
       <button
         type="button"
         onClick={onRetry}
-        className={`h-11 px-[18px] rounded-[10px] border-2 border-dawn-control bg-white hover:bg-dawn-page text-dawn-ink text-base font-bold cursor-pointer ${FOCUS_RING}`}
+        className={`h-11 px-[18px] rounded-[10px] border-2 border-ink-muted bg-surface hover:bg-page text-ink text-base font-bold cursor-pointer ${FOCUS_RING}`}
       >
         Try again
       </button>
@@ -198,7 +198,7 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { carepartnerId: number }) {
   const { state, retry } = useLoad<Media[]>(() => listMedia(carepartnerId), mediaError);
 
-  if (state.status === "loading") return <p className="m-0 text-base text-dawn-muted">Loading photos…</p>;
+  if (state.status === "loading") return <p className="m-0 text-base text-ink-muted">Loading photos…</p>;
   if (state.status === "error") return <LoadError message={state.message} onRetry={retry} />;
 
   const photos = state.value.filter((media) => media.kind === "photo");
@@ -208,8 +208,8 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
       <span className="text-base font-bold">Photo</span>
       {photos.length === 0 ? (
         <div className="flex items-center justify-between gap-2">
-          <p className="m-0 text-base text-dawn-muted">No photos yet.</p>
-          <Link to="/media" className="shrink-0 text-base font-bold text-dawn-accent hover:text-dawn-accent-hover">
+          <p className="m-0 text-base text-ink-muted">No photos yet.</p>
+          <Link to="/media" className="shrink-0 text-base font-bold text-link hover:underline">
             Add photos
           </Link>
         </div>
@@ -227,7 +227,7 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
       {/* The chosen photo, larger, with its name under it */}
       {chosen && (
         <figure className="m-0 flex flex-col gap-1.5">
-          <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-dawn-avatar" />
+          <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-border" />
           <figcaption className="text-base font-bold break-words">{chosen.display_name}</figcaption>
         </figure>
       )}
@@ -245,7 +245,7 @@ function SportsSettings({ widget, onChange }: SettingsProps) {
   const config = widget.config as Partial<SportsConfig>;
   const { state, retry } = useLoad<SportsLeague[]>(loadSportsLeagues, teamsLoadError);
 
-  if (state.status === "loading") return <p className="m-0 text-base text-dawn-muted">Loading teams…</p>;
+  if (state.status === "loading") return <p className="m-0 text-base text-ink-muted">Loading teams…</p>;
   if (state.status === "error") return <LoadError message={state.message} onRetry={retry} />;
 
   const league = state.value.find((other) => other.id === config.league);

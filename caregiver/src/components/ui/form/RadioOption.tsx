@@ -22,11 +22,11 @@ export default function RadioOption({ value, children, disabled }: RadioOptionPr
     <RadixRadioGroup.Item
       value={value}
       disabled={disabled}
-      className={`group flex items-center gap-2.5 min-h-12 px-3 py-1.5 rounded-[10px] border-2 text-left text-base font-bold text-dawn-ink cursor-pointer bg-white border-dawn-line-strong data-[state=checked]:bg-dawn-page data-[state=checked]:border-dawn-ink disabled:bg-dawn-sidebar disabled:border-dawn-line disabled:text-dawn-control/60 disabled:cursor-not-allowed ${FOCUS_RING}`}
+      className={`group flex items-center gap-2.5 min-h-12 px-3 py-1.5 rounded-[10px] border-2 text-left text-base font-bold text-ink cursor-pointer bg-surface border-border data-[state=checked]:bg-page data-[state=checked]:border-ink disabled:bg-page disabled:border-border disabled:text-ink-muted/60 disabled:cursor-not-allowed ${FOCUS_RING}`}
     >
       <span
         aria-hidden="true"
-        className="w-5 h-5 shrink-0 rounded-full bg-white border-2 border-dawn-control group-data-[state=checked]:border-[6px] group-data-[state=checked]:border-dawn-accent group-disabled:bg-dawn-sidebar group-disabled:border-dawn-line-strong"
+        className="w-5 h-5 shrink-0 rounded-full bg-surface border-2 border-ink-muted group-data-[state=checked]:border-[6px] group-data-[state=checked]:border-accent group-disabled:bg-page group-disabled:border-border"
       />
       {children}
     </RadixRadioGroup.Item>
