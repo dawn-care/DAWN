@@ -20,6 +20,8 @@ type PlaybackServiceInterface interface {
 	CreatePlayback(context.Context, int, int, *int, string, time.Time) (*playback.Playback, error)
 	UpdateStatus(context.Context, int, int, string) (*playback.Playback, error)
 	ListPlayed(context.Context, int, int) ([]playback.Playback, error)
+	GetPlayback(context.Context, int, int) (*playback.Playback, error)
+	RatePlayback(context.Context, int, int, string) (*playback.Playback, error)
 	RequestStaffPlay(context.Context, int, int) (*playback.Playback, error)
 	RequestStop(context.Context, int, int) (*playback.Playback, playbackSvc.StopOutcome, error)
 }
@@ -108,6 +110,75 @@ func (c *PlaybackController) UpdateStatusHandler(w http.ResponseWriter, r *http.
 	writeJSON(w, http.StatusOK, p)
 }
 
+// GetPlaybackHandler godoc
+// @Summary Get one playback
+// @Description Its status, and rating_closes_at: until when staff can rate it, or null if it never reached the screen. The staff app polls this while a clip plays.
+// @Tags playback
+// @Produce json
+// @Param id path int true "Playback ID"
+// @Param carepartner_id query int true "Carepartner ID"
+// @Success 200 {object} playback.Playback
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /playbacks/{id} [get]
+func (c *PlaybackController) GetPlaybackHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid playback ID"})
+		return
+	}
+	carepartnerID, err := strconv.Atoi(r.URL.Query().Get("carepartner_id"))
+	if err != nil || carepartnerID <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid carepartner ID"})
+		return
+	}
+	p, err := c.Service.GetPlayback(r.Context(), id, carepartnerID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
+// RatePlaybackRequest is how staff say a play went: "helped", "no_change" or "worse"
+type RatePlaybackRequest struct {
+	CarepartnerID int    `json:"carepartner_id"`
+	Rating        string `json:"rating"`
+}
+
+// RatePlaybackHandler godoc
+// @Summary Rate how a play went
+// @Description Staff rate a play from the staff app. Only a play that reached the screen can be rated, until 5 minutes after it ended; rating again inside that time replaces the rating. Ratings order the staff app's media list (GET /media?sort=rank).
+// @Tags playback
+// @Accept json
+// @Produce json
+// @Param id path int true "Playback ID"
+// @Param body body RatePlaybackRequest true "Rating"
+// @Success 200 {object} playback.Playback
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 409 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /playbacks/{id}/rating [post]
+func (c *PlaybackController) RatePlaybackHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid playback ID"})
+		return
+	}
+	var req RatePlaybackRequest
+	if !decodeRequest(w, r, &req) {
+		return
+	}
+	p, err := c.Service.RatePlayback(r.Context(), id, req.CarepartnerID, req.Rating)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, p)
+}
+
 // defaultListLimit is how many playbacks a list returns when no limit is given.
 const defaultListLimit = 50
 
@@ -172,6 +243,10 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		status, message = http.StatusNotFound, "playback not found"
 	case errors.Is(err, playbackSvc.ErrInvalidTransition):
 		status, message = http.StatusConflict, "invalid playback status transition"
+	case errors.Is(err, playbackSvc.ErrNotRateable):
+		status, message = http.StatusConflict, playbackSvc.ErrNotRateable.Error()
+	case errors.Is(err, playbackSvc.ErrRatingClosed):
+		status, message = http.StatusConflict, playbackSvc.ErrRatingClosed.Error()
 	}
 	// Never expose SQL errors or echo arbitrary request text.
 	writeJSON(w, status, map[string]string{"error": message})

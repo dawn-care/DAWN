@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"server/internal/db"
+	"server/internal/models/playback"
 )
 
 const (
@@ -138,16 +139,25 @@ type ListFilter struct {
 	Kind           string
 	Situation      string
 	FamilyMemberID int
+	// Rank puts the media staff rated best first (see scoreSQL); the score itself isn't sent
+	Rank bool
 }
 
-// List a carepartner's media that matches filter, newest first
+// scoreSQL is a media item's score: the points of every rating its plays got
+// (Points* in models/playback). Unrated media scores 0.
+var scoreSQL = fmt.Sprintf(`(SELECT COALESCE(SUM(CASE p.rating WHEN %d THEN %d WHEN %d THEN %d ELSE 0 END), 0)
+	FROM "Playback" p WHERE p.media_id = m.id)`,
+	playback.RatingHelped, playback.PointsHelped, playback.RatingWorse, playback.PointsWorse)
+
+// List a carepartner's media that matches filter: newest first, or with Rank, highest
+// score first and newest first among equal scores
 func ListMedia(db *sql.DB, carepartnerID int, filter ListFilter) ([]Media, error) {
 	rows, err := db.Query(
 		selectMedia+` WHERE m.carepartner_id = $1 AND ($2 = '' OR m.kind = $2)
 		  AND ($3 = '' OR EXISTS (SELECT 1 FROM "MediaSituation" s WHERE s.media_id = m.id AND s.situation = $3))
 		  AND ($4 = 0 OR EXISTS (SELECT 1 FROM "MediaFamilyMember" f WHERE f.media_id = m.id AND f.family_member_id = $4))
-		ORDER BY m.created_at DESC, m.id DESC;`,
-		carepartnerID, filter.Kind, filter.Situation, filter.FamilyMemberID,
+		ORDER BY CASE WHEN $5 THEN `+scoreSQL+` ELSE 0 END DESC, m.created_at DESC, m.id DESC;`,
+		carepartnerID, filter.Kind, filter.Situation, filter.FamilyMemberID, filter.Rank,
 	)
 	if err != nil {
 		return nil, err

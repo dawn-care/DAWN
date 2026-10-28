@@ -4,30 +4,45 @@
  * Play and Stop are real: the play command was sent from the clip picker, and
  * Stop asks the server to stop it on the tablet.
  *
- * What is NOT real yet:
- *  - Progress. The server can't yet report whether the tablet started or
- *    finished, so the bar is an estimate from the clip's length, and it is only
- *    shown when the server confirmed the tablet received the command.
- *  - Rating. It isn't saved anywhere; the screen behaves as if it were.
+ * The screen asks the server about the play every few seconds (getPlayState):
+ *  - Progress is estimated from the clip's length, and only shown when the
+ *    server confirmed the tablet received the command. When the tablet reports
+ *    the end, the screen says Finished then, whatever the estimate said.
+ *  - Rating ("How did it go?") appears only while the server would accept it:
+ *    once the clip has been on the tablet's screen for 15 seconds, or has ended
+ *    or been stopped if that's sooner, until five minutes after it ends
+ *    (rating_closes_at). Then it disappears, since later ratings aren't
+ *    accurate. Nothing is offered that would be refused. 15 seconds is enough to
+ *    see a first reaction without making staff wait out a long clip.
  *
- * Rating window: five minutes after the clip ends or is stopped, then the
- * controls disappear, since later ratings aren't accurate.
+ * Ratings are saved on the playback and rank the media list for every staff
+ * member (best first). Nobody is shown the scores. Rating again before the
+ * window closes replaces the rating.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { rateClip } from '../../../data/mock';
-import { getClip, getResident, stopOnTablet } from '../../../data/server';
+import {
+  getClip,
+  getPlayState,
+  getResident,
+  rateClip,
+  stopOnTablet,
+  type PlayState,
+} from '../../../data/server';
 import type { Clip, Rating, Resident } from '../../../data/types';
 import { logEvent } from '../../../lib/log';
 import { useThemeColors, type ThemeColors } from '../../../lib/theme';
 
-const RATING_WINDOW_MS = 5 * 60 * 1000;
 /** How long the server waits for an offline tablet before the command expires. */
 const DELIVERY_WINDOW_MS = 30 * 1000;
+/** How often to ask the server what the tablet has done with the play. */
+const POLL_MS = 3 * 1000;
+/** How long a clip is on screen before staff can rate it, if it hasn't ended by then. */
+const RATE_AFTER_MS = 15 * 1000;
 
 const formatDuration = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
@@ -41,11 +56,12 @@ const OPTIONS: { rating: Rating; label: string; icon: string; color: keyof Theme
 /**
  * - playing: sent to the tablet, estimated to be playing
  * - waiting: the tablet wasn't connected; it may still start if it reconnects
- * - ended: estimated to have finished
+ * - ended: finished, as the tablet reported or as estimated
  * - stopped: staff stopped it
  * - missed: the tablet never received it in time
+ * - failed: the tablet showed it but couldn't play it to the end
  */
-type Phase = 'playing' | 'waiting' | 'ended' | 'stopped' | 'missed';
+type Phase = 'playing' | 'waiting' | 'ended' | 'stopped' | 'missed' | 'failed';
 
 export default function PlayingScreen() {
   const { id, playbackId, clipId, delivered } = useLocalSearchParams<{
@@ -64,8 +80,11 @@ export default function PlayingScreen() {
   const [stopping, setStopping] = useState(false);
   const [stopNote, setStopNote] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<Rating | null>(null);
-  const [windowOpen, setWindowOpen] = useState(true);
-  const windowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [rating, setRating] = useState<Rating | null>(null);
+  const [ratingNote, setRatingNote] = useState<string | null>(null);
+  const [play, setPlay] = useState<PlayState | null>(null);
+  const [ratingClosed, setRatingClosed] = useState(false);
+  const [onScreenLongEnough, setOnScreenLongEnough] = useState(false);
 
   useEffect(() => {
     getClip(Number(clipId)).then((c) => setClip(c ?? null));
@@ -95,17 +114,54 @@ export default function PlayingScreen() {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  /** The rating window opens once the clip is over. */
+  /** What the tablet has done with the play, until there is nothing left to learn. */
   useEffect(() => {
-    if ((phase !== 'ended' && phase !== 'stopped') || !clip) return;
-    windowTimer.current = setTimeout(() => {
-      setWindowOpen(false);
-      logEvent({ type: 'rating_window_expired', residentId, clipId: clip.id });
-    }, RATING_WINDOW_MS);
+    if (phase === 'missed' || ratingClosed || submitted) return;
+    let active = true;
+    const check = () =>
+      getPlayState(residentId, Number(playbackId))
+        .then((state) => active && setPlay(state))
+        // A missed check is retried on the next one
+        .catch(() => undefined);
+    check();
+    const timer = setInterval(check, POLL_MS);
     return () => {
-      if (windowTimer.current) clearTimeout(windowTimer.current);
+      active = false;
+      clearInterval(timer);
     };
-  }, [phase, clip, residentId]);
+  }, [residentId, playbackId, phase, ratingClosed, submitted]);
+
+  /** The tablet's own end beats the estimate, including when it couldn't finish. */
+  useEffect(() => {
+    if (play?.failed && (phase === 'playing' || phase === 'ended')) {
+      setPhase('failed');
+    } else if (play?.ended && phase === 'playing') {
+      setPhase('ended');
+      if (clip?.duration) setPosition(clip.duration);
+    }
+  }, [play, phase, clip]);
+
+  /** Rating appears once the clip has been on the tablet's screen for RATE_AFTER_MS. */
+  const startedAt = play?.startedAt ?? null;
+  useEffect(() => {
+    if (startedAt === null) return;
+    const timer = setTimeout(
+      () => setOnScreenLongEnough(true),
+      Math.max(0, startedAt + RATE_AFTER_MS - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [startedAt]);
+
+  /** Rating disappears when the server would stop accepting it. */
+  const closesAt = play?.ratingClosesAt ?? null;
+  useEffect(() => {
+    if (closesAt === null || !clip) return;
+    const timer = setTimeout(() => {
+      setRatingClosed(true);
+      logEvent({ type: 'rating_window_expired', residentId, clipId: clip.id });
+    }, Math.max(0, closesAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [closesAt, clip, residentId]);
 
   if (!clip || !resident) return <ActivityIndicator className="mt-10" />;
 
@@ -134,20 +190,43 @@ export default function PlayingScreen() {
     }
   };
 
-  const submitRating = async (rating: Rating) => {
-    await rateClip(Number(playbackId), rating);
-    logEvent({ type: 'clip_rated', residentId, clipId: clip.id, rating });
-    setSubmitted(rating);
+  const submitRating = async (chosen: Rating) => {
+    setRating(chosen);
+    setRatingNote(null);
+    try {
+      // Closed only when tapped right as the window ends; then rating simply goes away
+      if ((await rateClip(residentId, Number(playbackId), chosen)) === 'closed') {
+        setRatingClosed(true);
+        return;
+      }
+    } catch {
+      setRatingNote("That didn't save. Check the connection and try again.");
+      return;
+    } finally {
+      setRating(null);
+    }
+    logEvent({ type: 'clip_rated', residentId, clipId: clip.id, rating: chosen });
+    setSubmitted(chosen);
   };
 
   const duration = clip.duration;
   const progress = duration ? Math.min(100, (position / duration) * 100) : 0;
+  // It reached the screen (the server gave it a closing time), and it has been on
+  // long enough or is already over. A play the tablet couldn't finish isn't rated:
+  // that says something about the tablet, not the clip.
+  const canRate =
+    closesAt !== null &&
+    !ratingClosed &&
+    phase !== 'failed' &&
+    !play?.failed &&
+    (onScreenLongEnough || play?.ended || phase === 'ended' || phase === 'stopped');
   const statusLabel = {
     playing: `Sent to ${firstName}'s tablet`,
     waiting: `${firstName}'s tablet isn't connected`,
     ended: 'Finished',
     stopped: 'Stopped',
     missed: "Didn't play",
+    failed: "Didn't finish",
   }[phase];
 
   return (
@@ -172,6 +251,11 @@ export default function PlayingScreen() {
         {phase === 'missed' && (
           <Text className="mt-2 text-base text-ink-muted">
             It didn&apos;t reach the tablet, so nothing played.
+          </Text>
+        )}
+        {phase === 'failed' && (
+          <Text className="mt-2 text-base text-ink-muted">
+            It started on the tablet but couldn&apos;t keep playing. You can try again.
           </Text>
         )}
 
@@ -221,22 +305,15 @@ export default function PlayingScreen() {
         {stopNote && <Text className="mt-3 text-base text-ink-muted">{stopNote}</Text>}
       </View>
 
-      {/* Rating. Not saved yet; only offered for a clip that actually reached the tablet. */}
-      {phase !== 'waiting' && phase !== 'missed' &&
-        (submitted ? (
-          <View className="mt-6 rounded-2xl bg-status-green-bg p-4">
-            <Text className="text-base font-semibold text-status-green-text">
-              Thanks — recorded as {OPTIONS.find((o) => o.rating === submitted)?.label}.
-            </Text>
-          </View>
-        ) : !windowOpen ? (
-          <View className="mt-6 rounded-2xl bg-surface-raised p-4">
-            <Text className="text-base text-ink-muted">
-              The rating window has closed. Ratings are only collected for five minutes after a
-              video plays, so they stay accurate.
-            </Text>
-          </View>
-        ) : (
+      {/* Rating: only offered while the server would accept it */}
+      {submitted ? (
+        <View className="mt-6 rounded-2xl bg-status-green-bg p-4">
+          <Text className="text-base font-semibold text-status-green-text">
+            Thanks — recorded as {OPTIONS.find((o) => o.rating === submitted)?.label}.
+          </Text>
+        </View>
+      ) : (
+        canRate && (
           <>
             <Text className="mt-6 text-3xl font-bold text-ink">How did it go?</Text>
             <Text className="mb-4 text-base text-ink-muted">
@@ -246,12 +323,20 @@ export default function PlayingScreen() {
               <Pressable
                 key={option.rating}
                 onPress={() => submitRating(option.rating)}
-                className="mb-3 flex-row items-center rounded-2xl border border-border bg-surface p-4 active:opacity-70"
+                disabled={rating !== null}
+                className={`mb-3 flex-row items-center rounded-2xl border border-border bg-surface p-4 active:opacity-70 ${
+                  rating !== null && rating !== option.rating ? 'opacity-60' : ''
+                }`}
               >
-                <Ionicons name={option.icon as never} size={24} color={colors[option.color]} />
+                {rating === option.rating ? (
+                  <ActivityIndicator color={colors[option.color]} />
+                ) : (
+                  <Ionicons name={option.icon as never} size={24} color={colors[option.color]} />
+                )}
                 <Text className="ml-3 text-lg font-semibold text-ink">{option.label}</Text>
               </Pressable>
             ))}
+            {ratingNote && <Text className="text-base text-ink-muted">{ratingNote}</Text>}
           </>
         ))}
 

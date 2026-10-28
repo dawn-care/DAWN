@@ -285,7 +285,7 @@ func TestListMedia_Usage(t *testing.T) {
 	now := time.Now()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Media" m`)).
-		WithArgs(1, "", "", 0).
+		WithArgs(1, "", "", 0, false).
 		WillReturnRows(sqlmock.NewRows(mediaColumns).
 			AddRow(1, 1, "photo", "Beach", "k1", "image/png", 10, nil, now, true, true, true).
 			AddRow(2, 1, "audio", "Hymn", "k2", "audio/mpeg", 10, 214, now, false, false, true).
@@ -315,10 +315,10 @@ func TestListMedia_Usage(t *testing.T) {
 func TestListMedia_Filters(t *testing.T) {
 	svc, mock, _, _ := newTestService(t, 0, nil)
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Media" m`)).
-		WithArgs(1, "video", "winding_down", 3).
+		WithArgs(1, "video", "winding_down", 3, true).
 		WillReturnRows(sqlmock.NewRows(mediaColumns))
 
-	items, err := svc.ListMedia(1, modelsMedia.ListFilter{Kind: "video", Situation: "winding_down", FamilyMemberID: 3})
+	items, err := svc.ListMedia(1, modelsMedia.ListFilter{Kind: "video", Situation: "winding_down", FamilyMemberID: 3, Rank: true})
 
 	require.NoError(t, err)
 	assert.Equal(t, []modelsMedia.Media{}, items, "no rows is an empty list, not nil")
@@ -536,5 +536,18 @@ func TestSetTags_NoneTakesItOutOfTheStaffApp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{}, *m.Situations)
 	assert.Equal(t, []int{}, *m.FamilyMemberIDs)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Ranked lists sum each item's rating points: helped +1, made it worse -2, no change 0
+func TestListMedia_RankScoresRatings(t *testing.T) {
+	svc, mock, _, _ := newTestService(t, 0, nil)
+	mock.ExpectQuery(`ORDER BY CASE WHEN \$5 THEN \(SELECT COALESCE\(SUM\(CASE p.rating WHEN 1 THEN 1 WHEN -1 THEN -2 ELSE 0 END\), 0\)\s+FROM "Playback" p WHERE p.media_id = m.id\) ELSE 0 END DESC, m.created_at DESC, m.id DESC`).
+		WithArgs(1, "", "", 0, true).
+		WillReturnRows(sqlmock.NewRows(mediaColumns))
+
+	_, err := svc.ListMedia(1, modelsMedia.ListFilter{Rank: true})
+
+	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
