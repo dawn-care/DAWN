@@ -79,7 +79,7 @@ export default function SelectCarePartnerPage() {
           className="w-full p-3 border rounded bg-surface text-ink"
         >
           <option value="">Select care partner</option>
-          {user?.carepartners?.map((cp: any) => (
+          {user?.carepartners?.map((cp) => (
             <option key={cp.id} value={cp.id}>
               {cp.name}
             </option>

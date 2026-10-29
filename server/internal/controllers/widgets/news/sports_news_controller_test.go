@@ -89,9 +89,9 @@ func TestGetSportsNewsWidgetByIDHandler(t *testing.T) {
 	controller := NewSportsNewsWidgetController(mockService)
 
 	r := chi.NewRouter()
-	r.Get("/sports-news-widgets/{id}", controller.GetSportsNewsWidgetByIDHandler)
+	r.Get("/sports-news-widgets", controller.GetSportsNewsWidgetByIDHandler)
 
-	req := httptest.NewRequest("GET", "/sports-news-widgets/1", nil)
+	req := httptest.NewRequest("GET", "/sports-news-widgets?id=1", nil)
 	rec := httptest.NewRecorder()
 
 	r.ServeHTTP(rec, req)
