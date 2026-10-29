@@ -43,7 +43,7 @@ describe("theme legibility", () => {
   });
 
   it("keeps orientation text at or above its floor", () => {
-    for (const size of [fontSizes.day, fontSizes.nightDay, fontSizes.timeOfDay]) {
+    for (const size of [fontSizes.day, fontSizes.nightDay, fontSizes.nightWord, fontSizes.timeOfDay]) {
       expect(size).toBeGreaterThanOrEqual(legibility.minOrientationText);
     }
   });
