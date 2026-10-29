@@ -49,7 +49,9 @@ export const legibility = {
 
 export const fontSizes = {
   day: 152,
-  nightDay: 120,
+  nightDay: 152,
+  /** "Nighttime" and its moon: at the orientation floor, so the day stands out above it. */
+  nightWord: legibility.minOrientationText,
   timeOfDay: 88,
   nightLine: 56,
   tileWord: 44,
