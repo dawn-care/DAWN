@@ -61,7 +61,7 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 ### Assumptions
 
 - The tablet shares its backend with the caregiver app, so endpoints the caregiver app uses must keep working. Where a caregiver setting has no UI yet (widget and photo choices), the server supplies a default.
-- Target device: an 11-inch Samsung Galaxy Tab A class tablet (Tab A9+ / A11+), 1920×1200, **landscape**, tested on an Android 15 emulator. The exact model isn't confirmed, so compute layout from the reported screen size and never hardcode dimensions. The visual design is drawn at 1280×800, the same 16:10 shape.
+- Target device: the confirmed tablet model for deployment is a **Samsung Galaxy Tab A9+**, 11-inch, 1920×1200, **landscape**, tested on an Android 15 emulator. Still compute layout from the reported screen size and never hardcode dimensions. The visual design is drawn at 1280×800, the same 16:10 shape.
 - Tablets are assumed to have live internet. Don't build dedicated offline behaviour; keep the last good data and send play reports when the connection returns.
 - Floor staff carry phones, so the tablet has no staff controls. Play and stop commands reach it from the server.
 
