@@ -61,10 +61,12 @@ Build first with the emulator closed, then start the emulator. Running both at o
 
 ```bash
 npm run build:emulator   # release build for an x86_64 emulator; needs JDK 17 or 21 (set JAVA_HOME)
-# start the emulator, then:
+npm run emulator         # in a second terminal; leave it running
 npm run e2e:install
 npm run e2e
 ```
+
+`npm run emulator` starts the emulator named `Carepartner_Tablet` from a fresh boot. If yours has another name, run `AVD=<name> npm run emulator` (`emulator -list-avds` lists them). It finds the emulator under `$ANDROID_HOME`, or `~/Android/Sdk` when that isn't set.
 
 `build:emulator` builds for the emulator's processor only. A real tablet needs `arm64-v8a`; use `npx expo run:android --variant release` with the tablet connected.
 
