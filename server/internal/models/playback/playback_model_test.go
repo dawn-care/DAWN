@@ -35,3 +35,14 @@ func TestPlaybackJSONHasRatingClosesAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(body), `"rating_closes_at":null`)
 }
+
+func TestRatingPoints(t *testing.T) {
+	// The middle is 0, a step off it is 1 point, the ends are 2, and worse steps
+	// count 1.5 times as much as the matching helped ones
+	require.Equal(t, map[int]float64{2: 2, 1: 1, 0: 0, -1: -1.5, -2: -3}, RatingPoints)
+	for name, rating := range RatingNames {
+		_, scored := RatingPoints[rating]
+		require.True(t, scored, "%s has points", name)
+	}
+	require.Len(t, RatingNames, 5)
+}

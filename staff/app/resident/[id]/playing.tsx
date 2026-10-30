@@ -5,9 +5,11 @@
  * Stop asks the server to stop it on the tablet.
  *
  * The screen asks the server about the play every few seconds (getPlayState):
- *  - Progress is estimated from the clip's length, and only shown when the
- *    server confirmed the tablet received the command. When the tablet reports
- *    the end, the screen says Finished then, whatever the estimate said.
+ *  - Progress is estimated: the time since the tablet put the clip on screen,
+ *    up to the clip's length. It is only shown when the server confirmed the
+ *    tablet received the command. When the tablet reports the end, the screen
+ *    says so then (Finished, Stopped, even if another phone stopped it, or
+ *    Didn't finish), whatever the estimate said.
  *  - Rating ("How did it go?") appears only while the server would accept it:
  *    once the clip has been on the tablet's screen for 15 seconds, or has ended
  *    or been stopped if that's sooner, until five minutes after it ends
@@ -16,8 +18,9 @@
  *    see a first reaction without making staff wait out a long clip.
  *
  * Ratings are saved on the playback and rank the media list for every staff
- * member (best first). Nobody is shown the scores. Rating again before the
- * window closes replaces the rating.
+ * member (best first). Nobody is shown the scores. One tap replaces the buttons
+ * with a thanks, so nothing is overwritten by accident; its Change link brings
+ * them back until the window closes, and the new rating replaces the old one.
  */
 
 import { useEffect, useState } from 'react';
@@ -47,10 +50,13 @@ const RATE_AFTER_MS = 15 * 1000;
 const formatDuration = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
+/** Best to worst. The server weighs the ends more, and worse more than helped. */
 const OPTIONS: { rating: Rating; label: string; icon: string; color: keyof ThemeColors }[] = [
-  { rating: 'helped', label: 'Helped', icon: 'checkmark', color: 'statusGreenText' },
+  { rating: 'helped_a_lot', label: 'Helped a lot', icon: 'checkmark-done', color: 'statusGreenText' },
+  { rating: 'helped', label: 'Helped a little', icon: 'checkmark', color: 'statusGreenText' },
   { rating: 'no_change', label: 'No change', icon: 'remove', color: 'statusGrayText' },
-  { rating: 'worse', label: 'Made it worse', icon: 'arrow-down', color: 'statusRedText' },
+  { rating: 'worse', label: 'Made it a little worse', icon: 'arrow-down', color: 'statusRedText' },
+  { rating: 'much_worse', label: 'Made it much worse', icon: 'arrow-down-circle', color: 'statusRedText' },
 ];
 
 /**
@@ -91,21 +97,28 @@ export default function PlayingScreen() {
     getResident(residentId).then((r) => setResident(r ?? null));
   }, [clipId, residentId]);
 
-  /** Estimated playback clock, from the clip's length. Not reported by the tablet. */
+  /**
+   * Estimated playback clock: the time since the tablet put the clip on screen
+   * (as the server reports it), capped at the clip's length. It stays at 0:00
+   * until the tablet has started, so a slow load doesn't eat into it.
+   */
+  const startedAt = play?.startedAt ?? null;
   useEffect(() => {
-    if (phase !== 'playing' || !clip?.duration) return;
+    if (phase !== 'playing' || !clip?.duration || startedAt === null) return;
     const duration = clip.duration;
-    const timer = setInterval(() => {
-      setPosition((p) => {
-        if (p + 1 >= duration) {
-          setPhase('ended');
-          return duration;
-        }
-        return p + 1;
-      });
-    }, 1000);
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      if (elapsed >= duration) {
+        setPosition(duration);
+        setPhase('ended');
+      } else {
+        setPosition(Math.max(0, elapsed));
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [phase, clip]);
+  }, [phase, clip, startedAt]);
 
   /** An offline tablet has 30 seconds to reconnect before the command expires. */
   useEffect(() => {
@@ -135,6 +148,9 @@ export default function PlayingScreen() {
   useEffect(() => {
     if (play?.failed && (phase === 'playing' || phase === 'ended')) {
       setPhase('failed');
+    } else if (play?.stopped && (phase === 'playing' || phase === 'ended')) {
+      // Stopped from another phone, or the tablet confirmed this phone's Stop
+      setPhase('stopped');
     } else if (play?.ended && phase === 'playing') {
       setPhase('ended');
       if (clip?.duration) setPosition(clip.duration);
@@ -142,7 +158,6 @@ export default function PlayingScreen() {
   }, [play, phase, clip]);
 
   /** Rating appears once the clip has been on the tablet's screen for RATE_AFTER_MS. */
-  const startedAt = play?.startedAt ?? null;
   useEffect(() => {
     if (startedAt === null) return;
     const timer = setTimeout(
@@ -307,10 +322,16 @@ export default function PlayingScreen() {
 
       {/* Rating: only offered while the server would accept it */}
       {submitted ? (
-        <View className="mt-6 rounded-2xl bg-status-green-bg p-4">
-          <Text className="text-base font-semibold text-status-green-text">
+        <View className="mt-6 flex-row items-center justify-between rounded-2xl bg-status-green-bg p-4">
+          <Text className="flex-1 text-base font-semibold text-status-green-text">
             Thanks — recorded as {OPTIONS.find((o) => o.rating === submitted)?.label}.
           </Text>
+          {/* A mis-tap can be fixed while the window is open; the new rating replaces this one */}
+          {!ratingClosed && (
+            <Pressable onPress={() => setSubmitted(null)} hitSlop={12} className="ml-3 active:opacity-70">
+              <Text className="text-base font-semibold text-link underline">Change</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         canRate && (

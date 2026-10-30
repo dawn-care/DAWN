@@ -19,29 +19,45 @@ const (
 	StatusExpired      = "expired"
 )
 
-// Ratings staff give a play, as stored in Rating (migration 8 allows only these)
+// Ratings staff give a play on five steps, as stored in Rating (migration 8 allows
+// only these)
 const (
-	RatingHelped   = 1
-	RatingNoChange = 0
-	RatingWorse    = -1
+	RatingHelpedALot = 2
+	RatingHelped     = 1
+	RatingNoChange   = 0
+	RatingWorse      = -1
+	RatingMuchWorse  = -2
 )
 
 // RatingNames are the words the staff app sends for each rating
 var RatingNames = map[string]int{
-	"helped":    RatingHelped,
-	"no_change": RatingNoChange,
-	"worse":     RatingWorse,
+	"helped_a_lot": RatingHelpedALot,
+	"helped":       RatingHelped,
+	"no_change":    RatingNoChange,
+	"worse":        RatingWorse,
+	"much_worse":   RatingMuchWorse,
 }
 
+// NegativeWeight is how much more a "worse" rating counts than the matching
+// "helped" one, so media that upset someone drops faster than helpful media rises
+const NegativeWeight = 1.5
+
 /*
-Points a rating adds to its media's score, which orders the staff app's list
-(see ListMedia in models/media). "Made it worse" counts double, so media that
-upset someone drops faster than helpful media rises.
+RatingPoints are what each rating adds to its media's score, which orders the staff
+app's list (see ListMedia in models/media): the step itself (a step off the middle is
+1 point, the ends are 2), with "worse" steps times NegativeWeight.
 */
-const (
-	PointsHelped = 1
-	PointsWorse  = -2
-)
+var RatingPoints = map[int]float64{
+	RatingHelpedALot: 2,
+	RatingHelped:     1,
+	RatingNoChange:   0,
+	RatingWorse:      -1 * NegativeWeight,
+	RatingMuchWorse:  -2 * NegativeWeight,
+}
+
+// RatingHalfLife is how long it takes a rating to count half as much in the score,
+// so what helped recently outranks what helped months ago
+const RatingHalfLife = 30 * 24 * time.Hour
 
 // RatingWindow is how long after a play ends staff can rate it; later ratings aren't
 // accurate

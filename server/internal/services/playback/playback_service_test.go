@@ -330,7 +330,8 @@ func TestRatePlayback(t *testing.T) {
 		rating string
 		stored int
 	}{
-		"helped": {"helped", 1}, "no change": {"no_change", 0}, "made it worse": {"worse", -1},
+		"helped a lot": {"helped_a_lot", 2}, "helped": {"helped", 1}, "no change": {"no_change", 0},
+		"made it worse": {"worse", -1}, "made it much worse": {"much_worse", -2},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, mock := setup(t)

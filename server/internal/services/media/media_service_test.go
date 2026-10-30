@@ -539,10 +539,13 @@ func TestSetTags_NoneTakesItOutOfTheStaffApp(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// Ranked lists sum each item's rating points: helped +1, made it worse -2, no change 0
+// Ranked lists sum each item's rating points, worse steps 1.5 times as heavy, each
+// halved for every 30 days since the play
 func TestListMedia_RankScoresRatings(t *testing.T) {
 	svc, mock, _, _ := newTestService(t, 0, nil)
-	mock.ExpectQuery(`ORDER BY CASE WHEN \$5 THEN \(SELECT COALESCE\(SUM\(CASE p.rating WHEN 1 THEN 1 WHEN -1 THEN -2 ELSE 0 END\), 0\)\s+FROM "Playback" p WHERE p.media_id = m.id\) ELSE 0 END DESC, m.created_at DESC, m.id DESC`).
+	mock.ExpectQuery(`ORDER BY CASE WHEN \$5 THEN \(SELECT COALESCE\(SUM\(\(CASE p.rating WHEN 2 THEN 2 WHEN 1 THEN 1 WHEN -1 THEN -1.5 WHEN -2 THEN -3 ELSE 0 END\)`+
+		`\s+\* power\(0.5, EXTRACT\(EPOCH FROM now\(\) - COALESCE\(p.started_at, now\(\)\)\) / 2592000\)\), 0\)`+
+		`\s+FROM "Playback" p WHERE p.media_id = m.id AND p.rating IS NOT NULL\) ELSE 0 END DESC, m.created_at DESC, m.id DESC`).
 		WithArgs(1, "", "", 0, true).
 		WillReturnRows(sqlmock.NewRows(mediaColumns))
 

@@ -197,6 +197,8 @@ export interface PlayState {
   ended: boolean;
   /** The tablet couldn't play it to the end (the file didn't load, or playback stalled). */
   failed: boolean;
+  /** Someone stopped it, from this phone or another. */
+  stopped: boolean;
   /** Until when it can be rated (ms since epoch); null if it never reached the screen. */
   ratingClosesAt: number | null;
 }
@@ -208,6 +210,7 @@ export async function getPlayState(residentId: number, playbackId: number): Prom
     startedAt: p.started_at ? Date.parse(p.started_at) : null,
     ended: p.ended_at !== null,
     failed: p.status === "failed",
+    stopped: p.status === "stopped",
     ratingClosesAt: p.rating_closes_at ? Date.parse(p.rating_closes_at) : null,
   };
 }

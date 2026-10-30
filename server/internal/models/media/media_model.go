@@ -3,6 +3,7 @@ package media
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/db"
@@ -143,11 +144,22 @@ type ListFilter struct {
 	Rank bool
 }
 
-// scoreSQL is a media item's score: the points of every rating its plays got
-// (Points* in models/playback). Unrated media scores 0.
-var scoreSQL = fmt.Sprintf(`(SELECT COALESCE(SUM(CASE p.rating WHEN %d THEN %d WHEN %d THEN %d ELSE 0 END), 0)
-	FROM "Playback" p WHERE p.media_id = m.id)`,
-	playback.RatingHelped, playback.PointsHelped, playback.RatingWorse, playback.PointsWorse)
+/*
+scoreSQL is a media item's score: the points of every rating its plays got
+(RatingPoints in models/playback), each halved for every RatingHalfLife since that
+play, so recent ratings count most. Unrated media scores 0. A play is rated within
+minutes of playing, so its start time stands in for when it was rated.
+*/
+var scoreSQL = func() string {
+	var points strings.Builder
+	for _, rating := range []int{playback.RatingHelpedALot, playback.RatingHelped, playback.RatingWorse, playback.RatingMuchWorse} {
+		fmt.Fprintf(&points, " WHEN %d THEN %g", rating, playback.RatingPoints[rating])
+	}
+	return fmt.Sprintf(`(SELECT COALESCE(SUM((CASE p.rating%s ELSE 0 END)
+		* power(0.5, EXTRACT(EPOCH FROM now() - COALESCE(p.started_at, now())) / %d)), 0)
+	FROM "Playback" p WHERE p.media_id = m.id AND p.rating IS NOT NULL)`,
+		points.String(), int64(playback.RatingHalfLife.Seconds()))
+}()
 
 // List a carepartner's media that matches filter: newest first, or with Rank, highest
 // score first and newest first among equal scores
