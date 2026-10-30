@@ -308,3 +308,137 @@ func TestListPlayedValidationAndFailures(t *testing.T) {
 		require.ErrorIs(t, err, cause)
 	})
 }
+
+// ratedRows is one playback that started at started and, unless ended is nil, ended then
+func ratedRows(started time.Time, ended *time.Time, rating any) *sqlmock.Rows {
+	var end any
+	status := "started"
+	if ended != nil {
+		end, status = *ended, "finished"
+	}
+	return sqlmock.NewRows(strings.Fields(strings.ReplaceAll(columns, ",", ""))).
+		AddRow(1, 2, 3, "video", "Clip", nil, "staff", status, started, started, started, end, started.Add(30*time.Second), rating)
+}
+
+func expectRatingRead(mock sqlmock.Sqlmock, rows *sqlmock.Rows) {
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT .* FROM "Playback" WHERE id = \$1 AND carepartner_id = \$2 FOR UPDATE`).WithArgs(1, 2).WillReturnRows(rows)
+}
+
+func TestRatePlayback(t *testing.T) {
+	for name, test := range map[string]struct {
+		rating string
+		stored int
+	}{
+		"helped a lot": {"helped_a_lot", 2}, "helped": {"helped", 1}, "no change": {"no_change", 0},
+		"made it worse": {"worse", -1}, "made it much worse": {"much_worse", -2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, mock := setup(t)
+			ended := time.Now().UTC().Add(-time.Minute)
+			expectRatingRead(mock, ratedRows(ended.Add(-30*time.Second), &ended, nil))
+			mock.ExpectExec(`UPDATE "Playback" SET rating = \$1 WHERE id = \$2 AND carepartner_id = \$3`).
+				WithArgs(test.stored, 1, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectCommit()
+
+			p, err := s.RatePlayback(context.Background(), 1, 2, test.rating)
+			require.NoError(t, err)
+			require.Equal(t, test.stored, *p.Rating)
+		})
+	}
+}
+
+func TestRatePlaybackReplacesEarlierRating(t *testing.T) {
+	s, mock := setup(t)
+	ended := time.Now().UTC().Add(-2 * time.Minute)
+	// A mis-tap on "worse" fixed to "helped" inside the window
+	expectRatingRead(mock, ratedRows(ended.Add(-time.Minute), &ended, -1))
+	mock.ExpectExec(`UPDATE "Playback" SET rating`).WithArgs(1, 1, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	p, err := s.RatePlayback(context.Background(), 1, 2, "helped")
+	require.NoError(t, err)
+	require.Equal(t, 1, *p.Rating)
+}
+
+func TestRatePlaybackWindow(t *testing.T) {
+	now := time.Now().UTC()
+	for name, test := range map[string]struct {
+		started time.Time
+		ended   *time.Time
+		want    error
+	}{
+		"ended over 5 minutes ago":            {now.Add(-7 * time.Minute), timePtr(now.Add(-6 * time.Minute)), ErrRatingClosed},
+		"never ended, started 16 minutes ago": {now.Add(-16 * time.Minute), nil, ErrRatingClosed},
+		"never ended, started 10 minutes ago": {now.Add(-10 * time.Minute), nil, nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, mock := setup(t)
+			expectRatingRead(mock, ratedRows(test.started, test.ended, nil))
+			if test.want == nil {
+				mock.ExpectExec(`UPDATE "Playback" SET rating`).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectCommit()
+			} else {
+				mock.ExpectRollback()
+			}
+			_, err := s.RatePlayback(context.Background(), 1, 2, "helped")
+			if test.want == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, test.want)
+			}
+		})
+	}
+}
+
+func TestRatePlaybackRefusals(t *testing.T) {
+	for _, test := range []struct {
+		id, cp int
+		rating string
+	}{{0, 2, "helped"}, {1, 0, "helped"}, {1, 2, "great"}, {1, 2, ""}} {
+		s, _ := setup(t)
+		_, err := s.RatePlayback(context.Background(), test.id, test.cp, test.rating)
+		require.ErrorIs(t, err, ErrInvalidInput)
+	}
+
+	t.Run("not found", func(t *testing.T) {
+		s, mock := setup(t)
+		mock.ExpectBegin()
+		mock.ExpectQuery(`FOR UPDATE`).WithArgs(1, 2).WillReturnError(sql.ErrNoRows)
+		mock.ExpectRollback()
+		_, err := s.RatePlayback(context.Background(), 1, 2, "helped")
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+	t.Run("never reached the screen", func(t *testing.T) {
+		s, mock := setup(t)
+		expectRatingRead(mock, playbackRows("expired", time.Now().Add(-time.Hour)))
+		mock.ExpectRollback()
+		_, err := s.RatePlayback(context.Background(), 1, 2, "helped")
+		require.ErrorIs(t, err, ErrNotRateable)
+	})
+}
+
+func timePtr(t time.Time) *time.Time { return &t }
+
+func TestGetPlayback(t *testing.T) {
+	s, mock := setup(t)
+	mock.ExpectQuery(`SELECT .* FROM "Playback" WHERE id = \$1 AND carepartner_id = \$2`).WithArgs(1, 2).
+		WillReturnRows(playbackRows("finished", time.Now().Add(time.Hour)))
+	p, err := s.GetPlayback(context.Background(), 1, 2)
+	require.NoError(t, err)
+	require.Equal(t, "finished", p.Status)
+	require.NotNil(t, p.RatingClosesAt())
+}
+
+func TestGetPlaybackRefusals(t *testing.T) {
+	s, _ := setup(t)
+	_, err := s.GetPlayback(context.Background(), 0, 2)
+	require.ErrorIs(t, err, ErrInvalidInput)
+	_, err = s.GetPlayback(context.Background(), 1, 0)
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	s, mock := setup(t)
+	mock.ExpectQuery(`FROM "Playback"`).WithArgs(1, 2).WillReturnError(sql.ErrNoRows)
+	_, err = s.GetPlayback(context.Background(), 1, 2)
+	require.ErrorIs(t, err, ErrNotFound)
+}

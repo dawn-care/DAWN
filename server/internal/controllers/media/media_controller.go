@@ -277,6 +277,7 @@ func (c *MediaController) UploadMediaHandler(w http.ResponseWriter, r *http.Requ
 // @Param kind query string false "photo, video or audio; omit for all"
 // @Param situation query string false "Only media under this situation"
 // @Param family_member_id query int false "Only media about this family member"
+// @Param sort query string false "rank: what staff rated best first (the scores aren't sent). Left out: newest first"
 // @Success 200 {array} media.Media
 // @Failure 400 {object} media.MediaError
 // @Failure 500 {object} media.MediaError
@@ -297,6 +298,14 @@ func (c *MediaController) ListMediaHandler(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		filter.FamilyMemberID = ids[0]
+	}
+	switch query.Get("sort") {
+	case "":
+	case "rank":
+		filter.Rank = true
+	default:
+		writeMediaError(w, http.StatusBadRequest, CodeInvalidRequest, "sort must be rank or left out")
+		return
 	}
 
 	items, err := c.Services.ListMedia(carepartnerID, filter)

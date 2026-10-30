@@ -75,4 +75,5 @@ export interface PlayedItem {
   startedAt: string;
 }
 
-export type Rating = 'helped' | 'no_change' | 'worse';
+/** How a play went, on five steps; the server stores 2 to -2 (docs/api/screen-and-media.md). */
+export type Rating = 'helped_a_lot' | 'helped' | 'no_change' | 'worse' | 'much_worse';

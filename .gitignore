@@ -2,7 +2,6 @@ node_modules
 dist
 .env
 .expo
-tsconfig.json
 out
 
 # Local Documents

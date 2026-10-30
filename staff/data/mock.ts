@@ -1,6 +1,6 @@
 /**
- * Fake data for the parts of the staff app with no backend yet: sleeping hours,
- * ratings and requests to the caregiver. Residents, clips and family folders are
+ * Fake data for the parts of the staff app with no backend yet: sleeping hours
+ * and requests to the caregiver. Residents, clips, family folders and ratings are
  * real (data/server.ts). The situations are fixed here; the server only knows
  * their IDs.
  *
@@ -8,7 +8,7 @@
  * doesn't change the screens.
  */
 
-import type { Rating, Situation, SleepingHours } from './types';
+import type { Situation, SleepingHours } from './types';
 
 export const SITUATIONS: Situation[] = [
   {
@@ -68,5 +68,3 @@ export const setSleepingHours = (residentId: number, hours: SleepingHours) => {
   return delay(hours);
 };
 
-/** Ratings aren't saved yet; the screen still behaves as if they were. */
-export const rateClip = (_playbackId: number, _rating: Rating) => delay(undefined);

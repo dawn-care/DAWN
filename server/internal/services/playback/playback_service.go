@@ -14,6 +14,8 @@ var (
 	ErrInvalidInput      = errors.New("invalid playback input")
 	ErrNotFound          = errors.New("playback not found")
 	ErrInvalidTransition = errors.New("invalid playback status transition")
+	ErrNotRateable       = errors.New("only a play that reached the screen can be rated")
+	ErrRatingClosed      = errors.New("the rating window has closed")
 )
 
 type PlaybackService struct {
@@ -189,6 +191,69 @@ func (s *PlaybackService) ListPlayed(ctx context.Context, carepartnerID, limit i
 		return nil, fmt.Errorf("list playbacks: %w", err)
 	}
 	return played, nil
+}
+
+/*
+GetPlayback returns one of a carepartner's playbacks. The staff app polls it while a
+clip plays, to see when the tablet ended it and until when it can be rated.
+*/
+func (s *PlaybackService) GetPlayback(ctx context.Context, id, carepartnerID int) (*playback.Playback, error) {
+	if id <= 0 || carepartnerID <= 0 {
+		return nil, fmt.Errorf("%w: positive IDs are required", ErrInvalidInput)
+	}
+	p, err := scanPlayback(s.DB.QueryRowContext(ctx, `SELECT `+columns+`
+		FROM "Playback" WHERE id = $1 AND carepartner_id = $2`, id, carepartnerID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get playback: %w", err)
+	}
+	return p, nil
+}
+
+/*
+RatePlayback records how a play went: "helped", "no_change" or "worse". Only a play
+that reached the screen can be rated, until its RatingClosesAt (RatingWindow after it
+ended). Rating it again before then replaces the earlier rating, so a mis-tap can be
+fixed.
+*/
+func (s *PlaybackService) RatePlayback(ctx context.Context, id, carepartnerID int, rating string) (*playback.Playback, error) {
+	value, known := playback.RatingNames[rating]
+	if id <= 0 || carepartnerID <= 0 || !known {
+		return nil, fmt.Errorf("%w: positive IDs and a rating of helped, no_change or worse are required", ErrInvalidInput)
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
+		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	closes := p.RatingClosesAt()
+	if closes == nil {
+		return nil, ErrNotRateable
+	}
+	if time.Now().UTC().After(*closes) {
+		return nil, ErrRatingClosed
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE "Playback" SET rating = $1 WHERE id = $2 AND carepartner_id = $3`,
+		value, id, carepartnerID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	p.Rating = &value
+	return p, nil
 }
 
 func canTransition(from, to string) bool {

@@ -37,6 +37,14 @@ func (m *mockService) ListPlayed(context.Context, int, int) ([]model.Playback, e
 	panic("not used by command endpoints")
 }
 
+func (m *mockService) GetPlayback(context.Context, int, int) (*model.Playback, error) {
+	panic("not used by command endpoints")
+}
+
+func (m *mockService) RatePlayback(context.Context, int, int, string) (*model.Playback, error) {
+	panic("not used by command endpoints")
+}
+
 func (m *mockService) RequestStop(ctx context.Context, id, carepartnerID int) (*model.Playback, service.StopOutcome, error) {
 	return m.requestStop(ctx, id, carepartnerID)
 }

@@ -4,7 +4,7 @@
  */
 
 import { api, ApiError, apiWithStatus, mediaUrl } from "../lib/api";
-import type { Clip, FamilyFolder, PlayedItem, Resident, SituationId } from "./types";
+import type { Clip, FamilyFolder, PlayedItem, Rating, Resident, SituationId } from "./types";
 
 interface ServerCarepartner {
   id: number;
@@ -33,7 +33,10 @@ export interface ServerPlayback {
   source: "staff" | "scheduled" | "tap";
   status: string;
   started_at: string | null;
+  ended_at: string | null;
   expires_at: string;
+  /** Until when staff can rate it; null if it never reached the screen. */
+  rating_closes_at: string | null;
 }
 
 interface CommandResponse {
@@ -93,12 +96,14 @@ const SERVER_SITUATIONS: SituationId[] = [
 export type ClipFilter = { familyMemberId?: number; situation?: string };
 
 /**
- * A resident's videos, audio and photos, newest first.
+ * A resident's videos, audio and photos: what staff rated best first, newest
+ * first among equal ratings (see rateClip).
  * With a family member, only clips about them; otherwise, with a situation the
  * caregiver can tag, only clips for it.
  */
 export async function getClips(residentId: number, filter: ClipFilter = {}): Promise<Clip[]> {
-  let query = `carepartner_id=${residentId}`;
+  // What staff rated best comes first; the scores themselves aren't sent
+  let query = `carepartner_id=${residentId}&sort=rank`;
   if (filter.familyMemberId) {
     query += `&family_member_id=${filter.familyMemberId}`;
   } else if (SERVER_SITUATIONS.includes(filter.situation as SituationId)) {
@@ -180,6 +185,57 @@ export async function stopOnTablet(residentId: number, playbackId: number): Prom
       // ended (finished, failed or expired), so there is nothing left to stop.
       return err.message === "tablet is not connected" ? "unreachable" : "finished";
     }
+    throw err;
+  }
+}
+
+/** What the tablet has done with a play, as far as the Playing screen needs. */
+export interface PlayState {
+  /** When it appeared on the tablet's screen (ms since epoch); null if it hasn't. */
+  startedAt: number | null;
+  /** The tablet reported it finished, was stopped, or failed. */
+  ended: boolean;
+  /** The tablet couldn't play it to the end (the file didn't load, or playback stalled). */
+  failed: boolean;
+  /** Someone stopped it, from this phone or another. */
+  stopped: boolean;
+  /** Until when it can be rated (ms since epoch); null if it never reached the screen. */
+  ratingClosesAt: number | null;
+}
+
+/** The server's record of a play, polled while the Playing screen is open. */
+export async function getPlayState(residentId: number, playbackId: number): Promise<PlayState> {
+  const p = await api<ServerPlayback>(`/playbacks/${playbackId}?carepartner_id=${residentId}`);
+  return {
+    startedAt: p.started_at ? Date.parse(p.started_at) : null,
+    ended: p.ended_at !== null,
+    failed: p.status === "failed",
+    stopped: p.status === "stopped",
+    ratingClosesAt: p.rating_closes_at ? Date.parse(p.rating_closes_at) : null,
+  };
+}
+
+/**
+ * What happened when staff rated a play:
+ * - "saved": recorded; it ranks the resident's media for every staff member
+ * - "closed": it can't be rated anymore. The screen only offers rating while it
+ *   can be, so this only happens right at the end of the window.
+ */
+export type RateResult = "saved" | "closed";
+
+/**
+ * Saves how a play went. Rating it again inside the window replaces the
+ * earlier rating.
+ */
+export async function rateClip(residentId: number, playbackId: number, rating: Rating): Promise<RateResult> {
+  try {
+    await api(`/playbacks/${playbackId}/rating`, {
+      method: "POST",
+      body: JSON.stringify({ carepartner_id: residentId, rating }),
+    });
+    return "saved";
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) return "closed";
     throw err;
   }
 }

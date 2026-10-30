@@ -288,7 +288,7 @@ const media = await api<Media>("/media", { method: "POST", body: form });
 
 ### `GET /media?carepartner_id={id}&kind={kind}`
 
-List a carepartner's media, newest first. Optional filters, which combine: `kind`, `situation` (only media under that situation) and `family_member_id` (only media about that person). Use `usage` for the library badges: photos can be `on_screen`, `audio_background` and `scheduled` at once; video and audio can only be `scheduled`. An empty list means saved but unused.
+List a carepartner's media, newest first. Optional filters, which combine: `kind`, `situation` (only media under that situation) and `family_member_id` (only media about that person). `sort=rank` lists what staff rated best first instead, newest first among equal scores (see `POST /playbacks/{id}/rating`); the staff app uses it. Use `usage` for the library badges: photos can be `on_screen`, `audio_background` and `scheduled` at once; video and audio can only be `scheduled`. An empty list means saved but unused.
 
 ### `GET /media/{id}`
 
@@ -636,6 +636,26 @@ What has played on the tablet, newest first. Returns `200` with an array of `Pla
 - `limit` is optional: 1 to 100, default 50. The staff app's "Last played" uses `limit=1`.
 - A missing or invalid `carepartner_id` or `limit` returns `400`.
 
+### `GET /playbacks/{id}?carepartner_id=1`
+
+One playback, by its playback ID (the `id` from `POST /playbacks/play`), whatever its status. The list above is different: it returns the most recent plays that reached the screen, which is what "Last played" needs. The staff app polls this one while a clip plays, to see when the tablet ended it and whether it can be rated yet. `404` if it isn't this carepartner's, which also doesn't reveal whether that ID exists.
+
+### `POST /playbacks/{id}/rating`
+
+Staff say how a play went, on five steps. Body `{"carepartner_id": 1, "rating": "helped"}`. Returns `200` with the `Playback`.
+
+| `rating` sent | Staff app button | Stored `rating` | Points |
+|---|---|---|---|
+| `helped_a_lot` | Helped a lot | `2` | +2 |
+| `helped` | Helped a little | `1` | +1 |
+| `no_change` | No change | `0` | 0 |
+| `worse` | Made it a little worse | `-1` | −1.5 |
+| `much_worse` | Made it much worse | `-2` | −3 |
+
+- Only a play that reached the screen can be rated (`409` otherwise), until 5 minutes after it ended (`409` after). A play the tablet never reported ending can be rated until 15 minutes after it started. Every `Playback` carries this as `rating_closes_at` (`null` when it never reached the screen), so show the rating controls only before that time.
+- Rating it again inside the window replaces the rating, so a mis-tap can be fixed.
+- Ratings rank the staff app's list (`GET /media?sort=rank`). A media item's score is the points of all its ratings: a step off the middle is 1 point and the ends are 2, with worse steps counting 1.5 times as much. Each rating's points halve every 30 days, so what helped recently ranks above what helped months ago. The scores themselves are never sent.
+
 ### Staff play and stop
 
 `POST /playbacks/play` with `{"carepartner_id": 1, "media_id": 9}` records a `staff` playback with a 30 second deadline and pushes it to the tablet over the WebSocket at `/realtime/tablet?carepartner_id=1`. `POST /playbacks/{id}/stop` with `{"carepartner_id": 1}` stops one. `module_id` is no longer accepted (`400`).
@@ -663,7 +683,8 @@ export interface Playback {
   started_at: string | null;
   ended_at: string | null;
   expires_at: string;
-  rating: number | null;         // scale not decided yet
+  rating: 2 | 1 | 0 | -1 | -2 | null; // helped a lot … made it much worse; null until staff rate it
+  rating_closes_at: string | null; // until when it can be rated; null if it never reached the screen
 }
 ```
 
