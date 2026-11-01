@@ -13,17 +13,18 @@
  * Save button are locked.
  */
 
-import { TEXT_LIMITS, widgetName } from "@shared";
+import { fitCaption, TEXT_LIMITS, widgetName } from "@shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PhotoPicker from "../components/ui/PhotoPicker";
 import SelectField from "../components/ui/form/SelectField";
 import TextField from "../components/ui/form/TextField";
+import ToggleButton from "../components/ui/form/ToggleButton";
 import { FOCUS_RING } from "../components/ui/styles";
 import { fileUrl, friendlyError as mediaError, listMedia } from "../media/api";
 import type { Media } from "../media/api";
 import { ApiError, friendlyError, loadSportsLeagues } from "./api";
-import type { MessageConfig, SportsConfig, SportsLeague, WeatherConfig } from "./api";
+import type { MessageConfig, PhotoConfig, SportsConfig, SportsLeague, WeatherConfig } from "./api";
 import type { EditorWidget } from "./layout";
 import { isComplete, isValidZip } from "./widgetSettings";
 import type { WidgetChanges } from "./useScreenEditor";
@@ -203,6 +204,19 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
 
   const photos = state.value.filter((media) => media.kind === "photo");
   const chosen = photos.find((media) => media.id === widget.photoMediaId);
+
+  // The caption is the photo's name until the caregiver types their own, so it follows a new or renamed photo
+  const config = widget.config as PhotoConfig;
+  const captionOn = config.show_caption !== false;
+  const defaultCaption = fitCaption(chosen?.display_name ?? "");
+  const caption = config.caption ?? defaultCaption;
+  // Left out of the config rather than set, so the saved settings hold only what differs from the default
+  const without = (key: keyof PhotoConfig): PhotoConfig => {
+    const rest = { ...config };
+    delete rest[key];
+    return rest;
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <span className="text-base font-bold">Photo</span>
@@ -224,12 +238,42 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
           }}
         />
       )}
-      {/* The chosen photo, larger, with its name under it */}
+      {/* The chosen photo, larger, with its caption as the screen will show it (none when it is off) */}
       {chosen && (
         <figure className="m-0 flex flex-col gap-1.5">
           <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-border" />
-          <figcaption className="text-base font-bold break-words">{chosen.display_name}</figcaption>
+          {captionOn && caption.trim() !== "" && (
+            <figcaption className="text-base font-bold break-words">{fitCaption(caption.trim())}</figcaption>
+          )}
         </figure>
+      )}
+      {chosen && (
+        <div className="flex flex-col gap-2">
+          <ToggleButton
+            pressed={captionOn}
+            className="self-start"
+            // On is the default, so turning it on removes the setting; the text stays while it is off
+            onClick={() => onChange({ config: captionOn ? { ...config, show_caption: false } : without("show_caption") })}
+          >
+            Show caption
+          </ToggleButton>
+          <div className="flex flex-col gap-1">
+            <TextField
+              label="Caption"
+              value={caption}
+              maxLength={TEXT_LIMITS.photoCaption}
+              placeholder={defaultCaption}
+              disabled={!captionOn}
+              className="disabled:opacity-50 disabled:cursor-not-allowed"
+              // Cleared text uses the photo's name again; the field is only left empty while it is being retyped
+              onChange={(event) => onChange({ config: { ...config, caption: event.target.value } })}
+              onBlur={() => config.caption !== undefined && config.caption.trim() === "" && onChange({ config: without("caption") })}
+            />
+            <div className="self-end text-sm text-ink-muted" aria-live="polite">
+              {caption.length} / {TEXT_LIMITS.photoCaption}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -19,7 +19,7 @@ const text = (value: unknown): string | null => (typeof value === "string" && va
 /** One short line about each type's settings, or null when there's nothing to say */
 const DETAILS: Record<ScreenWidgetType, (config: Record<string, unknown>) => string | null> = {
   day_time: () => "Always on screen",
-  photo: (config) => text(config.caption),
+  photo: (config) => (config.show_caption === false ? null : text(config.caption)),
   message: (config) => text(config.text),
   reminder: (config) => {
     const count = Array.isArray(config.items) ? config.items.length : 0;

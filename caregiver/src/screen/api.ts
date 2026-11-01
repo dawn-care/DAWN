@@ -28,7 +28,10 @@ const API_URL = import.meta.env.VITE_API_URL;
  * reminder already on the screen keeps its config and is sent back unchanged.
  */
 export interface PhotoConfig {
+  /** Replaces the photo's name as the caption; left out, the screen shows the name */
   caption?: string;
+  /** false hides the caption (the text is kept); left out, it is shown */
+  show_caption?: boolean;
 }
 export interface MessageConfig {
   text: string;
