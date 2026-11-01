@@ -5,7 +5,7 @@ import { fonts } from "../../theme/fonts";
 import { colors, fontSizes, radii, space } from "../../theme/theme";
 import type { PhotoData } from "../types";
 
-/** A large family photo with the person's name across the bottom. */
+/** A large family photo with its caption, the person's name by default, across the bottom. */
 export default function Photo({ data }: { data: PhotoData }) {
   const [failed, setFailed] = useState(false);
   const showImage = !!data.uri && !failed;

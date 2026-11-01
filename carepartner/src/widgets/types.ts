@@ -12,9 +12,10 @@ export type OrientationData = {
   showDate: boolean;
 };
 
-/** A large family photo with the person's name. */
+/** A large family photo with a caption, the person's name by default. */
 export type PhotoData = {
   uri?: string | null;
+  /** The caption to draw, already cut to fit; none (null) leaves it off. */
   name?: string | null;
 };
 

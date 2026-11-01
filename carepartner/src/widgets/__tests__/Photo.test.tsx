@@ -30,4 +30,11 @@ describe("Photo widget", () => {
 
     expect(screen.queryByText(/./)).toBeNull();
   });
+
+  it("leaves out the caption when the name is null, as when the caregiver turned it off", async () => {
+    await render(<Photo data={{ uri: "http://server/photo/file?id=1", name: null }} />);
+
+    expect(screen.getByTestId("photo-image")).toBeTruthy();
+    expect(screen.queryByText(/./)).toBeNull();
+  });
 });
