@@ -19,7 +19,7 @@ import { Link } from "react-router-dom";
 import PhotoPicker from "../components/ui/PhotoPicker";
 import SelectField from "../components/ui/form/SelectField";
 import TextField from "../components/ui/form/TextField";
-import ToggleButton from "../components/ui/form/ToggleButton";
+import Switch from "../components/ui/form/Switch";
 import { FOCUS_RING } from "../components/ui/styles";
 import { fileUrl, friendlyError as mediaError, listMedia } from "../media/api";
 import type { Media } from "../media/api";
@@ -238,28 +238,20 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
           }}
         />
       )}
-      {/* The chosen photo, larger, with its caption as the screen will show it (none when it is off) */}
-      {chosen && (
-        <figure className="m-0 flex flex-col gap-1.5">
-          <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-border" />
-          {captionOn && caption.trim() !== "" && (
-            <figcaption className="text-base font-bold break-words">{fitCaption(caption.trim())}</figcaption>
-          )}
-        </figure>
-      )}
+      {/* The chosen photo, larger */}
+      {chosen && <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-border" />}
       {chosen && (
         <div className="flex flex-col gap-2">
-          <ToggleButton
-            pressed={captionOn}
-            className="self-start"
+          <Switch
+            label="Show caption"
+            checked={captionOn}
             // On is the default, so turning it on removes the setting; the text stays while it is off
-            onClick={() => onChange({ config: captionOn ? { ...config, show_caption: false } : without("show_caption") })}
-          >
-            Show caption
-          </ToggleButton>
+            onCheckedChange={(on) => onChange({ config: on ? without("show_caption") : { ...config, show_caption: false } })}
+          />
           <div className="flex flex-col gap-1">
             <TextField
               label="Caption"
+              hideLabel
               value={caption}
               maxLength={TEXT_LIMITS.photoCaption}
               placeholder={defaultCaption}
