@@ -38,6 +38,9 @@ const MaxReminderItems = 10
 
 type PhotoConfig struct {
 	Caption string `json:"caption,omitempty"` // e.g. the daughter's name under the frame
+	// ShowCaption turns the caption off when false. Left out it is on, so photos saved before
+	// this field existed keep their captions; the caption text is kept while it is off.
+	ShowCaption *bool `json:"show_caption,omitempty"`
 }
 
 type MessageConfig struct {

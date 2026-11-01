@@ -21,6 +21,9 @@ func TestNormalizeConfig_Valid(t *testing.T) {
 	}{
 		{"photo, no config", TypePhoto, ``, `{}`},
 		{"photo caption trimmed", TypePhoto, `{"caption":"  Sarah "}`, `{"caption":"Sarah"}`},
+		{"photo caption on", TypePhoto, `{"show_caption":true}`, `{"show_caption":true}`},
+		{"photo caption off keeps the text", TypePhoto,
+			`{"caption":" Sarah ","show_caption":false}`, `{"caption":"Sarah","show_caption":false}`},
 		{"message", TypeMessage, `{"text":"Ana","label":"Nurse"}`, `{"text":"Ana","label":"Nurse"}`},
 		{"location reassurance", TypeMessage,
 			`{"text":"You are safe at home","location":"Rochester, NY","about":"carepartner"}`,
@@ -49,6 +52,7 @@ func TestNormalizeConfig_Invalid(t *testing.T) {
 		name, widgetType, in string
 	}{
 		{"unknown field (typo)", TypePhoto, `{"captoin":"Sarah"}`},
+		{"show_caption not a boolean", TypePhoto, `{"show_caption":"no"}`},
 		{"not an object", TypeWeather, `["14617"]`},
 		{"caption too long", TypePhoto, `{"caption":"` + strings.Repeat("a", 61) + `"}`},
 		{"message without text", TypeMessage, `{"label":"Nurse"}`},
