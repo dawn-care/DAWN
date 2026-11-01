@@ -638,7 +638,7 @@ What has played on the tablet, newest first. Returns `200` with an array of `Pla
 
 ### `GET /playbacks/{id}?carepartner_id=1`
 
-One playback, by its playback ID (the `id` from `POST /playbacks/play`), whatever its status. The list above is different: it returns the most recent plays that reached the screen, which is what "Last played" needs. The staff app polls this one while a clip plays, to see when the tablet ended it and whether it can be rated yet. `404` if it isn't this carepartner's, which also doesn't reveal whether that ID exists.
+One playback, by its playback ID (the `id` from `POST /playbacks/play`), whatever its status. The list above is different: it returns the most recent plays that reached the screen, which is what "Last played" needs. The staff app polls this one while a clip plays, to see when the tablet ended it and whether it can be rated yet. `404` if it isn't this carepartner's (see Errors below).
 
 ### `POST /playbacks/{id}/rating`
 
@@ -664,7 +664,9 @@ The tablet receives `{"type":"play","playback_id":12,"media_id":9,"expires_at":"
 
 ### Errors
 
-These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise. Deleting a media item keeps its playbacks and clears `media_id`; `media_kind` and `media_display_name` still say what played (the name as it was when it played). Deleting a scheduled item likewise keeps them and clears `scheduled_item_id`.
+These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise.
+
+A playback that belongs to a different carepartner than the one named also gets `404`, the same as one that doesn't exist, so the API doesn't reveal which playback IDs exist. The server log tells the two apart: it records that case as a 403, with whose playback it is (`playback: 403 Forbidden (answered as 404): playback 170 belongs to carepartner 1, not 2`). Deleting a media item keeps its playbacks and clears `media_id`; `media_kind` and `media_display_name` still say what played (the name as it was when it played). Deleting a scheduled item likewise keeps them and clears `scheduled_item_id`.
 
 ```ts
 export type PlaybackSource = "scheduled" | "staff" | "tap";

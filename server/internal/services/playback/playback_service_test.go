@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -441,4 +443,40 @@ func TestGetPlaybackRefusals(t *testing.T) {
 	mock.ExpectQuery(`FROM "Playback"`).WithArgs(1, 2).WillReturnError(sql.ErrNoRows)
 	_, err = s.GetPlayback(context.Background(), 1, 2)
 	require.ErrorIs(t, err, ErrNotFound)
+}
+
+// captureLog collects what the code under test logs
+func captureLog(t *testing.T) *strings.Builder {
+	var out strings.Builder
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	return &out
+}
+
+func TestOtherCarepartnersPlaybackIsLoggedAs403(t *testing.T) {
+	logged := captureLog(t)
+	s, mock := setup(t)
+	mock.ExpectQuery(`FROM "Playback" WHERE id = \$1 AND carepartner_id = \$2`).WithArgs(7, 2).WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(`SELECT carepartner_id FROM "Playback" WHERE id = \$1`).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}).AddRow(5))
+
+	_, err := s.GetPlayback(context.Background(), 7, 2)
+
+	require.ErrorIs(t, err, ErrNotFound, "the caller still answers 404")
+	require.Contains(t, logged.String(), "403 Forbidden (answered as 404): playback 7 belongs to carepartner 5, not 2")
+}
+
+func TestMissingPlaybackIsNotLoggedAs403(t *testing.T) {
+	logged := captureLog(t)
+	s, mock := setup(t)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`FOR UPDATE`).WithArgs(7, 2).WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(`SELECT carepartner_id FROM "Playback" WHERE id = \$1`).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"carepartner_id"}))
+	mock.ExpectRollback()
+
+	_, err := s.RatePlayback(context.Background(), 7, 2, "helped")
+
+	require.ErrorIs(t, err, ErrNotFound)
+	require.Empty(t, logged.String(), "a playback that doesn't exist is a plain 404")
 }

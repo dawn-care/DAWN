@@ -136,7 +136,7 @@ func (s *PlaybackService) RequestStop(ctx context.Context, id, carepartnerID int
 	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
 		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, ErrNotFound
+		return nil, 0, notFound(ctx, tx, id, carepartnerID)
 	}
 	if err != nil {
 		return nil, 0, err

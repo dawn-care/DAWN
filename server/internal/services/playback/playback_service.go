@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	playback "server/internal/models/playback"
@@ -17,6 +18,27 @@ var (
 	ErrNotRateable       = errors.New("only a play that reached the screen can be rated")
 	ErrRatingClosed      = errors.New("the rating window has closed")
 )
+
+// rowQuerier is a *sql.DB or *sql.Tx
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+/*
+notFound is what a lookup by playback ID and carepartner returns when it finds
+nothing. The caller answers 404 either way, so the API doesn't reveal which playback
+IDs exist. The server log still says what it really was: when the playback belongs
+to another carepartner, it is logged as a 403, so the two cases are easy to tell
+apart when debugging. A playback that doesn't exist at all needs no extra line; the
+request log already shows the 404.
+*/
+func notFound(ctx context.Context, q rowQuerier, id, carepartnerID int) error {
+	var owner int
+	if err := q.QueryRowContext(ctx, `SELECT carepartner_id FROM "Playback" WHERE id = $1`, id).Scan(&owner); err == nil {
+		log.Printf("playback: 403 Forbidden (answered as 404): playback %d belongs to carepartner %d, not %d", id, owner, carepartnerID)
+	}
+	return ErrNotFound
+}
 
 type PlaybackService struct {
 	DB *sql.DB
@@ -112,7 +134,7 @@ func (s *PlaybackService) UpdateStatus(ctx context.Context, id, carepartnerID in
 	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
 		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, notFound(ctx, tx, id, carepartnerID)
 	}
 	if err != nil {
 		return nil, err
@@ -204,7 +226,7 @@ func (s *PlaybackService) GetPlayback(ctx context.Context, id, carepartnerID int
 	p, err := scanPlayback(s.DB.QueryRowContext(ctx, `SELECT `+columns+`
 		FROM "Playback" WHERE id = $1 AND carepartner_id = $2`, id, carepartnerID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, notFound(ctx, s.DB, id, carepartnerID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get playback: %w", err)
@@ -232,7 +254,7 @@ func (s *PlaybackService) RatePlayback(ctx context.Context, id, carepartnerID in
 	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
 		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, notFound(ctx, tx, id, carepartnerID)
 	}
 	if err != nil {
 		return nil, err
