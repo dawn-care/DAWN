@@ -99,6 +99,18 @@ func TestLoginWithGoogle_NewCaregiverIsCreatedThenGetsASession(t *testing.T) {
 	assert.Equal(t, []int{12}, sessions.createdFor)
 }
 
+func TestLoginWithGoogle_CaregiverLookupErrorStartsNoSession(t *testing.T) {
+	sessions := &fakeSessions{}
+	svc, mock := newAuthService(t, fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, sessions)
+	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Caregiver"`)).WillReturnError(errors.New("db down"))
+
+	token, err := svc.LoginWithGoogle(context.Background(), "id-token")
+
+	assert.Error(t, err)
+	assert.Empty(t, token)
+	assert.Empty(t, sessions.createdFor)
+}
+
 func TestLoginWithGoogle_FailedGoogleCheckStartsNoSession(t *testing.T) {
 	sessions := &fakeSessions{}
 	svc, _ := newAuthService(t, fakeGoogle{err: errors.New("bad token")}, sessions)

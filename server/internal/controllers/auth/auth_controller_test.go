@@ -25,9 +25,12 @@ import (
 type fakeGoogle struct {
 	user *user.GoogleUser
 	err  error
+
+	verified []string
 }
 
-func (f fakeGoogle) Verify(ctx context.Context, idToken string) (*user.GoogleUser, error) {
+func (f *fakeGoogle) Verify(ctx context.Context, idToken string) (*user.GoogleUser, error) {
+	f.verified = append(f.verified, idToken)
 	return f.user, f.err
 }
 
@@ -110,7 +113,7 @@ func assertCleared(t *testing.T, w *httptest.ResponseRecorder) {
 func TestGoogleLogin_SetsALongLivedStrictCookie(t *testing.T) {
 	t.Setenv("RUN_MODE", "production")
 	sessions := &fakeSessions{createToken: "new-token"}
-	c, mock := newController(t, fakeGoogle{user: &user.GoogleUser{ID: "g-1", Name: "Pat"}}, sessions)
+	c, mock := newController(t, &fakeGoogle{user: &user.GoogleUser{ID: "g-1", Name: "Pat"}}, sessions)
 	expectExistingCaregiver(mock, 7)
 
 	w := login(c)
@@ -132,7 +135,7 @@ func TestGoogleLogin_SetsALongLivedStrictCookie(t *testing.T) {
 
 func TestGoogleLogin_DevCookieIsNotSecure(t *testing.T) {
 	t.Setenv("RUN_MODE", "dev")
-	c, mock := newController(t, fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, &fakeSessions{createToken: "new-token"})
+	c, mock := newController(t, &fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, &fakeSessions{createToken: "new-token"})
 	expectExistingCaregiver(mock, 7)
 
 	w := login(c)
@@ -144,9 +147,35 @@ func TestGoogleLogin_DevCookieIsNotSecure(t *testing.T) {
 	assert.Equal(t, http.SameSiteStrictMode, cookies[0].SameSite)
 }
 
+func TestGoogleLogin_SendsTheRequestsTokenToGoogle(t *testing.T) {
+	google := &fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}
+	c, mock := newController(t, google, &fakeSessions{createToken: "new-token"})
+	expectExistingCaregiver(mock, 7)
+
+	login(c)
+
+	assert.Equal(t, []string{"id-token"}, google.verified)
+}
+
+func TestGoogleLogin_UnreadableBodyIsRejectedAndSetsNoCookie(t *testing.T) {
+	// With no usable idToken the real Google check fails, as this stand-in does
+	google := &fakeGoogle{err: errors.New("no token")}
+	sessions := &fakeSessions{}
+	c, _ := newController(t, google, sessions)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/google", strings.NewReader(`not json`))
+	w := httptest.NewRecorder()
+
+	c.GoogleLogin(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Empty(t, w.Result().Cookies())
+	assert.Equal(t, []string{""}, google.verified, "an empty token is what reaches Google")
+	assert.Empty(t, sessions.createdFor)
+}
+
 func TestGoogleLogin_RejectedGoogleTokenSetsNoCookie(t *testing.T) {
 	sessions := &fakeSessions{}
-	c, _ := newController(t, fakeGoogle{err: errors.New("bad token")}, sessions)
+	c, _ := newController(t, &fakeGoogle{err: errors.New("bad token")}, sessions)
 
 	w := login(c)
 
@@ -157,7 +186,7 @@ func TestGoogleLogin_RejectedGoogleTokenSetsNoCookie(t *testing.T) {
 
 func TestGoogleLogin_SessionErrorSetsNoCookie(t *testing.T) {
 	sessions := &fakeSessions{createErr: errors.New("db down")}
-	c, mock := newController(t, fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, sessions)
+	c, mock := newController(t, &fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, sessions)
 	expectExistingCaregiver(mock, 7)
 
 	w := login(c)
