@@ -18,7 +18,8 @@ export const TEXT_LIMITS = {
   /**
    * A photo's caption, on one line across the bottom of its 2x2 tile at the
    * name size. The tile is 576 wide on the 1280x800 design, less 20 of padding
-   * each side; this is how many average glyphs fit in what is left.
+   * each side; this is how many average glyphs fit in what is left. The server
+   * enforces the same number (`MaxPhotoCaption` in screen_widgets/config.go).
    */
   photoCaption: 20,
 } as const;

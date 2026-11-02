@@ -31,6 +31,10 @@ const DefaultWeatherZip = "14617"
 // ReminderIcons are the icons a reminder item can show; "other" is used when none is given
 var ReminderIcons = []string{"meal", "medication", "walk", "visit", "appointment", "call", "rest", "other"}
 
+// MaxPhotoCaption is the longest caption the tablet shows whole; it matches
+// TEXT_LIMITS.photoCaption in shared/widgets/textLimits.ts.
+const MaxPhotoCaption = 20
+
 // MaxReminderItems caps how many reminders one widget holds
 const MaxReminderItems = 10
 
@@ -134,7 +138,7 @@ func NormalizeConfig(widgetType string, raw json.RawMessage) (json.RawMessage, e
 		if err = decodeStrict(raw, &c); err != nil {
 			return nil, err
 		}
-		if c.Caption, err = cleanText("caption", c.Caption, 60, false); err != nil {
+		if c.Caption, err = cleanText("caption", c.Caption, MaxPhotoCaption, false); err != nil {
 			return nil, err
 		}
 		out = c

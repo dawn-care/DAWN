@@ -25,12 +25,12 @@ export default function Switch({ label, checked, onCheckedChange, className = ""
 
   return (
     <button
+      {...buttonProps}
       type={type}
       role="switch"
       aria-checked={checked}
       onClick={() => onCheckedChange(!checked)}
       className={`flex items-center justify-between gap-3 min-h-11 w-full rounded-[10px] text-left text-base font-bold text-ink cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS_RING} ${className}`}
-      {...buttonProps}
     >
       {label}
       <span aria-hidden="true" className={`relative shrink-0 w-12 h-7 rounded-full border-2 ${track}`}>

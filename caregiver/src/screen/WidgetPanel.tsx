@@ -196,6 +196,13 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
+/** A photo's config without one key, so the saved settings hold only what differs from the default */
+function omit(config: PhotoConfig, key: keyof PhotoConfig): PhotoConfig {
+  const rest = { ...config };
+  delete rest[key];
+  return rest;
+}
+
 function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { carepartnerId: number }) {
   const { state, retry } = useLoad<Media[]>(() => listMedia(carepartnerId), mediaError);
 
@@ -205,17 +212,12 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
   const photos = state.value.filter((media) => media.kind === "photo");
   const chosen = photos.find((media) => media.id === widget.photoMediaId);
 
-  // The caption is the photo's name until the caregiver types their own, so it follows a new or renamed photo
+  // Until the caregiver types their own, the screen shows the photo's name, so it follows a new or renamed photo
   const config = widget.config as PhotoConfig;
   const captionOn = config.show_caption !== false;
   const defaultCaption = fitCaption(chosen?.display_name ?? "");
-  const caption = config.caption ?? defaultCaption;
-  // Left out of the config rather than set, so the saved settings hold only what differs from the default
-  const without = (key: keyof PhotoConfig): PhotoConfig => {
-    const rest = { ...config };
-    delete rest[key];
-    return rest;
-  };
+  const typed = config.caption ?? "";
+  const counterId = `${widget.id}-caption-count`;
 
   return (
     <div className="flex flex-col gap-2">
@@ -246,23 +248,26 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
             label="Show caption"
             checked={captionOn}
             // On is the default, so turning it on removes the setting; the text stays while it is off
-            onCheckedChange={(on) => onChange({ config: on ? without("show_caption") : { ...config, show_caption: false } })}
+            onCheckedChange={(on) => onChange({ config: on ? omit(config, "show_caption") : { ...config, show_caption: false } })}
           />
           <div className="flex flex-col gap-1">
             <TextField
               label="Caption"
               hideLabel
-              value={caption}
+              value={typed}
               maxLength={TEXT_LIMITS.photoCaption}
               placeholder={defaultCaption}
+              aria-describedby={counterId}
               disabled={!captionOn}
               className="disabled:opacity-50 disabled:cursor-not-allowed"
-              // Cleared text uses the photo's name again; the field is only left empty while it is being retyped
-              onChange={(event) => onChange({ config: { ...config, caption: event.target.value } })}
-              onBlur={() => config.caption !== undefined && config.caption.trim() === "" && onChange({ config: without("caption") })}
+              // Empty text is left out, so the screen shows the photo's name again
+              onChange={(event) => {
+                const text = event.target.value;
+                onChange({ config: text.trim() === "" ? omit(config, "caption") : { ...config, caption: text } });
+              }}
             />
-            <div className="self-end text-sm text-ink-muted" aria-live="polite">
-              {caption.length} / {TEXT_LIMITS.photoCaption}
+            <div id={counterId} className="self-end text-sm text-ink-muted">
+              {typed.length} / {TEXT_LIMITS.photoCaption}
             </div>
           </div>
         </div>

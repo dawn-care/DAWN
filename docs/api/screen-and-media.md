@@ -425,7 +425,7 @@ The server lets any type be any size and go anywhere on the grid, but see [Scree
 
 | Type | `config` | Photo |
 |---|---|---|
-| `photo` | `caption` optional, up to 60 characters. Without it the screen shows the photo's name. `show_caption` optional boolean: `false` hides the caption, and left out it is on. The `caption` text is kept while it is off. | Required |
+| `photo` | `caption` optional, up to 20 characters (what fits under the photo on the tablet). Without it the screen shows the photo's name. `show_caption` optional boolean: `false` hides the caption, and left out it is on. The `caption` text is kept while it is off. | Required |
 | `message` | `text` required (200). Optional `location` (100), `about` (`caregiver` or `carepartner`, for location reassurance), `label` (40) such as "Nurse". | Optional |
 | `reminder` | `items`: 1 to 10 of `{time, text, icon}`. `text` up to 60. Icons: `meal`, `medication`, `walk`, `visit`, `appointment`, `call`, `rest`, `other` (the default). Items come back sorted by time. | None |
 | `weather` | `zip`: 5 digit US zip. Defaults to `14617` (St. Ann's) when left out. | None |
