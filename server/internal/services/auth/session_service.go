@@ -3,29 +3,54 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 )
 
+const (
+	// A session ends this long after it was last used, which resets it
+	SessionIdleTTL = 90 * 24 * time.Hour
+	// A session ends this long after it was created, however active it was
+	SessionAbsoluteTTL = 365 * 24 * time.Hour
+	// A session renews at most this often, so using the app is not a database write each time
+	sessionTouchInterval = 24 * time.Hour
+)
+
+var (
+	ErrSessionNotFound = errors.New("session not found")
+	ErrSessionExpired  = errors.New("session expired")
+)
+
+// ValidatedSession is a session that is still valid
+type ValidatedSession struct {
+	UserID    int
+	ExpiresAt time.Time
+	// Refreshed is true when this call moved ExpiresAt later, so the cookie needs sending again
+	Refreshed bool
+}
+
 type SessionService interface {
 	Create(ctx context.Context, userID int) (string, error)
-	Validate(ctx context.Context, sessionID string) (int, error)
+	Validate(ctx context.Context, token string) (ValidatedSession, error)
+	DeleteAllForUser(ctx context.Context, userID int) error
 }
 
 type sessionService struct {
-	db *sql.DB
+	db  *sql.DB
+	now func() time.Time
 }
 
 func NewSessionService(db *sql.DB) *sessionService {
-	return &sessionService{db: db}
+	return &sessionService{db: db, now: time.Now}
 }
 
-const sessionTTL = time.Hour * 24 * 7 // token lasts a week (can update however we'd prefer)
-
-// Generate a random session ID
-func generateSessionID() (string, error) {
+// Generate a random session token, which only the browser's cookie holds
+func generateSessionToken() (string, error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -34,45 +59,93 @@ func generateSessionID() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// Create a session record in DB
-func (s *sessionService) Create(ctx context.Context, userID int) (string, error) {
-	sessionID, err := generateSessionID()
-	if err != nil {
-		return "", err
-	}
-
-	expiry := time.Now().Add(sessionTTL)
-
-	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO "Session" (session_id, user_id, expires_at)
-		VALUES ($1, $2, $3)
-	`, sessionID, userID, expiry)
-
-	if err != nil {
-		return "", err
-	}
-
-	return sessionID, nil
+// The database stores only this hash, so a leaked database or backup holds no usable logins
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
-// Validate session and return userID
-func (s *sessionService) Validate(ctx context.Context, sessionID string) (int, error) {
+// Create a session record in DB and return the token for the cookie
+func (s *sessionService) Create(ctx context.Context, userID int) (string, error) {
+	token, err := generateSessionToken()
+	if err != nil {
+		return "", err
+	}
+
+	now := s.now()
+
+	// Clean up this caregiver's dead sessions; a failure here must not block the login
+	_, err = s.db.ExecContext(ctx, `
+		DELETE FROM "Session"
+		WHERE user_id = $1 AND (expires_at < $2 OR created_at < $3)
+	`, userID, now, now.Add(-SessionAbsoluteTTL))
+	if err != nil {
+		log.Printf("session cleanup for caregiver %d failed: %v", userID, err)
+	}
+
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO "Session" (token_hash, user_id, created_at, expires_at, last_seen_at)
+		VALUES ($1, $2, $3, $4, $3)
+	`, hashToken(token), userID, now, now.Add(SessionIdleTTL))
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+// Validate session and return who it belongs to, renewing it when it was last renewed over a day ago
+func (s *sessionService) Validate(ctx context.Context, token string) (ValidatedSession, error) {
+	tokenHash := hashToken(token)
+	now := s.now()
+
 	var userID int
-	var expiresAt time.Time
+	var createdAt, expiresAt, lastSeenAt time.Time
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT user_id, expires_at
+		SELECT user_id, created_at, expires_at, last_seen_at
 		FROM "Session"
-		WHERE session_id = $1
-	`, sessionID).Scan(&userID, &expiresAt)
-
+		WHERE token_hash = $1
+	`, tokenHash).Scan(&userID, &createdAt, &expiresAt, &lastSeenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ValidatedSession{}, ErrSessionNotFound
+	}
 	if err != nil {
-		return 0, err
+		return ValidatedSession{}, err
 	}
 
-	if time.Now().After(expiresAt) {
-		return 0, errors.New("session expired")
+	cutoff := createdAt.Add(SessionAbsoluteTTL)
+	if now.After(expiresAt) || now.After(cutoff) {
+		if _, err := s.db.ExecContext(ctx, `DELETE FROM "Session" WHERE token_hash = $1`, tokenHash); err != nil {
+			log.Printf("deleting expired session of caregiver %d failed: %v", userID, err)
+		}
+		return ValidatedSession{}, ErrSessionExpired
 	}
 
-	return userID, nil
+	if now.Sub(lastSeenAt) < sessionTouchInterval {
+		return ValidatedSession{UserID: userID, ExpiresAt: expiresAt}, nil
+	}
+
+	// Renew: 90 days from now, but never past the cutoff
+	renewed := now.Add(SessionIdleTTL)
+	if renewed.After(cutoff) {
+		renewed = cutoff
+	}
+	_, err = s.db.ExecContext(ctx, `
+		UPDATE "Session" SET expires_at = $2, last_seen_at = $3
+		WHERE token_hash = $1
+	`, tokenHash, renewed, now)
+	if err != nil {
+		// The session is still valid, so a failed renewal must not log the caregiver out
+		log.Printf("renewing session of caregiver %d failed: %v", userID, err)
+		return ValidatedSession{UserID: userID, ExpiresAt: expiresAt}, nil
+	}
+
+	return ValidatedSession{UserID: userID, ExpiresAt: renewed, Refreshed: renewed.After(expiresAt)}, nil
+}
+
+// DeleteAllForUser ends every session of one caregiver (logout, account deletion)
+func (s *sessionService) DeleteAllForUser(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM "Session" WHERE user_id = $1`, userID)
+	return err
 }

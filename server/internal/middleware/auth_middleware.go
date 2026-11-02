@@ -21,13 +21,13 @@ func RequireAuth(sessionSvc auth.SessionService) func(http.Handler) http.Handler
 				return
 			}
 
-			userID, err := sessionSvc.Validate(r.Context(), cookie.Value)
+			session, err := sessionSvc.Validate(r.Context(), cookie.Value)
 			if err != nil {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), UserIDKey, userID)
+			ctx := context.WithValue(r.Context(), UserIDKey, session.UserID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
