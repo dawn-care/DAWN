@@ -19,7 +19,7 @@ import (
 
 // Deletes accounts through the real caregiver service, transaction and schema, and checks that
 // every login of that caregiver stops working. The sessions are removed by the Session table's
-// ON DELETE CASCADE (migration 8), so this is also what fails if that foreign key goes missing.
+// ON DELETE CASCADE (migration 9), so this is also what fails if that foreign key goes missing.
 // Set MIGRATION_TEST_DSN only for a disposable PostgreSQL database.
 func TestAccountDeletionEndsSessionsIntegration(t *testing.T) {
 	dsn := os.Getenv("MIGRATION_TEST_DSN")

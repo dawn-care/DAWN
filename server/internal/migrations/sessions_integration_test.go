@@ -32,7 +32,7 @@ func TestLongLivedSessionsMigrationIntegration(t *testing.T) {
 	defer db.Close()
 	require.NoError(t, Up(context.Background(), db))
 
-	script, err := files.ReadFile("sql/00008_long_lived_sessions.sql")
+	script, err := files.ReadFile("sql/00009_long_lived_sessions.sql")
 	require.NoError(t, err)
 	upAndDown := strings.Split(string(script), "-- +goose Down")
 	require.Len(t, upAndDown, 2)
