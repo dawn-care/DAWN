@@ -31,13 +31,13 @@ func (f fakeGoogle) Verify(ctx context.Context, idToken string) (*user.GoogleUse
 type fakeSessions struct {
 	createToken  string
 	createErr    error
-	validSession ValidatedSession
-	validateErr  error
+	foundSession ValidatedSession
+	findErr      error
 	deleteErr    error
 
-	createdFor      []int
-	validatedTokens []string
-	deletedFor      []int
+	createdFor  []int
+	foundTokens []string
+	deletedFor  []int
 }
 
 func (f *fakeSessions) Create(ctx context.Context, userID int) (string, error) {
@@ -46,8 +46,12 @@ func (f *fakeSessions) Create(ctx context.Context, userID int) (string, error) {
 }
 
 func (f *fakeSessions) Validate(ctx context.Context, token string) (ValidatedSession, error) {
-	f.validatedTokens = append(f.validatedTokens, token)
-	return f.validSession, f.validateErr
+	return ValidatedSession{}, errors.New("not used: logout looks the session up with Find, which does not renew it")
+}
+
+func (f *fakeSessions) Find(ctx context.Context, token string) (ValidatedSession, error) {
+	f.foundTokens = append(f.foundTokens, token)
+	return f.foundSession, f.findErr
 }
 
 func (f *fakeSessions) DeleteAllForUser(ctx context.Context, userID int) error {
@@ -107,6 +111,7 @@ func TestLoginWithGoogle_CaregiverLookupErrorStartsNoSession(t *testing.T) {
 	token, err := svc.LoginWithGoogle(context.Background(), "id-token")
 
 	assert.Error(t, err)
+	assert.NotErrorIs(t, err, ErrGoogleTokenRejected, "a database failure is not a bad Google token")
 	assert.Empty(t, token)
 	assert.Empty(t, sessions.createdFor)
 }
@@ -117,7 +122,8 @@ func TestLoginWithGoogle_FailedGoogleCheckStartsNoSession(t *testing.T) {
 
 	token, err := svc.LoginWithGoogle(context.Background(), "id-token")
 
-	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrGoogleTokenRejected)
+	assert.ErrorContains(t, err, "bad token", "Google's reason is kept for the log")
 	assert.Empty(t, token)
 	assert.Empty(t, sessions.createdFor)
 }
@@ -148,30 +154,30 @@ func TestStartSession_Error(t *testing.T) {
 ------------------------------------------------------- */
 
 func TestLogoutEverywhere_EndsEverySessionOfThatCaregiver(t *testing.T) {
-	sessions := &fakeSessions{validSession: ValidatedSession{UserID: 7}}
+	sessions := &fakeSessions{foundSession: ValidatedSession{UserID: 7}}
 	svc, _ := newAuthService(t, nil, sessions)
 
 	err := svc.LogoutEverywhere(context.Background(), "cookie-token")
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"cookie-token"}, sessions.validatedTokens)
+	assert.Equal(t, []string{"cookie-token"}, sessions.foundTokens)
 	assert.Equal(t, []int{7}, sessions.deletedFor)
 }
 
 func TestLogoutEverywhere_UnknownOrExpiredTokenHasNothingToEnd(t *testing.T) {
-	for _, validateErr := range []error{ErrSessionNotFound, ErrSessionExpired} {
-		sessions := &fakeSessions{validateErr: validateErr}
+	for _, findErr := range []error{ErrSessionNotFound, ErrSessionExpired} {
+		sessions := &fakeSessions{findErr: findErr}
 		svc, _ := newAuthService(t, nil, sessions)
 
 		err := svc.LogoutEverywhere(context.Background(), "cookie-token")
 
-		assert.NoError(t, err, validateErr.Error())
-		assert.Empty(t, sessions.deletedFor, validateErr.Error())
+		assert.NoError(t, err, findErr.Error())
+		assert.Empty(t, sessions.deletedFor, findErr.Error())
 	}
 }
 
 func TestLogoutEverywhere_DatabaseErrorOnLookupIsReported(t *testing.T) {
-	sessions := &fakeSessions{validateErr: errors.New("db down")}
+	sessions := &fakeSessions{findErr: errors.New("db down")}
 	svc, _ := newAuthService(t, nil, sessions)
 
 	err := svc.LogoutEverywhere(context.Background(), "cookie-token")
@@ -181,10 +187,11 @@ func TestLogoutEverywhere_DatabaseErrorOnLookupIsReported(t *testing.T) {
 }
 
 func TestLogoutEverywhere_DeleteErrorIsReported(t *testing.T) {
-	sessions := &fakeSessions{validSession: ValidatedSession{UserID: 7}, deleteErr: errors.New("db down")}
+	sessions := &fakeSessions{foundSession: ValidatedSession{UserID: 7}, deleteErr: errors.New("db down")}
 	svc, _ := newAuthService(t, nil, sessions)
 
 	err := svc.LogoutEverywhere(context.Background(), "cookie-token")
 
 	assert.Error(t, err, "saying logged out while sessions remain would be wrong")
+	assert.ErrorContains(t, err, "caregiver 7", "the log says whose sessions are left")
 }

@@ -122,8 +122,9 @@ func TestAccountDeletionEndsSessionsIntegration(t *testing.T) {
 		_, err = db.Exec(`CREATE TRIGGER block_caregiver_delete BEFORE DELETE ON "Caregiver"
 			FOR EACH ROW EXECUTE FUNCTION block_caregiver_delete()`)
 		require.NoError(t, err)
-		defer db.Exec(`DROP TRIGGER block_caregiver_delete ON "Caregiver"`)
+		// Defers run last first, so the trigger is dropped before the function it uses
 		defer db.Exec(`DROP FUNCTION block_caregiver_delete()`)
+		defer db.Exec(`DROP TRIGGER block_caregiver_delete ON "Caregiver"`)
 
 		assert.Error(t, caregivers.DeleteCaregiver(pat))
 

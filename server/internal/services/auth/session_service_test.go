@@ -44,11 +44,21 @@ func sessionRow(userID int, createdAt, expiresAt, lastSeenAt time.Time) *sqlmock
 		AddRow(userID, createdAt, expiresAt, lastSeenAt)
 }
 
+// The whole statements, so a test fails if a WHERE clause or comparison changes. sqlmock squashes
+// whitespace before matching, so the code's line breaks don't matter.
 const (
-	selectSession = `SELECT user_id, created_at, expires_at, last_seen_at FROM "Session"`
-	updateSession = `UPDATE "Session" SET expires_at`
-	deleteSession = `DELETE FROM "Session" WHERE token_hash`
+	cleanupSessions   = `DELETE FROM "Session" WHERE user_id = $1 AND (expires_at < $2 OR created_at < $3)`
+	insertSession     = `INSERT INTO "Session" (token_hash, user_id, created_at, expires_at, last_seen_at) VALUES ($1, $2, $3, $4, $3)`
+	selectSession     = `SELECT user_id, created_at, expires_at, last_seen_at FROM "Session" WHERE token_hash = $1`
+	updateSession     = `UPDATE "Session" SET expires_at = $2, last_seen_at = $3 WHERE token_hash = $1`
+	deleteSession     = `DELETE FROM "Session" WHERE token_hash = $1`
+	deleteAllSessions = `DELETE FROM "Session" WHERE user_id = $1`
 )
+
+// exactly matches the whole statement, not just a part of it
+func exactly(statement string) string {
+	return "^" + regexp.QuoteMeta(statement) + "$"
+}
 
 func days(n int) time.Duration { return time.Duration(n) * 24 * time.Hour }
 
@@ -82,11 +92,11 @@ func TestGenerateSessionToken_IsRandomAndLongEnough(t *testing.T) {
 func TestCreate_StoresOnlyTheHash(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Session"`)).
+	mock.ExpectExec(exactly(cleanupSessions)).
 		WithArgs(7, testNow, testNow.Add(-SessionAbsoluteTTL)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	stored := &captureArg{}
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "Session"`)).
+	mock.ExpectExec(exactly(insertSession)).
 		WithArgs(stored, 7, testNow, testNow.Add(90*24*time.Hour)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -102,20 +112,21 @@ func TestCreate_StoresOnlyTheHash(t *testing.T) {
 func TestCreate_InsertError(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Session"`)).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "Session"`)).WillReturnError(errors.New("db down"))
+	mock.ExpectExec(exactly(cleanupSessions)).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(exactly(insertSession)).WillReturnError(errors.New("db down"))
 
 	token, err := svc.Create(context.Background(), 7)
 
 	assert.Error(t, err)
 	assert.Empty(t, token)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestCreate_CleanupFailureDoesNotBlockLogin(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Session"`)).WillReturnError(errors.New("db hiccup"))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "Session"`)).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(exactly(cleanupSessions)).WillReturnError(errors.New("db hiccup"))
+	mock.ExpectExec(exactly(insertSession)).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	token, err := svc.Create(context.Background(), 7)
 
@@ -131,7 +142,7 @@ func TestCreate_CleanupFailureDoesNotBlockLogin(t *testing.T) {
 func TestValidate_LooksUpByHash(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WithArgs(hashToken("cookie-token")).
 		WillReturnRows(sessionRow(7, testNow.Add(-days(1)), testNow.Add(days(89)), testNow.Add(-time.Hour)))
 
@@ -145,17 +156,18 @@ func TestValidate_LooksUpByHash(t *testing.T) {
 func TestValidate_UnknownToken(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(exactly(selectSession)).WillReturnError(sql.ErrNoRows)
 
 	_, err := svc.Validate(context.Background(), "nope")
 
 	assert.ErrorIs(t, err, ErrSessionNotFound)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestValidate_DatabaseErrorIsNotReportedAsUnknownToken(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).WillReturnError(errors.New("db down"))
+	mock.ExpectQuery(exactly(selectSession)).WillReturnError(errors.New("db down"))
 
 	_, err := svc.Validate(context.Background(), "token")
 
@@ -169,7 +181,7 @@ func TestValidate_UsedRecentlyIsNotWrittenAgain(t *testing.T) {
 	expires := testNow.Add(days(40))
 
 	// Last renewed 23h59m ago: under a day, so no UPDATE (sqlmock fails on one nobody expected)
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, testNow.Add(-days(50)), expires, testNow.Add(-24*time.Hour+time.Minute)))
 
 	got, err := svc.Validate(context.Background(), "token")
@@ -185,9 +197,9 @@ func TestValidate_RenewsAfterADay(t *testing.T) {
 	created := testNow.Add(-days(50))
 	oldExpiry := testNow.Add(days(40))
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, created, oldExpiry, testNow.Add(-24*time.Hour)))
-	mock.ExpectExec(regexp.QuoteMeta(updateSession)).
+	mock.ExpectExec(exactly(updateSession)).
 		WithArgs(hashToken("token"), testNow.Add(SessionIdleTTL), testNow).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -204,9 +216,9 @@ func TestValidate_RenewalStopsAtTheOneYearCutoff(t *testing.T) {
 	created := testNow.Add(-days(300))
 	cutoff := created.Add(SessionAbsoluteTTL) // 65 days from now, sooner than 90
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, created, testNow.Add(days(10)), testNow.Add(-days(2))))
-	mock.ExpectExec(regexp.QuoteMeta(updateSession)).
+	mock.ExpectExec(exactly(updateSession)).
 		WithArgs(hashToken("token"), cutoff, testNow).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -223,10 +235,10 @@ func TestValidate_AtTheCutoffNothingMovesSoNoNewCookie(t *testing.T) {
 	created := testNow.Add(-days(364))
 	cutoff := created.Add(SessionAbsoluteTTL) // tomorrow, and expires_at is already there
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, created, cutoff, testNow.Add(-days(2))))
 	// last_seen_at is still written, or every request from here on would hit the database
-	mock.ExpectExec(regexp.QuoteMeta(updateSession)).
+	mock.ExpectExec(exactly(updateSession)).
 		WithArgs(hashToken("token"), cutoff, testNow).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -242,9 +254,9 @@ func TestValidate_FailedRenewalKeepsTheCaregiverLoggedIn(t *testing.T) {
 	svc, mock := setupSessionService(t)
 	oldExpiry := testNow.Add(days(40))
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, testNow.Add(-days(50)), oldExpiry, testNow.Add(-days(2))))
-	mock.ExpectExec(regexp.QuoteMeta(updateSession)).WillReturnError(errors.New("db hiccup"))
+	mock.ExpectExec(exactly(updateSession)).WillReturnError(errors.New("db hiccup"))
 
 	got, err := svc.Validate(context.Background(), "token")
 
@@ -252,14 +264,31 @@ func TestValidate_FailedRenewalKeepsTheCaregiverLoggedIn(t *testing.T) {
 	assert.Equal(t, 7, got.UserID)
 	assert.False(t, got.Refreshed)
 	assert.Equal(t, oldExpiry, got.ExpiresAt)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// A logout on another device can delete the session between the lookup and the renewal. It no
+// longer exists, so it must not be served or get a new cookie.
+func TestValidate_SessionEndedDuringRenewalIsNotFound(t *testing.T) {
+	svc, mock := setupSessionService(t)
+
+	mock.ExpectQuery(exactly(selectSession)).
+		WillReturnRows(sessionRow(7, testNow.Add(-days(50)), testNow.Add(days(40)), testNow.Add(-days(2))))
+	mock.ExpectExec(exactly(updateSession)).WillReturnResult(sqlmock.NewResult(0, 0))
+
+	got, err := svc.Validate(context.Background(), "token")
+
+	assert.ErrorIs(t, err, ErrSessionNotFound)
+	assert.False(t, got.Refreshed)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestValidate_IdleExpiredSessionIsDeleted(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, testNow.Add(-days(200)), testNow.Add(-time.Second), testNow.Add(-days(90))))
-	mock.ExpectExec(regexp.QuoteMeta(deleteSession)).
+	mock.ExpectExec(exactly(deleteSession)).
 		WithArgs(hashToken("token")).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -273,9 +302,9 @@ func TestValidate_PastTheOneYearCutoffIsDeletedEvenIfNotIdle(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
 	// Used yesterday and expires_at is in the future, but it was created 366 days ago
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, testNow.Add(-days(366)), testNow.Add(days(80)), testNow.Add(-days(1))))
-	mock.ExpectExec(regexp.QuoteMeta(deleteSession)).
+	mock.ExpectExec(exactly(deleteSession)).
 		WithArgs(hashToken("token")).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -288,13 +317,87 @@ func TestValidate_PastTheOneYearCutoffIsDeletedEvenIfNotIdle(t *testing.T) {
 func TestValidate_ExpiredStaysExpiredWhenDeleteFails(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectQuery(regexp.QuoteMeta(selectSession)).
+	mock.ExpectQuery(exactly(selectSession)).
 		WillReturnRows(sessionRow(7, testNow.Add(-days(200)), testNow.Add(-time.Second), testNow.Add(-days(90))))
-	mock.ExpectExec(regexp.QuoteMeta(deleteSession)).WillReturnError(errors.New("db hiccup"))
+	mock.ExpectExec(exactly(deleteSession)).WillReturnError(errors.New("db hiccup"))
 
 	_, err := svc.Validate(context.Background(), "token")
 
 	assert.ErrorIs(t, err, ErrSessionExpired)
+	assert.NoError(t, mock.ExpectationsWereMet(), "it still tries to delete the expired row")
+}
+
+// A session is still valid at the exact instant it expires and ends just after, for both the 90
+// day window and the 1 year cutoff. Create's cleanup (expires_at < now) agrees with this.
+func TestValidate_EndsJustAfterItsExpiryInstant(t *testing.T) {
+	cases := []struct {
+		name               string
+		createdAt, expires time.Time
+		valid              bool
+	}{
+		{"idle window, at the instant", testNow.Add(-days(100)), testNow, true},
+		{"idle window, just after", testNow.Add(-days(100)), testNow.Add(-time.Nanosecond), false},
+		{"1 year cutoff, at the instant", testNow.Add(-SessionAbsoluteTTL), testNow.Add(days(30)), true},
+		{"1 year cutoff, just after", testNow.Add(-SessionAbsoluteTTL - time.Nanosecond), testNow.Add(days(30)), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc, mock := setupSessionService(t)
+			// Renewed an hour ago, so a valid session needs no UPDATE
+			mock.ExpectQuery(exactly(selectSession)).
+				WillReturnRows(sessionRow(7, c.createdAt, c.expires, testNow.Add(-time.Hour)))
+			if !c.valid {
+				mock.ExpectExec(exactly(deleteSession)).WillReturnResult(sqlmock.NewResult(0, 1))
+			}
+
+			_, err := svc.Validate(context.Background(), "token")
+
+			if c.valid {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, ErrSessionExpired)
+			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+/* -------------------------------------------------------
+   FIND
+------------------------------------------------------- */
+
+func TestFind_DoesNotRenew(t *testing.T) {
+	svc, mock := setupSessionService(t)
+	expires := testNow.Add(days(40))
+
+	// Last renewed two days ago, which Validate would renew; Find writes nothing
+	mock.ExpectQuery(exactly(selectSession)).
+		WithArgs(hashToken("cookie-token")).
+		WillReturnRows(sessionRow(7, testNow.Add(-days(50)), expires, testNow.Add(-days(2))))
+
+	got, err := svc.Find(context.Background(), "cookie-token")
+
+	require.NoError(t, err)
+	assert.Equal(t, 7, got.UserID)
+	assert.Equal(t, expires, got.ExpiresAt)
+	assert.False(t, got.Refreshed)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestFind_UnknownAndExpiredAreReportedLikeValidate(t *testing.T) {
+	svc, mock := setupSessionService(t)
+
+	mock.ExpectQuery(exactly(selectSession)).WillReturnError(sql.ErrNoRows)
+	_, err := svc.Find(context.Background(), "nope")
+	assert.ErrorIs(t, err, ErrSessionNotFound)
+
+	mock.ExpectQuery(exactly(selectSession)).
+		WillReturnRows(sessionRow(7, testNow.Add(-days(200)), testNow.Add(-time.Second), testNow.Add(-days(90))))
+	mock.ExpectExec(exactly(deleteSession)).WithArgs(hashToken("old")).WillReturnResult(sqlmock.NewResult(0, 1))
+	_, err = svc.Find(context.Background(), "old")
+	assert.ErrorIs(t, err, ErrSessionExpired)
+
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 /* -------------------------------------------------------
@@ -304,7 +407,7 @@ func TestValidate_ExpiredStaysExpiredWhenDeleteFails(t *testing.T) {
 func TestDeleteAllForUser_Success(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Session" WHERE user_id = $1`)).
+	mock.ExpectExec(exactly(deleteAllSessions)).
 		WithArgs(7).
 		WillReturnResult(sqlmock.NewResult(0, 3))
 
@@ -315,7 +418,7 @@ func TestDeleteAllForUser_Success(t *testing.T) {
 func TestDeleteAllForUser_Error(t *testing.T) {
 	svc, mock := setupSessionService(t)
 
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "Session" WHERE user_id = $1`)).
+	mock.ExpectExec(exactly(deleteAllSessions)).
 		WillReturnError(errors.New("db down"))
 
 	assert.Error(t, svc.DeleteAllForUser(context.Background(), 7))

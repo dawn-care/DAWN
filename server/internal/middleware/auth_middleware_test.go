@@ -35,6 +35,10 @@ func (f *fakeSessions) Validate(ctx context.Context, token string) (auth.Validat
 	return f.session, f.err
 }
 
+func (f *fakeSessions) Find(ctx context.Context, token string) (auth.ValidatedSession, error) {
+	return auth.ValidatedSession{}, errors.New("not used by the middleware, which must renew")
+}
+
 func (f *fakeSessions) DeleteAllForUser(ctx context.Context, userID int) error {
 	return errors.New("not used by the middleware")
 }

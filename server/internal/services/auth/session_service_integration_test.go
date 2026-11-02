@@ -123,7 +123,7 @@ func TestSessionServiceIntegration(t *testing.T) {
 		user := newCaregiver(t)
 		token, err := svc.Create(ctx, user)
 		require.NoError(t, err)
-		_, err = db.Exec(`UPDATE "Session" SET expires_at = now() - interval '1 minute' WHERE token_hash = $1`, hashToken(token))
+		_, err = db.Exec(`UPDATE "Session" SET expires_at = now() - interval '1 hour' WHERE token_hash = $1`, hashToken(token))
 		require.NoError(t, err)
 
 		_, err = svc.Validate(ctx, token)

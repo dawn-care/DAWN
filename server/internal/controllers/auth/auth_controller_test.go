@@ -37,13 +37,13 @@ func (f *fakeGoogle) Verify(ctx context.Context, idToken string) (*user.GoogleUs
 type fakeSessions struct {
 	createToken  string
 	createErr    error
-	validSession authsvc.ValidatedSession
-	validateErr  error
+	foundSession authsvc.ValidatedSession
+	findErr      error
 	deleteErr    error
 
 	createdFor []int
 	deletedFor []int
-	validated  int
+	found      int
 }
 
 func (f *fakeSessions) Create(ctx context.Context, userID int) (string, error) {
@@ -52,8 +52,12 @@ func (f *fakeSessions) Create(ctx context.Context, userID int) (string, error) {
 }
 
 func (f *fakeSessions) Validate(ctx context.Context, token string) (authsvc.ValidatedSession, error) {
-	f.validated++
-	return f.validSession, f.validateErr
+	return authsvc.ValidatedSession{}, errors.New("not used: logout looks the session up with Find, which does not renew it")
+}
+
+func (f *fakeSessions) Find(ctx context.Context, token string) (authsvc.ValidatedSession, error) {
+	f.found++
+	return f.foundSession, f.findErr
 }
 
 func (f *fakeSessions) DeleteAllForUser(ctx context.Context, userID int) error {
@@ -157,9 +161,8 @@ func TestGoogleLogin_SendsTheRequestsTokenToGoogle(t *testing.T) {
 	assert.Equal(t, []string{"id-token"}, google.verified)
 }
 
-func TestGoogleLogin_UnreadableBodyIsRejectedAndSetsNoCookie(t *testing.T) {
-	// With no usable idToken the real Google check fails, as this stand-in does
-	google := &fakeGoogle{err: errors.New("no token")}
+func TestGoogleLogin_UnreadableBodyIsABadRequestAndSetsNoCookie(t *testing.T) {
+	google := &fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}
 	sessions := &fakeSessions{}
 	c, _ := newController(t, google, sessions)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/google", strings.NewReader(`not json`))
@@ -167,9 +170,9 @@ func TestGoogleLogin_UnreadableBodyIsRejectedAndSetsNoCookie(t *testing.T) {
 
 	c.GoogleLogin(w, req)
 
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Empty(t, w.Result().Cookies())
-	assert.Equal(t, []string{""}, google.verified, "an empty token is what reaches Google")
+	assert.Empty(t, google.verified, "nothing is sent to Google")
 	assert.Empty(t, sessions.createdFor)
 }
 
@@ -184,15 +187,28 @@ func TestGoogleLogin_RejectedGoogleTokenSetsNoCookie(t *testing.T) {
 	assert.Empty(t, sessions.createdFor)
 }
 
-func TestGoogleLogin_SessionErrorSetsNoCookie(t *testing.T) {
+// A failure on our side is a 500, so the caregiver is not told their Google sign-in was wrong
+func TestGoogleLogin_SessionErrorIsAServerErrorAndSetsNoCookie(t *testing.T) {
 	sessions := &fakeSessions{createErr: errors.New("db down")}
 	c, mock := newController(t, &fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, sessions)
 	expectExistingCaregiver(mock, 7)
 
 	w := login(c)
 
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Empty(t, w.Result().Cookies())
+}
+
+func TestGoogleLogin_CaregiverLookupErrorIsAServerError(t *testing.T) {
+	sessions := &fakeSessions{}
+	c, mock := newController(t, &fakeGoogle{user: &user.GoogleUser{ID: "g-1"}}, sessions)
+	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Caregiver"`)).WillReturnError(errors.New("db down"))
+
+	w := login(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Empty(t, w.Result().Cookies())
+	assert.Empty(t, sessions.createdFor)
 }
 
 /* -------------------------------------------------------
@@ -201,7 +217,7 @@ func TestGoogleLogin_SessionErrorSetsNoCookie(t *testing.T) {
 
 func TestLogout_EndsAllSessionsAndClearsTheCookie(t *testing.T) {
 	t.Setenv("RUN_MODE", "production")
-	sessions := &fakeSessions{validSession: authsvc.ValidatedSession{UserID: 7}}
+	sessions := &fakeSessions{foundSession: authsvc.ValidatedSession{UserID: 7}}
 	c, _ := newController(t, nil, sessions)
 
 	w := logout(c, sessionCookie("cookie-token"))
@@ -223,26 +239,26 @@ func TestLogout_WithoutACookieStillSucceeds(t *testing.T) {
 	w := logout(c, nil)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Zero(t, sessions.validated)
+	assert.Zero(t, sessions.found)
 	assert.Empty(t, sessions.deletedFor)
 	assertCleared(t, w)
 }
 
 func TestLogout_UnknownOrExpiredCookieStillSucceeds(t *testing.T) {
-	for _, validateErr := range []error{authsvc.ErrSessionNotFound, authsvc.ErrSessionExpired} {
-		sessions := &fakeSessions{validateErr: validateErr}
+	for _, findErr := range []error{authsvc.ErrSessionNotFound, authsvc.ErrSessionExpired} {
+		sessions := &fakeSessions{findErr: findErr}
 		c, _ := newController(t, nil, sessions)
 
 		w := logout(c, sessionCookie("stale-token"))
 
-		assert.Equal(t, http.StatusOK, w.Code, validateErr.Error())
-		assert.Empty(t, sessions.deletedFor, validateErr.Error())
+		assert.Equal(t, http.StatusOK, w.Code, findErr.Error())
+		assert.Empty(t, sessions.deletedFor, findErr.Error())
 		assertCleared(t, w)
 	}
 }
 
 func TestLogout_LookupErrorKeepsTheCookieSoTheCaregiverCanRetry(t *testing.T) {
-	sessions := &fakeSessions{validateErr: errors.New("db down")}
+	sessions := &fakeSessions{findErr: errors.New("db down")}
 	c, _ := newController(t, nil, sessions)
 
 	w := logout(c, sessionCookie("cookie-token"))
@@ -253,7 +269,7 @@ func TestLogout_LookupErrorKeepsTheCookieSoTheCaregiverCanRetry(t *testing.T) {
 }
 
 func TestLogout_DeleteErrorKeepsTheCookieSoTheCaregiverCanRetry(t *testing.T) {
-	sessions := &fakeSessions{validSession: authsvc.ValidatedSession{UserID: 7}, deleteErr: errors.New("db down")}
+	sessions := &fakeSessions{foundSession: authsvc.ValidatedSession{UserID: 7}, deleteErr: errors.New("db down")}
 	c, _ := newController(t, nil, sessions)
 
 	w := logout(c, sessionCookie("cookie-token"))

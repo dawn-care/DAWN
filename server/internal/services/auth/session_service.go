@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	// A session ends this long after it was last used, which resets it
+	// A session ends this long after it last renewed. A request through RequireAuth renews it,
+	// at most once every sessionTouchInterval.
 	SessionIdleTTL = 90 * 24 * time.Hour
 	// A session ends this long after it was created, however active it was
 	SessionAbsoluteTTL = 365 * 24 * time.Hour
@@ -37,6 +38,7 @@ type ValidatedSession struct {
 type SessionService interface {
 	Create(ctx context.Context, userID int) (string, error)
 	Validate(ctx context.Context, token string) (ValidatedSession, error)
+	Find(ctx context.Context, token string) (ValidatedSession, error)
 	DeleteAllForUser(ctx context.Context, userID int) error
 }
 
@@ -94,57 +96,89 @@ func (s *sessionService) Create(ctx context.Context, userID int) (string, error)
 	return token, nil
 }
 
+// storedSession is a session row that has not ended
+type storedSession struct {
+	userID                           int
+	createdAt, expiresAt, lastSeenAt time.Time
+}
+
+// cutoff is when the session ends however active it is
+func (r storedSession) cutoff() time.Time {
+	return r.createdAt.Add(SessionAbsoluteTTL)
+}
+
+// find looks up a session by its token's hash. One that has ended is deleted and reported as expired.
+func (s *sessionService) find(ctx context.Context, tokenHash string, now time.Time) (storedSession, error) {
+	var row storedSession
+	err := s.db.QueryRowContext(ctx, `
+		SELECT user_id, created_at, expires_at, last_seen_at
+		FROM "Session"
+		WHERE token_hash = $1
+	`, tokenHash).Scan(&row.userID, &row.createdAt, &row.expiresAt, &row.lastSeenAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return storedSession{}, ErrSessionNotFound
+	}
+	if err != nil {
+		return storedSession{}, err
+	}
+
+	if now.After(row.expiresAt) || now.After(row.cutoff()) {
+		if _, err := s.db.ExecContext(ctx, `DELETE FROM "Session" WHERE token_hash = $1`, tokenHash); err != nil {
+			log.Printf("deleting expired session of caregiver %d failed: %v", row.userID, err)
+		}
+		return storedSession{}, ErrSessionExpired
+	}
+	return row, nil
+}
+
+// Find returns who a session belongs to without renewing it, for logout, which is about to delete it
+func (s *sessionService) Find(ctx context.Context, token string) (ValidatedSession, error) {
+	row, err := s.find(ctx, hashToken(token), s.now())
+	if err != nil {
+		return ValidatedSession{}, err
+	}
+	return ValidatedSession{UserID: row.userID, ExpiresAt: row.expiresAt}, nil
+}
+
 // Validate session and return who it belongs to, renewing it when it was last renewed over a day ago
 func (s *sessionService) Validate(ctx context.Context, token string) (ValidatedSession, error) {
 	tokenHash := hashToken(token)
 	now := s.now()
 
-	var userID int
-	var createdAt, expiresAt, lastSeenAt time.Time
-
-	err := s.db.QueryRowContext(ctx, `
-		SELECT user_id, created_at, expires_at, last_seen_at
-		FROM "Session"
-		WHERE token_hash = $1
-	`, tokenHash).Scan(&userID, &createdAt, &expiresAt, &lastSeenAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ValidatedSession{}, ErrSessionNotFound
-	}
+	row, err := s.find(ctx, tokenHash, now)
 	if err != nil {
 		return ValidatedSession{}, err
 	}
 
-	cutoff := createdAt.Add(SessionAbsoluteTTL)
-	if now.After(expiresAt) || now.After(cutoff) {
-		if _, err := s.db.ExecContext(ctx, `DELETE FROM "Session" WHERE token_hash = $1`, tokenHash); err != nil {
-			log.Printf("deleting expired session of caregiver %d failed: %v", userID, err)
-		}
-		return ValidatedSession{}, ErrSessionExpired
-	}
-
-	if now.Sub(lastSeenAt) < sessionTouchInterval {
-		return ValidatedSession{UserID: userID, ExpiresAt: expiresAt}, nil
+	if now.Sub(row.lastSeenAt) < sessionTouchInterval {
+		return ValidatedSession{UserID: row.userID, ExpiresAt: row.expiresAt}, nil
 	}
 
 	// Renew: 90 days from now, but never past the cutoff
 	renewed := now.Add(SessionIdleTTL)
-	if renewed.After(cutoff) {
-		renewed = cutoff
+	if renewed.After(row.cutoff()) {
+		renewed = row.cutoff()
 	}
-	_, err = s.db.ExecContext(ctx, `
+	result, err := s.db.ExecContext(ctx, `
 		UPDATE "Session" SET expires_at = $2, last_seen_at = $3
 		WHERE token_hash = $1
 	`, tokenHash, renewed, now)
 	if err != nil {
 		// The session is still valid, so a failed renewal must not log the caregiver out
-		log.Printf("renewing session of caregiver %d failed: %v", userID, err)
-		return ValidatedSession{UserID: userID, ExpiresAt: expiresAt}, nil
+		log.Printf("renewing session of caregiver %d failed: %v", row.userID, err)
+		return ValidatedSession{UserID: row.userID, ExpiresAt: row.expiresAt}, nil
+	}
+	if n, err := result.RowsAffected(); err == nil && n == 0 {
+		// It ended between the lookup and the renewal (a logout on another device), so it no
+		// longer exists and must not get a new cookie
+		return ValidatedSession{}, ErrSessionNotFound
 	}
 
-	return ValidatedSession{UserID: userID, ExpiresAt: renewed, Refreshed: renewed.After(expiresAt)}, nil
+	return ValidatedSession{UserID: row.userID, ExpiresAt: renewed, Refreshed: renewed.After(row.expiresAt)}, nil
 }
 
-// DeleteAllForUser ends every session of one caregiver (logout, account deletion)
+// DeleteAllForUser ends every session of one caregiver, on all their devices (logout). Deleting
+// the caregiver ends them through the foreign key's ON DELETE CASCADE instead.
 func (s *sessionService) DeleteAllForUser(ctx context.Context, userID int) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM "Session" WHERE user_id = $1`, userID)
 	return err
