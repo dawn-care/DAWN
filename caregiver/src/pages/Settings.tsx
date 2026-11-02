@@ -8,7 +8,7 @@
  * Responsibilities:
  *  - Change the caregiver's name (its own Save button; a success shows a toast, an error stays under it)
  *  - Switch the active carepartner (applies as soon as it is picked)
- *  - Log out
+ *  - Log out (the server ends all of the caregiver's sessions, so the hint says it signs out every device)
  *  - Go to the pairing page to pair another tablet
  *
  * The caregiver comes from AuthContext, which RequireLogin has already loaded.
@@ -190,11 +190,14 @@ export default function SettingsPage() {
             <button type="button" onClick={handleSave} disabled={saving} className={PRIMARY_BUTTON}>
               {saving ? "Saving…" : "Save name"}
             </button>
-            <button type="button" onClick={logout} className={PRIMARY_BUTTON}>
+            <button type="button" onClick={logout} aria-describedby="settings-logout-hint" className={PRIMARY_BUTTON}>
               <LogOut size={18} aria-hidden="true" />
               Log out
             </button>
           </div>
+          <p id="settings-logout-hint" className="m-0 text-base text-ink-muted">
+            You stay logged in on this device for up to 90 days. Logging out signs you out on all your devices.
+          </p>
         </section>
 
         {/* Carepartner */}
