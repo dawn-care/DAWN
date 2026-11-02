@@ -13,6 +13,17 @@ type AuthController struct {
 	AuthService *auth.AuthService
 }
 
+// GoogleLogin godoc
+// @Summary Log in with Google
+// @Description Verifies a Google ID token and starts a session. The session cookie is HttpOnly, SameSite=Strict, and Secure outside dev. It lasts 90 days from last use (renewing as it is used) and always ends 1 year after login.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object{idToken=string} true "Google ID token"
+// @Success 200 {object} map[string]string "status: authenticated"
+// @Header 200 {string} Set-Cookie "session=<token>; Max-Age=7776000; HttpOnly; SameSite=Strict"
+// @Failure 401 {string} string "Unauthorized"
+// @Router /auth/google [post]
 func (c *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		IDToken string `json:"idToken"`
@@ -35,6 +46,16 @@ func (c *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MeHandler godoc
+// @Summary Get the signed-in caregiver
+// @Description Returns the caregiver the session cookie belongs to, with their carepartners. A session used more than a day after it last renewed is renewed here, and the cookie is sent again with its new expiry. An unknown or expired session gets 401 and its cookie is deleted; a failure checking the session gets 500 and leaves the cookie alone.
+// @Tags auth
+// @Produce json
+// @Success 200 {object} map[string]interface{} "id, name, role and carepartners"
+// @Header 200 {string} Set-Cookie "session=<token>; Max-Age=<seconds left>; HttpOnly; SameSite=Strict (only when the session renewed)"
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /me [get]
 func (c *AuthController) MeHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(mw.UserIDKey).(int)
 	if !ok {
@@ -120,8 +141,15 @@ func (c *AuthController) UpdateMeHandler(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-// Logout ends all of the caregiver's sessions, on every device, then clears this browser's cookie.
-// With no cookie, or one that is unknown or expired, there is nothing to end and it still succeeds.
+// Logout godoc
+// @Summary Log out
+// @Description Ends every session of the caregiver, on every device, then clears this browser's session cookie. With no cookie, or one that is unknown or expired, there is nothing to end and it still succeeds. If the sessions cannot be ended it answers 500 and keeps the cookie, so the caregiver can try again.
+// @Tags auth
+// @Produce json
+// @Success 200 {object} map[string]string "status: logged out"
+// @Header 200 {string} Set-Cookie "session=; Max-Age=0 (deletes the cookie)"
+// @Failure 500 {string} string "Failed to log out"
+// @Router /auth/logout [post]
 func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(mw.SessionCookieName); err == nil {
 		if err := c.AuthService.LogoutEverywhere(r.Context(), cookie.Value); err != nil {

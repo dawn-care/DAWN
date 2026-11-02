@@ -33,6 +33,39 @@ definitions:
       timed:
         type: boolean
     type: object
+  family.CreateFamilyMemberRequest:
+    properties:
+      carepartner_id:
+        type: integer
+      guidance_note:
+        type: string
+      name:
+        type: string
+      relationship:
+        type: string
+    type: object
+  family.FamilyError:
+    properties:
+      code:
+        type: string
+      error:
+        type: string
+    type: object
+  family.FamilyMember:
+    properties:
+      carepartner_id:
+        type: integer
+      created_at:
+        type: string
+      guidance_note:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      relationship:
+        type: string
+    type: object
   media.AudioMedia:
     properties:
       displayed_name:
@@ -56,12 +89,20 @@ definitions:
         type: string
       duration_seconds:
         type: integer
+      family_member_ids:
+        items:
+          type: integer
+        type: array
       id:
         type: integer
       kind:
         type: string
       mime_type:
         type: string
+      situations:
+        items:
+          type: string
+        type: array
       size_bytes:
         type: integer
       url:
@@ -95,6 +136,17 @@ definitions:
     properties:
       display_name:
         type: string
+    type: object
+  media.SetMediaTagsRequest:
+    properties:
+      family_member_ids:
+        items:
+          type: integer
+        type: array
+      situations:
+        items:
+          type: string
+        type: array
     type: object
   media.VideoMedia:
     properties:
@@ -825,6 +877,69 @@ paths:
       summary: Get audios by carepartner and caregiver
       tags:
       - audio
+  /auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a Google ID token and starts a session. The session cookie
+        is HttpOnly, SameSite=Strict, and Secure outside dev. It lasts 90 days from
+        last use (renewing as it is used) and always ends 1 year after login.
+      parameters:
+      - description: Google ID token
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            idToken:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: authenticated'
+          headers:
+            Set-Cookie:
+              description: session=<token>; Max-Age=7776000; HttpOnly; SameSite=Strict
+              type: string
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      summary: Log in with Google
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Ends every session of the caregiver, on every device, then clears
+        this browser's session cookie. With no cookie, or one that is unknown or expired,
+        there is nothing to end and it still succeeds. If the sessions cannot be ended
+        it answers 500 and keeps the cookie, so the caregiver can try again.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: logged out'
+          headers:
+            Set-Cookie:
+              description: session=; Max-Age=0 (deletes the cookie)
+              type: string
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to log out
+          schema:
+            type: string
+      summary: Log out
+      tags:
+      - auth
   /calendar:
     get:
       description: Repeating items are expanded on the server, skipped days are left
@@ -1825,6 +1940,96 @@ paths:
       summary: Delete all events in a list
       tags:
       - event
+  /family-members:
+    get:
+      description: In the order they were added. Family members are folders for grouping
+        media, not accounts.
+      parameters:
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/family.FamilyMember'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+      summary: List a carepartner's family members
+      tags:
+      - family
+    post:
+      consumes:
+      - application/json
+      description: Name is required; relationship and guidance_note are optional.
+      parameters:
+      - description: Family member
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/family.CreateFamilyMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/family.FamilyMember'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+      summary: Add a family member
+      tags:
+      - family
+  /me:
+    get:
+      description: Returns the caregiver the session cookie belongs to, with their
+        carepartners. A session used more than a day after it last renewed is renewed
+        here, and the cookie is sent again with its new expiry. An unknown or expired
+        session gets 401 and its cookie is deleted; a failure checking the session
+        gets 500 and leaves the cookie alone.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: id, name, role and carepartners
+          headers:
+            Set-Cookie:
+              description: session=<token>; Max-Age=<seconds left>; HttpOnly; SameSite=Strict
+                (only when the session renewed)
+              type: string
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get the signed-in caregiver
+      tags:
+      - auth
   /media:
     get:
       description: Newest first. Each item's usage lists where it is used (on_screen,
@@ -1839,6 +2044,14 @@ paths:
         in: query
         name: kind
         type: string
+      - description: Only media under this situation
+        in: query
+        name: situation
+        type: string
+      - description: Only media about this family member
+        in: query
+        name: family_member_id
+        type: integer
       produces:
       - application/json
       responses:
@@ -1884,6 +2097,20 @@ paths:
         in: formData
         name: display_name
         type: string
+      - collectionFormat: multi
+        description: Situations staff find it under; repeat the field for each
+        in: formData
+        items:
+          type: string
+        name: situations
+        type: array
+      - collectionFormat: multi
+        description: Family members it is about; repeat the field for each
+        in: formData
+        items:
+          type: integer
+        name: family_member_ids
+        type: array
       produces:
       - application/json
       responses:
@@ -2024,6 +2251,46 @@ paths:
           schema:
             $ref: '#/definitions/media.MediaError'
       summary: Download a media item's file
+      tags:
+      - media
+  /media/{id}/tags:
+    put:
+      consumes:
+      - application/json
+      description: Replaces its situations and family members; family members must
+        be the carepartner's. With both empty, staff don't see it.
+      parameters:
+      - description: Media ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Situations and family members
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.SetMediaTagsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/media.Media'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/media.MediaError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/media.MediaError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/media.MediaError'
+      summary: Set how staff find a media item
       tags:
       - media
   /messages:
@@ -2747,6 +3014,43 @@ paths:
       tags:
       - photo
   /playbacks:
+    get:
+      description: Playbacks that reached the screen, from any source, most recently
+        started first. Requests that never started are left out.
+      parameters:
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      - description: How many to return, 1 to 100 (default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/playback.Playback'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List what played on a carepartner's tablet
+      tags:
+      - playback
     post:
       consumes:
       - application/json
