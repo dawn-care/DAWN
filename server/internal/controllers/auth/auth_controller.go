@@ -2,8 +2,8 @@ package auth
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
-	"os"
 	mw "server/internal/middleware"
 	"server/internal/services/auth"
 	"strconv"
@@ -20,20 +20,14 @@ func (c *AuthController) GoogleLogin(w http.ResponseWriter, r *http.Request) {
 
 	json.NewDecoder(r.Body).Decode(&body)
 
-	sessionID, err := c.AuthService.LoginWithGoogle(r.Context(), body.IDToken)
+	token, err := c.AuthService.LoginWithGoogle(r.Context(), body.IDToken)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    sessionID,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   os.Getenv("RUN_MODE") != "dev",
-		SameSite: http.SameSiteLaxMode,
-	})
+	// A new session lasts the full idle window; it renews from there as it is used
+	mw.SetSessionCookie(w, token, auth.SessionIdleTTL)
 
 	//w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
@@ -126,16 +120,19 @@ func (c *AuthController) UpdateMeHandler(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
+// Logout ends all of the caregiver's sessions, on every device, then clears this browser's cookie.
+// With no cookie, or one that is unknown or expired, there is nothing to end and it still succeeds.
 func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1, // tells browser to delete immediately
-		HttpOnly: true,
-		Secure:   os.Getenv("RUN_MODE") != "dev",
-		SameSite: http.SameSiteLaxMode,
-	})
+	if cookie, err := r.Cookie(mw.SessionCookieName); err == nil {
+		if err := c.AuthService.LogoutEverywhere(r.Context(), cookie.Value); err != nil {
+			// The sessions may still be valid, so the cookie stays and the caregiver can try again
+			log.Printf("logout failed: %v", err)
+			http.Error(w, "Failed to log out", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	mw.ClearSessionCookie(w)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"logged out"}`))

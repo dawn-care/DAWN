@@ -35,8 +35,26 @@ func (a *AuthService) LoginWithGoogle(ctx context.Context, idToken string) (stri
 		return "", err
 	}
 
-	// creates the session and returns session ID
-	return a.Sessions.Create(ctx, user.ID)
+	return a.StartSession(ctx, user.ID)
+}
+
+// StartSession signs a caregiver in and returns the token for their cookie. Every way of
+// logging in ends here, so they all get the same kind of session.
+func (a *AuthService) StartSession(ctx context.Context, caregiverID int) (string, error) {
+	return a.Sessions.Create(ctx, caregiverID)
+}
+
+// LogoutEverywhere ends every session of the caregiver the token belongs to, on all their devices.
+// A token that is unknown or already expired has nothing to end, so that is not an error.
+func (a *AuthService) LogoutEverywhere(ctx context.Context, token string) error {
+	session, err := a.Sessions.Validate(ctx, token)
+	if errors.Is(err, ErrSessionNotFound) || errors.Is(err, ErrSessionExpired) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return a.Sessions.DeleteAllForUser(ctx, session.UserID)
 }
 
 func (s *AuthService) GetUserByID(ctx context.Context, id int) (*caregiverModel.Caregiver, error) {
