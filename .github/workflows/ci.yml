@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, canary]
+  # "Run workflow" button in the Actions tab; runs every job
+  workflow_dispatch:
+  # Lets the deploy workflow (#219) run CI before deploying; runs every job
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Decides which parts of the monorepo a PR touches. The check jobs below are
+  # skipped (not the whole workflow), because a skipped job still counts as
+  # passing for required status checks.
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      server: ${{ steps.filter.outputs.server }}
+      caregiver: ${{ steps.filter.outputs.caregiver }}
+      carepartner: ${{ steps.filter.outputs.carepartner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            server:
+              - 'server/**'
+              - '.github/workflows/ci.yml'
+            caregiver:
+              - 'caregiver/**'
+              - 'shared/**'
+              - '.github/workflows/ci.yml'
+            carepartner:
+              - 'carepartner/**'
+              - 'shared/**'
+              - '.github/workflows/ci.yml'
+
+  server:
+    needs: changes
+    # !cancelled() lets this run when `changes` was skipped (manual run or deploy)
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.server == 'true') }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      # Tests use go-sqlmock, so no database is needed
+      - run: go test ./...
+
+  caregiver:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.caregiver == 'true') }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: caregiver
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: caregiver/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # tsc -b && vite build, so this is also the type-check
+      - run: npm run build
+
+  carepartner:
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.carepartner == 'true') }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: carepartner
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: carepartner/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      # Jest roots include ../shared, so this runs the shared tests too
+      - run: npm test -- --ci
+      - name: Type-check shared/ without DOM or framework types
+        run: npm run typecheck:shared
+        working-directory: .
+
+  # Only canary may be merged into main. Required on main by its own ruleset;
+  # skipped everywhere else.
+  source-branch:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the PR comes from canary
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ "$HEAD_REF" != "canary" ] || [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::PRs into main must come from canary in this repo, not $HEAD_REPO:$HEAD_REF."
+            exit 1
+          fi

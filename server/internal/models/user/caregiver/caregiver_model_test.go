@@ -161,7 +161,7 @@ func TestCreateCaregiversBulk_QueryError_Rollback(t *testing.T) {
 		VALUES ($1, $2)
 		RETURNING id;
 	`)).
-		WithArgs(1, "a", "x").
+		WithArgs("a", "x").
 		WillReturnError(errors.New("insert error"))
 
 	mock.ExpectRollback()
@@ -179,11 +179,11 @@ func TestGetCaregiverByID_Found(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"id", "name", "role"}).
-		AddRow(10, "john", "admin")
+	rows := sqlmock.NewRows([]string{"id", "name", "role", "google_id"}).
+		AddRow(10, "john", "admin", "12345")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, name, role
+		SELECT id, name, role, google_id
 		FROM "Caregiver"
 		WHERE id = $1;
 	`)).
@@ -203,7 +203,7 @@ func TestGetCaregiverByID_NotFound(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, name, role
+		SELECT id, name, role, google_id
 		FROM "Caregiver"
 		WHERE id = $1;
 	`)).
@@ -221,7 +221,7 @@ func TestGetCaregiverByID_Error(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, name, role
+		SELECT id, name, role, google_id
 		FROM "Caregiver"
 		WHERE id = $1;
 	`)).

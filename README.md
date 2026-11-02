@@ -290,8 +290,43 @@ If the Google button fails with "The given origin is not allowed for the given c
 ### Tests
 
 ```bash
-cd server
-go test ./...
+cd server && go test ./...          # backend
+cd carepartner && npm test          # carepartner app and shared/
+npm run typecheck:shared            # from the repo root
 ```
 
-Some backend tests need MinIO running on `localhost:9000` and real weather/news API keys.
+Backend tests need nothing running. A few extra tests run only when you provide what they need, and skip otherwise: `MIGRATION_TEST_DSN` (a disposable PostgreSQL database), `NEWS_API_KEY`, `OPENWEATHER_API_KEY`, and `ffprobe` installed. The caregiver app has no tests; check it with `npm run lint` and `npm run build`.
+
+CI runs all of these on every pull request (see `.github/workflows/ci.yml`).
+
+---
+
+## Branching and pull requests
+
+```
+your branch ──PR──▶ canary ──PR──▶ main
+```
+
+- **`canary`** is the default branch, where all work is merged. Start new branches from it.
+- **`main`** holds released code, and only `canary` is merged into it. Once deploys are set up (#219), a merge into `main` will deploy.
+- Neither branch accepts direct pushes or force pushes, and neither can be deleted. Every change goes through a pull request.
+
+### Into `canary`
+
+- Open a pull request from your branch into `canary`.
+- It needs **1 approval** from someone other than you. Pushing new commits dismisses earlier approvals, and the latest push must be approved by someone other than the person who pushed it.
+- CI must pass: `changes`, `server`, `caregiver` and `carepartner`. Jobs for parts of the repo your pull request doesn't touch are skipped, and a skipped job counts as passing.
+- Your branch must be **up to date** with `canary`. If `canary` has moved on since you branched, use **Update branch** on the pull request (or merge or rebase `canary` yourself) and let CI run again. This way the exact result of the merge has been tested.
+- Any merge method is allowed.
+
+### Releasing: `canary` into `main`
+
+- Open a pull request from `canary` into `main`.
+- It needs **2 approvals**. New commits on `canary` while it is open dismiss them, so the approvals always cover what will be released.
+- CI must pass, and so must `source-branch`, which fails a pull request into `main` from any branch other than `canary`.
+- Merge with a **merge commit** (squash and rebase are turned off). Squashing would give `main` a commit `canary` never has, and later release pull requests would show old changes again.
+- The pull request doesn't need to be up to date with `main`. Each release adds a merge commit to `main` that `canary` doesn't have, and that is expected.
+
+### Hotfixes
+
+There is no shortcut into `main`. A fix goes into `canary` like any other change, then out in a release.

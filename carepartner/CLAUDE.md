@@ -61,7 +61,7 @@ npm run e2e                  # maestro test .maestro, against the app installed 
 ### Assumptions
 
 - The tablet shares its backend with the caregiver app, so endpoints the caregiver app uses must keep working. Where a caregiver setting has no UI yet (widget and photo choices), the server supplies a default.
-- Target device: an 11-inch Samsung Galaxy Tab A class tablet (Tab A9+ / A11+), 1920×1200, **landscape**, tested on an Android 15 emulator. The exact model isn't confirmed, so compute layout from the reported screen size and never hardcode dimensions. The visual design is drawn at 1280×800, the same 16:10 shape.
+- Target device: the confirmed tablet model for deployment is a **Samsung Galaxy Tab A9+**, 11-inch, 1920×1200, **landscape**, running **Android 16**, matched by the development emulator. Still compute layout from the reported screen size and never hardcode dimensions. The visual design is drawn at 1280×800, the same 16:10 shape.
 - Tablets are assumed to have live internet. Don't build dedicated offline behaviour; keep the last good data and send play reports when the connection returns.
 - Floor staff carry phones, so the tablet has no staff controls. Play and stop commands reach it from the server.
 
@@ -173,7 +173,7 @@ One state machine decides what the screen shows. Its state is three facts: `pair
 - Each play records its `playbackId` (staff) or `scheduledItemId` (scheduled) from `play`'s options, and `started`, which `started(playId)` sets once the player says the media is actually playing; until then it is loading.
 - When the player reports finished or failed, `ended(playId, reason)` returns the screen to idle with no animation. A report whose `playId` isn't the current play is ignored, so a replaced player can't end the new one. `stop(playbackId)` stops only the play with that record, so a late stop can't end a newer clip.
 - `PlaybackProvider` (in `_layout.tsx`) reads pairing at startup (`readPairedId`, see "Pairing and identity"), and tries again every `PAIRING_RETRY_MS` while storage can't be read; `TabletDisplay` tells it when night starts and ends. The machine keeps the paired carepartner ID, so the screen and the socket take it from `usePlayback().state.carepartnerId` instead of reading storage again. After pairing succeeds, `pair.tsx` calls `checkPairing()` and returns to `/`.
-- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `ChimeScreen`, then `MediaPlayer`, keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (dark and warm, with the day and "You're safe. Sleep well."), and `alwaysOn` renders `src/screen/AlwaysOnScreen.tsx`.
+- `app/index.tsx` only switches on the screen: an unpaired tablet is redirected to `/pair`, `playing` renders `ChimeScreen`, then `MediaPlayer`, keyed by `playId`, `night` renders `src/display/NightScreen.tsx` (dark and warm, with the day, a moon and "Nighttime" at the 76px orientation floor, and "You're safe. Sleep well."), and `alwaysOn` renders `src/screen/AlwaysOnScreen.tsx`.
 
 ### Staff commands (`src/playback/StaffCommands.tsx`, `socket.ts`, `socketMessages.ts`, `staffItem.ts`)
 

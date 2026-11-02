@@ -33,17 +33,19 @@ func TestCreateCaregiver_Success(t *testing.T) {
 
 	svc := NewCaregiverService(db)
 
+	googleID := "12345"
 	c := &model.Caregiver{
-		Name:          "john",
-		Role:          "helper",
+		Name:     "john",
+		Role:     "helper",
+		GoogleID: &googleID,
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "Caregiver" (carepartner_id, name, role)
+		INSERT INTO "Caregiver" (name, role, google_id)
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`)).
-		WithArgs(c.Name, c.Role).
+		WithArgs(c.Name, c.Role, c.GoogleID).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(5))
 
 	err := svc.CreateCaregiver(c)
@@ -53,28 +55,16 @@ func TestCreateCaregiver_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// func TestCreateCaregiver_ValidationError_EmptyName(t *testing.T) {
-// 	db, _ := setupMockDB(t)
-// 	defer db.Close()
-
-// 	svc := NewCaregiverService(db)
-// 	c := &model.Caregiver{CarepartnerID: 10}
-
-// 	err := svc.CreateCaregiver(c)
-// 	assert.Error(t, err)
-// 	assert.Equal(t, "name cannot be empty", err.Error())
-// }
-
-func TestCreateCaregiver_ValidationError_InvalidCarereceiver(t *testing.T) {
+func TestCreateCaregiver_ValidationError_EmptyName(t *testing.T) {
 	db, _ := setupMockDB(t)
 	defer db.Close()
 
 	svc := NewCaregiverService(db)
-	c := &model.Caregiver{Name: "john"}
+	c := &model.Caregiver{Role: "helper"}
 
 	err := svc.CreateCaregiver(c)
 	assert.Error(t, err)
-	assert.Equal(t, "carepartner_id must match caregiver ID or be set", err.Error())
+	assert.Equal(t, "name cannot be empty", err.Error())
 }
 
 /* -------------------------------------------------------
@@ -155,11 +145,11 @@ func TestGetCaregiverByID_Success(t *testing.T) {
 	svc := NewCaregiverService(db)
 
 	rows := sqlmock.NewRows([]string{
-		"id", "name", "role",
-	}).AddRow(1, "john", "helper")
+		"id", "name", "role", "google_id",
+	}).AddRow(1, "john", "helper", "12345")
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, name, role
+		SELECT id, name, role, google_id
 		FROM "Caregiver"
 		WHERE id = $1;
 	`)).

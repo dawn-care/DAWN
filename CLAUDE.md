@@ -35,7 +35,7 @@ go test ./internal/services/modules/ -run TestCreateModule   # one test
 swag init -g ./cmd/main.go -o ./cmd/docs  # regenerate Swagger docs after changing handler annotations
 ```
 
-Backend tests use `github.com/DATA-DOG/go-sqlmock` (no real DB needed) — see `server/internal/utils/test_helpers.go` for `SetupMockDB`/`SetupMockMinIO` helpers used across `*_test.go` files. Every layer (model, service, controller) typically has its own test file next to it.
+Backend tests use `github.com/DATA-DOG/go-sqlmock` (no real DB needed) — see `server/internal/utils/test_helpers.go` for the `SetupMockDB` helper used across `*_test.go` files. Every layer (model, service, controller) typically has its own test file next to it.
 
 ### Caregiver web app (`caregiver/`)
 
@@ -76,6 +76,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 `docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The image build also copies `shared/` next to `caregiver/` (as `/frontend/shared`, so a `../shared` import from the caregiver resolves). The carepartner app is never bundled into this image; it ships separately as an Android app.
+
+### CI (`.github/workflows/ci.yml`)
+
+Runs on every PR into `canary` or `main`, from the Actions tab ("Run workflow"), and when another workflow calls it. Each part of the repo is its own job: `server` (`go build`, `go vet`, `go test ./...`), `caregiver` (`npm ci`, `npm run lint`, `npm run build`) and `carepartner` (`npm ci`, `npm run lint`, `tsc --noEmit`, `npm test`, `npm run typecheck:shared`). On a PR, the `changes` job skips the jobs for parts it doesn't touch, and a change in `shared/` runs both frontend jobs. A skipped job counts as passing, so filter by job, never with `on.paths`. `source-branch` fails a PR into `main` that doesn't come from `canary`. CI never deploys. CI has nothing running (no Postgres, MinIO or network). A test that needs one of those skips itself when it's missing (like the `MIGRATION_TEST_DSN`, API key and `ffprobe` tests); never skip a test unconditionally — fix it or delete it. The `staff/` app isn't checked yet.
 
 ## Backend architecture (`server/internal/`)
 

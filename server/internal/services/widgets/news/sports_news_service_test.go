@@ -1,7 +1,6 @@
 package news
 
 import (
-	"fmt"
 	"regexp"
 	"testing"
 
@@ -111,20 +110,3 @@ func TestDeleteSportsNewsWidget(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestGetTeamGame(t *testing.T) {
-	db, _ := utils.SetupMockDB(t)
-	defer db.Close()
-
-	sports_news_service := NewSportsNewsWidgetService(db)
-
-	news_widget := &modelsWidget.NewsWidget{
-		ID:       1,
-		LANGUAGE: "Bills (BUF)",
-		COUNTRY:  "nfl",
-	}
-
-	game_overview, err := sports_news_service.GetTeamGame(news_widget)
-
-	fmt.Printf("%v+\n", game_overview)
-	assert.NoError(t, err)
-}
