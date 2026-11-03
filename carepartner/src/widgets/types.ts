@@ -16,7 +16,7 @@ export type OrientationData = {
 export type PhotoData = {
   uri?: string | null;
   /** The caption to draw, already cut to fit; none (null) leaves it off. */
-  name?: string | null;
+  caption?: string | null;
 };
 
 /** A caregiver's short message, with an optional photo and a role such as "Nurse". */

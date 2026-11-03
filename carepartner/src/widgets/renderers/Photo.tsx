@@ -25,10 +25,10 @@ export default function Photo({ data }: { data: PhotoData }) {
           <MaterialCommunityIcons name="image-outline" size={120} color={colors.day.placeholderIcon} />
         </View>
       )}
-      {!!data.name && (
+      {!!data.caption && (
         <View style={styles.caption}>
           <Text style={styles.name} numberOfLines={1}>
-            {data.name}
+            {data.caption}
           </Text>
         </View>
       )}

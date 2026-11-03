@@ -79,12 +79,12 @@ export const DAY_TIME_PLACEMENT: WidgetPlacement = {
 const LOOKS: Record<Exclude<ScreenWidgetType, "day_time">, (widget: ScreenWidget) => Look | null> = {
   photo: ({ photo, data }) => {
     if (!photo) return null;
-    // A caption the caregiver turned off isn't drawn; data without the switch (an older server) still shows it
-    const shown = !(isObject(data) && data.show_caption === false);
+    // The server always says whether to draw the caption; a caregiver who turned it off gets none
+    const shown = isObject(data) && data.show_caption === true;
     const caption = (isObject(data) && text(data.caption)) || text(photo.displayName);
     return {
       renderer: "photo",
-      data: { uri: resolveApiUri(photo.url), name: shown && caption ? fitCaption(caption) : null },
+      data: { uri: resolveApiUri(photo.url), caption: shown && caption ? fitCaption(caption) : null },
     };
   },
   message: ({ config, photo }) => {

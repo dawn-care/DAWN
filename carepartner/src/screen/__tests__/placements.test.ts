@@ -83,30 +83,30 @@ describe("placementsFor", () => {
   it("shows a photo with its caption, or else its name", () => {
     const photo = { url: "/media/4/file", displayName: "sarah_beach" };
     // Only one 2 x 2 photo fits beside the day and time, so each is placed on its own
-    const [captioned] = placed(widget({ type: "photo", width: 2, height: 2, photo, data: { caption: "Sarah" } }));
-    const [named] = placed(widget({ type: "photo", width: 2, height: 2, photo, data: null }));
+    const [captioned] = placed(widget({ type: "photo", width: 2, height: 2, photo, data: { caption: "Sarah", show_caption: true } }));
+    const [named] = placed(widget({ type: "photo", width: 2, height: 2, photo, data: { caption: "", show_caption: true } }));
 
-    expect(captioned).toMatchObject({ renderer: "photo", data: { uri: `${API_URL}/media/4/file`, name: "Sarah" } });
-    expect(named.data).toMatchObject({ name: "sarah_beach" });
+    expect(captioned).toMatchObject({ renderer: "photo", data: { uri: `${API_URL}/media/4/file`, caption: "Sarah" } });
+    expect(named.data).toMatchObject({ caption: "sarah_beach" });
   });
 
   describe("photo caption", () => {
     const photo = { url: "/media/4/file", displayName: "ny_giants_logo" };
     // Only one 2 x 2 photo fits beside the day and time, so each is placed on its own
-    const nameFor = (data: unknown, shown = photo) =>
-      (placed(widget({ type: "photo", width: 2, height: 2, photo: shown, data }))[0].data as { name: string | null }).name;
+    const captionFor = (data: unknown, shown = photo) =>
+      (placed(widget({ type: "photo", width: 2, height: 2, photo: shown, data }))[0].data as { caption: string | null }).caption;
 
     it("shows the photo's name when the caption is on", () => {
-      expect(nameFor({ caption: "ny_giants_logo", show_caption: true })).toBe("ny_giants_logo");
+      expect(captionFor({ caption: "ny_giants_logo", show_caption: true })).toBe("ny_giants_logo");
     });
 
     it("shows a custom caption when the caption is on", () => {
-      expect(nameFor({ caption: "Grandkids", show_caption: true })).toBe("Grandkids");
+      expect(captionFor({ caption: "Grandkids", show_caption: true })).toBe("Grandkids");
     });
 
     it("draws no caption when it is off, even a custom one", () => {
-      expect(nameFor({ caption: "ny_giants_logo", show_caption: false })).toBeNull();
-      expect(nameFor({ caption: "Grandkids", show_caption: false })).toBeNull();
+      expect(captionFor({ caption: "ny_giants_logo", show_caption: false })).toBeNull();
+      expect(captionFor({ caption: "Grandkids", show_caption: false })).toBeNull();
     });
 
     it("keeps drawing the photo when its caption is off", () => {
@@ -117,23 +117,18 @@ describe("placementsFor", () => {
       expect(placement).toMatchObject({ renderer: "photo", data: { uri: `${API_URL}/media/4/file` } });
     });
 
-    it("shows the caption when the server doesn't say whether to, as an older one doesn't", () => {
-      expect(nameFor({ caption: "Sarah" })).toBe("Sarah");
-      expect(nameFor(null)).toBe("ny_giants_logo");
-    });
-
     it("cuts a long name to fit the tile", () => {
       const long = { url: "/media/4/file", displayName: "IMG_2024_family_reunion_at_the_lake_house" };
 
-      expect(nameFor({ caption: long.displayName, show_caption: true }, long)).toBe(fitCaption(long.displayName));
-      expect(nameFor(null, long)).toBe(fitCaption(long.displayName));
-      expect(nameFor(null, long)).toHaveLength(TEXT_LIMITS.photoCaption);
+      expect(captionFor({ caption: long.displayName, show_caption: true }, long)).toBe(fitCaption(long.displayName));
+      expect(captionFor({ show_caption: true }, long)).toBe(fitCaption(long.displayName));
+      expect(captionFor({ show_caption: true }, long)).toHaveLength(TEXT_LIMITS.photoCaption);
     });
 
     it("cuts a long custom caption too", () => {
       const caption = "The whole family together at the lake house";
 
-      expect(nameFor({ caption, show_caption: true })).toBe(fitCaption(caption));
+      expect(captionFor({ caption, show_caption: true })).toBe(fitCaption(caption));
     });
   });
 

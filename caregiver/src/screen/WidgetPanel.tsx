@@ -212,11 +212,11 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
   const photos = state.value.filter((media) => media.kind === "photo");
   const chosen = photos.find((media) => media.id === widget.photoMediaId);
 
-  // Until the caregiver types their own, the screen shows the photo's name, so it follows a new or renamed photo
+  // Until the caregiver types their own, the field holds the photo's name, so it follows a new or renamed photo
   const config = widget.config as PhotoConfig;
   const captionOn = config.show_caption !== false;
-  const defaultCaption = fitCaption(chosen?.display_name ?? "");
-  const typed = config.caption ?? "";
+  const caption = config.caption ?? fitCaption(chosen?.display_name ?? "");
+  const missing = captionOn && caption.trim() === "";
   const counterId = `${widget.id}-caption-count`;
 
   return (
@@ -254,20 +254,22 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
             <TextField
               label="Caption"
               hideLabel
-              value={typed}
+              value={caption}
               maxLength={TEXT_LIMITS.photoCaption}
-              placeholder={defaultCaption}
               aria-describedby={counterId}
+              aria-invalid={missing}
               disabled={!captionOn}
               className="disabled:opacity-50 disabled:cursor-not-allowed"
-              // Empty text is left out, so the screen shows the photo's name again
-              onChange={(event) => {
-                const text = event.target.value;
-                onChange({ config: text.trim() === "" ? omit(config, "caption") : { ...config, caption: text } });
-              }}
+              // Cleared text is kept as typed, and Save stays off until there is a caption again or it is turned off
+              onChange={(event) => onChange({ config: { ...config, caption: event.target.value } })}
             />
-            <div id={counterId} className="self-end text-sm text-ink-muted">
-              {typed.length} / {TEXT_LIMITS.photoCaption}
+            <div id={counterId} className="flex justify-between gap-2 text-sm text-ink-muted">
+              <span role="alert" className={missing ? "font-bold text-link" : ""}>
+                {missing ? "Add a caption, or turn it off." : ""}
+              </span>
+              <span>
+                {caption.length} / {TEXT_LIMITS.photoCaption}
+              </span>
             </div>
           </div>
         </div>
