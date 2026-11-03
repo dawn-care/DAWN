@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	caregiverModel "server/internal/models/user/caregiver"
 	"server/internal/services/user/caregiver"
 	"server/internal/services/user/carepartner"
@@ -24,10 +25,14 @@ func NewAuthService(
 	return &AuthService{google, caregivers, carepartners, sessions}
 }
 
+// ErrGoogleTokenRejected means Google did not accept the ID token, so the login is refused (401).
+// Any other login error is a failure on our side (500).
+var ErrGoogleTokenRejected = errors.New("google rejected the ID token")
+
 func (a *AuthService) LoginWithGoogle(ctx context.Context, idToken string) (string, error) {
 	googleUser, err := a.Google.Verify(ctx, idToken)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrGoogleTokenRejected, err)
 	}
 
 	user, err := a.Caregivers.FindOrCreateFromGoogle(googleUser)
@@ -35,8 +40,31 @@ func (a *AuthService) LoginWithGoogle(ctx context.Context, idToken string) (stri
 		return "", err
 	}
 
-	// creates the session and returns session ID
-	return a.Sessions.Create(ctx, user.ID)
+	return a.StartSession(ctx, user.ID)
+}
+
+// StartSession signs a caregiver in and returns the token for their cookie. Every way of
+// logging in ends here, so they all get the same kind of session.
+func (a *AuthService) StartSession(ctx context.Context, caregiverID int) (string, error) {
+	return a.Sessions.Create(ctx, caregiverID)
+}
+
+// LogoutEverywhere ends every session of the caregiver the token belongs to, on all their devices.
+// A token that is unknown or already expired no longer says whose sessions to end, so nothing
+// else is ended and that is not an error; the caller still clears the cookie.
+func (a *AuthService) LogoutEverywhere(ctx context.Context, token string) error {
+	// Find, not Validate: renewing a session that is about to be deleted would be a wasted write
+	session, err := a.Sessions.Find(ctx, token)
+	if errors.Is(err, ErrSessionNotFound) || errors.Is(err, ErrSessionExpired) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("looking up the session to log out: %w", err)
+	}
+	if err := a.Sessions.DeleteAllForUser(ctx, session.UserID); err != nil {
+		return fmt.Errorf("ending the sessions of caregiver %d: %w", session.UserID, err)
+	}
+	return nil
 }
 
 func (s *AuthService) GetUserByID(ctx context.Context, id int) (*caregiverModel.Caregiver, error) {
