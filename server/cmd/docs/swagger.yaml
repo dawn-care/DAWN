@@ -825,6 +825,79 @@ paths:
       summary: Get audios by carepartner and caregiver
       tags:
       - audio
+  /auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a Google ID token and starts a session. The session cookie
+        is HttpOnly, SameSite=Strict, and Secure outside dev. It lasts 90 days from
+        when it last renewed (a request to /me renews it, at most once a day) and
+        always ends 1 year after login.
+      parameters:
+      - description: Google ID token
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            idToken:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: authenticated'
+          headers:
+            Set-Cookie:
+              description: session=<token>; Max-Age=7776000; HttpOnly; SameSite=Strict
+              type: string
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Log in with Google
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Ends every session of the caregiver, on every device, then clears
+        this browser's session cookie. With no cookie, or one that is unknown or expired,
+        it still succeeds and clears the cookie, but other devices stay signed in,
+        since the cookie no longer says whose sessions to end. If the sessions cannot
+        be ended it answers 500 and keeps the cookie, so the caregiver can try again.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: logged out'
+          headers:
+            Set-Cookie:
+              description: session=; Max-Age=0 (deletes the cookie)
+              type: string
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to log out
+          schema:
+            type: string
+      summary: Log out
+      tags:
+      - auth
   /calendar:
     get:
       description: Repeating items are expanded on the server, skipped days are left
@@ -1825,6 +1898,37 @@ paths:
       summary: Delete all events in a list
       tags:
       - event
+  /me:
+    get:
+      description: Returns the caregiver the session cookie belongs to, with their
+        carepartners. A session used more than a day after it last renewed is renewed
+        here, and the cookie is sent again with its new expiry. An unknown or expired
+        session gets 401 and its cookie is deleted. A failure loading the session,
+        the caregiver or their carepartners gets 500, and the cookie is left alone.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: id, name, role and carepartners
+          headers:
+            Set-Cookie:
+              description: session=<token>; Max-Age=<seconds left>; HttpOnly; SameSite=Strict
+                (only when the session renewed)
+              type: string
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get the signed-in caregiver
+      tags:
+      - auth
   /media:
     get:
       description: Newest first. Each item's usage lists where it is used (on_screen,
