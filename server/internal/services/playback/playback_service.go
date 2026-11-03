@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	playback "server/internal/models/playback"
@@ -14,7 +15,30 @@ var (
 	ErrInvalidInput      = errors.New("invalid playback input")
 	ErrNotFound          = errors.New("playback not found")
 	ErrInvalidTransition = errors.New("invalid playback status transition")
+	ErrNotRateable       = errors.New("only a play that reached the screen can be rated")
+	ErrRatingClosed      = errors.New("the rating window has closed")
 )
+
+// rowQuerier is a *sql.DB or *sql.Tx
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+/*
+notFound is what a lookup by playback ID and carepartner returns when it finds
+nothing. The caller answers 404 either way, so the API doesn't reveal which playback
+IDs exist. The server log still says what it really was: when the playback belongs
+to another carepartner, it is logged as a 403, so the two cases are easy to tell
+apart when debugging. A playback that doesn't exist at all needs no extra line; the
+request log already shows the 404.
+*/
+func notFound(ctx context.Context, q rowQuerier, id, carepartnerID int) error {
+	var owner int
+	if err := q.QueryRowContext(ctx, `SELECT carepartner_id FROM "Playback" WHERE id = $1`, id).Scan(&owner); err == nil {
+		log.Printf("playback: 403 Forbidden (answered as 404): playback %d belongs to carepartner %d, not %d", id, owner, carepartnerID)
+	}
+	return ErrNotFound
+}
 
 type PlaybackService struct {
 	DB *sql.DB
@@ -110,7 +134,7 @@ func (s *PlaybackService) UpdateStatus(ctx context.Context, id, carepartnerID in
 	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
 		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, notFound(ctx, tx, id, carepartnerID)
 	}
 	if err != nil {
 		return nil, err
@@ -189,6 +213,69 @@ func (s *PlaybackService) ListPlayed(ctx context.Context, carepartnerID, limit i
 		return nil, fmt.Errorf("list playbacks: %w", err)
 	}
 	return played, nil
+}
+
+/*
+GetPlayback returns one of a carepartner's playbacks. The staff app polls it while a
+clip plays, to see when the tablet ended it and until when it can be rated.
+*/
+func (s *PlaybackService) GetPlayback(ctx context.Context, id, carepartnerID int) (*playback.Playback, error) {
+	if id <= 0 || carepartnerID <= 0 {
+		return nil, fmt.Errorf("%w: positive IDs are required", ErrInvalidInput)
+	}
+	p, err := scanPlayback(s.DB.QueryRowContext(ctx, `SELECT `+columns+`
+		FROM "Playback" WHERE id = $1 AND carepartner_id = $2`, id, carepartnerID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, notFound(ctx, s.DB, id, carepartnerID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get playback: %w", err)
+	}
+	return p, nil
+}
+
+/*
+RatePlayback records how a play went: "helped", "no_change" or "worse". Only a play
+that reached the screen can be rated, until its RatingClosesAt (RatingWindow after it
+ended). Rating it again before then replaces the earlier rating, so a mis-tap can be
+fixed.
+*/
+func (s *PlaybackService) RatePlayback(ctx context.Context, id, carepartnerID int, rating string) (*playback.Playback, error) {
+	value, known := playback.RatingNames[rating]
+	if id <= 0 || carepartnerID <= 0 || !known {
+		return nil, fmt.Errorf("%w: positive IDs and a rating of helped, no_change or worse are required", ErrInvalidInput)
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	p, err := scanPlayback(tx.QueryRowContext(ctx, `SELECT `+columns+`
+		FROM "Playback" WHERE id = $1 AND carepartner_id = $2 FOR UPDATE`, id, carepartnerID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, notFound(ctx, tx, id, carepartnerID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	closes := p.RatingClosesAt()
+	if closes == nil {
+		return nil, ErrNotRateable
+	}
+	if time.Now().UTC().After(*closes) {
+		return nil, ErrRatingClosed
+	}
+
+	if _, err := tx.ExecContext(ctx, `UPDATE "Playback" SET rating = $1 WHERE id = $2 AND carepartner_id = $3`,
+		value, id, carepartnerID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	p.Rating = &value
+	return p, nil
 }
 
 func canTransition(from, to string) bool {

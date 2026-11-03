@@ -400,3 +400,18 @@ func TestDeleteMediaHandler(t *testing.T) {
 	NewMediaController(&mockMediaService{err: mediaSvc.ErrNotFound}).DeleteMediaHandler(w, withID(httptest.NewRequest(http.MethodDelete, "/api/media/4", nil), "4"))
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
+
+func TestListMediaHandler_Sort(t *testing.T) {
+	svc := &mockMediaService{list: []models.Media{}}
+	w := httptest.NewRecorder()
+	NewMediaController(svc).ListMediaHandler(w, httptest.NewRequest(http.MethodGet, "/api/media?carepartner_id=1&situation=winding_down&sort=rank", nil))
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, models.ListFilter{Situation: "winding_down", Rank: true}, *svc.filter)
+
+	w = httptest.NewRecorder()
+	svc = &mockMediaService{}
+	NewMediaController(svc).ListMediaHandler(w, httptest.NewRequest(http.MethodGet, "/api/media?carepartner_id=1&sort=score", nil))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, CodeInvalidRequest, decodeError(t, w).Code)
+	assert.Nil(t, svc.filter, "an unknown sort is turned away before the service")
+}
