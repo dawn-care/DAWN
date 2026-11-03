@@ -1,0 +1,15 @@
+region        = "us-east-1"
+facility      = "stanns"
+instance_type = "t3.medium"
+storage_gb    = 50
+
+# Replace these before running terraform plan/apply.
+# Select an official Canonical Ubuntu Server 24.04 LTS x86_64 AMI in us-east-1.
+ami_id         = "REPLACE_WITH_UBUNTU_AMI_ID"
+admin_cidr     = "REPLACE_WITH_YOUR_PUBLIC_IP/32"
+ssh_public_key = "REPLACE_WITH_YOUR_SSH_PUBLIC_KEY"
+
+# Optional: existing shared public hosted zone and facility subdomain.
+# Domain registration and shared hosted zone creation are managed separately.
+# dns_zone_id = "REPLACE_WITH_ROUTE53_ZONE_ID"
+# hostname    = "stanns.dawn-care.com"
