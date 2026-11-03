@@ -146,7 +146,7 @@ export interface ScreenSettings {
 export type WidgetType = "photo" | "message" | "reminder" | "weather" | "sports" | "news";
 
 // ---- Widget settings (the "config" object, by type) ----
-export interface PhotoConfig { caption?: string }
+export interface PhotoConfig { caption?: string; show_caption?: boolean }
 export interface MessageConfig {
   text: string;
   location?: string;
@@ -244,7 +244,7 @@ export interface ScreenWidget {
   data: PhotoData | WeatherData | SportsData | NewsData | null;
   error: "UPSTREAM_UNAVAILABLE" | null;
 }
-export interface PhotoData { caption: string }
+export interface PhotoData { caption: string; show_caption: boolean }
 export interface WeatherData {
   location: string; temp: number; feels_like: number; temp_min: number; temp_max: number;
   humidity: number; wind_speed: number; condition: string; description: string; message: string;
@@ -425,7 +425,7 @@ The server lets any type be any size and go anywhere on the grid, but see [Scree
 
 | Type | `config` | Photo |
 |---|---|---|
-| `photo` | `caption` optional, up to 60 characters. Without it the screen shows the photo's name. | Required |
+| `photo` | `caption` optional, up to 20 characters (what fits under the photo on the tablet). Without it the screen shows the photo's name. `show_caption` optional boolean: `false` hides the caption, and left out it is on. The `caption` text is kept while it is off. | Required |
 | `message` | `text` required (200). Optional `location` (100), `about` (`caregiver` or `carepartner`, for location reassurance), `label` (40) such as "Nurse". | Optional |
 | `reminder` | `items`: 1 to 10 of `{time, text, icon}`. `text` up to 60. Icons: `meal`, `medication`, `walk`, `visit`, `appointment`, `call`, `rest`, `other` (the default). Items come back sorted by time. | None |
 | `weather` | `zip`: 5 digit US zip. Defaults to `14617` (St. Ann's) when left out. | None |
@@ -544,7 +544,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
     {
       "id": 1, "type": "photo", "col": 2, "row": 0, "width": 2, "height": 2, "config": {},
       "photo": { "id": 1, "display_name": "Sarah", "url": "/media/1/file" },
-      "data": { "caption": "Sarah" }, "error": null
+      "data": { "caption": "Sarah", "show_caption": true }, "error": null
     },
     {
       "id": 3, "type": "weather", "col": 2, "row": 2, "width": 2, "height": 1,
@@ -579,7 +579,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 
 - `widgets` is in reading order. Each widget's `col`, `row`, `width` and `height` is a `GridArea`, so it goes straight into the tablet's existing `fitsGrid` and `cellRect`. Cells no widget covers are empty; there are no `null` placeholders.
 - Each widget type has one fixed size, `WIDGET_SIZES` in `shared/widgets/widgetSizes.ts` (photo 2×2; message, reminder, news, sports and weather 2×1). The server doesn't check it yet, so the editor should place widgets only at those sizes; the tablet leaves out a widget that isn't its type's size.
-- `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
+- `data` by type: photo `{caption, show_caption}` (`caption` is the config's caption or else the photo's name, and is sent even when `show_caption` is `false`, which means don't draw it); weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").
 - `schedule` covers today and tomorrow so playback keeps working past midnight. Trigger playback when the local time reaches an occurrence's `date` and `time`, as `carepartner/src/schedule/SchedulePlayer.tsx` does. Play photos for `duration_seconds`.

@@ -4,14 +4,14 @@ import Photo from "../renderers/Photo";
 
 describe("Photo widget", () => {
   it("shows the photo and the person's name", async () => {
-    await render(<Photo data={{ uri: "http://server/photo/file?id=1", name: "Sarah" }} />);
+    await render(<Photo data={{ uri: "http://server/photo/file?id=1", caption: "Sarah" }} />);
 
     expect(screen.getByTestId("photo-image").props.source).toEqual({ uri: "http://server/photo/file?id=1" });
     expect(screen.getByText("Sarah")).toBeTruthy();
   });
 
   it("shows a placeholder when there is no photo", async () => {
-    await render(<Photo data={{ uri: null, name: "Sarah" }} />);
+    await render(<Photo data={{ uri: null, caption: "Sarah" }} />);
 
     expect(screen.getByTestId("photo-placeholder")).toBeTruthy();
     expect(screen.queryByTestId("photo-image")).toBeNull();
@@ -25,9 +25,16 @@ describe("Photo widget", () => {
     expect(screen.getByTestId("photo-placeholder")).toBeTruthy();
   });
 
-  it("leaves out the caption when there is no name", async () => {
+  it("leaves out the caption when there is no caption", async () => {
     await render(<Photo data={{ uri: "http://server/photo/file?id=1" }} />);
 
+    expect(screen.queryByText(/./)).toBeNull();
+  });
+
+  it("leaves out the caption when the caption is null, as when the caregiver turned it off", async () => {
+    await render(<Photo data={{ uri: "http://server/photo/file?id=1", caption: null }} />);
+
+    expect(screen.getByTestId("photo-image")).toBeTruthy();
     expect(screen.queryByText(/./)).toBeNull();
   });
 });

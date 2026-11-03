@@ -5,7 +5,7 @@ import { fonts } from "../../theme/fonts";
 import { colors, fontSizes, radii, space } from "../../theme/theme";
 import type { PhotoData } from "../types";
 
-/** A large family photo with the person's name across the bottom. */
+/** A large family photo with its caption, the person's name by default, across the bottom. */
 export default function Photo({ data }: { data: PhotoData }) {
   const [failed, setFailed] = useState(false);
   const showImage = !!data.uri && !failed;
@@ -25,10 +25,10 @@ export default function Photo({ data }: { data: PhotoData }) {
           <MaterialCommunityIcons name="image-outline" size={120} color={colors.day.placeholderIcon} />
         </View>
       )}
-      {!!data.name && (
+      {!!data.caption && (
         <View style={styles.caption}>
           <Text style={styles.name} numberOfLines={1}>
-            {data.name}
+            {data.caption}
           </Text>
         </View>
       )}
