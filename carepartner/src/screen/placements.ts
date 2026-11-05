@@ -17,7 +17,7 @@
  *   malformed.
  */
 
-import { createDrawCheck, DAY_TIME_AREA, parseClock, type ScreenWidgetType } from "@shared";
+import { createDrawCheck, DAY_TIME_AREA, fitCaption, parseClock, type ScreenWidgetType } from "@shared";
 import { resolveApiUri } from "../api/resolveApiUri";
 import type { ReminderItem, WidgetPlacement } from "../widgets/types";
 import type { Screen, ScreenWidget } from "./screen";
@@ -77,11 +77,16 @@ export const DAY_TIME_PLACEMENT: WidgetPlacement = {
 
 /** How each widget type is drawn, or null when it has nothing to show. */
 const LOOKS: Record<Exclude<ScreenWidgetType, "day_time">, (widget: ScreenWidget) => Look | null> = {
-  photo: ({ photo, data }) =>
-    photo && {
+  photo: ({ photo, data }) => {
+    if (!photo) return null;
+    // The server always says whether to draw the caption; a caregiver who turned it off gets none
+    const shown = isObject(data) && data.show_caption === true;
+    const caption = (isObject(data) && text(data.caption)) || text(photo.displayName);
+    return {
       renderer: "photo",
-      data: { uri: resolveApiUri(photo.url), name: (isObject(data) && text(data.caption)) || text(photo.displayName) },
-    },
+      data: { uri: resolveApiUri(photo.url), caption: shown && caption ? fitCaption(caption) : null },
+    };
+  },
   message: ({ config, photo }) => {
     const words = isObject(config) ? text(config.text) : null;
     if (!isObject(config) || !words) return null;

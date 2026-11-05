@@ -13,17 +13,18 @@
  * Save button are locked.
  */
 
-import { TEXT_LIMITS, widgetName } from "@shared";
+import { fitCaption, TEXT_LIMITS, widgetName } from "@shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PhotoPicker from "../components/ui/PhotoPicker";
 import SelectField from "../components/ui/form/SelectField";
 import TextField from "../components/ui/form/TextField";
+import Switch from "../components/ui/form/Switch";
 import { FOCUS_RING } from "../components/ui/styles";
 import { fileUrl, friendlyError as mediaError, listMedia } from "../media/api";
 import type { Media } from "../media/api";
 import { ApiError, friendlyError, loadSportsLeagues } from "./api";
-import type { MessageConfig, SportsConfig, SportsLeague, WeatherConfig } from "./api";
+import type { MessageConfig, PhotoConfig, SportsConfig, SportsLeague, WeatherConfig } from "./api";
 import type { EditorWidget } from "./layout";
 import { isComplete, isValidZip } from "./widgetSettings";
 import type { WidgetChanges } from "./useScreenEditor";
@@ -195,6 +196,13 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
+/** A photo's config without one key, so the saved settings hold only what differs from the default */
+function omit(config: PhotoConfig, key: keyof PhotoConfig): PhotoConfig {
+  const rest = { ...config };
+  delete rest[key];
+  return rest;
+}
+
 function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { carepartnerId: number }) {
   const { state, retry } = useLoad<Media[]>(() => listMedia(carepartnerId), mediaError);
 
@@ -203,6 +211,14 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
 
   const photos = state.value.filter((media) => media.kind === "photo");
   const chosen = photos.find((media) => media.id === widget.photoMediaId);
+
+  // Until the caregiver types their own, the field holds the photo's name, so it follows a new or renamed photo
+  const config = widget.config as PhotoConfig;
+  const captionOn = config.show_caption !== false;
+  const caption = config.caption ?? fitCaption(chosen?.display_name ?? "");
+  const missing = captionOn && caption.trim() === "";
+  const counterId = `${widget.id}-caption-count`;
+
   return (
     <div className="flex flex-col gap-2">
       <span className="text-base font-bold">Photo</span>
@@ -224,12 +240,39 @@ function PhotoSettings({ carepartnerId, widget, onChange }: SettingsProps & { ca
           }}
         />
       )}
-      {/* The chosen photo, larger, with its name under it */}
+      {/* The chosen photo, larger */}
+      {chosen && <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-border" />}
       {chosen && (
-        <figure className="m-0 flex flex-col gap-1.5">
-          <img src={fileUrl(chosen)} alt="" className="w-full aspect-[4/3] object-cover rounded-lg bg-border" />
-          <figcaption className="text-base font-bold break-words">{chosen.display_name}</figcaption>
-        </figure>
+        <div className="flex flex-col gap-2">
+          <Switch
+            label="Show caption"
+            checked={captionOn}
+            // On is the default, so turning it on removes the setting; the text stays while it is off
+            onCheckedChange={(on) => onChange({ config: on ? omit(config, "show_caption") : { ...config, show_caption: false } })}
+          />
+          <div className="flex flex-col gap-1">
+            <TextField
+              label="Caption"
+              hideLabel
+              value={caption}
+              maxLength={TEXT_LIMITS.photoCaption}
+              aria-describedby={counterId}
+              aria-invalid={missing}
+              disabled={!captionOn}
+              className="disabled:opacity-50 disabled:cursor-not-allowed"
+              // Cleared text is kept as typed, and Save stays off until there is a caption again or it is turned off
+              onChange={(event) => onChange({ config: { ...config, caption: event.target.value } })}
+            />
+            <div id={counterId} className="flex justify-between gap-2 text-sm text-ink-muted">
+              <span role="alert" className={missing ? "font-bold text-link" : ""}>
+                {missing ? "Add a caption, or turn it off." : ""}
+              </span>
+              <span>
+                {caption.length} / {TEXT_LIMITS.photoCaption}
+              </span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

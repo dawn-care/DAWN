@@ -8,10 +8,10 @@
  * and again before saving.
  */
 
-import { isValidPlacement } from "@shared";
+import { isValidPlacement, TEXT_LIMITS } from "@shared";
 import type { ScreenWidgetType } from "@shared";
 import type { EditorWidget } from "./layout";
-import type { MessageConfig, SportsConfig, WeatherConfig } from "./api";
+import type { MessageConfig, PhotoConfig, SportsConfig, WeatherConfig } from "./api";
 
 /**
  * The types whose settings the editor changes in a panel. News has none, and
@@ -45,6 +45,12 @@ export function settingsChanged(before: EditorWidget, after: EditorWidget): bool
 export function saveProblem(widgets: readonly EditorWidget[]): { message: string; widgetId?: EditorWidget["id"] } | null {
   const incomplete = widgets.find((widget) => !isComplete(widget));
   if (incomplete) return { message: "Finish the settings of the selected widget before saving.", widgetId: incomplete.id };
+  const longCaption = widgets.find(
+    (widget) => widget.type === "photo" && ((widget.config as PhotoConfig).caption ?? "").length > TEXT_LIMITS.photoCaption,
+  );
+  if (longCaption) {
+    return { message: `A photo's caption can be at most ${TEXT_LIMITS.photoCaption} characters. Shorten it before saving.`, widgetId: longCaption.id };
+  }
   if (!isValidPlacement(widgets)) return { message: "A widget doesn't fit on the carepartner's screen." };
   return null;
 }
@@ -56,7 +62,7 @@ export function isValidZip(zip: string): boolean {
 
 /**
  * Whether a widget has everything it needs to be saved: a message has text, a
- * weather widget a five digit zip, a photo widget a photo, and a sports widget
+ * weather widget a five digit zip, a photo widget a photo (and a caption, unless it is turned off), and a sports widget
  * both its league and its team. Types without settings are always complete.
  * The panel's Save is off until this is true, and so is saving the screen.
  */
@@ -66,8 +72,11 @@ export function isComplete(widget: EditorWidget): boolean {
       return ((widget.config as Partial<MessageConfig>).text ?? "").trim() !== "";
     case "weather":
       return isValidZip((widget.config as Partial<WeatherConfig>).zip ?? "");
-    case "photo":
-      return widget.photoMediaId !== null;
+    case "photo": {
+      // An empty caption can't be saved while it is shown; with none set, the screen uses the photo's name
+      const { caption, show_caption } = widget.config as PhotoConfig;
+      return widget.photoMediaId !== null && (show_caption === false || caption === undefined || caption.trim() !== "");
+    }
     case "sports": {
       const { league, team } = widget.config as Partial<SportsConfig>;
       return !!league && !!team;

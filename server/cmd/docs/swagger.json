@@ -401,6 +401,107 @@
                 }
             }
         },
+        "/auth/google": {
+            "post": {
+                "description": "Verifies a Google ID token and starts a session. The session cookie is HttpOnly, SameSite=Strict, and Secure outside dev. It lasts 90 days from when it last renewed (a request to /me renews it, at most once a day) and always ends 1 year after login.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Log in with Google",
+                "parameters": [
+                    {
+                        "description": "Google ID token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "idToken": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "status: authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "headers": {
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "session=\u003ctoken\u003e; Max-Age=7776000; HttpOnly; SameSite=Strict"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "description": "Ends every session of the caregiver, on every device, then clears this browser's session cookie. With no cookie, or one that is unknown or expired, it still succeeds and clears the cookie, but other devices stay signed in, since the cookie no longer says whose sessions to end. If the sessions cannot be ended it answers 500 and keeps the cookie, so the caregiver can try again.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Log out",
+                "responses": {
+                    "200": {
+                        "description": "status: logged out",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "headers": {
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "session=; Max-Age=0 (deletes the cookie)"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to log out",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/calendar": {
             "get": {
                 "description": "Repeating items are expanded on the server, skipped days are left out, and outside_awake_hours reflects the current awake hours. from and to are inclusive and at most 62 days apart.",
@@ -1901,6 +2002,45 @@
                     },
                     "500": {
                         "description": "internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/me": {
+            "get": {
+                "description": "Returns the caregiver the session cookie belongs to, with their carepartners. A session used more than a day after it last renewed is renewed here, and the cookie is sent again with its new expiry. An unknown or expired session gets 401 and its cookie is deleted. A failure loading the session, the caregiver or their carepartners gets 500, and the cookie is left alone.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get the signed-in caregiver",
+                "responses": {
+                    "200": {
+                        "description": "id, name, role and carepartners",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "headers": {
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "session=\u003ctoken\u003e; Max-Age=\u003cseconds left\u003e; HttpOnly; SameSite=Strict (only when the session renewed)"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "string"
                         }
