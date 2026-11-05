@@ -67,4 +67,10 @@ describe("TEXT_LIMITS", () => {
   it("leaves room for the longest reminder on two lines beside its icon and time", () => {
     expect(capacity(300, 2 * legibility.minText * LINE_HEIGHT)).toBeGreaterThanOrEqual(TEXT_LIMITS.reminder);
   });
+
+  it("leaves room for the longest photo caption on one line across its 2x2 tile", () => {
+    // Two 272 wide cells and the 32 gap between them, less the caption's padding on both sides
+    const width = 2 * 272 + space.md - 2 * space.sm;
+    expect(Math.floor(width / (fontSizes.name * GLYPH_WIDTH))).toBeGreaterThanOrEqual(TEXT_LIMITS.photoCaption);
+  });
 });

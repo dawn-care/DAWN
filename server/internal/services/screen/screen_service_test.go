@@ -3,6 +3,7 @@ package screen
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"sync"
 	"testing"
@@ -138,7 +139,7 @@ func TestGetScreen_Mockup(t *testing.T) {
 	require.Len(t, screen.Widgets, 4, "every stored widget, in reading order")
 	photo, message, weatherTile, news := screen.Widgets[0], screen.Widgets[1], screen.Widgets[2], screen.Widgets[3]
 	assert.Equal(t, widgetModel.GridArea{Col: 0, Row: 0, Width: 2, Height: 2}, areaOf(photo))
-	assert.Equal(t, PhotoData{Caption: "Sarah"}, photo.Data, "caption falls back to the photo's name")
+	assert.Equal(t, PhotoData{Caption: "Sarah", ShowCaption: true}, photo.Data, "caption falls back to the photo's name")
 	assert.Equal(t, "/media/4/file", photo.Photo.URL)
 	assert.Equal(t, widgetModel.GridArea{Col: 2, Row: 0, Width: 2, Height: 1}, areaOf(message))
 	assert.Equal(t, "Nurse", jsonField(t, message.Config, "label"))
@@ -177,13 +178,47 @@ func TestGetScreen_SportsAndNews(t *testing.T) {
 	screen, err := s.GetScreen(1)
 
 	require.NoError(t, err)
-	assert.Equal(t, PhotoData{Caption: "Grandkids"}, screen.Widgets[0].Data, "caption wins over the photo's name")
+	assert.Equal(t, PhotoData{Caption: "Grandkids", ShowCaption: true}, screen.Widgets[0].Data, "caption wins over the photo's name")
 	assert.Equal(t, SportsData{League: "mlb", TeamName: "New York Yankees", Result: "won",
 		OpponentTeamName: "Boston Red Sox", TeamScore: 5, OpponentScore: 3, Message: "won"}, screen.Widgets[1].Data)
 	assert.Len(t, screen.Widgets[2].Data.(NewsData).Articles, MaxNewsArticles)
 	assert.Equal(t, widgetModel.GridArea{Col: 3, Row: 0, Width: 1, Height: 2}, areaOf(screen.Widgets[2]))
 	assert.Equal(t, "reminder", screen.Widgets[3].Type)
 	assert.Nil(t, screen.Widgets[3].Data, "reminders are all config")
+}
+
+func TestGetScreen_PhotoCaptionSwitch(t *testing.T) {
+	cases := []struct {
+		name, config string
+		want         PhotoData
+	}{
+		{"on by default", `{}`, PhotoData{Caption: "Sarah", ShowCaption: true}},
+		{"on explicitly", `{"show_caption":true}`, PhotoData{Caption: "Sarah", ShowCaption: true}},
+		{"off", `{"show_caption":false}`, PhotoData{Caption: "Sarah", ShowCaption: false}},
+		{"off keeps the custom caption", `{"caption":"Grandkids","show_caption":false}`,
+			PhotoData{Caption: "Grandkids", ShowCaption: false}},
+		{"on with a custom caption", `{"caption":"Grandkids","show_caption":true}`,
+			PhotoData{Caption: "Grandkids", ShowCaption: true}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, mock, _, _ := newService(t, afternoon)
+			expectBasics(mock, sqlmock.NewRows(widgetCols).
+				AddRow(1, 1, "photo", 0, 0, 1, 1, []byte(tc.config), 4))
+			expectPhoto(mock)
+
+			screen, err := s.GetScreen(1)
+
+			require.NoError(t, err)
+			require.Len(t, screen.Widgets, 1)
+			assert.Equal(t, tc.want, screen.Widgets[0].Data)
+
+			// The JSON a tablet receives always says whether to show the caption
+			raw, err := json.Marshal(screen.Widgets[0].Data)
+			require.NoError(t, err)
+			assert.Contains(t, string(raw), fmt.Sprintf(`"show_caption":%t`, tc.want.ShowCaption))
+		})
+	}
 }
 
 func TestGetScreen_UpstreamFailureOnlyAffectsThatWidget(t *testing.T) {

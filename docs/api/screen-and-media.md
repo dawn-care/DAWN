@@ -146,7 +146,7 @@ export interface ScreenSettings {
 export type WidgetType = "photo" | "message" | "reminder" | "weather" | "sports" | "news";
 
 // ---- Widget settings (the "config" object, by type) ----
-export interface PhotoConfig { caption?: string }
+export interface PhotoConfig { caption?: string; show_caption?: boolean }
 export interface MessageConfig {
   text: string;
   location?: string;
@@ -244,7 +244,7 @@ export interface ScreenWidget {
   data: PhotoData | WeatherData | SportsData | NewsData | null;
   error: "UPSTREAM_UNAVAILABLE" | null;
 }
-export interface PhotoData { caption: string }
+export interface PhotoData { caption: string; show_caption: boolean }
 export interface WeatherData {
   location: string; temp: number; feels_like: number; temp_min: number; temp_max: number;
   humidity: number; wind_speed: number; condition: string; description: string; message: string;
@@ -288,7 +288,7 @@ const media = await api<Media>("/media", { method: "POST", body: form });
 
 ### `GET /media?carepartner_id={id}&kind={kind}`
 
-List a carepartner's media, newest first. Optional filters, which combine: `kind`, `situation` (only media under that situation) and `family_member_id` (only media about that person). Use `usage` for the library badges: photos can be `on_screen`, `audio_background` and `scheduled` at once; video and audio can only be `scheduled`. An empty list means saved but unused.
+List a carepartner's media, newest first. Optional filters, which combine: `kind`, `situation` (only media under that situation) and `family_member_id` (only media about that person). `sort=rank` lists what staff rated best first instead, newest first among equal scores (see `POST /playbacks/{id}/rating`); the staff app uses it. Use `usage` for the library badges: photos can be `on_screen`, `audio_background` and `scheduled` at once; video and audio can only be `scheduled`. An empty list means saved but unused.
 
 ### `GET /media/{id}`
 
@@ -425,7 +425,7 @@ The server lets any type be any size and go anywhere on the grid, but see [Scree
 
 | Type | `config` | Photo |
 |---|---|---|
-| `photo` | `caption` optional, up to 60 characters. Without it the screen shows the photo's name. | Required |
+| `photo` | `caption` optional, up to 20 characters (what fits under the photo on the tablet). Without it the screen shows the photo's name. `show_caption` optional boolean: `false` hides the caption, and left out it is on. The `caption` text is kept while it is off. | Required |
 | `message` | `text` required (200). Optional `location` (100), `about` (`caregiver` or `carepartner`, for location reassurance), `label` (40) such as "Nurse". | Optional |
 | `reminder` | `items`: 1 to 10 of `{time, text, icon}`. `text` up to 60. Icons: `meal`, `medication`, `walk`, `visit`, `appointment`, `call`, `rest`, `other` (the default). Items come back sorted by time. | None |
 | `weather` | `zip`: 5 digit US zip. Defaults to `14617` (St. Ann's) when left out. | None |
@@ -544,7 +544,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
     {
       "id": 1, "type": "photo", "col": 2, "row": 0, "width": 2, "height": 2, "config": {},
       "photo": { "id": 1, "display_name": "Sarah", "url": "/media/1/file" },
-      "data": { "caption": "Sarah" }, "error": null
+      "data": { "caption": "Sarah", "show_caption": true }, "error": null
     },
     {
       "id": 3, "type": "weather", "col": 2, "row": 2, "width": 2, "height": 1,
@@ -579,7 +579,7 @@ Everything the tablet shows, in one response. The caregiver's preview of the tab
 
 - `widgets` is in reading order. Each widget's `col`, `row`, `width` and `height` is a `GridArea`, so it goes straight into the tablet's existing `fitsGrid` and `cellRect`. Cells no widget covers are empty; there are no `null` placeholders.
 - Each widget type has one fixed size, `WIDGET_SIZES` in `shared/widgets/widgetSizes.ts` (photo 2×2; message, reminder, news, sports and weather 2×1). The server doesn't check it yet, so the editor should place widgets only at those sizes; the tablet leaves out a widget that isn't its type's size.
-- `data` by type: photo `{caption}`; weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
+- `data` by type: photo `{caption, show_caption}` (`caption` is the config's caption or else the photo's name, and is sent even when `show_caption` is `false`, which means don't draw it); weather the current conditions; sports `{team_name, result, opponent_team_name, team_score, opponent_score, ...}`; news `{articles}` (up to 3). Message and reminder widgets have `data: null`; everything is in `config`.
 - If an outside service is down, that widget has `data: null` and `error: "UPSTREAM_UNAVAILABLE"`. Show a calm fallback for that widget only; the rest of the screen is fine. Weather and news need API keys on the server.
 - `awake_hours.is_awake_now` says whether to show the screen or the screensaver. Use `wake` on the screensaver ("Wakes up at 7:00 AM").
 - `schedule` covers today and tomorrow so playback keeps working past midnight. Trigger playback when the local time reaches an occurrence's `date` and `time`, as `carepartner/src/schedule/SchedulePlayer.tsx` does. Play photos for `duration_seconds`.
@@ -636,6 +636,26 @@ What has played on the tablet, newest first. Returns `200` with an array of `Pla
 - `limit` is optional: 1 to 100, default 50. The staff app's "Last played" uses `limit=1`.
 - A missing or invalid `carepartner_id` or `limit` returns `400`.
 
+### `GET /playbacks/{id}?carepartner_id=1`
+
+One playback, by its playback ID (the `id` from `POST /playbacks/play`), whatever its status. The list above is different: it returns the most recent plays that reached the screen, which is what "Last played" needs. The staff app polls this one while a clip plays, to see when the tablet ended it and whether it can be rated yet. `404` if it isn't this carepartner's (see Errors below).
+
+### `POST /playbacks/{id}/rating`
+
+Staff say how a play went, on five steps. Body `{"carepartner_id": 1, "rating": "helped"}`. Returns `200` with the `Playback`.
+
+| `rating` sent | Staff app button | Stored `rating` | Points |
+|---|---|---|---|
+| `helped_a_lot` | Helped a lot | `2` | +2 |
+| `helped` | Helped a little | `1` | +1 |
+| `no_change` | No change | `0` | 0 |
+| `worse` | Made it a little worse | `-1` | −1.5 |
+| `much_worse` | Made it much worse | `-2` | −3 |
+
+- Only a play that reached the screen can be rated (`409` otherwise), until 5 minutes after it ended (`409` after). A play the tablet never reported ending can be rated until 15 minutes after it started. Every `Playback` carries this as `rating_closes_at` (`null` when it never reached the screen), so show the rating controls only before that time.
+- Rating it again inside the window replaces the rating, so a mis-tap can be fixed.
+- Ratings rank the staff app's list (`GET /media?sort=rank`). A media item's score is the points of all its ratings: a step off the middle is 1 point and the ends are 2, with worse steps counting 1.5 times as much. Each rating's points halve every 30 days, so what helped recently ranks above what helped months ago. The scores themselves are never sent.
+
 ### Staff play and stop
 
 `POST /playbacks/play` with `{"carepartner_id": 1, "media_id": 9}` records a `staff` playback with a 30 second deadline and pushes it to the tablet over the WebSocket at `/realtime/tablet?carepartner_id=1`. `POST /playbacks/{id}/stop` with `{"carepartner_id": 1}` stops one. `module_id` is no longer accepted (`400`).
@@ -644,7 +664,9 @@ The tablet receives `{"type":"play","playback_id":12,"media_id":9,"expires_at":"
 
 ### Errors
 
-These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise. Deleting a media item keeps its playbacks and clears `media_id`; `media_kind` and `media_display_name` still say what played (the name as it was when it played). Deleting a scheduled item likewise keeps them and clears `scheduled_item_id`.
+These endpoints return `{"error": "..."}` without a `code`: `400` invalid input, `404` playback not found, `409` invalid status change, `500` otherwise.
+
+A playback that belongs to a different carepartner than the one named also gets `404`, the same as one that doesn't exist, so the API doesn't reveal which playback IDs exist. The server log tells the two apart: it records that case as a 403, with whose playback it is (`playback: 403 Forbidden (answered as 404): playback 170 belongs to carepartner 1, not 2`). Deleting a media item keeps its playbacks and clears `media_id`; `media_kind` and `media_display_name` still say what played (the name as it was when it played). Deleting a scheduled item likewise keeps them and clears `scheduled_item_id`.
 
 ```ts
 export type PlaybackSource = "scheduled" | "staff" | "tap";
@@ -663,7 +685,8 @@ export interface Playback {
   started_at: string | null;
   ended_at: string | null;
   expires_at: string;
-  rating: number | null;         // scale not decided yet
+  rating: 2 | 1 | 0 | -1 | -2 | null; // helped a lot … made it much worse; null until staff rate it
+  rating_closes_at: string | null; // until when it can be rated; null if it never reached the screen
 }
 ```
 

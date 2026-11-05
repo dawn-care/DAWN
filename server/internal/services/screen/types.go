@@ -41,7 +41,7 @@ another package.
 Config is the widget's settings as stored (see the screen layout endpoints).
 Data depends on the type and is null for photo, message and reminder widgets,
 whose content is all in Config and Photo:
-  - photo: PhotoData (the caption to show)
+  - photo: PhotoData (the caption to show, and whether to show it)
   - weather: WeatherData
   - sports: SportsData
   - news: NewsData
@@ -72,9 +72,11 @@ type Photo struct {
 // Widget error codes
 const ErrorUpstreamUnavailable = "UPSTREAM_UNAVAILABLE"
 
-// PhotoData is what to write under the photo frame: the caption, or the photo's name
+// PhotoData is what to write under the photo frame: the caption, or the photo's name.
+// ShowCaption is false when the caregiver turned the caption off, whatever Caption says.
 type PhotoData struct {
-	Caption string `json:"caption"`
+	Caption     string `json:"caption"`
+	ShowCaption bool   `json:"show_caption"`
 }
 
 // WeatherData is the current weather for the widget's zip code

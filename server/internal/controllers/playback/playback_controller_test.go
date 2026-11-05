@@ -176,3 +176,74 @@ func TestListPlaybacksDatabaseError(t *testing.T) {
 	require.Equal(t, 500, response.Code)
 	require.NotContains(t, response.Body.String(), "sensitive")
 }
+
+func TestRatePlaybackEndpoint(t *testing.T) {
+	r, mock := setup(t)
+	ended := time.Now().UTC().Add(-time.Minute)
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT .* FOR UPDATE`).WithArgs(1, 2).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "carepartner_id", "media_id", "media_kind", "media_display_name", "scheduled_item_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
+			AddRow(1, 2, 3, "video", "Clip", nil, "staff", "finished", ended, ended, ended, ended, ended, nil))
+	mock.ExpectExec(`UPDATE "Playback" SET rating`).WithArgs(-1, 1, 2).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	response := call(r, "POST", "/api/playbacks/1/rating", `{"carepartner_id":2,"rating":"worse"}`)
+	require.Equal(t, 200, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"rating":-1`)
+}
+
+func TestRatePlaybackRejectsBadRequests(t *testing.T) {
+	for _, body := range []string{"", "{}", `{"carepartner_id":2}`, `{"carepartner_id":2,"rating":"great"}`, `{"carepartner_id":2,"rating":"helped","note":"x"}`, `{"carepartner_id":2,"rating":1}`} {
+		r, _ := setup(t)
+		require.Equal(t, 400, call(r, "POST", "/api/playbacks/1/rating", body).Code, body)
+	}
+	r, _ := setup(t)
+	require.Equal(t, 400, call(r, "POST", "/api/playbacks/zero/rating", `{"carepartner_id":2,"rating":"helped"}`).Code)
+}
+
+func TestRatePlaybackConflicts(t *testing.T) {
+	long := time.Now().UTC().Add(-time.Hour)
+	for name, test := range map[string]struct {
+		started, ended any
+		want           string
+	}{
+		"never reached the screen": {nil, nil, "only a play that reached the screen can be rated"},
+		"window closed":            {long, long, "the rating window has closed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, mock := setup(t)
+			mock.ExpectBegin()
+			mock.ExpectQuery(`SELECT .* FOR UPDATE`).WithArgs(1, 2).WillReturnRows(
+				sqlmock.NewRows([]string{"id", "carepartner_id", "media_id", "media_kind", "media_display_name", "scheduled_item_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
+					AddRow(1, 2, 3, "video", "Clip", nil, "staff", "stopped", long, nil, test.started, test.ended, long, nil))
+			mock.ExpectRollback()
+
+			response := call(r, "POST", "/api/playbacks/1/rating", `{"carepartner_id":2,"rating":"helped"}`)
+			require.Equal(t, 409, response.Code)
+			require.Contains(t, response.Body.String(), test.want)
+		})
+	}
+}
+
+func TestGetPlaybackEndpoint(t *testing.T) {
+	r, mock := setup(t)
+	ended := time.Date(2026, 10, 28, 14, 1, 0, 0, time.UTC)
+	mock.ExpectQuery(`SELECT .* FROM "Playback" WHERE id = \$1 AND carepartner_id = \$2`).WithArgs(1, 2).WillReturnRows(
+		sqlmock.NewRows([]string{"id", "carepartner_id", "media_id", "media_kind", "media_display_name", "scheduled_item_id", "source", "status", "requested_at", "acknowledged_at", "started_at", "ended_at", "expires_at", "rating"}).
+			AddRow(1, 2, 3, "video", "Clip", nil, "staff", "finished", ended, ended, ended.Add(-time.Minute), ended, ended, nil))
+
+	response := call(r, "GET", "/api/playbacks/1?carepartner_id=2", "")
+	require.Equal(t, 200, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"status":"finished"`)
+	require.Contains(t, response.Body.String(), `"rating_closes_at":"2026-10-28T14:06:00Z"`)
+}
+
+func TestGetPlaybackEndpointErrors(t *testing.T) {
+	for _, path := range []string{"/api/playbacks/zero?carepartner_id=2", "/api/playbacks/1", "/api/playbacks/1?carepartner_id=two"} {
+		r, _ := setup(t)
+		require.Equal(t, 400, call(r, "GET", path, "").Code, path)
+	}
+	r, mock := setup(t)
+	mock.ExpectQuery(`FROM "Playback"`).WithArgs(1, 2).WillReturnError(sql.ErrNoRows)
+	require.Equal(t, 404, call(r, "GET", "/api/playbacks/1?carepartner_id=2", "").Code)
+}

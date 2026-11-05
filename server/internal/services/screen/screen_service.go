@@ -178,7 +178,8 @@ func (s *ScreenService) fillData(w *Widget) {
 		if caption == "" && w.Photo != nil {
 			caption = w.Photo.DisplayName
 		}
-		data = PhotoData{Caption: caption}
+		// Left out, show_caption is on, so photos saved before it existed keep their captions
+		data = PhotoData{Caption: caption, ShowCaption: c.ShowCaption == nil || *c.ShowCaption}
 
 	case widgets.TypeWeather:
 		var c widgets.WeatherConfig

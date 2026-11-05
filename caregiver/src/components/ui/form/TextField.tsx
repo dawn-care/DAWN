@@ -14,12 +14,14 @@ import { FIELD_CLASSES } from "../styles";
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
+  /** Keeps the label for screen readers only, when another heading already names the field */
+  hideLabel?: boolean;
   /** Short helper text shown under the label */
   hint?: string;
 }
 
 const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { label, hint, className = "", id, "aria-describedby": describedBy, ...inputProps },
+  { label, hideLabel = false, hint, className = "", id, "aria-describedby": describedBy, ...inputProps },
   ref
 ) {
   const generatedId = useId();
@@ -29,7 +31,7 @@ const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextFiel
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-base font-bold text-ink">
+      <label htmlFor={inputId} className={hideLabel ? "sr-only" : "text-base font-bold text-ink"}>
         {label}
       </label>
       {hint && (

@@ -14,7 +14,7 @@ const sampleScreen: WidgetPlacement[] = [
     row: 0,
     width: 2,
     height: 3,
-    data: { uri: "http://localhost:8080/api/media/1/file", name: "Sunset" },
+    data: { uri: "http://localhost:8080/api/media/1/file", caption: "Sunset" },
   },
   { id: "weather", renderer: "wideTile", col: 0, row: 2, width: 2, height: 1, data: { icon: "cloudy", label: "Cloudy", word: "48°" } },
 ];
@@ -30,7 +30,7 @@ describe("Grid", () => {
 
     expect(screen.getByText("Tuesday")).toBeTruthy();
     const photo = sampleScreen.find((w) => w.renderer === "photo")!;
-    expect(screen.getByText((photo.data as { name: string }).name)).toBeTruthy();
+    expect(screen.getByText((photo.data as { caption: string }).caption)).toBeTruthy();
     expect(screen.getByText("48°")).toBeTruthy();
   });
 
