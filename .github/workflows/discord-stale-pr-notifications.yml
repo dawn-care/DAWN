@@ -65,7 +65,7 @@ jobs:
               REVIEWER_LINE="Help fix this, ${REVIEWERS} 😰"
             else
               TAG="👺"
-              NUDGES=("HOLY MOLY SOMEONE PLEASE REVIEW (open ${DAYS_OPEN} days with no review)")
+              NUDGES=("HOLY MOLY PLEASE REVIEW THIS IT'S BEEN ${DAYS_OPEN} DAYS" "HAS BEEN OPEN ${DAYS_OPEN} DAYS WITHOUT REVIEW, THIS IS A TRAVESTY" "CODE RED: STILL NO REVIEW AFTER ${DAYS_OPEN} DAYS WHAT IS WRONG WITH YOU PEOPLE" "IS GAINING SENTIENCE AGAIN AFTER ${DAYS_OPEN} DAYS WITH NO REVIEW")
               REVIEWER_LINE="Shame on ${REVIEWERS} (point and laugh) 🫵😐"
             fi
             NUDGE="${NUDGES[$((RANDOM % ${#NUDGES[@]}))]}"
