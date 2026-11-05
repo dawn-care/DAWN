@@ -51,7 +51,7 @@ jobs:
 
             MESSAGE="⏰ [${TITLE}](${URL}) has been open 24+ hours with no review."
             if [ -n "$REVIEWERS" ]; then
-              MESSAGE="${MESSAGE} Still waiting on ${REVIEWERS}."
+              MESSAGE="${MESSAGE} Still waiting on ${REVIEWERS} 🫵😐."
             fi
 
             jq -n --arg content "$MESSAGE" \
