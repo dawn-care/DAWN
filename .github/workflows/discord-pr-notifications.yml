@@ -23,6 +23,7 @@ jobs:
         env:
           REQUESTED_REVIEWERS: ${{ toJSON(github.event.pull_request.requested_reviewers.*.login) }}
           DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+          PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
         run: |
           # Escape [ and ] so a title can't break the markdown link
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
@@ -47,6 +48,12 @@ jobs:
             MESSAGE="${MESSAGE} Review requested from ${REVIEWERS}."
           fi
 
+          # 11pm-5am Eastern (matches the team's actual timezone, not UTC)
+          HOUR_ET=$(TZ="America/New_York" date -d "$PR_CREATED_AT" +%H)
+          if [ "$HOUR_ET" -ge 23 ] || [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} Go to bed, ${PR_AUTHOR}."
+          fi
+
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
             | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
@@ -55,6 +62,7 @@ jobs:
         if: github.event.action == 'closed' && github.event.pull_request.merged == true
         env:
           MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+          PR_MERGED_AT: ${{ github.event.pull_request.merged_at }}
         run: |
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
 
@@ -69,6 +77,12 @@ jobs:
           fi
 
           MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY}${SIZE_TAG}."
+
+          # 11pm-5am Eastern (matches the team's actual timezone, not UTC)
+          HOUR_ET=$(TZ="America/New_York" date -d "$PR_MERGED_AT" +%H)
+          if [ "$HOUR_ET" -ge 23 ] || [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} Go to bed, ${MERGED_BY}."
+          fi
 
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
