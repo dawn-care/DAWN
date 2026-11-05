@@ -3,6 +3,8 @@ name: Discord PR Notifications
 on:
   pull_request:
     types: [opened, closed, review_requested]
+  pull_request_review:
+    types: [submitted]
 
 permissions: {}
 
@@ -17,13 +19,13 @@ jobs:
       PR_URL: ${{ github.event.pull_request.html_url }}
       PR_AUTHOR: ${{ github.event.pull_request.user.login }}
       PR_LINES_CHANGED: ${{ github.event.pull_request.additions + github.event.pull_request.deletions }}
+      PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
     steps:
       - name: PR opened
         if: github.event.action == 'opened'
         env:
           REQUESTED_REVIEWERS: ${{ toJSON(github.event.pull_request.requested_reviewers.*.login) }}
           DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
-          PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
         run: |
           # Escape [ and ] so a title can't break the markdown link
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
@@ -109,6 +111,45 @@ jobs:
           PHRASE="${REQUEST_PHRASES[$((RANDOM % ${#REQUEST_PHRASES[@]}))]}"
 
           MESSAGE="👀 ${REVIEWER} ${PHRASE} [${TITLE}](${PR_URL})."
+
+          jq -n --arg content "$MESSAGE" \
+            '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+            | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      # pull_request_review (not pull_request) is the event type for a
+      # completed review — different payload shape: github.event.review has
+      # the reviewer/state/submitted_at, while github.event.pull_request
+      # still has the PR's own fields (title, url, created_at) same as above.
+      - name: Review submitted
+        if: >-
+          github.event_name == 'pull_request_review' && github.event.action == 'submitted' &&
+          !endsWith(github.event.review.user.login, '[bot]')
+        env:
+          REVIEWER: ${{ github.event.review.user.login }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_SUBMITTED_AT: ${{ github.event.review.submitted_at }}
+        run: |
+          TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
+
+          case "$REVIEW_STATE" in
+            APPROVED) EMOJI="✅"; VERB="approved" ;;
+            CHANGES_REQUESTED) EMOJI="🚫"; VERB="denied" ;;
+            *) EMOJI="💬"; VERB="commented on" ;;
+          esac
+
+          MESSAGE="${EMOJI} ${REVIEWER} ${VERB} [${TITLE}](${PR_URL})"
+
+          HOURS_TO_REVIEW=$(( ( $(date -u -d "$REVIEW_SUBMITTED_AT" +%s) - $(date -u -d "$PR_CREATED_AT" +%s) ) / 3600 ))
+          if [ "$HOURS_TO_REVIEW" -gt 24 ]; then
+            MESSAGE="${MESSAGE} after ${HOURS_TO_REVIEW} hours (shame)"
+          fi
+          MESSAGE="${MESSAGE}."
+
+          # 11pm-5am Eastern (matches the team's actual timezone, not UTC)
+          HOUR_ET=$(TZ="America/New_York" date -d "$REVIEW_SUBMITTED_AT" +%H)
+          if [ "$HOUR_ET" -ge 23 ] || [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} Go to bed, ${REVIEWER}."
+          fi
 
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
