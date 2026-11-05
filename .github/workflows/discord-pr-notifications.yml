@@ -2,7 +2,7 @@ name: Discord PR Notifications
 
 on:
   pull_request:
-    types: [opened, closed]
+    types: [opened, closed, review_requested]
 
 permissions: {}
 
@@ -48,6 +48,29 @@ jobs:
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
 
           MESSAGE="🟣 [${TITLE}](${PR_URL}) merged by ${MERGED_BY}."
+
+          jq -n --arg content "$MESSAGE" \
+            '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+            | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      # requested_reviewer is singular here (one delivery per reviewer added),
+      # unlike the plural requested_reviewers snapshot used above at open time.
+      # A team (rather than user) review request carries requested_team
+      # instead, with requested_reviewer null — the guard below no-ops then,
+      # since DISCORD_USER_MAP is keyed by individual logins, not teams.
+      - name: Reviewer requested
+        if: github.event.action == 'review_requested' && github.event.requested_reviewer != null
+        env:
+          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
+          DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+        run: |
+          TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
+
+          REVIEWER=$(jq -rn --argjson users "$DISCORD_USER_MAP" --arg login "$REQUESTED_REVIEWER" '
+            if $users[$login] then "<@\($users[$login])>" else $login end
+          ')
+
+          MESSAGE="👀 ${REVIEWER} was requested to review [${TITLE}](${PR_URL})."
 
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
