@@ -36,15 +36,15 @@ jobs:
             map(if $users[.] then "<@\($users[.])>" else . end) | join(", ")
           ' <<< "$REQUESTED_REVIEWERS")
 
-          OPEN_VERBS=("opened" "dropped" "shipped out" "unleashed" "cooked up")
+          OPEN_VERBS=("opened" "opened" "opened" "unleashed" "cooked up" "politely suggests merging" "commands us to merge")
           VERB="${OPEN_VERBS[$((RANDOM % ${#OPEN_VERBS[@]}))]}"
 
           PR_LINES_CHANGED=$((PR_ADDITIONS + PR_DELETIONS))
           SIZE_TAG=""
-          if [ "$PR_LINES_CHANGED" -lt 20 ]; then
-            SIZE_TAG=" (a lil guy 🐣)"
-          elif [ "$PR_LINES_CHANGED" -gt 500 ]; then
-            SIZE_TAG=" (an absolute unit 🦣, ${PR_LINES_CHANGED} lines)"
+          if [ "$PR_LINES_CHANGED" -lt 40 ]; then
+            SIZE_TAG=" (a rinky dinky lil guy 🐣, ${PR_LINES_CHANGED} lines)"
+          elif [ "$PR_LINES_CHANGED" -gt 1000 ]; then
+            SIZE_TAG=" (a grotesque behemoth monstrosity 🧌, ${PR_LINES_CHANGED} lines)"
           fi
 
           MESSAGE="🟢 ${PR_AUTHOR} ${VERB} [${TITLE}](${PR_URL})${SIZE_TAG}."
@@ -52,10 +52,10 @@ jobs:
             MESSAGE="${MESSAGE} Review requested from ${REVIEWERS}."
           fi
 
-          # 11pm-5am Eastern (matches the team's actual timezone, not UTC)
+          # 1am-5am Eastern (matches the team's actual timezone, not UTC)
           HOUR_ET=$(TZ="America/New_York" date -d "$PR_CREATED_AT" +%H)
-          if [ "$HOUR_ET" -ge 23 ] || [ "$HOUR_ET" -lt 5 ]; then
-            MESSAGE="${MESSAGE} Go to bed, ${PR_AUTHOR}."
+          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} (also ${PR_AUTHOR} should go to bed 🫵😐)"
           fi
 
           jq -n --arg content "$MESSAGE" \
@@ -73,20 +73,15 @@ jobs:
           MERGE_VERBS=("merged" "shipped" "landed" "locked in")
           VERB="${MERGE_VERBS[$((RANDOM % ${#MERGE_VERBS[@]}))]}"
 
-          PR_LINES_CHANGED=$((PR_ADDITIONS + PR_DELETIONS))
-          SIZE_TAG=""
-          if [ "$PR_LINES_CHANGED" -lt 20 ]; then
-            SIZE_TAG=" 🐣"
-          elif [ "$PR_LINES_CHANGED" -gt 500 ]; then
-            SIZE_TAG=" 🦣"
-          fi
+          MERGE_EMOJIS=("🎉" "🥳" "🛳️" "😰" "😭" "🫩")
+          EMOJI="${MERGE_EMOJIS[$((RANDOM % ${#MERGE_EMOJIS[@]}))]}"
 
-          MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY}${SIZE_TAG}."
+          MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY} ${EMOJI}."
 
-          # 11pm-5am Eastern (matches the team's actual timezone, not UTC)
+          # 1am-5am Eastern (matches the team's actual timezone, not UTC)
           HOUR_ET=$(TZ="America/New_York" date -d "$PR_MERGED_AT" +%H)
-          if [ "$HOUR_ET" -ge 23 ] || [ "$HOUR_ET" -lt 5 ]; then
-            MESSAGE="${MESSAGE} Go to bed, ${MERGED_BY}."
+          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} (also plz go to sleep ${MERGED_BY} 🫵😐)"
           fi
 
           jq -n --arg content "$MESSAGE" \
@@ -110,7 +105,7 @@ jobs:
             if $users[$login] then "<@\($users[$login])>" else $login end
           ')
 
-          REQUEST_PHRASES=("was requested to review" "got summoned to review" "has been volun-told to review" "is needed on")
+          REQUEST_PHRASES=("was requested to review" "got summoned to review" '"volunteered" to review')
           PHRASE="${REQUEST_PHRASES[$((RANDOM % ${#REQUEST_PHRASES[@]}))]}"
 
           MESSAGE="👀 ${REVIEWER} ${PHRASE} [${TITLE}](${PR_URL})."
@@ -148,10 +143,10 @@ jobs:
           fi
           MESSAGE="${MESSAGE}."
 
-          # 11pm-5am Eastern (matches the team's actual timezone, not UTC)
+          # 1am-5am Eastern (matches the team's actual timezone, not UTC)
           HOUR_ET=$(TZ="America/New_York" date -d "$REVIEW_SUBMITTED_AT" +%H)
-          if [ "$HOUR_ET" -ge 23 ] || [ "$HOUR_ET" -lt 5 ]; then
-            MESSAGE="${MESSAGE} Go to bed, ${REVIEWER}."
+          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} Also, go to sleep ${REVIEWER} 🫵😐"
           fi
 
           jq -n --arg content "$MESSAGE" \
