@@ -2,7 +2,9 @@ name: Discord PR Notifications
 
 on:
   pull_request:
-    types: [opened, closed]
+    types: [opened, closed, review_requested]
+  pull_request_review:
+    types: [submitted]
 
 permissions: {}
 
@@ -16,6 +18,9 @@ jobs:
       PR_TITLE: ${{ github.event.pull_request.title }}
       PR_URL: ${{ github.event.pull_request.html_url }}
       PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      PR_ADDITIONS: ${{ github.event.pull_request.additions }}
+      PR_DELETIONS: ${{ github.event.pull_request.deletions }}
+      PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
     steps:
       - name: PR opened
         if: github.event.action == 'opened'
@@ -31,9 +36,26 @@ jobs:
             map(if $users[.] then "<@\($users[.])>" else . end) | join(", ")
           ' <<< "$REQUESTED_REVIEWERS")
 
-          MESSAGE="🟢 ${PR_AUTHOR} opened [${TITLE}](${PR_URL})."
+          OPEN_VERBS=("opened" "opened" "opened" "unleashed" "cooked up" "politely suggests merging" "commands us to merge")
+          VERB="${OPEN_VERBS[$((RANDOM % ${#OPEN_VERBS[@]}))]}"
+
+          PR_LINES_CHANGED=$((PR_ADDITIONS + PR_DELETIONS))
+          SIZE_TAG=""
+          if [ "$PR_LINES_CHANGED" -lt 40 ]; then
+            SIZE_TAG=" (a rinky dinky lil guy 🐣, ${PR_LINES_CHANGED} lines)"
+          elif [ "$PR_LINES_CHANGED" -gt 1000 ]; then
+            SIZE_TAG=" (a grotesque behemoth monstrosity 🧌, ${PR_LINES_CHANGED} lines)"
+          fi
+
+          MESSAGE="🟢 ${PR_AUTHOR} ${VERB} [${TITLE}](${PR_URL})${SIZE_TAG}."
           if [ -n "$REVIEWERS" ]; then
             MESSAGE="${MESSAGE} Review requested from ${REVIEWERS}."
+          fi
+
+          # 1am-5am Eastern (matches the team's actual timezone, not UTC)
+          HOUR_ET=$(TZ="America/New_York" date -d "$PR_CREATED_AT" +%H)
+          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} (also ${PR_AUTHOR} should go to bed 🫵😐)"
           fi
 
           jq -n --arg content "$MESSAGE" \
@@ -44,10 +66,88 @@ jobs:
         if: github.event.action == 'closed' && github.event.pull_request.merged == true
         env:
           MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+          PR_MERGED_AT: ${{ github.event.pull_request.merged_at }}
         run: |
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
 
-          MESSAGE="🟣 [${TITLE}](${PR_URL}) merged by ${MERGED_BY}."
+          MERGE_VERBS=("merged" "shipped" "landed" "locked in")
+          VERB="${MERGE_VERBS[$((RANDOM % ${#MERGE_VERBS[@]}))]}"
+
+          MERGE_EMOJIS=("🎉" "🥳" "🛳️" "😰" "😭" "🫩")
+          EMOJI="${MERGE_EMOJIS[$((RANDOM % ${#MERGE_EMOJIS[@]}))]}"
+
+          MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY} ${EMOJI}."
+
+          # 1am-5am Eastern (matches the team's actual timezone, not UTC)
+          HOUR_ET=$(TZ="America/New_York" date -d "$PR_MERGED_AT" +%H)
+          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} (also plz go to sleep ${MERGED_BY} 🫵😐)"
+          fi
+
+          jq -n --arg content "$MESSAGE" \
+            '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+            | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      # requested_reviewer is singular here (one delivery per reviewer added),
+      # unlike the plural requested_reviewers snapshot used above at open time.
+      # A team (rather than user) review request carries requested_team
+      # instead, with requested_reviewer null — the guard below no-ops then,
+      # since DISCORD_USER_MAP is keyed by individual logins, not teams.
+      - name: Reviewer requested
+        if: github.event.action == 'review_requested' && github.event.requested_reviewer != null
+        env:
+          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
+          DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+        run: |
+          TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
+
+          REVIEWER=$(jq -rn --argjson users "$DISCORD_USER_MAP" --arg login "$REQUESTED_REVIEWER" '
+            if $users[$login] then "<@\($users[$login])>" else $login end
+          ')
+
+          REQUEST_PHRASES=("was requested to review" "got summoned to review" '"volunteered" to review')
+          PHRASE="${REQUEST_PHRASES[$((RANDOM % ${#REQUEST_PHRASES[@]}))]}"
+
+          MESSAGE="👀 ${REVIEWER} ${PHRASE} [${TITLE}](${PR_URL})."
+
+          jq -n --arg content "$MESSAGE" \
+            '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+            | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+
+      # pull_request_review (not pull_request) is the event type for a
+      # completed review — different payload shape: github.event.review has
+      # the reviewer/state/submitted_at, while github.event.pull_request
+      # still has the PR's own fields (title, url, created_at) same as above.
+      - name: Review submitted
+        if: >-
+          github.event_name == 'pull_request_review' && github.event.action == 'submitted' &&
+          !endsWith(github.event.review.user.login, '[bot]')
+        env:
+          REVIEWER: ${{ github.event.review.user.login }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_SUBMITTED_AT: ${{ github.event.review.submitted_at }}
+        run: |
+          TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
+
+          case "$REVIEW_STATE" in
+            APPROVED) EMOJI="✅"; VERB="approved" ;;
+            CHANGES_REQUESTED) EMOJI="🚫"; VERB="denied" ;;
+            *) EMOJI="💬"; VERB="commented on" ;;
+          esac
+
+          MESSAGE="${EMOJI} ${REVIEWER} ${VERB} [${TITLE}](${PR_URL})"
+
+          HOURS_TO_REVIEW=$(( ( $(date -u -d "$REVIEW_SUBMITTED_AT" +%s) - $(date -u -d "$PR_CREATED_AT" +%s) ) / 3600 ))
+          if [ "$HOURS_TO_REVIEW" -gt 24 ]; then
+            MESSAGE="${MESSAGE} after ${HOURS_TO_REVIEW} hours (shame)"
+          fi
+          MESSAGE="${MESSAGE}."
+
+          # 1am-5am Eastern (matches the team's actual timezone, not UTC)
+          HOUR_ET=$(TZ="America/New_York" date -d "$REVIEW_SUBMITTED_AT" +%H)
+          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+            MESSAGE="${MESSAGE} Also, go to sleep ${REVIEWER} 🫵😐"
+          fi
 
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
