@@ -76,11 +76,19 @@ jobs:
           MERGE_EMOJIS=("🎉" "🥳" "🛳️" "😰" "😭" "🫩")
           EMOJI="${MERGE_EMOJIS[$((RANDOM % ${#MERGE_EMOJIS[@]}))]}"
 
-          MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY} ${EMOJI}."
+          # merged_by can be null — e.g. GitHub auto-merges a PR as a side
+          # effect of another PR's merge landing the same commits first, with
+          # no distinct person to attribute it to. Drop "by X" entirely then,
+          # rather than printing "by" with nothing after it.
+          if [ -n "$MERGED_BY" ]; then
+            MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY} ${EMOJI}."
+          else
+            MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} ${EMOJI}."
+          fi
 
           # 1am-5am Eastern (matches the team's actual timezone, not UTC)
           HOUR_ET=$(TZ="America/New_York" date -d "$PR_MERGED_AT" +%H)
-          if [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
+          if [ -n "$MERGED_BY" ] && [ "$HOUR_ET" -ge 1 ] && [ "$HOUR_ET" -lt 5 ]; then
             MESSAGE="${MESSAGE} (also plz go to sleep ${MERGED_BY} 🫵😐)"
           fi
 
