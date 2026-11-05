@@ -18,7 +18,8 @@ jobs:
       PR_TITLE: ${{ github.event.pull_request.title }}
       PR_URL: ${{ github.event.pull_request.html_url }}
       PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-      PR_LINES_CHANGED: ${{ github.event.pull_request.additions + github.event.pull_request.deletions }}
+      PR_ADDITIONS: ${{ github.event.pull_request.additions }}
+      PR_DELETIONS: ${{ github.event.pull_request.deletions }}
       PR_CREATED_AT: ${{ github.event.pull_request.created_at }}
     steps:
       - name: PR opened
@@ -38,6 +39,7 @@ jobs:
           OPEN_VERBS=("opened" "dropped" "shipped out" "unleashed" "cooked up")
           VERB="${OPEN_VERBS[$((RANDOM % ${#OPEN_VERBS[@]}))]}"
 
+          PR_LINES_CHANGED=$((PR_ADDITIONS + PR_DELETIONS))
           SIZE_TAG=""
           if [ "$PR_LINES_CHANGED" -lt 20 ]; then
             SIZE_TAG=" (a lil guy 🐣)"
@@ -71,6 +73,7 @@ jobs:
           MERGE_VERBS=("merged" "shipped" "landed" "locked in")
           VERB="${MERGE_VERBS[$((RANDOM % ${#MERGE_VERBS[@]}))]}"
 
+          PR_LINES_CHANGED=$((PR_ADDITIONS + PR_DELETIONS))
           SIZE_TAG=""
           if [ "$PR_LINES_CHANGED" -lt 20 ]; then
             SIZE_TAG=" 🐣"
