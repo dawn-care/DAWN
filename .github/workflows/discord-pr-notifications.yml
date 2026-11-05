@@ -16,6 +16,7 @@ jobs:
       PR_TITLE: ${{ github.event.pull_request.title }}
       PR_URL: ${{ github.event.pull_request.html_url }}
       PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+      PR_LINES_CHANGED: ${{ github.event.pull_request.additions + github.event.pull_request.deletions }}
     steps:
       - name: PR opened
         if: github.event.action == 'opened'
@@ -31,7 +32,17 @@ jobs:
             map(if $users[.] then "<@\($users[.])>" else . end) | join(", ")
           ' <<< "$REQUESTED_REVIEWERS")
 
-          MESSAGE="🟢 ${PR_AUTHOR} opened [${TITLE}](${PR_URL})."
+          OPEN_VERBS=("opened" "dropped" "shipped out" "unleashed" "cooked up")
+          VERB="${OPEN_VERBS[$((RANDOM % ${#OPEN_VERBS[@]}))]}"
+
+          SIZE_TAG=""
+          if [ "$PR_LINES_CHANGED" -lt 20 ]; then
+            SIZE_TAG=" (a lil guy 🐣)"
+          elif [ "$PR_LINES_CHANGED" -gt 500 ]; then
+            SIZE_TAG=" (an absolute unit 🦣, ${PR_LINES_CHANGED} lines)"
+          fi
+
+          MESSAGE="🟢 ${PR_AUTHOR} ${VERB} [${TITLE}](${PR_URL})${SIZE_TAG}."
           if [ -n "$REVIEWERS" ]; then
             MESSAGE="${MESSAGE} Review requested from ${REVIEWERS}."
           fi
@@ -47,7 +58,17 @@ jobs:
         run: |
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
 
-          MESSAGE="🟣 [${TITLE}](${PR_URL}) merged by ${MERGED_BY}."
+          MERGE_VERBS=("merged" "shipped" "landed" "locked in")
+          VERB="${MERGE_VERBS[$((RANDOM % ${#MERGE_VERBS[@]}))]}"
+
+          SIZE_TAG=""
+          if [ "$PR_LINES_CHANGED" -lt 20 ]; then
+            SIZE_TAG=" 🐣"
+          elif [ "$PR_LINES_CHANGED" -gt 500 ]; then
+            SIZE_TAG=" 🦣"
+          fi
+
+          MESSAGE="🟣 [${TITLE}](${PR_URL}) ${VERB} by ${MERGED_BY}${SIZE_TAG}."
 
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
@@ -70,7 +91,10 @@ jobs:
             if $users[$login] then "<@\($users[$login])>" else $login end
           ')
 
-          MESSAGE="👀 ${REVIEWER} was requested to review [${TITLE}](${PR_URL})."
+          REQUEST_PHRASES=("was requested to review" "got summoned to review" "has been volun-told to review" "is needed on")
+          PHRASE="${REQUEST_PHRASES[$((RANDOM % ${#REQUEST_PHRASES[@]}))]}"
+
+          MESSAGE="👀 ${REVIEWER} ${PHRASE} [${TITLE}](${PR_URL})."
 
           jq -n --arg content "$MESSAGE" \
             '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
