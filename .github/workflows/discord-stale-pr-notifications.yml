@@ -58,11 +58,11 @@ jobs:
             if [ "$HOURS_OPEN" -lt 48 ]; then
               TAG="😬"
               NUDGES=("looks a little moldy, ew (open 24+ hours with no review)" "is getting kinda crusty (open 24+ hours with no review)" "is starting to smell bad 🤢 (open 24+ hours with no review)")
-              REVIEWER_LINE="Time to check on it, ${REVIEWERS} 🫪"
+              REVIEWER_LINE="Time to check on it, ${REVIEWERS} ☹️"
             elif [ "$HOURS_OPEN" -lt 72 ]; then
               TAG="😞"
               NUDGES=("has gone crusty and moldy after ${DAYS_OPEN} days with no review" "has shriveled up after ${DAYS_OPEN} days with no review" "is sad and lonely after ${DAYS_OPEN} days with no review")
-              REVIEWER_LINE="Help fix this, ${REVIEWERS} 🙏"
+              REVIEWER_LINE="Help fix this, ${REVIEWERS} 😰"
             else
               TAG="👺"
               NUDGES=("HOLY MOLY SOMEONE PLEASE REVIEW (open ${DAYS_OPEN} days with no review)")
