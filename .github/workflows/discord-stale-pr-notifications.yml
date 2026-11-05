@@ -26,6 +26,7 @@ jobs:
           set -euo pipefail
 
           CUTOFF_EPOCH=$(date -u -d '24 hours ago' +%s)
+          NOW_EPOCH=$(date -u +%s)
           NOTIFIED=0
 
           while read -r pr; do
@@ -49,9 +50,29 @@ jobs:
               $requested | map(if $users[.] then "<@\($users[.])>" else . end) | join(", ")
             ')
 
-            MESSAGE="⏰ [${TITLE}](${URL}) has been open 24+ hours with no review."
+            # Tone escalates with how long it's actually been open, since this
+            # re-notifies daily for as long as a PR stays unreviewed — day 1
+            # is a nudge, day 3+ is a bit, rotating within each tier.
+            HOURS_OPEN=$(( (NOW_EPOCH - CREATED_EPOCH) / 3600 ))
+            DAYS_OPEN=$(( HOURS_OPEN / 24 ))
+            if [ "$HOURS_OPEN" -lt 48 ]; then
+              TAG="😬"
+              NUDGES=("looks a little moldy, ew (open 24+ hours with no review)" "is getting kinda crusty (open 24+ hours with no review)" "is starting to smell bad 🤢 (open 24+ hours with no review)")
+              REVIEWER_LINE="Time to check on it, ${REVIEWERS} 🫪"
+            elif [ "$HOURS_OPEN" -lt 72 ]; then
+              TAG="😞"
+              NUDGES=("has gone crusty and moldy after ${DAYS_OPEN} days with no review" "has shriveled up after ${DAYS_OPEN} days with no review" "is sad and lonely after ${DAYS_OPEN} days with no review")
+              REVIEWER_LINE="Help fix this, ${REVIEWERS} 🙏"
+            else
+              TAG="👺"
+              NUDGES=("HOLY MOLY SOMEONE PLEASE REVIEW (open ${DAYS_OPEN} days with no review)")
+              REVIEWER_LINE="Everybody point and laugh at ${REVIEWERS} 🫵😐"
+            fi
+            NUDGE="${NUDGES[$((RANDOM % ${#NUDGES[@]}))]}"
+
+            MESSAGE="${TAG} [${TITLE}](${URL}) ${NUDGE}."
             if [ -n "$REVIEWERS" ]; then
-              MESSAGE="${MESSAGE} Still waiting on ${REVIEWERS} 🫵😐."
+              MESSAGE="${MESSAGE} ${REVIEWER_LINE}"
             fi
 
             jq -n --arg content "$MESSAGE" \
