@@ -23,7 +23,21 @@ services:
       PORT: 8080
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
       NEWS_API_KEY: ${NEWS_API_KEY}
+      # Sign-in code emails go to Mailpit (inbox at http://localhost:8025) unless SMTP_* in .env
+      # points at a real mail server
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: "${SMTP_FROM:-D.A.W.N. <no-reply@dawn.local>}"
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     ports:
       - "8080:8080"
     volumes: []
+
+  # Catches every email the server sends in development; nothing leaves your machine
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "8025:8025" # inbox in the browser
+      - "1025:1025" # SMTP

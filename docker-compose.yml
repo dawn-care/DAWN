@@ -21,6 +21,11 @@ services:
       API_URL: https://startup-da.gccis.rit.edu
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
       NEWS_API_KEY: ${NEWS_API_KEY}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: "${SMTP_FROM:-}"
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     depends_on:
       db:
