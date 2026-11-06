@@ -23,25 +23,16 @@ services:
       PORT: 8080
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
       NEWS_API_KEY: ${NEWS_API_KEY}
-      # Sign-in code emails go to Mailpit (inbox at http://localhost:8025) unless SMTP_* in .env
-      # points at a real mail server
-      SMTP_HOST: ${SMTP_HOST:-mailpit}
-      SMTP_PORT: ${SMTP_PORT:-1025}
+      # Sign-in code emails. With SMTP_HOST empty, the server prints the email, and the code in
+      # it, in its log instead of sending it. Set SMTP_* in .env to send real emails.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: "${SMTP_FROM:-D.A.W.N. <no-reply@dawn.local>}"
+      SMTP_FROM: "${SMTP_FROM:-}"
       # Hashes sign-in codes. This default is for local development only, never production.
       LOGIN_CODE_SECRET: ${LOGIN_CODE_SECRET:-dev-only-secret-not-for-production-0123456789}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     ports:
       - "8080:8080"
     volumes: []
-
-  # Catches every email the server sends in development; nothing leaves your machine
-  mailpit:
-    image: axllent/mailpit:v1.21
-    ports:
-      - "8025:8025" # inbox in the browser
-      - "1025:1025" # SMTP
-    networks:
-      - app-network # the same network as the server, which reaches it as mailpit:1025

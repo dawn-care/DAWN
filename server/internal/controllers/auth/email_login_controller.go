@@ -89,7 +89,7 @@ func (c *AuthController) RequestEmailCode(w http.ResponseWriter, r *http.Request
 	case errors.Is(err, auth.ErrInvalidEmail):
 		writeAuthError(w, http.StatusBadRequest, CodeInvalidEmail, "Enter a valid email address.")
 	case errors.Is(err, auth.ErrTooManyRequests):
-		writeAuthError(w, http.StatusTooManyRequests, CodeRateLimited, "Too many codes requested. Wait a few minutes and try again.")
+		writeAuthError(w, http.StatusTooManyRequests, CodeRateLimited, "Too many codes requested. Try again later.")
 	case errors.Is(err, auth.ErrEmailLoginDisabled):
 		writeAuthError(w, http.StatusServiceUnavailable, CodeEmailLoginUnavailable, "Signing in with an emailed code is not available right now. Sign in with Google instead.")
 	case err != nil:
