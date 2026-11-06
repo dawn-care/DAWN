@@ -137,9 +137,14 @@ jobs:
         run: |
           TITLE=$(printf '%s' "$PR_TITLE" | sed 's/[][]/\\&/g')
 
+          # The pull_request_review webhook payload uses lowercase state
+          # values ("approved", "changes_requested", "commented") — unlike
+          # the REST API's PR-reviews *list* endpoint, which returns them
+          # uppercase. Matching uppercase here meant every review fell
+          # through to the wildcard, so "approved"/"denied" never fired.
           case "$REVIEW_STATE" in
-            APPROVED) EMOJI="✅"; VERB="approved" ;;
-            CHANGES_REQUESTED) EMOJI="🚫"; VERB="denied" ;;
+            approved) EMOJI="✅"; VERB="approved" ;;
+            changes_requested) EMOJI="🚫"; VERB="denied" ;;
             *) EMOJI="💬"; VERB="commented on" ;;
           esac
 
