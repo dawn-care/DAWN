@@ -9,10 +9,13 @@ import (
 
 // Caregiver represents a caregiver "user"
 type Caregiver struct {
-	ID            int     `json:"id"`
-	Name          string  `json:"name"`
-	Role          string  `json:"role"`
-	GoogleID      *string `json:"google_id"`
+	ID       int     `json:"id"`
+	Name     string  `json:"name"`
+	Role     string  `json:"role"`
+	GoogleID *string `json:"google_id"`
+	// Email is stored lowercase. It is never sent in a response: several caregiver routes
+	// are not behind login yet, so the address stays on the server.
+	Email *string `json:"-"`
 }
 
 // ─────────────────────────────────────────────
@@ -22,11 +25,11 @@ type Caregiver struct {
 // CreateCaregiver inserts a single caregiver
 func CreateCaregiver(db *sql.DB, c *Caregiver) error {
 	query := `
-		INSERT INTO "Caregiver" (name, role, google_id)
-		VALUES ($1, $2, $3)
+		INSERT INTO "Caregiver" (name, role, google_id, email)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`
-	return db.QueryRow(query, c.Name, c.Role, c.GoogleID).Scan(&c.ID)
+	return db.QueryRow(query, c.Name, c.Role, c.GoogleID, c.Email).Scan(&c.ID)
 }
 
 // CreateCaregiversBulk inserts many caregivers
@@ -68,7 +71,7 @@ func CreateCaregiversBulk(db *sql.DB, caregivers []Caregiver) error {
 // GetCaregiverByID retrieves a caregiver by ID
 func GetCaregiverByID(db *sql.DB, id int) (*Caregiver, error) {
 	query := `
-		SELECT id, name, role, google_id
+		SELECT id, name, role, google_id, email
 		FROM "Caregiver"
 		WHERE id = $1;
 	`
@@ -79,6 +82,7 @@ func GetCaregiverByID(db *sql.DB, id int) (*Caregiver, error) {
 		&c.Name,
 		&c.Role,
 		&c.GoogleID,
+		&c.Email,
 	)
 
 	if err != nil {
@@ -242,7 +246,7 @@ func DeleteCaregiver(exec db.Execer, id int) error {
 // Get Caregiver by Google ID (OAuth Implementation)
 func GetCaregiverByGoogleID(db *sql.DB, googleID string) (*Caregiver, error) {
 	query := `
-		SELECT id, name, role, google_id
+		SELECT id, name, role, google_id, email
 		FROM "Caregiver"
 		WHERE google_id = $1;
 	`
@@ -253,6 +257,7 @@ func GetCaregiverByGoogleID(db *sql.DB, googleID string) (*Caregiver, error) {
 		&c.Name,
 		&c.Role,
 		&c.GoogleID,
+		&c.Email,
 	)
 
 	if err == sql.ErrNoRows {
@@ -262,4 +267,62 @@ func GetCaregiverByGoogleID(db *sql.DB, googleID string) (*Caregiver, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// GetCaregiverByEmail finds a caregiver by email, ignoring case (email sign-in)
+func GetCaregiverByEmail(db *sql.DB, email string) (*Caregiver, error) {
+	query := `
+		SELECT id, name, role, google_id, email
+		FROM "Caregiver"
+		WHERE lower(email) = lower($1);
+	`
+
+	c := &Caregiver{}
+	err := db.QueryRow(query, email).Scan(
+		&c.ID,
+		&c.Name,
+		&c.Role,
+		&c.GoogleID,
+		&c.Email,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// SetGoogleID links a Google account to a caregiver that has none yet.
+// It reports whether the caregiver was changed; it never replaces a Google ID.
+func SetGoogleID(db *sql.DB, id int, googleID string) (bool, error) {
+	res, err := db.Exec(`
+		UPDATE "Caregiver"
+		SET google_id = $1
+		WHERE id = $2 AND google_id IS NULL;
+	`, googleID, id)
+	if err != nil {
+		return false, err
+	}
+	count, _ := res.RowsAffected()
+	return count > 0, nil
+}
+
+// SetEmail saves the email of a caregiver that has none yet.
+// It reports whether the caregiver was changed. It does nothing when the caregiver already
+// has an email or when another caregiver already uses this one.
+func SetEmail(db *sql.DB, id int, email string) (bool, error) {
+	res, err := db.Exec(`
+		UPDATE "Caregiver"
+		SET email = $1
+		WHERE id = $2 AND email IS NULL
+		  AND NOT EXISTS (SELECT 1 FROM "Caregiver" WHERE lower(email) = lower($1));
+	`, email, id)
+	if err != nil {
+		return false, err
+	}
+	count, _ := res.RowsAffected()
+	return count > 0, nil
 }

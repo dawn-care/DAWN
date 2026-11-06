@@ -77,7 +77,7 @@ func newController(t *testing.T, google authsvc.GoogleAuthService, sessions auth
 
 func expectExistingCaregiver(mock sqlmock.Sqlmock, id int) {
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Caregiver"`)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "role", "google_id"}).AddRow(id, "Pat", "caregiver", "g-1"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "role", "google_id", "email"}).AddRow(id, "Pat", "caregiver", "g-1", nil))
 }
 
 func login(c *AuthController) *httptest.ResponseRecorder {

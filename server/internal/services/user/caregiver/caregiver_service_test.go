@@ -41,11 +41,11 @@ func TestCreateCaregiver_Success(t *testing.T) {
 	}
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		INSERT INTO "Caregiver" (name, role, google_id)
-		VALUES ($1, $2, $3)
+		INSERT INTO "Caregiver" (name, role, google_id, email)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`)).
-		WithArgs(c.Name, c.Role, c.GoogleID).
+		WithArgs(c.Name, c.Role, c.GoogleID, c.Email).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(5))
 
 	err := svc.CreateCaregiver(c)
@@ -145,11 +145,11 @@ func TestGetCaregiverByID_Success(t *testing.T) {
 	svc := NewCaregiverService(db)
 
 	rows := sqlmock.NewRows([]string{
-		"id", "name", "role", "google_id",
-	}).AddRow(1, "john", "helper", "12345")
+		"id", "name", "role", "google_id", "email",
+	}).AddRow(1, "john", "helper", "12345", nil)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-		SELECT id, name, role, google_id
+		SELECT id, name, role, google_id, email
 		FROM "Caregiver"
 		WHERE id = $1;
 	`)).
