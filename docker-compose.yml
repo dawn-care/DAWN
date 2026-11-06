@@ -26,6 +26,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: "${SMTP_FROM:-}"
+      LOGIN_CODE_SECRET: ${LOGIN_CODE_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     depends_on:
       db:

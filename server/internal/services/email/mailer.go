@@ -62,7 +62,7 @@ func NewMailerFromEnv(getenv func(string) string, devMode bool) (Mailer, error) 
 		return nil, fmt.Errorf("email: set both SMTP_USER and SMTP_PASS, or neither")
 	}
 
-	return NewSMTPMailer(Config{
+	mailer, err := NewSMTPMailer(Config{
 		Host:          host,
 		Port:          port,
 		User:          user,
@@ -71,6 +71,11 @@ func NewMailerFromEnv(getenv func(string) string, devMode bool) (Mailer, error) 
 		ImplicitTLS:   port == 465,
 		AllowInsecure: devMode,
 	})
+	if err != nil {
+		// Returning mailer here would wrap a nil pointer in a non-nil Mailer
+		return nil, err
+	}
+	return mailer, nil
 }
 
 // LogMailer prints emails to a log instead of sending them. Development only: the log shows

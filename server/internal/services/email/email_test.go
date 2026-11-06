@@ -343,7 +343,7 @@ func TestNewMailerFromEnv_RejectsAnInvalidConfiguration(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m, err := NewMailerFromEnv(env(values), false)
 			assert.Error(t, err)
-			assert.Nil(t, m)
+			assert.True(t, m == nil, "a plain nil, so the caller's == nil check works")
 		})
 	}
 }

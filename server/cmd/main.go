@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -78,6 +79,7 @@ import (
 	mw "server/internal/middleware"
 	"server/internal/migrations"
 	"server/internal/realtime"
+	emailSvc "server/internal/services/email"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -86,6 +88,27 @@ func getEnvOrDefault(key, fallback string) string {
 		return fallback
 	}
 	return val
+}
+
+// enableEmailSignIn turns on sign-in with an emailed code when the mail server (SMTP_*) and
+// LOGIN_CODE_SECRET are set up. Without them the server runs as before and only Google sign-in works.
+func enableEmailSignIn(authService *authSvc.AuthService, db *sql.DB) {
+	mailer, err := emailSvc.NewMailerFromEnv(os.Getenv, os.Getenv("RUN_MODE") == "dev")
+	if err != nil {
+		log.Printf("WARNING: sign-in with an emailed code is off: %v", err)
+		return
+	}
+	if mailer == nil {
+		log.Print("WARNING: sign-in with an emailed code is off: SMTP_HOST is not set")
+		return
+	}
+	codes, err := authSvc.NewLoginCodeService(db, mailer, []byte(os.Getenv("LOGIN_CODE_SECRET")))
+	if err != nil {
+		log.Printf("WARNING: sign-in with an emailed code is off: %v", err)
+		return
+	}
+	authService.WithLoginCodes(codes)
+	log.Print("sign-in with an emailed code is on")
 }
 
 func main() {
@@ -158,6 +181,7 @@ func main() {
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
 	authService := authSvc.NewAuthService(googleService, caregiverService, carepartnerService, sessionService)
+	enableEmailSignIn(authService, db)
 
 	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)
