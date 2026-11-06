@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"errors"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -78,6 +81,7 @@ import (
 	mw "server/internal/middleware"
 	"server/internal/migrations"
 	"server/internal/realtime"
+	emailSvc "server/internal/services/email"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -88,18 +92,59 @@ func getEnvOrDefault(key, fallback string) string {
 	return val
 }
 
+// newLoginCodes sets up sign-in with an emailed code. It is always on: outside development it
+// needs a mail server (SMTP_*) and LOGIN_CODE_SECRET, and the server does not start without
+// them. In development with no SMTP_HOST the email is printed to the log, and with no
+// LOGIN_CODE_SECRET a random one is made for this run (codes then stop working on a restart).
+func newLoginCodes(getenv func(string) string, db *sql.DB) (authSvc.LoginCodeService, error) {
+	devMode := getenv("RUN_MODE") == "dev"
+	mailer, err := emailSvc.NewMailerFromEnv(getenv, devMode)
+	if err != nil {
+		return nil, err
+	}
+	if mailer == nil {
+		return nil, errors.New("SMTP_HOST is not set (see .env.example)")
+	}
+
+	secret := []byte(getenv("LOGIN_CODE_SECRET"))
+	if len(secret) == 0 && devMode {
+		secret = make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return nil, fmt.Errorf("making a development LOGIN_CODE_SECRET: %w", err)
+		}
+		log.Print("LOGIN_CODE_SECRET is not set; using a random one until the server restarts (development only)")
+	}
+	codes, err := authSvc.NewLoginCodeService(db, mailer, secret)
+	if err != nil {
+		// Returning codes here would wrap a nil pointer in a non-nil LoginCodeService
+		return nil, err
+	}
+	return codes, nil
+}
+
+// allowedOriginsFor lists the browser pages allowed to call the API with cookies. Production
+// trusts only its own https site (the caregiver app is served from it); the localhost
+// development servers are trusted only in development.
+func allowedOriginsFor(devMode bool) []string {
+	if devMode {
+		return []string{
+			"http://localhost:5173",
+			"http://localhost:8081",
+			"http://localhost:8082", // staff app web build in development
+		}
+	}
+	return []string{"https://startup-da.gccis.rit.edu"}
+}
+
 func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// Browser pages allowed to call the API. The sign-in routes trust the same origins.
+	allowedOrigins := allowedOriginsFor(os.Getenv("RUN_MODE") == "dev")
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"http://localhost:5173",
-			"http://localhost:8081",
-			"http://localhost:8082", // staff app web build in development
-			"http://startup-da.gccis.rit.edu",
-		},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -158,6 +203,11 @@ func main() {
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
 	authService := authSvc.NewAuthService(googleService, caregiverService, carepartnerService, sessionService)
+	loginCodes, err := newLoginCodes(os.Getenv, db)
+	if err != nil {
+		log.Fatal("sign-in with an emailed code: ", err)
+	}
+	authService.WithLoginCodes(loginCodes)
 
 	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)
@@ -260,8 +310,16 @@ func main() {
 	})
 
 	// Auth
-	r.Post("/api/auth/google", authController.GoogleLogin)
-	r.Post("/api/auth/logout", authController.Logout)
+	// A sign-in request has no session cookie yet, so SameSite cannot stop another site's page
+	// from making it; these routes also refuse cross-site requests.
+	crossOrigin, err := mw.CrossOriginProtection(allowedOrigins)
+	if err != nil {
+		log.Fatal("cross-origin protection: ", err)
+	}
+	r.With(crossOrigin).Post("/api/auth/google", authController.GoogleLogin)
+	r.With(crossOrigin).Post("/api/auth/email/code", authController.RequestEmailCode)
+	r.With(crossOrigin).Post("/api/auth/email/verify", authController.VerifyEmailCode)
+	r.With(crossOrigin).Post("/api/auth/logout", authController.Logout)
 
 	// Protected route (test route - update later w protected routes)
 	r.Group(func(r chi.Router) {
