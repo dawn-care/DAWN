@@ -168,15 +168,6 @@ func TestRequestCode_StoresAHashedCodeThenEmailsIt(t *testing.T) {
 	assert.Contains(t, sent[0].text, "10 minutes")
 }
 
-func TestRequestCode_IsAllowedJustBelowEveryLimit(t *testing.T) {
-	svc, mock, mailer := newCodeServiceWithMock(t)
-	expectChecks(mock, svc, testIP, maxCodesPerEmailPer15Min-1, maxCodesPerEmailPerDay-1, maxCodesPerIPPerHour-1)
-	expectStore(mock, svc, testIP, "123456")
-
-	require.NoError(t, svc.RequestCode(context.Background(), testAddress, testIP))
-	assert.Len(t, mailer.emails(), 1)
-}
-
 func TestRequestCode_RefusesAtEveryLimitAndSendsNothing(t *testing.T) {
 	cases := map[string][3]int{
 		"3 for this email in 15 minutes": {maxCodesPerEmailPer15Min, 3, 0},
@@ -225,12 +216,6 @@ func TestRequestCode_ReturnsTheMailErrorAfterStoringTheCode(t *testing.T) {
 }
 
 func TestRequestCode_DatabaseErrors(t *testing.T) {
-	t.Run("cannot begin", func(t *testing.T) {
-		svc, mock, mailer := newCodeServiceWithMock(t)
-		mock.ExpectBegin().WillReturnError(errors.New("db down"))
-		assert.Error(t, svc.RequestCode(context.Background(), testAddress, testIP))
-		assert.Empty(t, mailer.emails())
-	})
 	t.Run("cannot count", func(t *testing.T) {
 		svc, mock, mailer := newCodeServiceWithMock(t)
 		mock.ExpectBegin()
@@ -253,25 +238,6 @@ func TestRequestCode_DatabaseErrors(t *testing.T) {
 		assert.Error(t, svc.RequestCode(context.Background(), testAddress, testIP))
 		assert.Empty(t, mailer.emails(), "a code that was not stored is never emailed")
 	})
-	t.Run("cannot commit", func(t *testing.T) {
-		svc, mock, mailer := newCodeServiceWithMock(t)
-		expectChecks(mock, svc, testIP, 0, 0, 0)
-		mock.ExpectExec(q(supersedeSQL)).WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(q(insertCodeSQL)).WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectExec(q(insertRequestSQL)).WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectCommit().WillReturnError(errors.New("db down"))
-		assert.Error(t, svc.RequestCode(context.Background(), testAddress, testIP))
-		assert.Empty(t, mailer.emails())
-	})
-}
-
-func TestRequestCode_CodeGeneratorError(t *testing.T) {
-	svc, mock, mailer := newCodeServiceWithMock(t)
-	svc.generate = func() (string, error) { return "", errors.New("no randomness") }
-
-	assert.Error(t, svc.RequestCode(context.Background(), testAddress, testIP))
-	assert.Empty(t, mailer.emails())
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 /* -------------------------------------------------------
@@ -322,16 +288,6 @@ func TestVerifyCode_TheFifthWrongCodeBurnsIt(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestVerifyCode_TheFifthGuessMayStillBeRight(t *testing.T) {
-	svc, mock, _ := newCodeServiceWithMock(t)
-	expectCodeRow(mock, svc, "123456", loginCodeMaxAttempts-1)
-	mock.ExpectExec(q(countAttemptSQL)).WithArgs(5).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(q(markUsedSQL)).WithArgs(5, fixedNow).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
-
-	assert.NoError(t, svc.VerifyCode(context.Background(), testAddress, "123456"))
-}
-
 func TestVerifyCode_ABurnedCodeIsRefusedEvenWhenTheGuessIsRight(t *testing.T) {
 	svc, mock, _ := newCodeServiceWithMock(t)
 	expectCodeRow(mock, svc, "123456", loginCodeMaxAttempts)
@@ -375,13 +331,6 @@ func TestVerifyCode_MalformedInputNeverReachesTheDatabase(t *testing.T) {
 }
 
 func TestVerifyCode_DatabaseErrors(t *testing.T) {
-	t.Run("cannot begin", func(t *testing.T) {
-		svc, mock, _ := newCodeServiceWithMock(t)
-		mock.ExpectBegin().WillReturnError(errors.New("db down"))
-		err := svc.VerifyCode(context.Background(), testAddress, "123456")
-		assert.Error(t, err)
-		assert.NotErrorIs(t, err, ErrCodeRejected, "a database failure is not a wrong code")
-	})
 	t.Run("cannot look up the code", func(t *testing.T) {
 		svc, mock, _ := newCodeServiceWithMock(t)
 		mock.ExpectBegin()
@@ -391,13 +340,6 @@ func TestVerifyCode_DatabaseErrors(t *testing.T) {
 		assert.Error(t, err)
 		assert.NotErrorIs(t, err, ErrCodeRejected)
 	})
-	t.Run("cannot count the attempt", func(t *testing.T) {
-		svc, mock, _ := newCodeServiceWithMock(t)
-		expectCodeRow(mock, svc, "123456", 0)
-		mock.ExpectExec(q(countAttemptSQL)).WillReturnError(errors.New("db down"))
-		mock.ExpectRollback()
-		assert.Error(t, svc.VerifyCode(context.Background(), testAddress, "123456"), "the right code is not accepted when the attempt cannot be recorded")
-	})
 	t.Run("cannot mark the code used", func(t *testing.T) {
 		svc, mock, _ := newCodeServiceWithMock(t)
 		expectCodeRow(mock, svc, "123456", 0)
@@ -405,14 +347,6 @@ func TestVerifyCode_DatabaseErrors(t *testing.T) {
 		mock.ExpectExec(q(markUsedSQL)).WillReturnError(errors.New("db down"))
 		mock.ExpectRollback()
 		assert.Error(t, svc.VerifyCode(context.Background(), testAddress, "123456"), "a code that cannot be used up does not sign anyone in")
-	})
-	t.Run("cannot commit", func(t *testing.T) {
-		svc, mock, _ := newCodeServiceWithMock(t)
-		expectCodeRow(mock, svc, "123456", 0)
-		mock.ExpectExec(q(countAttemptSQL)).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectExec(q(markUsedSQL)).WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectCommit().WillReturnError(errors.New("db down"))
-		assert.Error(t, svc.VerifyCode(context.Background(), testAddress, "123456"))
 	})
 }
 

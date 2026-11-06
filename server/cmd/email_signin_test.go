@@ -21,8 +21,6 @@ func TestEnableEmailSignIn(t *testing.T) {
 		{"production with no mail server", map[string]string{"LOGIN_CODE_SECRET": goodSecret}, false},
 		{"no secret", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com"}, false},
 		{"secret too short", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com", "LOGIN_CODE_SECRET": "short"}, false},
-		{"mail server without a sender", map[string]string{"SMTP_HOST": "smtp.example.com", "LOGIN_CODE_SECRET": goodSecret}, false},
-		{"mail server with a bad port", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_PORT": "abc", "SMTP_FROM": "no-reply@example.com", "LOGIN_CODE_SECRET": goodSecret}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

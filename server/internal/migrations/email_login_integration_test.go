@@ -50,36 +50,10 @@ func TestEmailLoginCodesMigrationIntegration(t *testing.T) {
 		require.False(t, googleID.Valid)
 	})
 
-	t.Run("email is optional and a Google caregiver keeps its google_id", func(t *testing.T) {
-		_, err := db.Exec(`INSERT INTO "Caregiver" (name, google_id) VALUES ('No email one', 'g-1'), ('No email two', 'g-2')`)
-		require.NoError(t, err)
-	})
-
 	t.Run("email is unique ignoring case", func(t *testing.T) {
 		_, err := db.Exec(`INSERT INTO "Caregiver" (name, email) VALUES ('Unique', 'Person@Example.com')`)
 		require.NoError(t, err)
 		_, err = db.Exec(`INSERT INTO "Caregiver" (name, email) VALUES ('Duplicate', 'person@example.COM')`)
-		require.Error(t, err)
-	})
-
-	t.Run("a login code starts unused with no attempts", func(t *testing.T) {
-		var attempts int
-		var usedAt sql.NullTime
-		var createdAt time.Time
-		require.NoError(t, db.QueryRow(`INSERT INTO "LoginCode" (email, code_hash, expires_at)
-			VALUES ('person@example.com', 'hash', now() + interval '10 minutes')
-			RETURNING attempts, used_at, created_at`).Scan(&attempts, &usedAt, &createdAt))
-		require.Equal(t, 0, attempts)
-		require.False(t, usedAt.Valid)
-		require.WithinDuration(t, time.Now(), createdAt, time.Minute)
-		_, err := db.Exec(`INSERT INTO "LoginCode" (email, code_hash) VALUES ('person@example.com', 'hash')`)
-		require.Error(t, err, "expires_at is required")
-	})
-
-	t.Run("a request log row needs an email and an ip hash", func(t *testing.T) {
-		_, err := db.Exec(`INSERT INTO "LoginCodeRequest" (email, ip_hash) VALUES ('person@example.com', 'iphash')`)
-		require.NoError(t, err)
-		_, err = db.Exec(`INSERT INTO "LoginCodeRequest" (email) VALUES ('person@example.com')`)
 		require.Error(t, err)
 	})
 

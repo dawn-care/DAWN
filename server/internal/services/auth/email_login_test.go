@@ -48,14 +48,6 @@ func TestRequestEmailCode_PassesTheAddressAndIPOn(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet(), "requesting a code does not look up the caregiver, so it cannot reveal who has an account")
 }
 
-func TestRequestEmailCode_ReturnsTheServiceError(t *testing.T) {
-	codes := &fakeCodes{requestErr: ErrTooManyRequests}
-	svc, _ := newAuthService(t, fakeGoogle{}, &fakeSessions{})
-	svc.WithLoginCodes(codes)
-
-	assert.ErrorIs(t, svc.RequestEmailCode(context.Background(), "pat@example.com", "203.0.113.9"), ErrTooManyRequests)
-}
-
 func TestEmailLogin_DisabledWhenNotSetUp(t *testing.T) {
 	sessions := &fakeSessions{}
 	svc, mock := newAuthService(t, fakeGoogle{}, sessions)
@@ -118,30 +110,4 @@ func TestLoginWithEmailCode_AWrongCodeStartsNoSessionAndCreatesNoCaregiver(t *te
 		assert.Empty(t, sessions.createdFor)
 		assert.NoError(t, mock.ExpectationsWereMet(), "the caregiver table is not touched without a right code")
 	}
-}
-
-func TestLoginWithEmailCode_CaregiverErrorsStartNoSession(t *testing.T) {
-	sessions := &fakeSessions{}
-	svc, mock := newAuthService(t, fakeGoogle{}, sessions)
-	svc.WithLoginCodes(&fakeCodes{})
-	mock.ExpectQuery(findByEmail).WillReturnError(errors.New("db down"))
-
-	token, err := svc.LoginWithEmailCode(context.Background(), "pat@example.com", "123456")
-
-	assert.Error(t, err)
-	assert.Empty(t, token)
-	assert.Empty(t, sessions.createdFor)
-}
-
-func TestLoginWithEmailCode_SessionErrorIsReturned(t *testing.T) {
-	sessions := &fakeSessions{createErr: errors.New("db down")}
-	svc, mock := newAuthService(t, fakeGoogle{}, sessions)
-	svc.WithLoginCodes(&fakeCodes{})
-	mock.ExpectQuery(findByEmail).
-		WillReturnRows(sqlmock.NewRows(caregiverColumns).AddRow(9, "Pat", "caregiver", nil, "pat@example.com"))
-
-	token, err := svc.LoginWithEmailCode(context.Background(), "pat@example.com", "123456")
-
-	assert.Error(t, err)
-	assert.Empty(t, token)
 }

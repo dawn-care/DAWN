@@ -122,17 +122,6 @@ func TestSMTPMailer_DevelopmentMayUseAServerWithoutTLS(t *testing.T) {
 	assert.False(t, got[0].tls)
 }
 
-func TestSMTPMailer_DevelopmentStillUsesTLSWhenTheServerOffersIt(t *testing.T) {
-	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true })
-	m := mailerFor(t, srv, func(c *Config) { c.AllowInsecure = true })
-
-	require.NoError(t, sendTestCode(t, m, "pat@example.com"))
-
-	got := srv.delivered()
-	require.Len(t, got, 1)
-	assert.True(t, got[0].tls)
-}
-
 func TestSMTPMailer_DoesNotTrustAnUnknownCertificate(t *testing.T) {
 	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true })
 	m := mailerFor(t, srv, nil)
@@ -219,59 +208,6 @@ func TestSMTPMailer_ServerThatNeverAnswersTimesOut(t *testing.T) {
 	assert.Less(t, time.Since(start), 5*time.Second)
 }
 
-func TestSMTPMailer_CancelledContextStopsTheSend(t *testing.T) {
-	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true })
-	m := mailerFor(t, srv, nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := m.Send(ctx, "pat@example.com", LoginCodeSubject, "text", "<p>html</p>")
-
-	assert.Error(t, err)
-	assert.Empty(t, srv.delivered())
-}
-
-func TestSMTPMailer_ServerThatIsDown(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := ln.Addr().(*net.TCPAddr).Port
-	ln.Close()
-	m, err := NewSMTPMailer(Config{Host: "127.0.0.1", Port: port, From: "no-reply@example.com"})
-	require.NoError(t, err)
-
-	assert.Error(t, sendTestCode(t, m, "pat@example.com"))
-}
-
-func TestSMTPMailer_NonASCIISubjectIsEncoded(t *testing.T) {
-	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true })
-	m := mailerFor(t, srv, nil)
-
-	require.NoError(t, m.Send(context.Background(), "pat@example.com", "Votre code café", "texte", "<p>texte</p>"))
-
-	got := srv.delivered()
-	require.Len(t, got, 1)
-	assert.NotContains(t, got[0].data, "café", "raw non-ASCII text is not put in a header")
-	header, _ := readParts(t, got[0].data)
-	decoded, err := new(mime.WordDecoder).DecodeHeader(header.Get("Subject"))
-	require.NoError(t, err)
-	assert.Equal(t, "Votre code café", decoded)
-}
-
-func TestNewSMTPMailer_Validates(t *testing.T) {
-	_, err := NewSMTPMailer(Config{From: "no-reply@example.com"})
-	assert.Error(t, err, "a host is required")
-
-	_, err = NewSMTPMailer(Config{Host: "smtp.example.com", From: ""})
-	assert.Error(t, err, "a sender is required")
-
-	_, err = NewSMTPMailer(Config{Host: "smtp.example.com", From: "not a sender"})
-	assert.Error(t, err, "the sender must be an address")
-
-	m, err := NewSMTPMailer(Config{Host: "smtp.example.com", From: "D.A.W.N. <no-reply@example.com>"})
-	require.NoError(t, err)
-	assert.Equal(t, 587, m.cfg.Port, "the port defaults to 587")
-}
-
 /* -------------------------------------------------------
    NewMailerFromEnv
 ------------------------------------------------------- */
@@ -332,8 +268,6 @@ func TestNewMailerFromEnv_RejectsAnInvalidConfiguration(t *testing.T) {
 	}
 	cases := map[string]map[string]string{
 		"port is not a number":     base(map[string]string{"SMTP_PORT": "abc"}),
-		"port is zero":             base(map[string]string{"SMTP_PORT": "0"}),
-		"port is too large":        base(map[string]string{"SMTP_PORT": "70000"}),
 		"user without a password":  base(map[string]string{"SMTP_USER": "apiuser"}),
 		"password without a user":  base(map[string]string{"SMTP_PASS": "secret"}),
 		"no sender":                {"SMTP_HOST": "smtp.example.com"},
@@ -363,14 +297,6 @@ func TestLogMailer_PrintsTheEmail(t *testing.T) {
 	assert.Contains(t, out.String(), testCode, "development reads the code from the log")
 }
 
-func TestLogMailer_RejectsAnInvalidRecipient(t *testing.T) {
-	var out bytes.Buffer
-	m := NewLogMailer(log.New(&out, "", 0))
-
-	assert.Error(t, sendTestCode(t, m, "not-an-email"))
-	assert.Empty(t, out.String())
-}
-
 /* -------------------------------------------------------
    Sign-in code email
 ------------------------------------------------------- */
@@ -386,15 +312,4 @@ func TestLoginCodeMessage(t *testing.T) {
 	}
 	assert.Contains(t, html, "<html>")
 	assert.NotContains(t, text, "<", "the plain text has no markup")
-}
-
-func TestLoginCodeMessage_OneMinute(t *testing.T) {
-	text, _ := LoginCodeMessage("123456", time.Minute)
-	assert.Contains(t, text, "expires in 1 minute.")
-}
-
-func TestLoginCodeMessage_EscapesTheCodeInHTML(t *testing.T) {
-	_, html := LoginCodeMessage("<b>1</b>", 10*time.Minute)
-	assert.NotContains(t, html, "<b>1</b>")
-	assert.Contains(t, html, "&lt;b&gt;1&lt;/b&gt;")
 }

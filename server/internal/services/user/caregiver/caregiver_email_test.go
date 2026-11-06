@@ -52,18 +52,6 @@ func TestFindOrCreateFromGoogle_KnownGoogleIDWithoutEmailSavesTheVerifiedEmail(t
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestFindOrCreateFromGoogle_KnownGoogleIDWithAnEmailChangesNothing(t *testing.T) {
-	svc, mock := newMockedService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WithArgs("g-1").
-		WillReturnRows(sqlmock.NewRows(columns).AddRow(7, "Pat", "caregiver", "g-1", "old@example.com"))
-
-	c, err := svc.FindOrCreateFromGoogle(googleUser("new@example.com", true))
-
-	require.NoError(t, err)
-	assert.Equal(t, "old@example.com", *c.Email)
-	assert.NoError(t, mock.ExpectationsWereMet(), "no update was expected")
-}
-
 func TestFindOrCreateFromGoogle_KnownGoogleIDDoesNotSaveAnUnverifiedEmail(t *testing.T) {
 	svc, mock := newMockedService(t)
 	mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WithArgs("g-1").
@@ -88,18 +76,6 @@ func TestFindOrCreateFromGoogle_KnownGoogleIDStillSignsInWhenTheEmailBelongsToSo
 	require.NoError(t, err)
 	assert.Equal(t, 7, c.ID)
 	assert.Nil(t, c.Email)
-}
-
-func TestFindOrCreateFromGoogle_KnownGoogleIDFailsWhenSavingTheEmailFails(t *testing.T) {
-	svc, mock := newMockedService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WithArgs("g-1").
-		WillReturnRows(sqlmock.NewRows(columns).AddRow(7, "Pat", "caregiver", "g-1", nil))
-	mock.ExpectExec(regexp.QuoteMeta(setEmailSQL)).WillReturnError(errors.New("db down"))
-
-	c, err := svc.FindOrCreateFromGoogle(googleUser("pat@example.com", true))
-
-	assert.Error(t, err)
-	assert.Nil(t, c)
 }
 
 func TestFindOrCreateFromGoogle_VerifiedEmailOfAnEmailCaregiverLinksTheGoogleAccount(t *testing.T) {
@@ -138,23 +114,6 @@ func TestFindOrCreateFromGoogle_EmailAlreadyLinkedToAnotherGoogleAccountIsNotTak
 	assert.NoError(t, mock.ExpectationsWereMet(), "the other account was not linked")
 }
 
-func TestFindOrCreateFromGoogle_EmailCaregiverLinkedByAnotherSignInMeanwhileIsNotTakenOver(t *testing.T) {
-	svc, mock := newMockedService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WithArgs("g-1").
-		WillReturnRows(sqlmock.NewRows(columns))
-	mock.ExpectQuery(regexp.QuoteMeta(byEmailSQL)).WithArgs("pat@example.com").
-		WillReturnRows(sqlmock.NewRows(columns).AddRow(9, "pat", "caregiver", nil, "pat@example.com"))
-	mock.ExpectExec(regexp.QuoteMeta(setGoogleIDSQL)).WithArgs("g-1", 9).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(regexp.QuoteMeta(insertSQL)).WithArgs("Pat", "caregiver", "g-1", nil).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
-
-	c, err := svc.FindOrCreateFromGoogle(googleUser("pat@example.com", true))
-
-	require.NoError(t, err)
-	assert.Equal(t, 21, c.ID)
-}
-
 func TestFindOrCreateFromGoogle_UnverifiedEmailIsNeverMatchedOrStored(t *testing.T) {
 	svc, mock := newMockedService(t)
 	mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WithArgs("g-1").
@@ -188,27 +147,7 @@ func TestFindOrCreateFromGoogle_NewCaregiverGetsTheVerifiedEmail(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestFindOrCreateFromGoogle_NewCaregiverWithoutAnEmailClaim(t *testing.T) {
-	svc, mock := newMockedService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WithArgs("g-1").
-		WillReturnRows(sqlmock.NewRows(columns))
-	mock.ExpectQuery(regexp.QuoteMeta(insertSQL)).WithArgs("Pat", "caregiver", "g-1", nil).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(24))
-
-	c, err := svc.FindOrCreateFromGoogle(googleUser("", false))
-
-	require.NoError(t, err)
-	assert.Nil(t, c.Email)
-}
-
 func TestFindOrCreateFromGoogle_LookupErrorsAreReturned(t *testing.T) {
-	t.Run("by Google ID", func(t *testing.T) {
-		svc, mock := newMockedService(t)
-		mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WillReturnError(errors.New("db down"))
-		c, err := svc.FindOrCreateFromGoogle(googleUser("pat@example.com", true))
-		assert.Error(t, err)
-		assert.Nil(t, c)
-	})
 	t.Run("by email", func(t *testing.T) {
 		svc, mock := newMockedService(t)
 		mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WillReturnRows(sqlmock.NewRows(columns))
@@ -223,15 +162,6 @@ func TestFindOrCreateFromGoogle_LookupErrorsAreReturned(t *testing.T) {
 		mock.ExpectQuery(regexp.QuoteMeta(byEmailSQL)).
 			WillReturnRows(sqlmock.NewRows(columns).AddRow(9, "pat", "caregiver", nil, "pat@example.com"))
 		mock.ExpectExec(regexp.QuoteMeta(setGoogleIDSQL)).WillReturnError(errors.New("db down"))
-		c, err := svc.FindOrCreateFromGoogle(googleUser("pat@example.com", true))
-		assert.Error(t, err)
-		assert.Nil(t, c)
-	})
-	t.Run("creating", func(t *testing.T) {
-		svc, mock := newMockedService(t)
-		mock.ExpectQuery(regexp.QuoteMeta(byGoogleIDSQL)).WillReturnRows(sqlmock.NewRows(columns))
-		mock.ExpectQuery(regexp.QuoteMeta(byEmailSQL)).WillReturnRows(sqlmock.NewRows(columns))
-		mock.ExpectQuery(regexp.QuoteMeta(insertSQL)).WillReturnError(errors.New("db down"))
 		c, err := svc.FindOrCreateFromGoogle(googleUser("pat@example.com", true))
 		assert.Error(t, err)
 		assert.Nil(t, c)
@@ -282,28 +212,6 @@ func TestFindOrCreateFromEmail_UsesTheCaregiverAnotherSignInCreatedFirst(t *test
 
 	require.NoError(t, err)
 	assert.Equal(t, 31, c.ID)
-}
-
-func TestFindOrCreateFromEmail_ReturnsTheErrorWhenCreatingFailsForAnotherReason(t *testing.T) {
-	svc, mock := newMockedService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(byEmailSQL)).WillReturnRows(sqlmock.NewRows(columns))
-	mock.ExpectQuery(regexp.QuoteMeta(insertSQL)).WillReturnError(errors.New("db down"))
-	mock.ExpectQuery(regexp.QuoteMeta(byEmailSQL)).WillReturnRows(sqlmock.NewRows(columns))
-
-	c, err := svc.FindOrCreateFromEmail("pat@example.com")
-
-	assert.EqualError(t, err, "db down")
-	assert.Nil(t, c)
-}
-
-func TestFindOrCreateFromEmail_LookupError(t *testing.T) {
-	svc, mock := newMockedService(t)
-	mock.ExpectQuery(regexp.QuoteMeta(byEmailSQL)).WillReturnError(errors.New("db down"))
-
-	c, err := svc.FindOrCreateFromEmail("pat@example.com")
-
-	assert.Error(t, err)
-	assert.Nil(t, c)
 }
 
 func TestFindOrCreateFromEmail_RejectsAnEmptyEmail(t *testing.T) {

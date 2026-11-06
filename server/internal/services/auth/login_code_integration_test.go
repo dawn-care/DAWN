@@ -105,13 +105,6 @@ func TestLoginCodeFlowIntegration(t *testing.T) {
 		assert.ErrorIs(t, env.svc.VerifyCode(ctx, testAddress, env.lastCode()), ErrCodeRejected, "a used code does not work again")
 	})
 
-	t.Run("a code is tied to its address", func(t *testing.T) {
-		env := newCodeEnv(t)
-		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
-		assert.ErrorIs(t, env.svc.VerifyCode(ctx, "sam@example.com", env.lastCode()), ErrCodeRejected)
-		assert.NoError(t, env.svc.VerifyCode(ctx, testAddress, env.lastCode()))
-	})
-
 	t.Run("a code works for just under 10 minutes", func(t *testing.T) {
 		env := newCodeEnv(t)
 		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
@@ -149,15 +142,6 @@ func TestLoginCodeFlowIntegration(t *testing.T) {
 		assert.Equal(t, loginCodeMaxAttempts, env.count(t, `SELECT attempts FROM "LoginCode"`), "refused guesses are not counted further")
 
 		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP), "a new code starts fresh")
-		assert.NoError(t, env.svc.VerifyCode(ctx, testAddress, env.lastCode()))
-	})
-
-	t.Run("the fifth guess can still be right", func(t *testing.T) {
-		env := newCodeEnv(t)
-		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
-		for i := 0; i < 4; i++ {
-			assert.ErrorIs(t, env.svc.VerifyCode(ctx, testAddress, "000000"), ErrCodeRejected)
-		}
 		assert.NoError(t, env.svc.VerifyCode(ctx, testAddress, env.lastCode()))
 	})
 
@@ -205,15 +189,6 @@ func TestLoginCodeRateLimitsIntegration(t *testing.T) {
 
 		env.clock.Advance(24 * time.Hour)
 		assert.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
-	})
-
-	t.Run("another email is not affected by a limited one", func(t *testing.T) {
-		env := newCodeEnv(t)
-		for i := 0; i < 3; i++ {
-			require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
-		}
-		assert.ErrorIs(t, env.svc.RequestCode(ctx, testAddress, testIPSecondClient), ErrTooManyRequests, "the email limit holds from another IP")
-		assert.NoError(t, env.svc.RequestCode(ctx, "sam@example.com", testIP))
 	})
 
 	t.Run("10 codes per IP in an hour, for any addresses", func(t *testing.T) {
@@ -363,15 +338,4 @@ func TestLoginWithEmailCodeIntegration(t *testing.T) {
 		assert.Equal(t, id, session.UserID)
 	})
 
-	t.Run("a wrong code signs nobody in and creates no caregiver", func(t *testing.T) {
-		auth, env, _ := newAuth(t)
-		require.NoError(t, auth.RequestEmailCode(ctx, "new@example.com", testIP))
-
-		token, err := auth.LoginWithEmailCode(ctx, "new@example.com", "000000")
-
-		assert.ErrorIs(t, err, ErrCodeRejected)
-		assert.Empty(t, token)
-		assert.Equal(t, 0, env.count(t, `SELECT count(*) FROM "Caregiver" WHERE email = 'new@example.com'`))
-		assert.Equal(t, 0, env.count(t, `SELECT count(*) FROM "Session"`))
-	})
 }

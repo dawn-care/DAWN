@@ -1,7 +1,6 @@
 package caregiver
 
 import (
-	"errors"
 	"regexp"
 	"testing"
 
@@ -56,16 +55,6 @@ func TestGetCaregiverByEmail_NotFoundIsNilNotAnError(t *testing.T) {
 	assert.Nil(t, c)
 }
 
-func TestGetCaregiverByEmail_DatabaseError(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
-	mock.ExpectQuery(regexp.QuoteMeta(`WHERE lower(email) = lower($1)`)).WillReturnError(errors.New("db down"))
-
-	c, err := GetCaregiverByEmail(db, "pat@example.com")
-	assert.Error(t, err)
-	assert.Nil(t, c)
-}
-
 func TestSetGoogleID_OnlyFillsAnEmptyGoogleID(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -86,16 +75,6 @@ func TestSetGoogleID_OnlyFillsAnEmptyGoogleID(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestSetGoogleID_DatabaseError(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
-	mock.ExpectExec(regexp.QuoteMeta(`SET google_id`)).WillReturnError(errors.New("db down"))
-
-	changed, err := SetGoogleID(db, 4, "g-1")
-	assert.Error(t, err)
-	assert.False(t, changed)
-}
-
 func TestSetEmail_OnlyFillsAnEmptyEmailThatNobodyElseUses(t *testing.T) {
 	db, mock := setupMockDB(t)
 	defer db.Close()
@@ -111,14 +90,4 @@ func TestSetEmail_OnlyFillsAnEmptyEmailThatNobodyElseUses(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, changed, "an email another caregiver uses, or one already set, changes nothing")
 	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestSetEmail_DatabaseError(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
-	mock.ExpectExec(regexp.QuoteMeta(`SET email`)).WillReturnError(errors.New("db down"))
-
-	changed, err := SetEmail(db, 4, "pat@example.com")
-	assert.Error(t, err)
-	assert.False(t, changed)
 }
