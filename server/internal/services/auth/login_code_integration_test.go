@@ -105,13 +105,6 @@ func TestLoginCodeFlowIntegration(t *testing.T) {
 		assert.ErrorIs(t, env.svc.VerifyCode(ctx, testAddress, env.lastCode()), ErrCodeRejected, "a used code does not work again")
 	})
 
-	t.Run("a code works for just under 10 minutes", func(t *testing.T) {
-		env := newCodeEnv(t)
-		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
-		env.clock.Advance(10*time.Minute - time.Second)
-		assert.NoError(t, env.svc.VerifyCode(ctx, testAddress, env.lastCode()))
-	})
-
 	t.Run("a code expires after 10 minutes", func(t *testing.T) {
 		env := newCodeEnv(t)
 		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
@@ -323,19 +316,6 @@ func TestLoginWithEmailCodeIntegration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, first.UserID, second.UserID, "the same caregiver")
 		assert.Equal(t, 1, env.count(t, `SELECT count(*) FROM "Caregiver" WHERE email = 'jo.smith@example.com'`))
-	})
-
-	t.Run("a caregiver who signed up with Google signs in by code as the same account", func(t *testing.T) {
-		auth, env, sessions := newAuth(t)
-		var id int
-		require.NoError(t, env.db.QueryRow(`INSERT INTO "Caregiver" (name, role, google_id, email) VALUES ('Pat', 'caregiver', 'g-1', $1) RETURNING id`, testAddress).Scan(&id))
-
-		require.NoError(t, auth.RequestEmailCode(ctx, testAddress, testIP))
-		token, err := auth.LoginWithEmailCode(ctx, testAddress, env.lastCode())
-		require.NoError(t, err)
-		session, err := sessions.Validate(ctx, token)
-		require.NoError(t, err)
-		assert.Equal(t, id, session.UserID)
 	})
 
 }

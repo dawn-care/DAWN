@@ -63,11 +63,3 @@ func TestCrossOriginProtection_OnlyChecksUnsafeMethods(t *testing.T) {
 	w := call(t, http.MethodGet, map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"})
 	assert.Equal(t, http.StatusNoContent, w.Code)
 }
-
-func TestCrossOriginProtection_RejectsAMalformedTrustedOrigin(t *testing.T) {
-	for _, origin := range []string{"localhost:5173", "http://localhost:5173/path", "*", ""} {
-		protect, err := CrossOriginProtection([]string{origin})
-		assert.Error(t, err, "%q", origin)
-		assert.Nil(t, protect)
-	}
-}

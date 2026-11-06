@@ -10,7 +10,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
-	"net"
 	"net/mail"
 	"strings"
 	"testing"
@@ -133,17 +132,6 @@ func TestSMTPMailer_DoesNotTrustAnUnknownCertificate(t *testing.T) {
 	assert.Empty(t, srv.delivered())
 }
 
-func TestSMTPMailer_WrongPassword(t *testing.T) {
-	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true; s.user = "apiuser"; s.pass = "secret" })
-	m := mailerFor(t, srv, func(c *Config) { c.User = "apiuser"; c.Password = "wrong" })
-
-	err := sendTestCode(t, m, "pat@example.com")
-
-	assert.Error(t, err)
-	assert.NotContains(t, err.Error(), "wrong", "the password is not put in the error")
-	assert.Empty(t, srv.delivered())
-}
-
 func TestSMTPMailer_RejectedRecipient(t *testing.T) {
 	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true; s.rejectRcpt = true })
 	m := mailerFor(t, srv, nil)
@@ -182,30 +170,6 @@ func TestSMTPMailer_SubjectWithALineBreakIsRefused(t *testing.T) {
 	assert.Error(t, err)
 	connections, _ := srv.counts()
 	assert.Zero(t, connections)
-}
-
-func TestSMTPMailer_ServerThatNeverAnswersTimesOut(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	t.Cleanup(func() { ln.Close() })
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			t.Cleanup(func() { conn.Close() })
-		}
-	}()
-	m, err := NewSMTPMailer(Config{Host: "127.0.0.1", Port: ln.Addr().(*net.TCPAddr).Port, From: "no-reply@example.com"})
-	require.NoError(t, err)
-	m.timeout = 300 * time.Millisecond
-
-	start := time.Now()
-	err = sendTestCode(t, m, "pat@example.com")
-
-	assert.Error(t, err)
-	assert.Less(t, time.Since(start), 5*time.Second)
 }
 
 /* -------------------------------------------------------

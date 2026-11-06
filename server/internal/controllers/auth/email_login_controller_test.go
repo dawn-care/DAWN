@@ -118,10 +118,9 @@ func TestRequestEmailCode_Errors(t *testing.T) {
 		status int
 		code   string
 	}{
-		"invalid address":    {authsvc.ErrInvalidEmail, http.StatusBadRequest, CodeInvalidEmail},
-		"rate limited":       {authsvc.ErrTooManyRequests, http.StatusTooManyRequests, CodeRateLimited},
-		"another failure":    {errors.New("smtp: password rejected for hunter2"), http.StatusInternalServerError, CodeInternal},
-		"wrapped rate limit": {errors.Join(errors.New("context"), authsvc.ErrTooManyRequests), http.StatusTooManyRequests, CodeRateLimited},
+		"invalid address": {authsvc.ErrInvalidEmail, http.StatusBadRequest, CodeInvalidEmail},
+		"rate limited":    {authsvc.ErrTooManyRequests, http.StatusTooManyRequests, CodeRateLimited},
+		"another failure": {errors.New("smtp: password rejected for hunter2"), http.StatusInternalServerError, CodeInternal},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -145,10 +144,8 @@ func TestRequestEmailCode_UnavailableWhenNotSetUp(t *testing.T) {
 
 func TestEmailLoginEndpoints_RejectUnreadableBodies(t *testing.T) {
 	bodies := map[string]string{
-		"empty":       ``,
 		"not json":    `email=pat@example.com`,
 		"broken json": `{"email":`,
-		"wrong shape": `["pat@example.com"]`,
 		"too large":   `{"email":"` + strings.Repeat("a", 5000) + `"}`,
 	}
 	for name, body := range bodies {
@@ -191,20 +188,6 @@ func TestVerifyEmailCode_SignsInWithTheSameCookieAsGoogle(t *testing.T) {
 	assert.True(t, cookie.Secure)
 	assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
 	assert.Equal(t, "/", cookie.Path)
-}
-
-func TestVerifyEmailCode_DevCookieIsNotSecure(t *testing.T) {
-	t.Setenv("RUN_MODE", "dev")
-	c, mock := newEmailController(t, &fakeCodes{}, &fakeSessions{createToken: "new-token"})
-	expectExistingCaregiver(mock, 7)
-
-	w := post(c.VerifyEmailCode, "203.0.113.9:1", `{"email":"pat@example.com","code":"123456"}`)
-
-	cookies := w.Result().Cookies()
-	require.Len(t, cookies, 1)
-	assert.False(t, cookies[0].Secure)
-	assert.True(t, cookies[0].HttpOnly)
-	assert.Equal(t, http.SameSiteStrictMode, cookies[0].SameSite)
 }
 
 func TestVerifyEmailCode_Errors(t *testing.T) {

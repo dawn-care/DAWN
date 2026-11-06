@@ -282,9 +282,9 @@ func TestUpdateCaregiver_Success(t *testing.T) {
 	svc := NewCaregiverService(db)
 
 	c := &model.Caregiver{
-		ID:            10,
-		Name:          "bob",
-		Role:          "helper",
+		ID:   10,
+		Name: "bob",
+		Role: "helper",
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(`

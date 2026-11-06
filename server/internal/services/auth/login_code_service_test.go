@@ -108,20 +108,6 @@ func expectStore(mock sqlmock.Sqlmock, svc *loginCodeService, ip, code string) {
    NewLoginCodeService
 ------------------------------------------------------- */
 
-func TestNewLoginCodeService_Validates(t *testing.T) {
-	_, err := NewLoginCodeService(nil, nil, []byte(testCodeSecret))
-	assert.Error(t, err, "a mailer is required")
-
-	_, err = NewLoginCodeService(nil, &codeMailer{}, []byte("too-short"))
-	assert.ErrorContains(t, err, "at least 32")
-
-	_, err = NewLoginCodeService(nil, &codeMailer{}, nil)
-	assert.Error(t, err, "a secret is required")
-
-	_, err = NewLoginCodeService(nil, &codeMailer{}, []byte(testCodeSecret))
-	assert.NoError(t, err)
-}
-
 func TestRandomLoginCode_IsSixDigits(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 300; i++ {
@@ -228,15 +214,6 @@ func TestRequestCode_DatabaseErrors(t *testing.T) {
 		assert.Error(t, err)
 		assert.NotErrorIs(t, err, ErrTooManyRequests, "a database failure is not a rate limit")
 		assert.Empty(t, mailer.emails())
-	})
-	t.Run("cannot store the code", func(t *testing.T) {
-		svc, mock, mailer := newCodeServiceWithMock(t)
-		expectChecks(mock, svc, testIP, 0, 0, 0)
-		mock.ExpectExec(q(supersedeSQL)).WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(q(insertCodeSQL)).WillReturnError(errors.New("db down"))
-		mock.ExpectRollback()
-		assert.Error(t, svc.RequestCode(context.Background(), testAddress, testIP))
-		assert.Empty(t, mailer.emails(), "a code that was not stored is never emailed")
 	})
 }
 

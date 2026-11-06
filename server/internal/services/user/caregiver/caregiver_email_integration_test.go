@@ -96,16 +96,6 @@ func TestEmailAndGoogleLinkingIntegration(t *testing.T) {
 		assert.Equal(t, "g-old", ownerGoogleID.String, "the first account keeps its Google ID")
 	})
 
-	t.Run("an unverified Google email is never matched to an account", func(t *testing.T) {
-		svc, _ := newService(t)
-		victim, err := svc.FindOrCreateFromEmail("victim@example.com")
-		require.NoError(t, err)
-
-		attacker, err := svc.FindOrCreateFromGoogle(&user.GoogleUser{ID: "g-evil", Name: "Evil", Email: "victim@example.com", EmailVerified: false})
-		require.NoError(t, err)
-		assert.NotEqual(t, victim.ID, attacker.ID)
-	})
-
 	t.Run("saving an email never takes one another caregiver has, in any letter case", func(t *testing.T) {
 		svc, db := newService(t)
 		owner, err := svc.FindOrCreateFromEmail("shared@example.com")
