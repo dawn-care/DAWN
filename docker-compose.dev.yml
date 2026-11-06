@@ -43,3 +43,5 @@ services:
     ports:
       - "8025:8025" # inbox in the browser
       - "1025:1025" # SMTP
+    networks:
+      - app-network # the same network as the server, which reaches it as mailpit:1025

@@ -116,13 +116,15 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// Browser pages allowed to call the API. The sign-in routes trust the same origins.
+	allowedOrigins := []string{
+		"http://localhost:5173",
+		"http://localhost:8081",
+		"http://localhost:8082", // staff app web build in development
+		"http://startup-da.gccis.rit.edu",
+	}
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"http://localhost:5173",
-			"http://localhost:8081",
-			"http://localhost:8082", // staff app web build in development
-			"http://startup-da.gccis.rit.edu",
-		},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -284,8 +286,16 @@ func main() {
 	})
 
 	// Auth
-	r.Post("/api/auth/google", authController.GoogleLogin)
-	r.Post("/api/auth/logout", authController.Logout)
+	// A sign-in request has no session cookie yet, so SameSite cannot stop another site's page
+	// from making it; these routes also refuse cross-site requests.
+	crossOrigin, err := mw.CrossOriginProtection(allowedOrigins)
+	if err != nil {
+		log.Fatal("cross-origin protection: ", err)
+	}
+	r.With(crossOrigin).Post("/api/auth/google", authController.GoogleLogin)
+	r.With(crossOrigin).Post("/api/auth/email/code", authController.RequestEmailCode)
+	r.With(crossOrigin).Post("/api/auth/email/verify", authController.VerifyEmailCode)
+	r.With(crossOrigin).Post("/api/auth/logout", authController.Logout)
 
 	// Protected route (test route - update later w protected routes)
 	r.Group(func(r chi.Router) {

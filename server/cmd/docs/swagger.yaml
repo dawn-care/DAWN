@@ -1,4 +1,11 @@
 definitions:
+  auth.AuthError:
+    properties:
+      code:
+        type: string
+      error:
+        type: string
+    type: object
   caregiver.Caregiver:
     properties:
       google_id:
@@ -825,6 +832,123 @@ paths:
       summary: Get audios by carepartner and caregiver
       tags:
       - audio
+  /auth/email/code:
+    post:
+      consumes:
+      - application/json
+      description: Emails a 6-digit sign-in code to the address. It works the same
+        whether or not the address has an account, so it cannot be used to find out
+        who has one. The code expires after 10 minutes, and a new code replaces any
+        earlier one. Limited to 3 codes per address per 15 minutes, 10 per address
+        per day, and 10 per IP address per hour.
+      parameters:
+      - description: Email address
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            email:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: sent'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: INVALID_REQUEST or INVALID_EMAIL
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "403":
+          description: 'CROSS_ORIGIN_BLOCKED: the request came from another site'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "429":
+          description: RATE_LIMITED
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "503":
+          description: 'EMAIL_LOGIN_UNAVAILABLE: the server has no mail server set
+            up'
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+      summary: Email a sign-in code
+      tags:
+      - auth
+  /auth/email/verify:
+    post:
+      consumes:
+      - application/json
+      description: Checks the code emailed to the address and starts a session, creating
+        the caregiver if this is their first sign-in. The session cookie is the same
+        as for Google sign-in. A code works once, for 10 minutes, and is burned after
+        5 wrong guesses.
+      parameters:
+      - description: Email address and the 6-digit code
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            code:
+              type: string
+            email:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'status: authenticated'
+          headers:
+            Set-Cookie:
+              description: session=<token>; Max-Age=7776000; HttpOnly; SameSite=Strict
+              type: string
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: INVALID_REQUEST
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "401":
+          description: 'CODE_REJECTED: the code is wrong, expired or already used'
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "403":
+          description: 'CROSS_ORIGIN_BLOCKED: the request came from another site'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "429":
+          description: 'TOO_MANY_ATTEMPTS: the code was guessed wrong too many times,
+            request a new one'
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "500":
+          description: INTERNAL_ERROR
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+        "503":
+          description: EMAIL_LOGIN_UNAVAILABLE
+          schema:
+            $ref: '#/definitions/auth.AuthError'
+      summary: Sign in with an emailed code
+      tags:
+      - auth
   /auth/google:
     post:
       consumes:

@@ -412,6 +412,171 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/email/code": {
+            "post": {
+                "description": "Emails a 6-digit sign-in code to the address. It works the same whether or not the address has an account, so it cannot be used to find out who has one. The code expires after 10 minutes, and a new code replaces any earlier one. Limited to 3 codes per address per 15 minutes, 10 per address per day, and 10 per IP address per hour.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Email a sign-in code",
+                "parameters": [
+                    {
+                        "description": "Email address",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "email": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "status: sent",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "INVALID_REQUEST or INVALID_EMAIL",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "403": {
+                        "description": "CROSS_ORIGIN_BLOCKED: the request came from another site",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "503": {
+                        "description": "EMAIL_LOGIN_UNAVAILABLE: the server has no mail server set up",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/email/verify": {
+            "post": {
+                "description": "Checks the code emailed to the address and starts a session, creating the caregiver if this is their first sign-in. The session cookie is the same as for Google sign-in. A code works once, for 10 minutes, and is burned after 5 wrong guesses.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Sign in with an emailed code",
+                "parameters": [
+                    {
+                        "description": "Email address and the 6-digit code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "email": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "status: authenticated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "headers": {
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "session=\u003ctoken\u003e; Max-Age=7776000; HttpOnly; SameSite=Strict"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "INVALID_REQUEST",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "401": {
+                        "description": "CODE_REJECTED: the code is wrong, expired or already used",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "403": {
+                        "description": "CROSS_ORIGIN_BLOCKED: the request came from another site",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "TOO_MANY_ATTEMPTS: the code was guessed wrong too many times, request a new one",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    },
+                    "503": {
+                        "description": "EMAIL_LOGIN_UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AuthError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/google": {
             "post": {
                 "description": "Verifies a Google ID token and starts a session. The session cookie is HttpOnly, SameSite=Strict, and Secure outside dev. It lasts 90 days from when it last renewed (a request to /me renews it, at most once a day) and always ends 1 year after login.",
@@ -5255,6 +5420,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "auth.AuthError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
         "caregiver.Caregiver": {
             "type": "object",
             "properties": {
