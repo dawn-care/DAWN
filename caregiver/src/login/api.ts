@@ -22,15 +22,26 @@ export const GENERIC_ERROR = "Something went wrong. Please try again.";
 /** Wording for each `code` the server can answer with */
 const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_EMAIL: "Please enter a valid email address.",
+  INVALID_REQUEST: "Something went wrong. Please reload the page and try again.",
   RATE_LIMITED: "Too many codes requested. Try again later.",
-  EMAIL_LOGIN_UNAVAILABLE:
-    "Signing in with an emailed code isn't available right now. Sign in with Google instead.",
+  EMAIL_SEND_FAILED:
+    "We couldn't send the email. Check the address, or try again in a few minutes.",
   CODE_REJECTED: "That code is incorrect or has expired.",
   TOO_MANY_ATTEMPTS:
     "Too many incorrect attempts. Send a new code and try again.",
+  TOO_MANY_GUESSES:
+    "Too many incorrect codes from this network. Try again later.",
+  CROSS_ORIGIN_BLOCKED:
+    "This page can't sign you in. Open D.A.W.N. from its own address and try again.",
   NETWORK_ERROR:
     "Couldn't reach the server. Check your connection and try again.",
 };
+
+/**
+ * The rate limits: the server's own message says how long to wait ("Try again
+ * in 15 minutes."), so it is shown instead of the general wording above
+ */
+const SERVER_WORDED = new Set(["RATE_LIMITED", "TOO_MANY_GUESSES"]);
 
 async function post(path: string, body: Record<string, string>): Promise<void> {
   let res: Response;
@@ -64,6 +75,7 @@ export const verifyEmailCode = (email: string, code: string) =>
 
 /** Wording to show the caregiver for anything thrown by a call here */
 export function friendlyError(err: unknown): string {
-  if (err instanceof ApiError) return ERROR_MESSAGES[err.code] ?? GENERIC_ERROR;
-  return GENERIC_ERROR;
+  if (!(err instanceof ApiError)) return GENERIC_ERROR;
+  if (SERVER_WORDED.has(err.code) && err.message) return err.message;
+  return ERROR_MESSAGES[err.code] ?? GENERIC_ERROR;
 }

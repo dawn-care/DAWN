@@ -30,7 +30,7 @@ Single `<Routes>` tree. `AuthContext` (`src/context/AuthContext.tsx`) holds `isA
 
 `src/context/session.ts` holds what signing in and out share: `fetchCurrentUser` (`GET /me`, `null` on 401), `useSignIn` (fills `AuthContext` and picks the carepartner with `pickCarepartner`: the saved one if it is still theirs, otherwise their first), `pathAfterLogin` (`/setup` with no carepartner, otherwise `state.from` or `/`) and `useLogout`. `/login` also asks `GET /me`, so a signed-in caregiver who opens it goes straight on.
 
-`/login` offers Google and, under it, sign-in with an emailed code (`src/login/EmailSignIn.tsx`, calls in `src/login/api.ts`): the email, then the 6-digit code. Send a new code waits 30 seconds, and the two buttons under Sign in share a row only when the card is wide enough. A right code has already started the session, so `Login` only loads who signed in (`finishSignIn`) and the usual redirect follows.
+`/login` offers Google and, under it, sign-in with an emailed code (`src/login/EmailSignIn.tsx`, calls in `src/login/api.ts`): the email, then the 6-digit code. Send a new code waits 30 seconds, and the two buttons under Sign in share a row only when the card is wide enough. A right code has already started the session (and is used up), so `Login` only loads who signed in (`finishSignIn`) and the usual redirect follows; if that load fails, the caregiver is told to reload, not to enter the code again. For the two rate limits (`RATE_LIMITED`, `TOO_MANY_GUESSES`) the server's own message is shown, since it says how long to wait.
 
 ### API calls: per-component, except the media page
 

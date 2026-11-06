@@ -33,6 +33,7 @@ func (g *googleAuthService) Verify(ctx context.Context, token string) (*user.Goo
 func googleUserFromClaims(subject string, claims map[string]any) *user.GoogleUser {
 	email, _ := claims["email"].(string)
 	name, _ := claims["name"].(string)
+	hostedDomain, _ := claims["hd"].(string)
 
 	verified := false
 	switch v := claims["email_verified"].(type) {
@@ -47,5 +48,6 @@ func googleUserFromClaims(subject string, claims map[string]any) *user.GoogleUse
 		Email:         email,
 		Name:          name,
 		EmailVerified: verified && email != "",
+		HostedDomain:  hostedDomain,
 	}
 }

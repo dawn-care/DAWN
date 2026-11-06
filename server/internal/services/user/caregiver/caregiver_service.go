@@ -3,6 +3,8 @@ package caregiver
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"log"
 	"server/internal/models/user/caregiver"
 	"server/internal/models/user/carepartner"
 	"server/internal/models/user/device_pairing"
@@ -129,16 +131,18 @@ func (s *CaregiverService) DeleteCaregiver(id int) error {
 
 // FindOrCreateFromGoogle returns the caregiver for a verified Google sign-in.
 // Email is the key both sign-in methods share, so, in order:
-//  1. A caregiver with this Google ID is the one. Their email is saved if they have none.
-//  2. Otherwise, if Google verified the email, the caregiver with that email gets this Google
-//     ID, unless they are already linked to a different Google account. An address can pass to
-//     a new person, and that person must not take over the old account.
+//  1. A caregiver with this Google ID is the one. Their email is saved if they have none. If
+//     an email-only caregiver (no Google ID) already holds it, that is the same person, who
+//     signed in by email before their email was saved here, so that account is merged in.
+//  2. Otherwise, if the email is trusted, the caregiver with that email gets this Google ID,
+//     unless they are already linked to a different Google account. An address can pass to a
+//     new person, and that person must not take over the old account.
 //  3. Otherwise a new caregiver is created.
+//
+// Only a trusted email (GoogleUser.TrustedEmail: Gmail or a Google Workspace domain) is saved
+// or matched. Any other address may have passed to someone else since Google checked it.
 func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (*caregiver.Caregiver, error) {
-	email := ""
-	if googleUser.EmailVerified {
-		email = NormalizeEmail(googleUser.Email)
-	}
+	email := NormalizeEmail(googleUser.TrustedEmail())
 
 	existing, err := caregiver.GetCaregiverByGoogleID(s.DB, googleUser.ID)
 	if err != nil {
@@ -152,6 +156,20 @@ func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (
 			}
 			if saved {
 				existing.Email = &email
+			} else {
+				// Someone else holds the address. If it is an email-only account, it is this
+				// same person, who used email sign-in before Google sign-in had saved their email
+				// here: fold it into this one, so they do not keep two accounts.
+				mergedID, err := caregiver.MergeEmailCaregiverInto(s.DB, existing.ID, email)
+				if err != nil {
+					return nil, fmt.Errorf("merging the email account into caregiver %d: %w", existing.ID, err)
+				}
+				if mergedID != 0 {
+					log.Printf("merged email-only caregiver %d into Google caregiver %d", mergedID, existing.ID)
+					existing.Email = &email
+				} else {
+					log.Printf("caregiver %d signed in with Google; their email belongs to a caregiver with another Google account, so it was not saved", existing.ID)
+				}
 			}
 		}
 		return existing, nil
@@ -187,8 +205,15 @@ func (s *CaregiverService) FindOrCreateFromGoogle(googleUser *user.GoogleUser) (
 	if emailForNew != "" {
 		c.Email = &emailForNew
 	}
-	if err := caregiver.CreateCaregiver(s.DB, c); err != nil {
-		return nil, err
+	err = caregiver.CreateCaregiver(s.DB, c)
+	if caregiver.IsEmailTaken(err) {
+		// An email sign-in created the address's account at the same moment; this Google
+		// account gets its own, as when the address was already taken
+		c.Email = nil
+		err = caregiver.CreateCaregiver(s.DB, c)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("creating a caregiver for Google sign-in: %w", err)
 	}
 
 	return c, nil
@@ -212,13 +237,19 @@ func (s *CaregiverService) FindOrCreateFromEmail(rawEmail string) (*caregiver.Ca
 
 	name, _, _ := strings.Cut(email, "@")
 	c := &caregiver.Caregiver{Name: name, Role: "caregiver", Email: &email}
-	if err := caregiver.CreateCaregiver(s.DB, c); err != nil {
+	err = caregiver.CreateCaregiver(s.DB, c)
+	if caregiver.IsEmailTaken(err) {
 		// Two sign-ins for a new address at once: the other one created it first
 		again, lookupErr := caregiver.GetCaregiverByEmail(s.DB, email)
-		if lookupErr == nil && again != nil {
+		if lookupErr != nil {
+			return nil, fmt.Errorf("finding the caregiver another sign-in created: %w", errors.Join(err, lookupErr))
+		}
+		if again != nil {
 			return again, nil
 		}
-		return nil, err
+	}
+	if err != nil {
+		return nil, fmt.Errorf("creating a caregiver for email sign-in: %w", err)
 	}
 	return c, nil
 }

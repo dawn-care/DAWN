@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/mail"
 	"time"
@@ -28,21 +29,43 @@ const (
 	maxCodesPerEmailPer15Min = 3
 	maxCodesPerEmailPerDay   = 10
 	maxCodesPerIPPerHour     = 10
+	// Wrong guesses are limited per IP across every address, so one caller cannot burn other
+	// people's codes, or guess at many addresses, in bulk. A right guess does not count.
+	maxWrongGuessesPerIPPerHour = 20
 
-	// Codes and request logs are kept this long, then deleted
+	// Codes, request logs and wrong guesses older than this are deleted the next time a code
+	// request goes through. There is no scheduled cleanup.
 	loginCodeRetention = 24 * time.Hour
 
 	minLoginCodeSecretBytes = 32
 )
 
 var (
-	ErrInvalidEmail    = errors.New("that is not a valid email address")
+	ErrInvalidEmail = errors.New("that is not a valid email address")
+	// ErrTooManyRequests means a sending limit was reached (429). It comes as a *LimitError.
 	ErrTooManyRequests = errors.New("too many sign-in codes requested")
+	// ErrSendFailed means the code could not be emailed (502). Nothing was stored or counted,
+	// so an earlier code still works.
+	ErrSendFailed = errors.New("the sign-in code could not be emailed")
 	// ErrCodeRejected means the code is wrong, expired or already used (401)
 	ErrCodeRejected = errors.New("the sign-in code is wrong or has expired")
 	// ErrTooManyAttempts means the code was guessed wrong too many times and no longer works (429)
 	ErrTooManyAttempts = errors.New("too many wrong sign-in codes")
+	// ErrTooManyGuesses means this IP made too many wrong guesses lately (429), whatever the
+	// address. It comes as a *LimitError. The code was not checked, so it still works.
+	ErrTooManyGuesses = errors.New("too many wrong sign-in codes from this network")
 )
+
+// LimitError is a rate limit that was reached. errors.Is matches it to Limit
+// (ErrTooManyRequests or ErrTooManyGuesses).
+type LimitError struct {
+	Limit error
+	// RetryAfter is the longest the caller may have to wait: the length of the limit's window
+	RetryAfter time.Duration
+}
+
+func (e *LimitError) Error() string { return e.Limit.Error() }
+func (e *LimitError) Unwrap() error { return e.Limit }
 
 // LoginCodeService sends and checks emailed sign-in codes. It knows nothing about caregivers
 // or sessions: AuthService turns a checked code into a session.
@@ -50,8 +73,10 @@ type LoginCodeService interface {
 	// RequestCode emails a new code to the address. An earlier unused code stops working.
 	// ip is the caller's address, used only for rate limiting.
 	RequestCode(ctx context.Context, address, ip string) error
-	// VerifyCode checks a code and uses it up, so it works once.
-	VerifyCode(ctx context.Context, address, code string) error
+	// VerifyCode checks a code and, if it is right, runs onAccepted and uses the code up. If
+	// onAccepted fails, the code is not used up, so the caregiver can enter it again.
+	// ip is the caller's address, used only for rate limiting.
+	VerifyCode(ctx context.Context, address, code, ip string, onAccepted func() error) error
 }
 
 type loginCodeService struct {
@@ -126,6 +151,11 @@ func validCodeFormat(code string) bool {
 	return true
 }
 
+// RequestCode checks the rate limits, stores the new code and emails it, all in one
+// transaction: the code is committed only once the mail server has accepted the email. A
+// failed send therefore leaves the earlier code working and does not count toward the limits.
+// It holds a lock on the address, so two requests at once cannot both pass a limit. The IP
+// limit is not locked, so many requests at the very same moment can pass it by a few.
 func (s *loginCodeService) RequestCode(ctx context.Context, rawAddress, ip string) error {
 	address := caregiver.NormalizeEmail(rawAddress)
 	if !validAddress(address) {
@@ -135,51 +165,53 @@ func (s *loginCodeService) RequestCode(ctx context.Context, rawAddress, ip strin
 	if err != nil {
 		return fmt.Errorf("making a sign-in code: %w", err)
 	}
-
+	// A caller who closes the page must not cut off a send that is under way, or roll back a
+	// code the mail server has already accepted. The mailer has its own timeout.
+	ctx = context.WithoutCancel(ctx)
 	now := s.now()
-	if err := s.storeCode(ctx, address, s.ipHash(ip), s.codeHash(address, code), now); err != nil {
-		return err
-	}
 
-	// The code is stored before it is sent, so a code that arrives always works
-	text, html := email.LoginCodeMessage(code, LoginCodeTTL)
-	if err := s.mailer.Send(ctx, address, email.LoginCodeSubject, text, html); err != nil {
-		return fmt.Errorf("sending the sign-in code: %w", err)
-	}
-	return nil
-}
-
-// storeCode checks the rate limits and, if they allow it, replaces the address's code with a
-// new one. It holds a lock on the address, so two requests at once cannot both pass a limit.
-// The IP limit is not locked, so many requests at the very same moment can pass it by a few.
-func (s *loginCodeService) storeCode(ctx context.Context, address, ipHash, codeHash string, now time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("storing a sign-in code: %w", err)
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, address); err != nil {
+	if err := s.checkSendLimits(ctx, tx, address, s.ipHash(ip), now); err != nil {
 		return err
+	}
+	if err := s.storeCode(ctx, tx, address, s.ipHash(ip), s.codeHash(address, code), now); err != nil {
+		return fmt.Errorf("storing a sign-in code: %w", err)
 	}
 
-	retentionCutoff := now.Add(-loginCodeRetention)
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "LoginCodeRequest" WHERE created_at < $1`, retentionCutoff); err != nil {
-		return err
+	text, html := email.LoginCodeMessage(code, LoginCodeTTL)
+	if err := s.mailer.Send(ctx, address, email.LoginCodeSubject, text, html); err != nil {
+		return fmt.Errorf("%w: %w", ErrSendFailed, err)
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "LoginCode" WHERE created_at < $1`, retentionCutoff); err != nil {
-		return err
+	// The email is out; if this fails the code in it will not work, which is rare and is
+	// reported as an error so the caregiver asks again
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("saving a sign-in code that was already emailed: %w", err)
+	}
+
+	s.deleteOldRows(ctx, now)
+	return nil
+}
+
+// checkSendLimits takes the address's lock and checks the sending limits
+func (s *loginCodeService) checkSendLimits(ctx context.Context, tx *sql.Tx, address, ipHash string, now time.Time) error {
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, address); err != nil {
+		return fmt.Errorf("locking the address for a sign-in code: %w", err)
 	}
 
 	var recentForEmail, todayForEmail int
-	err = tx.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		SELECT count(*) FILTER (WHERE created_at > $3), count(*)
 		FROM "LoginCodeRequest"
 		WHERE lower(email) = $1 AND created_at > $2`,
 		address, now.Add(-24*time.Hour), now.Add(-15*time.Minute),
 	).Scan(&recentForEmail, &todayForEmail)
 	if err != nil {
-		return err
+		return fmt.Errorf("counting sign-in codes for the address: %w", err)
 	}
 	var lastHourForIP int
 	err = tx.QueryRowContext(ctx, `
@@ -187,12 +219,23 @@ func (s *loginCodeService) storeCode(ctx context.Context, address, ipHash, codeH
 		ipHash, now.Add(-time.Hour),
 	).Scan(&lastHourForIP)
 	if err != nil {
-		return err
-	}
-	if recentForEmail >= maxCodesPerEmailPer15Min || todayForEmail >= maxCodesPerEmailPerDay || lastHourForIP >= maxCodesPerIPPerHour {
-		return ErrTooManyRequests
+		return fmt.Errorf("counting sign-in codes for the IP: %w", err)
 	}
 
+	// The longest window that is full says how long to wait
+	switch {
+	case todayForEmail >= maxCodesPerEmailPerDay:
+		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: 24 * time.Hour}
+	case lastHourForIP >= maxCodesPerIPPerHour:
+		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: time.Hour}
+	case recentForEmail >= maxCodesPerEmailPer15Min:
+		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: 15 * time.Minute}
+	}
+	return nil
+}
+
+// storeCode replaces the address's code with a new one and logs the request
+func (s *loginCodeService) storeCode(ctx context.Context, tx *sql.Tx, address, ipHash, codeHash string, now time.Time) error {
 	// Only the newest code works
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE "LoginCode" SET used_at = $2 WHERE lower(email) = $1 AND used_at IS NULL`,
@@ -204,26 +247,60 @@ func (s *loginCodeService) storeCode(ctx context.Context, address, ipHash, codeH
 		address, codeHash, now, now.Add(LoginCodeTTL)); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO "LoginCodeRequest" (email, ip_hash, created_at) VALUES ($1, $2, $3)`,
-		address, ipHash, now); err != nil {
-		return err
-	}
-	return tx.Commit()
+		address, ipHash, now)
+	return err
 }
 
-func (s *loginCodeService) VerifyCode(ctx context.Context, rawAddress, code string) error {
+// deleteOldRows removes codes, request logs and wrong guesses past their retention. It runs
+// after a request has gone through and only logs a failure: cleanup must never stop sign-in.
+func (s *loginCodeService) deleteOldRows(ctx context.Context, now time.Time) {
+	cutoff := now.Add(-loginCodeRetention)
+	for _, table := range []string{"LoginCodeRequest", "LoginCode", "LoginCodeGuess"} {
+		if _, err := s.db.ExecContext(ctx, `DELETE FROM "`+table+`" WHERE created_at < $1`, cutoff); err != nil {
+			log.Printf("deleting old %s rows failed: %v", table, err)
+		}
+	}
+}
+
+func (s *loginCodeService) VerifyCode(ctx context.Context, rawAddress, code, ip string, onAccepted func() error) error {
 	address := caregiver.NormalizeEmail(rawAddress)
 	if !validAddress(address) || !validCodeFormat(code) {
 		return ErrCodeRejected
 	}
 	now := s.now()
+	ipHash := s.ipHash(ip)
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("checking a sign-in code: %w", err)
 	}
 	defer tx.Rollback()
+
+	// Checked before the code is looked at, so a caller over the limit cannot burn it
+	var wrongFromIP int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT count(*) FROM "LoginCodeGuess" WHERE ip_hash = $1 AND created_at > $2`,
+		ipHash, now.Add(-time.Hour)).Scan(&wrongFromIP); err != nil {
+		return fmt.Errorf("counting wrong sign-in codes for the IP: %w", err)
+	}
+	if wrongFromIP >= maxWrongGuessesPerIPPerHour {
+		return &LimitError{Limit: ErrTooManyGuesses, RetryAfter: time.Hour}
+	}
+
+	// reject records a wrong guess from this IP, keeps it and the code's attempt count, and
+	// returns the rejection
+	reject := func(rejection error) error {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO "LoginCodeGuess" (ip_hash, created_at) VALUES ($1, $2)`, ipHash, now); err != nil {
+			return fmt.Errorf("recording a wrong sign-in code: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("recording a wrong sign-in code: %w", err)
+		}
+		return rejection
+	}
 
 	// The row stays locked until the end, so guesses at one code are counted one by one
 	// and a correct code cannot be used twice at the same moment
@@ -236,32 +313,37 @@ func (s *loginCodeService) VerifyCode(ctx context.Context, rawAddress, code stri
 		LIMIT 1
 		FOR UPDATE`, address, now).Scan(&id, &storedHash, &attempts)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ErrCodeRejected
+		return reject(ErrCodeRejected)
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("finding the sign-in code: %w", err)
 	}
 	if attempts >= loginCodeMaxAttempts {
-		return ErrTooManyAttempts
+		return reject(ErrTooManyAttempts)
 	}
 
-	// The guess is counted before it is compared, and kept whatever the outcome
+	// The guess is counted before it is compared, and kept if it is wrong
 	if _, err := tx.ExecContext(ctx, `UPDATE "LoginCode" SET attempts = attempts + 1 WHERE id = $1`, id); err != nil {
-		return err
+		return fmt.Errorf("counting a sign-in code guess: %w", err)
 	}
 
-	if hmac.Equal([]byte(storedHash), []byte(s.codeHash(address, code))) {
-		if _, err := tx.ExecContext(ctx, `UPDATE "LoginCode" SET used_at = $2 WHERE id = $1`, id, now); err != nil {
-			return err
+	if !hmac.Equal([]byte(storedHash), []byte(s.codeHash(address, code))) {
+		if attempts+1 >= loginCodeMaxAttempts {
+			return reject(ErrTooManyAttempts)
 		}
-		return tx.Commit()
+		return reject(ErrCodeRejected)
 	}
 
-	if err := tx.Commit(); err != nil {
+	// The code is right. It is used up only if signing in works, so a failure here (the
+	// database, say) leaves it for another try; the row lock still stops a second use meanwhile.
+	if err := onAccepted(); err != nil {
 		return err
 	}
-	if attempts+1 >= loginCodeMaxAttempts {
-		return ErrTooManyAttempts
+	if _, err := tx.ExecContext(ctx, `UPDATE "LoginCode" SET used_at = $2 WHERE id = $1`, id, now); err != nil {
+		return fmt.Errorf("using up the sign-in code: %w", err)
 	}
-	return ErrCodeRejected
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("using up the sign-in code: %w", err)
+	}
+	return nil
 }

@@ -840,7 +840,8 @@ paths:
         whether or not the address has an account, so it cannot be used to find out
         who has one. The code expires after 10 minutes, and a new code replaces any
         earlier one. Limited to 3 codes per address per 15 minutes, 10 per address
-        per day, and 10 per IP address per hour.
+        per day, and 10 per IP address per hour. A code that could not be emailed
+        is not stored and does not count toward the limits.
       parameters:
       - description: Email address
         in: body
@@ -867,20 +868,18 @@ paths:
         "403":
           description: 'CROSS_ORIGIN_BLOCKED: the request came from another site'
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/auth.AuthError'
         "429":
-          description: RATE_LIMITED
+          description: RATE_LIMITED, with a Retry-After header in seconds
           schema:
             $ref: '#/definitions/auth.AuthError'
         "500":
           description: INTERNAL_ERROR
           schema:
             $ref: '#/definitions/auth.AuthError'
-        "503":
-          description: 'EMAIL_LOGIN_UNAVAILABLE: the server has no mail server set
-            up'
+        "502":
+          description: 'EMAIL_SEND_FAILED: the mail server did not accept the email;
+            an earlier code still works'
           schema:
             $ref: '#/definitions/auth.AuthError'
       summary: Email a sign-in code
@@ -893,7 +892,9 @@ paths:
       description: Checks the code emailed to the address and starts a session, creating
         the caregiver if this is their first sign-in. The session cookie is the same
         as for Google sign-in. A code works once, for 10 minutes, and is burned after
-        5 wrong guesses.
+        5 wrong guesses. One IP address may make at most 20 wrong guesses per hour,
+        across every address. If the code is right but signing in fails (500), the
+        code still works.
       parameters:
       - description: Email address and the 6-digit code
         in: body
@@ -930,20 +931,15 @@ paths:
         "403":
           description: 'CROSS_ORIGIN_BLOCKED: the request came from another site'
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/auth.AuthError'
         "429":
           description: 'TOO_MANY_ATTEMPTS: the code was guessed wrong too many times,
-            request a new one'
+            request a new one; or TOO_MANY_GUESSES: too many wrong codes from this
+            IP, with a Retry-After header in seconds'
           schema:
             $ref: '#/definitions/auth.AuthError'
         "500":
           description: INTERNAL_ERROR
-          schema:
-            $ref: '#/definitions/auth.AuthError'
-        "503":
-          description: EMAIL_LOGIN_UNAVAILABLE
           schema:
             $ref: '#/definitions/auth.AuthError'
       summary: Sign in with an emailed code

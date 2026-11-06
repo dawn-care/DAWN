@@ -27,9 +27,6 @@ type Config struct {
 	// ImplicitTLS connects over TLS from the first byte (port 465). Otherwise the connection
 	// starts as plain text and is upgraded with STARTTLS (port 587) before anything is sent.
 	ImplicitTLS bool
-	// AllowInsecure lets the mailer send over a connection with no TLS when the server does not
-	// offer STARTTLS. Only local development uses it, to reach a test inbox such as Mailpit.
-	AllowInsecure bool
 }
 
 // NewMailerFromEnv builds the mailer from SMTP_HOST, SMTP_PORT (default 587), SMTP_USER,
@@ -67,9 +64,8 @@ func NewMailerFromEnv(getenv func(string) string, devMode bool) (Mailer, error) 
 		Port:          port,
 		User:          user,
 		Password:      password,
-		From:          strings.TrimSpace(getenv("SMTP_FROM")),
-		ImplicitTLS:   port == 465,
-		AllowInsecure: devMode,
+		From:        strings.TrimSpace(getenv("SMTP_FROM")),
+		ImplicitTLS: port == 465,
 	})
 	if err != nil {
 		// Returning mailer here would wrap a nil pointer in a non-nil Mailer

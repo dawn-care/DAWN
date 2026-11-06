@@ -27,7 +27,7 @@ const defaultTimeout = 20 * time.Second
 
 // SMTPMailer sends email through an SMTP server. It only sends over TLS: either from the first
 // byte (ImplicitTLS) or after STARTTLS, and the server's certificate must be valid. Without
-// TLS it refuses, unless AllowInsecure is set for local development. The password is only sent
+// TLS it refuses, in development too. The password is only sent
 // over TLS (or to localhost).
 type SMTPMailer struct {
 	cfg     Config
@@ -88,7 +88,7 @@ func (m *SMTPMailer) Send(ctx context.Context, to, subject, text, html string) e
 			if err := client.StartTLS(m.tlsSettings()); err != nil {
 				return fmt.Errorf("email: start TLS with %s: %w", addr, err)
 			}
-		} else if !m.cfg.AllowInsecure {
+		} else {
 			return ErrInsecureServer
 		}
 	}

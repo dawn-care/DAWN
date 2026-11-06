@@ -1,15 +1,17 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	authsvc "server/internal/services/auth"
+	"server/internal/services/auth/authtest"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
@@ -20,32 +22,11 @@ import (
    SETUP
 ------------------------------------------------------- */
 
-// fakeCodes is a LoginCodeService that records what it was asked
-type fakeCodes struct {
-	requested  []string // "address|ip"
-	verified   []string // "address|code"
-	requestErr error
-	verifyErr  error
-}
-
-func (f *fakeCodes) RequestCode(ctx context.Context, address, ip string) error {
-	f.requested = append(f.requested, address+"|"+ip)
-	return f.requestErr
-}
-
-func (f *fakeCodes) VerifyCode(ctx context.Context, address, code string) error {
-	f.verified = append(f.verified, address+"|"+code)
-	return f.verifyErr
-}
-
-// newEmailController builds a controller with the fake code service; nil codes means email
-// sign-in is not set up on the server
-func newEmailController(t *testing.T, codes *fakeCodes, sessions *fakeSessions) (*AuthController, sqlmock.Sqlmock) {
+// newEmailController builds a controller with the fake code service
+func newEmailController(t *testing.T, codes *authtest.FakeCodes, sessions *fakeSessions) (*AuthController, sqlmock.Sqlmock) {
 	t.Helper()
 	c, mock := newController(t, &fakeGoogle{}, sessions)
-	if codes != nil {
-		c.AuthService.WithLoginCodes(codes)
-	}
+	c.AuthService.WithLoginCodes(codes)
 	return c, mock
 }
 
@@ -74,7 +55,7 @@ func requireError(t *testing.T, w *httptest.ResponseRecorder, status int, code s
 ------------------------------------------------------- */
 
 func TestRequestEmailCode_SendsACodeForTheAddressAndClientIP(t *testing.T) {
-	codes := &fakeCodes{}
+	codes := &authtest.FakeCodes{}
 	c, _ := newEmailController(t, codes, &fakeSessions{})
 
 	w := post(c.RequestEmailCode, "203.0.113.9:51234", `{"email":"pat@example.com"}`)
@@ -82,12 +63,12 @@ func TestRequestEmailCode_SendsACodeForTheAddressAndClientIP(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.JSONEq(t, `{"status":"sent"}`, w.Body.String())
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
-	assert.Equal(t, []string{"pat@example.com|203.0.113.9"}, codes.requested, "the IP without its port")
+	assert.Equal(t, []string{"pat@example.com|203.0.113.9"}, codes.Requested, "the IP without its port")
 	assert.Empty(t, w.Result().Cookies(), "asking for a code signs nobody in")
 }
 
 func TestRequestEmailCode_UsesTheConnectionsIPNotForwardingHeaders(t *testing.T) {
-	codes := &fakeCodes{}
+	codes := &authtest.FakeCodes{}
 	c, _ := newEmailController(t, codes, &fakeSessions{})
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"email":"pat@example.com"}`))
 	req.RemoteAddr = "203.0.113.9:51234"
@@ -96,7 +77,7 @@ func TestRequestEmailCode_UsesTheConnectionsIPNotForwardingHeaders(t *testing.T)
 
 	c.RequestEmailCode(httptest.NewRecorder(), req)
 
-	assert.Equal(t, []string{"pat@example.com|203.0.113.9"}, codes.requested, "a client cannot pick its own IP to get around the per-IP limit")
+	assert.Equal(t, []string{"pat@example.com|203.0.113.9"}, codes.Requested, "a client cannot pick its own IP to get around the per-IP limit")
 }
 
 func TestClientIP(t *testing.T) {
@@ -119,12 +100,13 @@ func TestRequestEmailCode_Errors(t *testing.T) {
 		code   string
 	}{
 		"invalid address": {authsvc.ErrInvalidEmail, http.StatusBadRequest, CodeInvalidEmail},
-		"rate limited":    {authsvc.ErrTooManyRequests, http.StatusTooManyRequests, CodeRateLimited},
-		"another failure": {errors.New("smtp: password rejected for hunter2"), http.StatusInternalServerError, CodeInternal},
+		"rate limited":    {&authsvc.LimitError{Limit: authsvc.ErrTooManyRequests, RetryAfter: 15 * time.Minute}, http.StatusTooManyRequests, CodeRateLimited},
+		"send failed":     {fmt.Errorf("%w: smtp: password rejected for hunter2", authsvc.ErrSendFailed), http.StatusBadGateway, CodeEmailSendFailed},
+		"another failure": {errors.New("db: password rejected for hunter2"), http.StatusInternalServerError, CodeInternal},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			c, _ := newEmailController(t, &fakeCodes{requestErr: tc.err}, &fakeSessions{})
+			c, _ := newEmailController(t, &authtest.FakeCodes{RequestErr: tc.err}, &fakeSessions{})
 
 			w := post(c.RequestEmailCode, "203.0.113.9:1", `{"email":"pat@example.com"}`)
 
@@ -132,14 +114,6 @@ func TestRequestEmailCode_Errors(t *testing.T) {
 			assert.NotContains(t, w.Body.String(), "hunter2", "internal error text is not sent to the browser")
 		})
 	}
-}
-
-func TestRequestEmailCode_UnavailableWhenNotSetUp(t *testing.T) {
-	c, _ := newEmailController(t, nil, &fakeSessions{})
-
-	w := post(c.RequestEmailCode, "203.0.113.9:1", `{"email":"pat@example.com"}`)
-
-	requireError(t, w, http.StatusServiceUnavailable, CodeEmailLoginUnavailable)
 }
 
 func TestEmailLoginEndpoints_RejectUnreadableBodies(t *testing.T) {
@@ -150,13 +124,13 @@ func TestEmailLoginEndpoints_RejectUnreadableBodies(t *testing.T) {
 	}
 	for name, body := range bodies {
 		t.Run(name, func(t *testing.T) {
-			codes := &fakeCodes{}
+			codes := &authtest.FakeCodes{}
 			c, _ := newEmailController(t, codes, &fakeSessions{})
 
 			requireError(t, post(c.RequestEmailCode, "203.0.113.9:1", body), http.StatusBadRequest, CodeInvalidRequest)
 			requireError(t, post(c.VerifyEmailCode, "203.0.113.9:1", body), http.StatusBadRequest, CodeInvalidRequest)
-			assert.Empty(t, codes.requested)
-			assert.Empty(t, codes.verified)
+			assert.Empty(t, codes.Requested)
+			assert.Empty(t, codes.Verified)
 		})
 	}
 }
@@ -167,7 +141,7 @@ func TestEmailLoginEndpoints_RejectUnreadableBodies(t *testing.T) {
 
 func TestVerifyEmailCode_SignsInWithTheSameCookieAsGoogle(t *testing.T) {
 	t.Setenv("RUN_MODE", "production")
-	codes := &fakeCodes{}
+	codes := &authtest.FakeCodes{}
 	sessions := &fakeSessions{createToken: "new-token"}
 	c, mock := newEmailController(t, codes, sessions)
 	expectExistingCaregiver(mock, 7)
@@ -176,7 +150,7 @@ func TestVerifyEmailCode_SignsInWithTheSameCookieAsGoogle(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.JSONEq(t, `{"status":"authenticated"}`, w.Body.String())
-	assert.Equal(t, []string{"pat@example.com|123456"}, codes.verified)
+	assert.Equal(t, []string{"pat@example.com|123456|203.0.113.9"}, codes.Verified)
 	assert.Equal(t, []int{7}, sessions.createdFor)
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
@@ -198,12 +172,13 @@ func TestVerifyEmailCode_Errors(t *testing.T) {
 	}{
 		"wrong or expired code": {authsvc.ErrCodeRejected, http.StatusUnauthorized, CodeCodeRejected},
 		"too many attempts":     {authsvc.ErrTooManyAttempts, http.StatusTooManyRequests, CodeTooManyAttempts},
+		"too many guesses":      {&authsvc.LimitError{Limit: authsvc.ErrTooManyGuesses, RetryAfter: time.Hour}, http.StatusTooManyRequests, CodeTooManyGuesses},
 		"another failure":       {errors.New("db: password authentication failed"), http.StatusInternalServerError, CodeInternal},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			sessions := &fakeSessions{createToken: "new-token"}
-			c, mock := newEmailController(t, &fakeCodes{verifyErr: tc.err}, sessions)
+			c, mock := newEmailController(t, &authtest.FakeCodes{VerifyErr: tc.err}, sessions)
 
 			w := post(c.VerifyEmailCode, "203.0.113.9:1", `{"email":"pat@example.com","code":"000000"}`)
 
@@ -216,22 +191,39 @@ func TestVerifyEmailCode_Errors(t *testing.T) {
 	}
 }
 
-func TestVerifyEmailCode_UnavailableWhenNotSetUp(t *testing.T) {
-	c, _ := newEmailController(t, nil, &fakeSessions{})
-
-	w := post(c.VerifyEmailCode, "203.0.113.9:1", `{"email":"pat@example.com","code":"123456"}`)
-
-	requireError(t, w, http.StatusServiceUnavailable, CodeEmailLoginUnavailable)
-	assert.Empty(t, w.Result().Cookies())
-}
-
 func TestVerifyEmailCode_NoCookieWhenTheSessionCannotBeStarted(t *testing.T) {
 	sessions := &fakeSessions{createErr: errors.New("db down")}
-	c, mock := newEmailController(t, &fakeCodes{}, sessions)
+	c, mock := newEmailController(t, &authtest.FakeCodes{}, sessions)
 	expectExistingCaregiver(mock, 7)
 
 	w := post(c.VerifyEmailCode, "203.0.113.9:1", `{"email":"pat@example.com","code":"123456"}`)
 
 	requireError(t, w, http.StatusInternalServerError, CodeInternal)
 	assert.Empty(t, w.Result().Cookies())
+}
+
+func TestLimitErrors_SayHowLongToWait(t *testing.T) {
+	request := func(c *AuthController) http.HandlerFunc { return c.RequestEmailCode }
+	verify := func(c *AuthController) http.HandlerFunc { return c.VerifyEmailCode }
+	cases := []struct {
+		err        error
+		handler    func(*AuthController) http.HandlerFunc
+		code       string
+		retryAfter string
+		wording    string
+	}{
+		{&authsvc.LimitError{Limit: authsvc.ErrTooManyRequests, RetryAfter: 15 * time.Minute}, request, CodeRateLimited, "900", "in 15 minutes"},
+		{&authsvc.LimitError{Limit: authsvc.ErrTooManyGuesses, RetryAfter: time.Hour}, verify, CodeTooManyGuesses, "3600", "in an hour"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.wording, func(t *testing.T) {
+			c, _ := newEmailController(t, &authtest.FakeCodes{RequestErr: tc.err, VerifyErr: tc.err}, &fakeSessions{})
+
+			w := post(tc.handler(c), "203.0.113.9:1", `{"email":"pat@example.com","code":"123456"}`)
+
+			requireError(t, w, http.StatusTooManyRequests, tc.code)
+			assert.Equal(t, tc.retryAfter, w.Header().Get("Retry-After"))
+			assert.Contains(t, w.Body.String(), tc.wording)
+		})
+	}
 }

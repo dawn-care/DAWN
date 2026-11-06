@@ -14,7 +14,8 @@ type AuthService struct {
 	Caregivers   *caregiver.CaregiverService
 	Carepartners *carepartner.CarepartnerService
 	Sessions     SessionService
-	// LoginCodes is nil when email sign-in is not set up (no mail server or no secret)
+	// LoginCodes sends and checks emailed sign-in codes. main always sets it (WithLoginCodes);
+	// the server does not start without a working email setup.
 	LoginCodes LoginCodeService
 }
 
@@ -27,40 +28,39 @@ func NewAuthService(
 	return &AuthService{Google: google, Caregivers: caregivers, Carepartners: carepartners, Sessions: sessions}
 }
 
-// WithLoginCodes turns on sign-in with an emailed code
+// WithLoginCodes sets the service that sends and checks emailed sign-in codes
 func (a *AuthService) WithLoginCodes(codes LoginCodeService) *AuthService {
 	a.LoginCodes = codes
 	return a
 }
 
-// ErrEmailLoginDisabled means sign-in with an emailed code is not set up on this server (503)
-var ErrEmailLoginDisabled = errors.New("sign-in with an emailed code is not available")
-
 // RequestEmailCode emails a sign-in code. It does the same whether or not the address has an
 // account, so it cannot be used to find out who has one.
 func (a *AuthService) RequestEmailCode(ctx context.Context, address, ip string) error {
-	if a.LoginCodes == nil {
-		return ErrEmailLoginDisabled
-	}
 	return a.LoginCodes.RequestCode(ctx, address, ip)
 }
 
 // LoginWithEmailCode signs in the caregiver who owns the address, creating them if this is
 // their first sign-in, once the code is right. It returns the token for their cookie.
-func (a *AuthService) LoginWithEmailCode(ctx context.Context, address, code string) (string, error) {
-	if a.LoginCodes == nil {
-		return "", ErrEmailLoginDisabled
-	}
-	if err := a.LoginCodes.VerifyCode(ctx, address, code); err != nil {
-		return "", err
-	}
-
-	user, err := a.Caregivers.FindOrCreateFromEmail(address)
+// The code is used up only once the session exists, so if finding the caregiver or starting
+// the session fails, the same code can be entered again.
+func (a *AuthService) LoginWithEmailCode(ctx context.Context, address, code, ip string) (string, error) {
+	var token string
+	err := a.LoginCodes.VerifyCode(ctx, address, code, ip, func() error {
+		user, err := a.Caregivers.FindOrCreateFromEmail(address)
+		if err != nil {
+			return fmt.Errorf("finding or creating the caregiver for email sign-in: %w", err)
+		}
+		token, err = a.StartSession(ctx, user.ID)
+		if err != nil {
+			return fmt.Errorf("starting a session for caregiver %d: %w", user.ID, err)
+		}
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
-
-	return a.StartSession(ctx, user.ID)
+	return token, nil
 }
 
 // ErrGoogleTokenRejected means Google did not accept the ID token, so the login is refused (401).

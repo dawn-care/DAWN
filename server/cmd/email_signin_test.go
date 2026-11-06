@@ -3,35 +3,39 @@ package main
 import (
 	"testing"
 
-	authSvc "server/internal/services/auth"
-
 	"github.com/stretchr/testify/assert"
 )
 
 const goodSecret = "0123456789abcdef0123456789abcdef"
 
-func TestEnableEmailSignIn(t *testing.T) {
+func TestNewLoginCodes(t *testing.T) {
 	cases := []struct {
 		name string
 		env  map[string]string
-		on   bool
+		ok   bool
 	}{
 		{"production with a mail server and a secret", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com", "LOGIN_CODE_SECRET": goodSecret}, true},
 		{"development with no mail server logs the email instead", map[string]string{"RUN_MODE": "dev", "LOGIN_CODE_SECRET": goodSecret}, true},
-		{"production with no mail server", map[string]string{"LOGIN_CODE_SECRET": goodSecret}, false},
-		{"no secret", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com"}, false},
-		{"secret too short", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com", "LOGIN_CODE_SECRET": "short"}, false},
+		{"development with no secret makes one for the run", map[string]string{"RUN_MODE": "dev"}, true},
+		{"production with no mail server does not start", map[string]string{"LOGIN_CODE_SECRET": goodSecret}, false},
+		{"production with no secret does not start", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com"}, false},
+		{"a secret that is too short does not start", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_FROM": "no-reply@example.com", "LOGIN_CODE_SECRET": "short"}, false},
+		{"development with a short secret does not start either", map[string]string{"RUN_MODE": "dev", "LOGIN_CODE_SECRET": "short"}, false},
+		{"an invalid mail setting does not start", map[string]string{"SMTP_HOST": "smtp.example.com", "SMTP_PORT": "nope", "SMTP_FROM": "no-reply@example.com", "LOGIN_CODE_SECRET": goodSecret}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, key := range []string{"RUN_MODE", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM", "LOGIN_CODE_SECRET"} {
-				t.Setenv(key, tc.env[key])
+			getenv := func(key string) string { return tc.env[key] }
+
+			codes, err := newLoginCodes(getenv, nil)
+
+			if tc.ok {
+				assert.NoError(t, err)
+				assert.NotNil(t, codes)
+			} else {
+				assert.Error(t, err)
+				assert.Nil(t, codes)
 			}
-			auth := authSvc.NewAuthService(nil, nil, nil, nil)
-
-			enableEmailSignIn(auth, nil)
-
-			assert.Equal(t, tc.on, auth.LoginCodes != nil)
 		})
 	}
 }

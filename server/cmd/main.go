@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"errors"
 	"database/sql"
 	"fmt"
 	"log"
@@ -90,25 +92,48 @@ func getEnvOrDefault(key, fallback string) string {
 	return val
 }
 
-// enableEmailSignIn turns on sign-in with an emailed code when the mail server (SMTP_*) and
-// LOGIN_CODE_SECRET are set up. Without them the server runs as before and only Google sign-in works.
-func enableEmailSignIn(authService *authSvc.AuthService, db *sql.DB) {
-	mailer, err := emailSvc.NewMailerFromEnv(os.Getenv, os.Getenv("RUN_MODE") == "dev")
+// newLoginCodes sets up sign-in with an emailed code. It is always on: outside development it
+// needs a mail server (SMTP_*) and LOGIN_CODE_SECRET, and the server does not start without
+// them. In development with no SMTP_HOST the email is printed to the log, and with no
+// LOGIN_CODE_SECRET a random one is made for this run (codes then stop working on a restart).
+func newLoginCodes(getenv func(string) string, db *sql.DB) (authSvc.LoginCodeService, error) {
+	devMode := getenv("RUN_MODE") == "dev"
+	mailer, err := emailSvc.NewMailerFromEnv(getenv, devMode)
 	if err != nil {
-		log.Printf("WARNING: sign-in with an emailed code is off: %v", err)
-		return
+		return nil, err
 	}
 	if mailer == nil {
-		log.Print("WARNING: sign-in with an emailed code is off: SMTP_HOST is not set")
-		return
+		return nil, errors.New("SMTP_HOST is not set (see .env.example)")
 	}
-	codes, err := authSvc.NewLoginCodeService(db, mailer, []byte(os.Getenv("LOGIN_CODE_SECRET")))
+
+	secret := []byte(getenv("LOGIN_CODE_SECRET"))
+	if len(secret) == 0 && devMode {
+		secret = make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return nil, fmt.Errorf("making a development LOGIN_CODE_SECRET: %w", err)
+		}
+		log.Print("LOGIN_CODE_SECRET is not set; using a random one until the server restarts (development only)")
+	}
+	codes, err := authSvc.NewLoginCodeService(db, mailer, secret)
 	if err != nil {
-		log.Printf("WARNING: sign-in with an emailed code is off: %v", err)
-		return
+		// Returning codes here would wrap a nil pointer in a non-nil LoginCodeService
+		return nil, err
 	}
-	authService.WithLoginCodes(codes)
-	log.Print("sign-in with an emailed code is on")
+	return codes, nil
+}
+
+// allowedOriginsFor lists the browser pages allowed to call the API with cookies. Production
+// trusts only its own https site (the caregiver app is served from it); the localhost
+// development servers are trusted only in development.
+func allowedOriginsFor(devMode bool) []string {
+	if devMode {
+		return []string{
+			"http://localhost:5173",
+			"http://localhost:8081",
+			"http://localhost:8082", // staff app web build in development
+		}
+	}
+	return []string{"https://startup-da.gccis.rit.edu"}
 }
 
 func main() {
@@ -117,12 +142,7 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	// Browser pages allowed to call the API. The sign-in routes trust the same origins.
-	allowedOrigins := []string{
-		"http://localhost:5173",
-		"http://localhost:8081",
-		"http://localhost:8082", // staff app web build in development
-		"http://startup-da.gccis.rit.edu",
-	}
+	allowedOrigins := allowedOriginsFor(os.Getenv("RUN_MODE") == "dev")
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -183,7 +203,11 @@ func main() {
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
 	authService := authSvc.NewAuthService(googleService, caregiverService, carepartnerService, sessionService)
-	enableEmailSignIn(authService, db)
+	loginCodes, err := newLoginCodes(os.Getenv, db)
+	if err != nil {
+		log.Fatal("sign-in with an emailed code: ", err)
+	}
+	authService.WithLoginCodes(loginCodes)
 
 	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)

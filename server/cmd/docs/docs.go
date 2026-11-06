@@ -414,7 +414,7 @@ const docTemplate = `{
         },
         "/auth/email/code": {
             "post": {
-                "description": "Emails a 6-digit sign-in code to the address. It works the same whether or not the address has an account, so it cannot be used to find out who has one. The code expires after 10 minutes, and a new code replaces any earlier one. Limited to 3 codes per address per 15 minutes, 10 per address per day, and 10 per IP address per hour.",
+                "description": "Emails a 6-digit sign-in code to the address. It works the same whether or not the address has an account, so it cannot be used to find out who has one. The code expires after 10 minutes, and a new code replaces any earlier one. Limited to 3 codes per address per 15 minutes, 10 per address per day, and 10 per IP address per hour. A code that could not be emailed is not stored and does not count toward the limits.",
                 "consumes": [
                     "application/json"
                 ],
@@ -460,14 +460,11 @@ const docTemplate = `{
                     "403": {
                         "description": "CROSS_ORIGIN_BLOCKED: the request came from another site",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/auth.AuthError"
                         }
                     },
                     "429": {
-                        "description": "RATE_LIMITED",
+                        "description": "RATE_LIMITED, with a Retry-After header in seconds",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthError"
                         }
@@ -478,8 +475,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/auth.AuthError"
                         }
                     },
-                    "503": {
-                        "description": "EMAIL_LOGIN_UNAVAILABLE: the server has no mail server set up",
+                    "502": {
+                        "description": "EMAIL_SEND_FAILED: the mail server did not accept the email; an earlier code still works",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthError"
                         }
@@ -489,7 +486,7 @@ const docTemplate = `{
         },
         "/auth/email/verify": {
             "post": {
-                "description": "Checks the code emailed to the address and starts a session, creating the caregiver if this is their first sign-in. The session cookie is the same as for Google sign-in. A code works once, for 10 minutes, and is burned after 5 wrong guesses.",
+                "description": "Checks the code emailed to the address and starts a session, creating the caregiver if this is their first sign-in. The session cookie is the same as for Google sign-in. A code works once, for 10 minutes, and is burned after 5 wrong guesses. One IP address may make at most 20 wrong guesses per hour, across every address. If the code is right but signing in fails (500), the code still works.",
                 "consumes": [
                     "application/json"
                 ],
@@ -550,26 +547,17 @@ const docTemplate = `{
                     "403": {
                         "description": "CROSS_ORIGIN_BLOCKED: the request came from another site",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/auth.AuthError"
                         }
                     },
                     "429": {
-                        "description": "TOO_MANY_ATTEMPTS: the code was guessed wrong too many times, request a new one",
+                        "description": "TOO_MANY_ATTEMPTS: the code was guessed wrong too many times, request a new one; or TOO_MANY_GUESSES: too many wrong codes from this IP, with a Retry-After header in seconds",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthError"
                         }
                     },
                     "500": {
                         "description": "INTERNAL_ERROR",
-                        "schema": {
-                            "$ref": "#/definitions/auth.AuthError"
-                        }
-                    },
-                    "503": {
-                        "description": "EMAIL_LOGIN_UNAVAILABLE",
                         "schema": {
                             "$ref": "#/definitions/auth.AuthError"
                         }

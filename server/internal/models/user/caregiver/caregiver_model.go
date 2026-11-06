@@ -2,10 +2,22 @@ package caregiver
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"server/internal/db"
+
+	"github.com/lib/pq"
 )
+
+// emailIndex is the unique index on lower(email) (migration 10)
+const emailIndex = "Caregiver_email_lower_key"
+
+// IsEmailTaken reports whether err is another caregiver already having this email
+func IsEmailTaken(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == emailIndex
+}
 
 // Caregiver represents a caregiver "user"
 type Caregiver struct {
@@ -306,7 +318,10 @@ func SetGoogleID(db *sql.DB, id int, googleID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	count, _ := res.RowsAffected()
+	count, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
 	return count > 0, nil
 }
 
@@ -320,9 +335,69 @@ func SetEmail(db *sql.DB, id int, email string) (bool, error) {
 		WHERE id = $2 AND email IS NULL
 		  AND NOT EXISTS (SELECT 1 FROM "Caregiver" WHERE lower(email) = lower($1));
 	`, email, id)
+	if IsEmailTaken(err) {
+		// Another sign-in saved the same address at the same moment
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
-	count, _ := res.RowsAffected()
+	count, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
 	return count > 0, nil
+}
+
+// MergeEmailCaregiverInto folds an email-only caregiver (one with no Google ID) that holds
+// email into the caregiver targetID, which has no email yet. The email-only caregiver's
+// carepartners move to targetID, it is deleted (its sessions end with it), and targetID gets
+// the email. It reports the merged caregiver's ID, or 0 when there was nothing to merge: no
+// email-only caregiver holds the address, or targetID already has an email.
+//
+// The caller must already know that the person signing in to targetID owns email.
+func MergeEmailCaregiverInto(conn *sql.DB, targetID int, email string) (int, error) {
+	tx, err := conn.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var targetFound bool
+	err = tx.QueryRow(`
+		SELECT true FROM "Caregiver" WHERE id = $1 AND email IS NULL FOR UPDATE;
+	`, targetID).Scan(&targetFound)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("locking caregiver %d: %w", targetID, err)
+	}
+
+	var sourceID int
+	err = tx.QueryRow(`
+		SELECT id FROM "Caregiver"
+		WHERE lower(email) = lower($1) AND google_id IS NULL AND id <> $2
+		FOR UPDATE;
+	`, email, targetID).Scan(&sourceID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("finding the email caregiver to merge: %w", err)
+	}
+
+	if _, err := tx.Exec(`UPDATE "Carepartner" SET caregiver_id = $1 WHERE caregiver_id = $2;`, targetID, sourceID); err != nil {
+		return 0, fmt.Errorf("moving carepartners from caregiver %d to %d: %w", sourceID, targetID, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM "Caregiver" WHERE id = $1;`, sourceID); err != nil {
+		return 0, fmt.Errorf("deleting merged caregiver %d: %w", sourceID, err)
+	}
+	if _, err := tx.Exec(`UPDATE "Caregiver" SET email = $1 WHERE id = $2;`, email, targetID); err != nil {
+		return 0, fmt.Errorf("saving the email on caregiver %d: %w", targetID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return sourceID, nil
 }

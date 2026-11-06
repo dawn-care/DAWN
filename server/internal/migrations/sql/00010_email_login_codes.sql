@@ -5,7 +5,9 @@
 -- The demo caregiver's email was seeded into google_id, so it moves to email.
 -- LoginCode holds the codes: only a keyed hash (code_hash), never the code itself.
 -- LoginCodeRequest is the log the rate limits count (per email and per IP). ip_hash is a keyed
--- hash, never the address. The server deletes rows of both tables older than a day.
+-- hash, never the address. LoginCodeGuess logs wrong code guesses per IP (ip_hash, a keyed hash),
+-- for the limit of 20 wrong guesses per IP per hour. Rows of all three tables older than a day
+-- are deleted the next time a code request goes through; there is no scheduled cleanup.
 -- +goose Up
 
 ALTER TABLE "Caregiver" ADD COLUMN "email" text;
@@ -40,10 +42,20 @@ CREATE TABLE "LoginCodeRequest" (
 CREATE INDEX "LoginCodeRequest_email_created_at_idx" ON "LoginCodeRequest" (lower("email"), "created_at");
 CREATE INDEX "LoginCodeRequest_ip_hash_created_at_idx" ON "LoginCodeRequest" ("ip_hash", "created_at");
 
+CREATE TABLE "LoginCodeGuess" (
+  "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "ip_hash" text NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now()
+);
+
+-- Counting recent wrong guesses per IP
+CREATE INDEX "LoginCodeGuess_ip_hash_created_at_idx" ON "LoginCodeGuess" ("ip_hash", "created_at");
+
 -- +goose Down
 -- Codes and request logs are short-lived, so they are dropped. Only the demo caregiver's
 -- email goes back to google_id; other stored emails are lost.
 
+DROP TABLE "LoginCodeGuess";
 DROP TABLE "LoginCodeRequest";
 DROP TABLE "LoginCode";
 

@@ -110,17 +110,6 @@ func TestSMTPMailer_RefusesAServerWithoutTLSAndSendsNothing(t *testing.T) {
 	assert.Zero(t, authAttempts, "the password is never sent over a connection with no TLS")
 }
 
-func TestSMTPMailer_DevelopmentMayUseAServerWithoutTLS(t *testing.T) {
-	srv := newFakeSMTP(t, nil) // like Mailpit: no TLS, no login
-	m := mailerFor(t, srv, func(c *Config) { c.AllowInsecure = true })
-
-	require.NoError(t, sendTestCode(t, m, "pat@example.com"))
-
-	got := srv.delivered()
-	require.Len(t, got, 1)
-	assert.False(t, got[0].tls)
-}
-
 func TestSMTPMailer_DoesNotTrustAnUnknownCertificate(t *testing.T) {
 	srv := newFakeSMTP(t, func(s *fakeSMTP) { s.startTLS = true })
 	m := mailerFor(t, srv, nil)
@@ -204,12 +193,8 @@ func TestNewMailerFromEnv_BuildsAnSMTPMailer(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, Config{
 		Host: "smtp.example.com", Port: 587, User: "apiuser", Password: "secret",
-		From: "D.A.W.N. <no-reply@example.com>", ImplicitTLS: false, AllowInsecure: false,
-	}, smtpMailer.cfg, "production never allows a connection without TLS")
-
-	m, err = NewMailerFromEnv(env(values), true)
-	require.NoError(t, err)
-	assert.True(t, m.(*SMTPMailer).cfg.AllowInsecure, "development may reach a test inbox without TLS")
+		From: "D.A.W.N. <no-reply@example.com>", ImplicitTLS: false,
+	}, smtpMailer.cfg)
 }
 
 func TestNewMailerFromEnv_Port465UsesImplicitTLS(t *testing.T) {

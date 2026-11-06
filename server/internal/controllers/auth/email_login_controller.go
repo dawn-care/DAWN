@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
+	"time"
 
 	mw "server/internal/middleware"
 	"server/internal/services/auth"
@@ -13,13 +15,14 @@ import (
 
 // Error codes returned in the "code" field of error responses from the sign-in code endpoints
 const (
-	CodeInvalidRequest        = "INVALID_REQUEST"
-	CodeInvalidEmail          = "INVALID_EMAIL"
-	CodeRateLimited           = "RATE_LIMITED"
-	CodeEmailLoginUnavailable = "EMAIL_LOGIN_UNAVAILABLE"
-	CodeCodeRejected          = "CODE_REJECTED"
-	CodeTooManyAttempts       = "TOO_MANY_ATTEMPTS"
-	CodeInternal              = "INTERNAL_ERROR"
+	CodeInvalidRequest  = "INVALID_REQUEST"
+	CodeInvalidEmail    = "INVALID_EMAIL"
+	CodeRateLimited     = "RATE_LIMITED"
+	CodeEmailSendFailed = "EMAIL_SEND_FAILED"
+	CodeCodeRejected    = "CODE_REJECTED"
+	CodeTooManyAttempts = "TOO_MANY_ATTEMPTS"
+	CodeTooManyGuesses  = "TOO_MANY_GUESSES"
+	CodeInternal        = "INTERNAL_ERROR"
 )
 
 // maxEmailLoginBody is far more than an address and a 6-digit code need
@@ -62,19 +65,43 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
+// writeLimitError answers 429 with a Retry-After header and the wait in the message
+func writeLimitError(w http.ResponseWriter, err error, code, message string) {
+	var limit *auth.LimitError
+	if errors.As(err, &limit) && limit.RetryAfter > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(int(limit.RetryAfter.Seconds())))
+		message += " Try again " + waitText(limit.RetryAfter) + "."
+	} else {
+		message += " Try again later."
+	}
+	writeAuthError(w, http.StatusTooManyRequests, code, message)
+}
+
+// waitText says how long the longest wait is, for the caregiver
+func waitText(d time.Duration) string {
+	switch {
+	case d >= 24*time.Hour:
+		return "tomorrow"
+	case d >= time.Hour:
+		return "in an hour"
+	default:
+		return "in " + strconv.Itoa(int(d.Round(time.Minute).Minutes())) + " minutes"
+	}
+}
+
 // RequestEmailCode godoc
 // @Summary Email a sign-in code
-// @Description Emails a 6-digit sign-in code to the address. It works the same whether or not the address has an account, so it cannot be used to find out who has one. The code expires after 10 minutes, and a new code replaces any earlier one. Limited to 3 codes per address per 15 minutes, 10 per address per day, and 10 per IP address per hour.
+// @Description Emails a 6-digit sign-in code to the address. It works the same whether or not the address has an account, so it cannot be used to find out who has one. The code expires after 10 minutes, and a new code replaces any earlier one. Limited to 3 codes per address per 15 minutes, 10 per address per day, and 10 per IP address per hour. A code that could not be emailed is not stored and does not count toward the limits.
 // @Tags auth
 // @Accept json
 // @Produce json
 // @Param body body object{email=string} true "Email address"
 // @Success 200 {object} map[string]string "status: sent"
 // @Failure 400 {object} AuthError "INVALID_REQUEST or INVALID_EMAIL"
-// @Failure 403 {object} map[string]string "CROSS_ORIGIN_BLOCKED: the request came from another site"
-// @Failure 429 {object} AuthError "RATE_LIMITED"
+// @Failure 403 {object} AuthError "CROSS_ORIGIN_BLOCKED: the request came from another site"
+// @Failure 429 {object} AuthError "RATE_LIMITED, with a Retry-After header in seconds"
 // @Failure 500 {object} AuthError "INTERNAL_ERROR"
-// @Failure 503 {object} AuthError "EMAIL_LOGIN_UNAVAILABLE: the server has no mail server set up"
+// @Failure 502 {object} AuthError "EMAIL_SEND_FAILED: the mail server did not accept the email; an earlier code still works"
 // @Router /auth/email/code [post]
 func (c *AuthController) RequestEmailCode(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -89,11 +116,12 @@ func (c *AuthController) RequestEmailCode(w http.ResponseWriter, r *http.Request
 	case errors.Is(err, auth.ErrInvalidEmail):
 		writeAuthError(w, http.StatusBadRequest, CodeInvalidEmail, "Enter a valid email address.")
 	case errors.Is(err, auth.ErrTooManyRequests):
-		writeAuthError(w, http.StatusTooManyRequests, CodeRateLimited, "Too many codes requested. Try again later.")
-	case errors.Is(err, auth.ErrEmailLoginDisabled):
-		writeAuthError(w, http.StatusServiceUnavailable, CodeEmailLoginUnavailable, "Signing in with an emailed code is not available right now. Sign in with Google instead.")
+		writeLimitError(w, err, CodeRateLimited, "Too many codes requested.")
+	case errors.Is(err, auth.ErrSendFailed):
+		log.Printf("emailing a sign-in code failed: %v", err)
+		writeAuthError(w, http.StatusBadGateway, CodeEmailSendFailed, "We couldn't send the email. Check the address, or try again in a few minutes.")
 	case err != nil:
-		log.Printf("sending a sign-in code failed: %v", err)
+		log.Printf("requesting a sign-in code failed: %v", err)
 		writeAuthError(w, http.StatusInternalServerError, CodeInternal, "Something went wrong. Please try again.")
 	default:
 		writeAuthJSON(w, http.StatusOK, map[string]string{"status": "sent"})
@@ -102,7 +130,7 @@ func (c *AuthController) RequestEmailCode(w http.ResponseWriter, r *http.Request
 
 // VerifyEmailCode godoc
 // @Summary Sign in with an emailed code
-// @Description Checks the code emailed to the address and starts a session, creating the caregiver if this is their first sign-in. The session cookie is the same as for Google sign-in. A code works once, for 10 minutes, and is burned after 5 wrong guesses.
+// @Description Checks the code emailed to the address and starts a session, creating the caregiver if this is their first sign-in. The session cookie is the same as for Google sign-in. A code works once, for 10 minutes, and is burned after 5 wrong guesses. One IP address may make at most 20 wrong guesses per hour, across every address. If the code is right but signing in fails (500), the code still works.
 // @Tags auth
 // @Accept json
 // @Produce json
@@ -111,10 +139,9 @@ func (c *AuthController) RequestEmailCode(w http.ResponseWriter, r *http.Request
 // @Header 200 {string} Set-Cookie "session=<token>; Max-Age=7776000; HttpOnly; SameSite=Strict"
 // @Failure 400 {object} AuthError "INVALID_REQUEST"
 // @Failure 401 {object} AuthError "CODE_REJECTED: the code is wrong, expired or already used"
-// @Failure 403 {object} map[string]string "CROSS_ORIGIN_BLOCKED: the request came from another site"
-// @Failure 429 {object} AuthError "TOO_MANY_ATTEMPTS: the code was guessed wrong too many times, request a new one"
+// @Failure 403 {object} AuthError "CROSS_ORIGIN_BLOCKED: the request came from another site"
+// @Failure 429 {object} AuthError "TOO_MANY_ATTEMPTS: the code was guessed wrong too many times, request a new one; or TOO_MANY_GUESSES: too many wrong codes from this IP, with a Retry-After header in seconds"
 // @Failure 500 {object} AuthError "INTERNAL_ERROR"
-// @Failure 503 {object} AuthError "EMAIL_LOGIN_UNAVAILABLE"
 // @Router /auth/email/verify [post]
 func (c *AuthController) VerifyEmailCode(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -125,16 +152,17 @@ func (c *AuthController) VerifyEmailCode(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	token, err := c.AuthService.LoginWithEmailCode(r.Context(), body.Email, body.Code)
+	token, err := c.AuthService.LoginWithEmailCode(r.Context(), body.Email, body.Code, clientIP(r))
 	switch {
 	case errors.Is(err, auth.ErrCodeRejected):
 		writeAuthError(w, http.StatusUnauthorized, CodeCodeRejected, "That code is wrong or has expired.")
 	case errors.Is(err, auth.ErrTooManyAttempts):
 		writeAuthError(w, http.StatusTooManyRequests, CodeTooManyAttempts, "Too many wrong codes. Request a new code.")
-	case errors.Is(err, auth.ErrEmailLoginDisabled):
-		writeAuthError(w, http.StatusServiceUnavailable, CodeEmailLoginUnavailable, "Signing in with an emailed code is not available right now. Sign in with Google instead.")
+	case errors.Is(err, auth.ErrTooManyGuesses):
+		writeLimitError(w, err, CodeTooManyGuesses, "Too many wrong codes from this network.")
 	case err != nil:
-		// The code was right, or the check itself failed, but the server could not sign them in
+		// A database or session error, while checking the code or after it was accepted. The
+		// code is not used up in either case.
 		log.Printf("email code login failed: %v", err)
 		writeAuthError(w, http.StatusInternalServerError, CodeInternal, "Something went wrong. Please try again.")
 	default:

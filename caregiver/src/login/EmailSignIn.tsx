@@ -8,10 +8,12 @@
  *
  *  - "Send a new code" waits RESEND_SECONDS between sends
  *  - Five wrong codes burn the code (the server says so), and the field is cleared
- *  - A code is not needed to be typed exactly: spaces and dashes are dropped
+ *  - Anything typed in the code field that is not a digit is dropped
  *
- * Once the server has accepted the code it has started the session, and
- * `onSignedIn` loads who signed in; the Login page then moves on.
+ * Once the server has accepted the code it has started the session and used
+ * the code up, and `onSignedIn` loads who signed in; the Login page then moves
+ * on. If that load fails, the caregiver is told to reload, not to re-enter the
+ * code, which no longer works.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -22,7 +24,6 @@ import { FOCUS_RING } from "../components/ui/styles";
 import { PRIMARY_BUTTON } from "../media/styles";
 import {
   CODE_LENGTH,
-  GENERIC_ERROR,
   RESEND_SECONDS,
   friendlyError,
   requestEmailCode,
@@ -33,6 +34,11 @@ interface EmailSignInProps {
   /** Loads the caregiver the server just signed in. Resolves false if nobody is signed in */
   onSignedIn: () => Promise<boolean>;
 }
+
+// A right code has been used up and the session cookie is set, so reloading
+// signs the caregiver in; entering the code again would only be refused
+const SIGNED_IN_BUT_NOT_LOADED =
+  "You're signed in, but we couldn't load your account. Reload the page to continue.";
 
 const ALERT_CLASSES =
   "m-0 px-3 py-2.5 rounded-lg bg-status-red-bg text-base font-bold text-status-red-text";
@@ -91,12 +97,22 @@ const EmailSignIn = ({ onSignedIn }: EmailSignInProps) => {
     setNotice(null);
     try {
       await verifyEmailCode(email.trim(), code);
-      if (!(await onSignedIn())) setError(GENERIC_ERROR);
     } catch (err) {
       setError(friendlyError(err));
       // The code is burned, so there is nothing left to correct
       if (err instanceof ApiError && err.code === "TOO_MANY_ATTEMPTS")
         setCode("");
+      setBusy(false);
+      return;
+    }
+    try {
+      if (!(await onSignedIn())) {
+        console.error("Signed in with an emailed code, but GET /me says nobody is signed in");
+        setError(SIGNED_IN_BUT_NOT_LOADED);
+      }
+    } catch (err) {
+      console.error("Signed in with an emailed code, but loading the caregiver failed", err);
+      setError(SIGNED_IN_BUT_NOT_LOADED);
     } finally {
       setBusy(false);
     }
