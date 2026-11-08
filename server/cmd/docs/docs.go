@@ -2020,6 +2020,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/family-members": {
+            "get": {
+                "description": "In the order they were added. Family members are folders for grouping media, not accounts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "family"
+                ],
+                "summary": "List a carepartner's family members",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Carepartner ID",
+                        "name": "carepartner_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/family.FamilyMember"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/family.FamilyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/family.FamilyError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Name is required; relationship and guidance_note are optional.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "family"
+                ],
+                "summary": "Add a family member",
+                "parameters": [
+                    {
+                        "description": "Family member",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/family.CreateFamilyMemberRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/family.FamilyMember"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/family.FamilyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/family.FamilyError"
+                        }
+                    }
+                }
+            }
+        },
         "/me": {
             "get": {
                 "description": "Returns the caregiver the session cookie belongs to, with their carepartners. A session used more than a day after it last renewed is renewed here, and the cookie is sent again with its new expiry. An unknown or expired session gets 401 and its cookie is deleted. A failure loading the session, the caregiver or their carepartners gets 500, and the cookie is left alone.",
@@ -2081,6 +2169,24 @@ const docTemplate = `{
                         "type": "string",
                         "description": "photo, video or audio; omit for all",
                         "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only media under this situation",
+                        "name": "situation",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only media about this family member",
+                        "name": "family_member_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "rank: what staff rated best first (the scores aren't sent). Left out: newest first",
+                        "name": "sort",
                         "in": "query"
                     }
                 ],
@@ -2146,6 +2252,26 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Name shown to the caregiver; defaults to the file name",
                         "name": "display_name",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Situations staff find it under; repeat the field for each",
+                        "name": "situations",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Family members it is about; repeat the field for each",
+                        "name": "family_member_ids",
                         "in": "formData"
                     }
                 ],
@@ -2340,6 +2466,65 @@ const docTemplate = `{
                         "description": "Media file",
                         "schema": {
                             "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/media.MediaError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/media.MediaError"
+                        }
+                    }
+                }
+            }
+        },
+        "/media/{id}/tags": {
+            "put": {
+                "description": "Replaces its situations and family members; family members must be the carepartner's. With both empty, staff don't see it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "media"
+                ],
+                "summary": "Set how staff find a media item",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Media ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Situations and family members",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/media.SetMediaTagsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/media.Media"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/media.MediaError"
                         }
                     },
                     "404": {
@@ -3444,6 +3629,60 @@ const docTemplate = `{
             }
         },
         "/playbacks": {
+            "get": {
+                "description": "Playbacks that reached the screen, from any source, most recently started first. Requests that never started are left out.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "playback"
+                ],
+                "summary": "List what played on a carepartner's tablet",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Carepartner ID",
+                        "name": "carepartner_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "How many to return, 1 to 100 (default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/playback.Playback"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
             "post": {
                 "consumes": [
                     "application/json"
@@ -3527,6 +3766,146 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/playbacks/{id}": {
+            "get": {
+                "description": "Its status, and rating_closes_at: until when staff can rate it, or null if it never reached the screen. The staff app polls this while a clip plays.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "playback"
+                ],
+                "summary": "Get one playback",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Playback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Carepartner ID",
+                        "name": "carepartner_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/playback.Playback"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/playbacks/{id}/rating": {
+            "post": {
+                "description": "Staff rate a play from the staff app. Only a play that reached the screen can be rated, until 5 minutes after it ended; rating again inside that time replaces the rating. Ratings order the staff app's media list (GET /media?sort=rank).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "playback"
+                ],
+                "summary": "Rate how a play went",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Playback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rating",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/playback.RatePlaybackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/playback.Playback"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -4750,6 +5129,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/tablet-events/touches": {
+            "post": {
+                "description": "The tablet sends the touches it recorded about once a minute, at most 50 events per request; quick repeats on the same thing are one event with a count. The whole batch is stored, or none of it. Unknown fields are rejected. 400 means the batch can never be stored and the tablet drops it; 5xx means it should retry, and a resent batch is not stored twice.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tablet-events"
+                ],
+                "summary": "Store a batch of the resident's touches",
+                "parameters": [
+                    {
+                        "description": "Touch events; first_at and last_at are RFC 3339",
+                        "name": "batch",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tablet_events.RecordTouchesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/video/list": {
             "get": {
                 "description": "Returns all video records associated with a carepartner and caregiver",
@@ -5307,6 +5732,57 @@ const docTemplate = `{
                 }
             }
         },
+        "family.CreateFamilyMemberRequest": {
+            "type": "object",
+            "properties": {
+                "carepartner_id": {
+                    "type": "integer"
+                },
+                "guidance_note": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "relationship": {
+                    "type": "string"
+                }
+            }
+        },
+        "family.FamilyError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "family.FamilyMember": {
+            "type": "object",
+            "properties": {
+                "carepartner_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "guidance_note": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "relationship": {
+                    "type": "string"
+                }
+            }
+        },
         "media.AudioMedia": {
             "type": "object",
             "properties": {
@@ -5342,6 +5818,12 @@ const docTemplate = `{
                 "duration_seconds": {
                     "type": "integer"
                 },
+                "family_member_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -5350,6 +5832,12 @@ const docTemplate = `{
                 },
                 "mime_type": {
                     "type": "string"
+                },
+                "situations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "size_bytes": {
                     "type": "integer"
@@ -5401,6 +5889,23 @@ const docTemplate = `{
             "properties": {
                 "display_name": {
                     "type": "string"
+                }
+            }
+        },
+        "media.SetMediaTagsRequest": {
+            "type": "object",
+            "properties": {
+                "family_member_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "situations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -5579,6 +6084,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "playback.RatePlaybackRequest": {
+            "type": "object",
+            "properties": {
+                "carepartner_id": {
+                    "type": "integer"
+                },
+                "rating": {
                     "type": "string"
                 }
             }
@@ -6079,6 +6595,52 @@ const docTemplate = `{
                     "$ref": "#/definitions/screen_widgets.Cell"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "tablet_events.RecordTouchesRequest": {
+            "type": "object",
+            "properties": {
+                "carepartner_id": {
+                    "type": "integer"
+                },
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tablet_events.TouchEvent"
+                    }
+                }
+            }
+        },
+        "tablet_events.TouchEvent": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "first_at": {
+                    "type": "string"
+                },
+                "gesture": {
+                    "type": "string"
+                },
+                "last_at": {
+                    "type": "string"
+                },
+                "media_kind": {
+                    "type": "string"
+                },
+                "screen": {
+                    "type": "string"
+                },
+                "target_type": {
+                    "type": "string"
+                },
+                "widget_id": {
+                    "type": "string"
+                },
+                "widget_type": {
                     "type": "string"
                 }
             }

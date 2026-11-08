@@ -8,12 +8,14 @@ import (
 	"log"
 	"net/http"
 
-	model "server/internal/models/tablet_events"
+	// Imported under its own package name: swag (v1.16) can't find a model type through
+	// any other alias, and RecordTouchesRequest would be empty in the Swagger docs
+	tablet_events "server/internal/models/tablet_events"
 	touchSvc "server/internal/services/tablet_events"
 )
 
 type TouchServiceInterface interface {
-	RecordTouches(context.Context, int, []model.TouchEvent) error
+	RecordTouches(context.Context, int, []tablet_events.TouchEvent) error
 }
 
 type TouchController struct {
@@ -27,8 +29,8 @@ func NewTouchController(service TouchServiceInterface) *TouchController {
 // RecordTouchesRequest is one batch from the tablet's touch telemetry
 // (carepartner/src/telemetry/touchLog.ts), at most 50 events
 type RecordTouchesRequest struct {
-	CarepartnerID int                `json:"carepartner_id"`
-	Events        []model.TouchEvent `json:"events"`
+	CarepartnerID int                        `json:"carepartner_id"`
+	Events        []tablet_events.TouchEvent `json:"events"`
 }
 
 // maxBodyBytes fits a full batch (50 events are about 15 KB) with room to spare
