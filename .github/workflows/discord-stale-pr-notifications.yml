@@ -1,0 +1,86 @@
+name: Discord Stale PR Notifications
+
+# Unlike discord-pr-notifications.yml, "open 24+ hours with no review" can't
+# be detected from a single webhook payload — it has to be checked on a
+# schedule. Re-notifies on every run for as long as a PR stays unreviewed;
+# kept intentionally stateless rather than tracking which PRs were already
+# flagged (see ticket #467).
+on:
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  pull-requests: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+    steps:
+      - name: Notify about PRs open 24+ hours with no human review
+        run: |
+          set -euo pipefail
+
+          CUTOFF_EPOCH=$(date -u -d '24 hours ago' +%s)
+          NOW_EPOCH=$(date -u +%s)
+          NOTIFIED=0
+
+          while read -r pr; do
+            IS_DRAFT=$(jq -r '.isDraft' <<< "$pr")
+            [ "$IS_DRAFT" = "true" ] && continue
+
+            CREATED_EPOCH=$(date -u -d "$(jq -r '.createdAt' <<< "$pr")" +%s)
+            [ "$CREATED_EPOCH" -gt "$CUTOFF_EPOCH" ] && continue
+
+            # gh's review JSON only exposes the reviewer's login, not whether
+            # they're a bot, so use GitHub's standard "[bot]"-suffixed login
+            # convention (e.g. dependabot[bot]) as the human/bot signal instead.
+            HAS_HUMAN_REVIEW=$(jq '[.reviews[] | select(.author.login | endswith("[bot]") | not)] | length > 0' <<< "$pr")
+            [ "$HAS_HUMAN_REVIEW" = "true" ] && continue
+
+            TITLE=$(jq -r '.title' <<< "$pr" | sed 's/[][]/\\&/g')
+            URL=$(jq -r '.url' <<< "$pr")
+
+            REQUESTED_USERS=$(jq -c '[.reviewRequests[] | select(.__typename == "User") | .login]' <<< "$pr")
+            REVIEWERS=$(jq -rn --argjson users "$DISCORD_USER_MAP" --argjson requested "$REQUESTED_USERS" '
+              $requested | map(if $users[.] then "<@\($users[.])>" else . end) | join(", ")
+            ')
+
+            # Tone escalates with how long it's actually been open, since this
+            # re-notifies daily for as long as a PR stays unreviewed — day 1
+            # is a nudge, day 3+ is a bit, rotating within each tier.
+            HOURS_OPEN=$(( (NOW_EPOCH - CREATED_EPOCH) / 3600 ))
+            DAYS_OPEN=$(( HOURS_OPEN / 24 ))
+            if [ "$HOURS_OPEN" -lt 48 ]; then
+              TAG="😬"
+              NUDGES=("looks a little moldy, ew (open 24+ hours with no review)" "is getting kinda crusty (open 24+ hours with no review)" "is starting to smell bad 🤢 (open 24+ hours with no review)")
+              REVIEWER_LINE="Time to check on it, ${REVIEWERS} ☹️"
+            elif [ "$HOURS_OPEN" -lt 72 ]; then
+              TAG="😞"
+              NUDGES=("has gone crusty and moldy after ${DAYS_OPEN} days with no review" "has shriveled up after ${DAYS_OPEN} days with no review" "is sad and lonely after ${DAYS_OPEN} days with no review")
+              REVIEWER_LINE="Help fix this, ${REVIEWERS} 😰"
+            else
+              TAG="👺"
+              NUDGES=("HOLY MOLY PLEASE REVIEW THIS IT'S BEEN ${DAYS_OPEN} DAYS" "HAS BEEN OPEN ${DAYS_OPEN} DAYS WITHOUT REVIEW, THIS IS A TRAVESTY" "CODE RED: STILL NO REVIEW AFTER ${DAYS_OPEN} DAYS WHAT IS WRONG WITH YOU PEOPLE" "IS GAINING SENTIENCE AGAIN AFTER ${DAYS_OPEN} DAYS WITH NO REVIEW")
+              REVIEWER_LINE="Shame on ${REVIEWERS} (point and laugh) 🫵😐"
+            fi
+            NUDGE="${NUDGES[$((RANDOM % ${#NUDGES[@]}))]}"
+
+            MESSAGE="${TAG} [${TITLE}](${URL}) ${NUDGE}."
+            if [ -n "$REVIEWERS" ]; then
+              MESSAGE="${MESSAGE} ${REVIEWER_LINE}"
+            fi
+
+            jq -n --arg content "$MESSAGE" \
+              '{content: $content, flags: 4, allowed_mentions: {parse: ["users"]}}' \
+              | curl -sS -f -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK_URL"
+            NOTIFIED=$((NOTIFIED + 1))
+          done < <(gh pr list --repo "${{ github.repository }}" --state open \
+                      --json number,title,url,isDraft,createdAt,reviews,reviewRequests \
+                      | jq -c '.[]')
+
+          echo "Notified about $NOTIFIED stale PR(s)."
