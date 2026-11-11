@@ -182,6 +182,21 @@ func TestLoginCodeRateLimitsIntegration(t *testing.T) {
 		assert.Len(t, env.mailer.emails(), 4)
 	})
 
+	t.Run("the wait is until the oldest request in the window ages out, not the whole window", func(t *testing.T) {
+		env := newCodeEnv(t)
+		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
+		env.clock.Advance(6 * time.Minute)
+		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
+		require.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
+
+		var limit *LimitError
+		require.ErrorAs(t, env.svc.RequestCode(ctx, testAddress, testIP), &limit)
+		assert.Equal(t, 9*time.Minute, limit.RetryAfter, "the first request leaves the 15 minute window 9 minutes from now")
+
+		env.clock.Advance(9 * time.Minute)
+		assert.NoError(t, env.svc.RequestCode(ctx, testAddress, testIP))
+	})
+
 	t.Run("10 codes per email in a day", func(t *testing.T) {
 		env := newCodeEnv(t)
 		for i := 0; i < 10; i++ {

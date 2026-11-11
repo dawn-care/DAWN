@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -69,7 +70,7 @@ func clientIP(r *http.Request) string {
 func writeLimitError(w http.ResponseWriter, err error, code, message string) {
 	var limit *auth.LimitError
 	if errors.As(err, &limit) && limit.RetryAfter > 0 {
-		w.Header().Set("Retry-After", strconv.Itoa(int(limit.RetryAfter.Seconds())))
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(limit.RetryAfter.Seconds()))))
 		message += " Try again " + waitText(limit.RetryAfter) + "."
 	} else {
 		message += " Try again later."
@@ -77,15 +78,19 @@ func writeLimitError(w http.ResponseWriter, err error, code, message string) {
 	writeAuthError(w, http.StatusTooManyRequests, code, message)
 }
 
-// waitText says how long the longest wait is, for the caregiver
+// waitText says how long the wait is, for the caregiver. It rounds up, so it never says a
+// shorter wait than the real one.
 func waitText(d time.Duration) string {
+	minutes := int(math.Ceil(d.Minutes()))
 	switch {
-	case d >= 24*time.Hour:
-		return "tomorrow"
-	case d >= time.Hour:
+	case minutes <= 1:
+		return "in a minute"
+	case minutes < 60:
+		return "in " + strconv.Itoa(minutes) + " minutes"
+	case minutes == 60:
 		return "in an hour"
 	default:
-		return "in " + strconv.Itoa(int(d.Round(time.Minute).Minutes())) + " minutes"
+		return "in about " + strconv.Itoa(int(math.Ceil(d.Hours()))) + " hours"
 	}
 }
 

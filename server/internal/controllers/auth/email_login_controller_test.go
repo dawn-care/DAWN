@@ -227,3 +227,13 @@ func TestLimitErrors_SayHowLongToWait(t *testing.T) {
 		})
 	}
 }
+
+func TestWaitText_RoundsUpSoItNeverSaysTooShortAWait(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		time.Second:                     "in a minute",
+		14*time.Minute + 30*time.Second: "in 15 minutes",
+		time.Hour + time.Second:         "in about 2 hours",
+	} {
+		assert.Equal(t, want, waitText(d), d.String())
+	}
+}

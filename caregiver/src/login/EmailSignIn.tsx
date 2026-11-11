@@ -6,6 +6,11 @@
  * Sign in with an emailed 6-digit code, for caregivers without a Google account.
  * Two steps: enter the email address, then the code that was sent to it.
  *
+ *  - The code step checks the code against the address it was sent to, which
+ *    can't be edited while the code is being sent
+ *  - "Already have a code? Enter here" goes to the code step without sending one, for a
+ *    caregiver who reloaded the page or reached the sending limit with a code
+ *    that still works
  *  - "Send a new code" waits RESEND_SECONDS between sends
  *  - Five wrong codes burn the code (the server says so), and the field is cleared
  *  - Anything typed in the code field that is not a digit is dropped
@@ -48,9 +53,22 @@ const ALERT_CLASSES =
 // what is left equally.
 const ROW_BUTTON = `h-11 px-3 flex-1 whitespace-nowrap rounded-[10px] border-2 border-ink-muted bg-surface text-sm font-bold text-ink cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`;
 
+const ALREADY_HAVE_CODE = "Already have a code? Enter here";
+
+// A text link under Send Code, so Send Code stays the one obvious next step. A button that looks
+// like a link, since it changes the step rather than the page; underlined and 44px tall so it
+// reads as clickable and is easy to hit.
+const TEXT_LINK_BUTTON = `self-center min-h-11 px-2 rounded-md bg-transparent border-0 text-base font-bold text-link underline underline-offset-4 cursor-pointer hover:no-underline disabled:opacity-60 disabled:no-underline disabled:cursor-default ${FOCUS_RING}`;
+
 const EmailSignIn = ({ onSignedIn }: EmailSignInProps) => {
   const [step, setStep] = useState<"email" | "code">("email");
+  // What is typed in the email field
   const [email, setEmail] = useState("");
+  // The address the code step is for: the one the code was sent to, or the one
+  // typed before "Already have a code? Enter here"
+  const [sentTo, setSentTo] = useState("");
+  // False when the code step was reached without sending a code on this visit
+  const [codeSentHere, setCodeSentHere] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,22 +89,41 @@ const EmailSignIn = ({ onSignedIn }: EmailSignInProps) => {
 
   const sendCode = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (busy || !email.trim()) return;
     const resend = step === "code";
+    // Read once, so the code step is for the address the code went to
+    const address = resend ? sentTo : email.trim();
+    if (busy || !address) return;
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      await requestEmailCode(email.trim());
+      await requestEmailCode(address);
+      setSentTo(address);
+      setCodeSentHere(true);
       setCode("");
       setWait(RESEND_SECONDS);
       setStep("code");
       if (resend) setNotice("We sent a new code. Only the newest one works.");
     } catch (err) {
       setError(friendlyError(err));
+      // An earlier code may still work, so point to where it can be entered
+      if (!resend && err instanceof ApiError && err.code === "RATE_LIMITED")
+        setNotice(`If you already have a code, choose "${ALREADY_HAVE_CODE}" above.`);
     } finally {
       setBusy(false);
     }
+  };
+
+  const enterExistingCode = () => {
+    const address = email.trim();
+    if (busy || !address) return;
+    setSentTo(address);
+    setCodeSentHere(false);
+    setCode("");
+    setError(null);
+    setNotice(null);
+    setWait(0);
+    setStep("code");
   };
 
   const signIn = async (event: FormEvent) => {
@@ -96,7 +133,7 @@ const EmailSignIn = ({ onSignedIn }: EmailSignInProps) => {
     setError(null);
     setNotice(null);
     try {
-      await verifyEmailCode(email.trim(), code);
+      await verifyEmailCode(sentTo, code);
     } catch (err) {
       setError(friendlyError(err));
       // The code is burned, so there is nothing left to correct
@@ -136,6 +173,8 @@ const EmailSignIn = ({ onSignedIn }: EmailSignInProps) => {
             autoComplete="email"
             inputMode="email"
             value={email}
+            // Read-only while sending, so the address can't change under the request
+            readOnly={busy}
             onChange={(event) => setEmail(event.target.value)}
           />
           <button
@@ -145,15 +184,31 @@ const EmailSignIn = ({ onSignedIn }: EmailSignInProps) => {
           >
             {busy ? "Sending…" : "Send Code"}
           </button>
+          <button
+            type="button"
+            onClick={enterExistingCode}
+            disabled={busy || !email.trim()}
+            className={TEXT_LINK_BUTTON}
+          >
+            {ALREADY_HAVE_CODE}
+          </button>
         </form>
       ) : (
         <form onSubmit={signIn} noValidate className="flex flex-col gap-3">
-          <p className="m-0 text-base text-ink">
-            We sent a {CODE_LENGTH}-digit code to{" "}
-            <strong className="break-all">{email.trim()}</strong>. It can take a
-            minute to arrive. If you don&apos;t see it, check your spam or junk
-            folder.
-          </p>
+          {codeSentHere ? (
+            <p className="m-0 text-base text-ink">
+              We sent a {CODE_LENGTH}-digit code to{" "}
+              <strong className="break-all">{sentTo}</strong>. It can take a
+              minute to arrive. If you don&apos;t see it, check your spam or
+              junk folder.
+            </p>
+          ) : (
+            <p className="m-0 text-base text-ink">
+              Enter the {CODE_LENGTH}-digit code we emailed to{" "}
+              <strong className="break-all">{sentTo}</strong>. Only the newest
+              code works, and a code stops working after 10 minutes.
+            </p>
+          )}
           <TextField
             ref={codeInput}
             label={`${CODE_LENGTH}-digit code`}

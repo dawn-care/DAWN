@@ -60,7 +60,8 @@ var (
 // (ErrTooManyRequests or ErrTooManyGuesses).
 type LimitError struct {
 	Limit error
-	// RetryAfter is the longest the caller may have to wait: the length of the limit's window
+	// RetryAfter is how long until another try would be allowed: until enough of the requests
+	// (or wrong guesses) that fill each full window have aged out of it. Whole seconds, at least 1.
 	RetryAfter time.Duration
 }
 
@@ -222,16 +223,71 @@ func (s *loginCodeService) checkSendLimits(ctx context.Context, tx *sql.Tx, addr
 		return fmt.Errorf("counting sign-in codes for the IP: %w", err)
 	}
 
-	// The longest window that is full says how long to wait
-	switch {
-	case todayForEmail >= maxCodesPerEmailPerDay:
-		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: 24 * time.Hour}
-	case lastHourForIP >= maxCodesPerIPPerHour:
-		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: time.Hour}
-	case recentForEmail >= maxCodesPerEmailPer15Min:
-		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: 15 * time.Minute}
+	// A new code needs room in every window, so the wait is the longest of the full windows' waits
+	windows := []struct {
+		full   bool
+		filter string
+		key    string
+		limit  int
+		length time.Duration
+	}{
+		{todayForEmail >= maxCodesPerEmailPerDay, emailFilter, address, maxCodesPerEmailPerDay, 24 * time.Hour},
+		{recentForEmail >= maxCodesPerEmailPer15Min, emailFilter, address, maxCodesPerEmailPer15Min, 15 * time.Minute},
+		{lastHourForIP >= maxCodesPerIPPerHour, ipFilter, ipHash, maxCodesPerIPPerHour, time.Hour},
+	}
+	var wait time.Duration
+	for _, window := range windows {
+		if !window.full {
+			continue
+		}
+		reopens, err := reopensIn(ctx, tx, "LoginCodeRequest", window.filter, window.key, window.limit, window.length, now)
+		if err != nil {
+			return fmt.Errorf("working out when sign-in codes can be sent again: %w", err)
+		}
+		wait = max(wait, reopens)
+	}
+	if wait > 0 {
+		return &LimitError{Limit: ErrTooManyRequests, RetryAfter: wait}
 	}
 	return nil
+}
+
+// The rows a limit counts: by address (stored lowercase) or by hashed IP
+const (
+	emailFilter = `lower(email) = $1`
+	ipFilter    = `ip_hash = $1`
+)
+
+// reopensIn says how long until a full window has room again. With limit rows counted in the
+// window, the limit-th newest is the one that has to age out for the count to drop below the
+// limit (older ones go first). A row stops counting once it is length old. If that row has
+// already gone (a cleanup, say), the whole length is the safe answer.
+func reopensIn(ctx context.Context, tx *sql.Tx, table, filter, key string, limit int, length time.Duration, now time.Time) (time.Duration, error) {
+	var createdAt time.Time
+	err := tx.QueryRowContext(ctx, `
+		SELECT created_at FROM "`+table+`"
+		WHERE `+filter+` AND created_at > $2
+		ORDER BY created_at DESC
+		OFFSET $3 LIMIT 1`,
+		key, now.Add(-length), limit-1,
+	).Scan(&createdAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return length, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return wholeSecondsUp(createdAt.Add(length).Sub(now)), nil
+}
+
+// wholeSecondsUp rounds up to a whole second, at least 1, so a caller who waits that long is
+// never early
+func wholeSecondsUp(d time.Duration) time.Duration {
+	rounded := d.Truncate(time.Second)
+	if rounded < d {
+		rounded += time.Second
+	}
+	return max(rounded, time.Second)
 }
 
 // storeCode replaces the address's code with a new one and logs the request
@@ -286,7 +342,11 @@ func (s *loginCodeService) VerifyCode(ctx context.Context, rawAddress, code, ip 
 		return fmt.Errorf("counting wrong sign-in codes for the IP: %w", err)
 	}
 	if wrongFromIP >= maxWrongGuessesPerIPPerHour {
-		return &LimitError{Limit: ErrTooManyGuesses, RetryAfter: time.Hour}
+		wait, err := reopensIn(ctx, tx, "LoginCodeGuess", ipFilter, ipHash, maxWrongGuessesPerIPPerHour, time.Hour, now)
+		if err != nil {
+			return fmt.Errorf("working out when sign-in codes can be checked again: %w", err)
+		}
+		return &LimitError{Limit: ErrTooManyGuesses, RetryAfter: wait}
 	}
 
 	// reject records a wrong guess from this IP, keeps it and the code's attempt count, and

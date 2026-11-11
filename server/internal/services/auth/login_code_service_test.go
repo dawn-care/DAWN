@@ -73,6 +73,9 @@ const (
 	supersedeSQL       = `UPDATE "LoginCode" SET used_at = $2 WHERE lower(email) = $1 AND used_at IS NULL`
 	insertCodeSQL      = `INSERT INTO "LoginCode" (email, code_hash, created_at, expires_at) VALUES ($1, $2, $3, $4)`
 	insertRequestSQL   = `INSERT INTO "LoginCodeRequest" (email, ip_hash, created_at) VALUES ($1, $2, $3)`
+	reopenByEmailSQL   = `SELECT created_at FROM "LoginCodeRequest" WHERE lower(email) = $1 AND created_at > $2 ORDER BY created_at DESC OFFSET $3 LIMIT 1`
+	reopenByIPSQL      = `SELECT created_at FROM "LoginCodeRequest" WHERE ip_hash = $1 AND created_at > $2 ORDER BY created_at DESC OFFSET $3 LIMIT 1`
+	reopenGuessesSQL   = `SELECT created_at FROM "LoginCodeGuess" WHERE ip_hash = $1 AND created_at > $2 ORDER BY created_at DESC OFFSET $3 LIMIT 1`
 	countGuessesSQL    = `SELECT count(*) FROM "LoginCodeGuess" WHERE ip_hash = $1 AND created_at > $2`
 	insertGuessSQL     = `INSERT INTO "LoginCodeGuess" (ip_hash, created_at) VALUES ($1, $2)`
 	selectCodeSQL      = `FROM "LoginCode" WHERE lower(email) = $1 AND used_at IS NULL AND expires_at > $2 ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE`
@@ -93,6 +96,12 @@ func expectChecks(mock sqlmock.Sqlmock, svc *loginCodeService, ip string, recent
 	mock.ExpectQuery(q(countByIPSQL)).
 		WithArgs(svc.ipHash(ip), fixedNow.Add(-time.Hour)).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(fromIP))
+}
+
+// expectReopen expects the look-up of the row a full window waits on, made createdAgo ago
+func expectReopen(mock sqlmock.Sqlmock, query, key string, length time.Duration, limit int, createdAgo time.Duration) {
+	mock.ExpectQuery(q(query)).WithArgs(key, fixedNow.Add(-length), limit-1).
+		WillReturnRows(sqlmock.NewRows([]string{"created_at"}).AddRow(fixedNow.Add(-createdAgo)))
 }
 
 // expectStore expects the new code and the request log row to be written (not yet committed)
@@ -164,19 +173,42 @@ func TestRequestCode_StoresAHashedCodeThenEmailsIt(t *testing.T) {
 	assert.Contains(t, sent[0].text, "10 minutes")
 }
 
-func TestRequestCode_RefusesAtEveryLimitAndSendsNothing(t *testing.T) {
+func TestRequestCode_RefusesAtEveryLimitSaysWhenItReopensAndSendsNothing(t *testing.T) {
+	// reopen is one full window's look-up, for a row made createdAgo ago
+	type reopen struct {
+		byIP       bool
+		length     time.Duration
+		limit      int
+		createdAgo time.Duration
+	}
+	day := func(ago time.Duration) reopen { return reopen{false, 24 * time.Hour, maxCodesPerEmailPerDay, ago} }
+	quarter := func(ago time.Duration) reopen { return reopen{false, 15 * time.Minute, maxCodesPerEmailPer15Min, ago} }
+	hourForIP := func(ago time.Duration) reopen { return reopen{true, time.Hour, maxCodesPerIPPerHour, ago} }
+
 	cases := map[string]struct {
 		counts     [3]int
+		reopens    []reopen
 		retryAfter time.Duration
 	}{
-		"3 for this email in 15 minutes": {[3]int{maxCodesPerEmailPer15Min, 3, 0}, 15 * time.Minute},
-		"10 for this email in a day":     {[3]int{2, maxCodesPerEmailPerDay, 0}, 24 * time.Hour},
-		"10 from this IP in an hour":     {[3]int{0, 0, maxCodesPerIPPerHour}, time.Hour},
+		"3 for this email in 15 minutes": {[3]int{maxCodesPerEmailPer15Min, 3, 0}, []reopen{quarter(10 * time.Minute)}, 5 * time.Minute},
+		"10 for this email in a day":     {[3]int{2, maxCodesPerEmailPerDay, 0}, []reopen{day(20 * time.Hour)}, 4 * time.Hour},
+		"10 from this IP in an hour":     {[3]int{0, 0, maxCodesPerIPPerHour}, []reopen{hourForIP(50 * time.Minute)}, 10 * time.Minute},
+		"every window full: the longest wait, not the longest window": {
+			[3]int{maxCodesPerEmailPer15Min, maxCodesPerEmailPerDay, maxCodesPerIPPerHour},
+			[]reopen{day(23*time.Hour + 50*time.Minute), quarter(14 * time.Minute), hourForIP(30 * time.Minute)},
+			30 * time.Minute},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			svc, mock, mailer := newCodeServiceWithMock(t)
 			expectChecks(mock, svc, testIP, tc.counts[0], tc.counts[1], tc.counts[2])
+			for _, r := range tc.reopens {
+				if r.byIP {
+					expectReopen(mock, reopenByIPSQL, svc.ipHash(testIP), r.length, r.limit, r.createdAgo)
+				} else {
+					expectReopen(mock, reopenByEmailSQL, testAddress, r.length, r.limit, r.createdAgo)
+				}
+			}
 			mock.ExpectRollback()
 
 			err := svc.RequestCode(context.Background(), testAddress, testIP)
@@ -344,6 +376,23 @@ func TestVerifyCode_NoActiveCode(t *testing.T) {
 
 	assert.ErrorIs(t, err, ErrCodeRejected, "an expired, used or never sent code looks the same as a wrong one")
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestVerifyCode_TooManyWrongGuessesFromTheIPSaysWhenItReopens(t *testing.T) {
+	svc, mock, _ := newCodeServiceWithMock(t)
+	expectGuessCount(mock, svc, maxWrongGuessesPerIPPerHour)
+	expectReopen(mock, reopenGuessesSQL, svc.ipHash(testIP), time.Hour, maxWrongGuessesPerIPPerHour, 45*time.Minute)
+	mock.ExpectRollback()
+	var ran bool
+
+	err := svc.VerifyCode(context.Background(), testAddress, "123456", testIP, accept(&ran))
+
+	assert.ErrorIs(t, err, ErrTooManyGuesses)
+	var limit *LimitError
+	require.ErrorAs(t, err, &limit)
+	assert.Equal(t, 15*time.Minute, limit.RetryAfter, "when the 20th newest wrong guess is an hour old")
+	assert.False(t, ran)
+	assert.NoError(t, mock.ExpectationsWereMet(), "the code was not looked at")
 }
 
 func TestVerifyCode_MalformedInputNeverReachesTheDatabase(t *testing.T) {
