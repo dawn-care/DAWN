@@ -20,9 +20,22 @@
 import { useEffect, useRef } from "react";
 import * as Updates from "expo-updates";
 import { usePlayback } from "../playback/PlaybackProvider";
+import { colors } from "../theme/theme";
 
 /** How often to check again while the night screen shows. */
 export const UPDATE_CHECK_MS = 60 * 60_000;
+
+/**
+ * What shows while the app restarts into an update. By default it is white
+ * with a spinner, which would flash in a dark room at night; this is the
+ * night screen's colour with nothing on it, so the restart is a moment of the
+ * same dark screen.
+ */
+export const RELOAD_SCREEN: Updates.ReloadScreenOptions = {
+  backgroundColor: colors.night.background,
+  spinner: { enabled: false },
+  fade: false,
+};
 
 export default function NightlyUpdate() {
   const quiet = usePlayback().screen === "night";
@@ -46,7 +59,7 @@ export default function NightlyUpdate() {
           }
         }
         if (downloaded.current) {
-          if (!cancelled && quietNow.current) await Updates.reloadAsync();
+          if (!cancelled && quietNow.current) await Updates.reloadAsync({ reloadScreenOptions: RELOAD_SCREEN });
           return;
         }
       } catch (error) {

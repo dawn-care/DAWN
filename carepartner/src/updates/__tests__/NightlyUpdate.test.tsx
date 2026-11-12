@@ -3,7 +3,8 @@ import { act, render } from "@testing-library/react-native";
 import * as Updates from "expo-updates";
 import type { Screen } from "../../playback/machine";
 import { usePlayback } from "../../playback/PlaybackProvider";
-import NightlyUpdate, { UPDATE_CHECK_MS } from "../NightlyUpdate";
+import { colors } from "../../theme/theme";
+import NightlyUpdate, { RELOAD_SCREEN, UPDATE_CHECK_MS } from "../NightlyUpdate";
 
 jest.mock("expo-updates", () => ({
   isEnabled: true,
@@ -59,6 +60,14 @@ describe("NightlyUpdate", () => {
 
     expect(updates.fetchUpdateAsync).toHaveBeenCalledTimes(1);
     expect(updates.reloadAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("restarts on a dark screen with no spinner, not the default white one", async () => {
+    updateAvailable();
+    await showScreen("night");
+
+    expect(updates.reloadAsync).toHaveBeenCalledWith({ reloadScreenOptions: RELOAD_SCREEN });
+    expect(RELOAD_SCREEN).toEqual({ backgroundColor: colors.night.background, spinner: { enabled: false }, fade: false });
   });
 
   it("restarts to roll back to the build's own code", async () => {
