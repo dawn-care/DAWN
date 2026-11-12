@@ -42,6 +42,43 @@ To use any other backend, copy `.env.example` to `.env.local` and set `EXPO_PUBL
 
 Android blocks plain `http://` connections in release builds. The build allows them automatically when the server address is `http://` (including the local defaults above) and keeps them blocked for an `https://` server, so production builds stay secure. After changing `EXPO_PUBLIC_API_URL`, rebuild the app.
 
+## Deploying to tablets
+
+Tablets get the app from **EAS Build** (Expo's build service) and later changes over the air from **EAS Update**, so no tablet is plugged in. Both read the server address from `eas.json` and `package.json`, never `.env.local`.
+
+### One-time setup
+
+Someone with the team's Expo account runs, from this folder:
+
+```bash
+npx eas-cli login
+npx eas-cli init
+```
+
+`init` creates the EAS project and adds its ID to `app.json` (`extra.eas.projectId`); commit that. `app.config.ts` turns the ID into the update address, so if `init` says it can't write to a dynamic config, add `"extra": { "eas": { "projectId": "<the ID>" } }` to `app.json` by hand.
+
+### Install the app on a tablet
+
+```bash
+npm run build:tablet
+```
+
+This builds a signed APK in the cloud (the `production` profile in `eas.json`, pointed at `https://startup-da.gccis.rit.edu/api`, on the `production` update channel). EAS creates and keeps the signing key. When it finishes it prints a link and a QR code: open it in the tablet's browser, allow installing from the browser once, install, then pair the tablet. Each build gets a higher version code, so a new APK installs over the old one and keeps the pairing.
+
+### Update the app over the air
+
+```bash
+npm run update:tablet
+```
+
+This publishes the current JavaScript and assets to the `production` channel. Every tablet downloads it while its night screen shows and restarts into it (`src/updates/NightlyUpdate.tsx`), so a change published by day reaches the tablets that night. Nothing plays at night, so no clip is cut off.
+
+An update only reaches a build whose native code matches it (`runtimeVersion` uses the `fingerprint` policy). After a native change, such as a new Expo module, an upgrade, or a change to `app.json` plugins or permissions, run `npm run build:tablet` again and reinstall on each tablet; updates published before that don't reach the new build.
+
+To undo a bad update, publish the previous code again, or use `npx eas-cli update:roll-back-to-embedded --channel production` to send tablets back to the code their APK shipped with.
+
+Local builds (`npm run android`, `npm run build:emulator`) aren't built for the `production` channel, so test updates on an EAS build. Development builds and the web build don't use updates at all.
+
 ## Testing at a different time of day
 
 To see how the app behaves at another time, set `EXPO_PUBLIC_FAKE_TIME` in `.env.local` (for example `EXPO_PUBLIC_FAKE_TIME=2026-10-03T21:30:00`). The app's clock starts at that time and runs forward normally. Leave it unset for the real time. Code reads the time through `src/clock`, never `new Date()` directly, so this works everywhere.

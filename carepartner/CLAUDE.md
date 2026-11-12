@@ -48,6 +48,8 @@ npm run android              # expo run:android (build + install on a connected 
 npm run lint                 # expo lint
 npm test                     # jest (jest-expo preset); `npx jest src/pairing` for one folder, `-t "name"` for one test
 npm run e2e                  # maestro test .maestro, against the app installed on an emulator or tablet
+npm run build:tablet         # EAS Build: signed APK for real tablets, installed from a link (see README "Deploying to tablets")
+npm run update:tablet        # EAS Update: publish JS and assets over the air to the production channel
 ```
 
 - The Android build needs JDK 17 or 21 (set `JAVA_HOME`); the Gradle version in use does not run on JDK 25.
@@ -149,6 +151,8 @@ The repo-root `shared/` folder holds plain TypeScript rules used by this app and
 
 - `src/api/config.ts` exports `API_URL`: `EXPO_PUBLIC_API_URL` if set (in `.env.local`; see `.env.example`), otherwise the local backend for the platform, `http://localhost:8080/api` on web and `http://10.0.2.2:8080/api` on Android (the emulator's address for the computer it runs on).
 - `app.config.ts` extends `app.json` with build settings that depend on the environment. It allows plain `http://` traffic in Android builds only when the server address is `http://` or unset, so production builds against `https://` keep it blocked. Rebuild after changing `EXPO_PUBLIC_API_URL`.
+- Deployment is EAS (see README "Deploying to tablets"). `eas.json`'s `production` profile builds an APK against the production server on the `production` channel; `npm run update:tablet` publishes to that channel with `EXPO_NO_DOTENV=1`, so a developer's `.env.local` (a LAN address, `EXPO_PUBLIC_FAKE_TIME`) never reaches tablets. Keep the server address in `eas.json` and the `update:tablet` script the same. `runtimeVersion` uses the `fingerprint` policy, so an update never reaches a build with different native code. `app.config.ts` sets `updates.url` from `extra.eas.projectId` in `app.json`, and leaves updates without an address until that ID exists.
+- `src/updates/NightlyUpdate.tsx` (in `_layout.tsx`, draws nothing, left out of a preview) applies updates: `expo-updates` alone would wait for the next launch, which a tablet rarely has. While the screen is `night` it checks, downloads and calls `reloadAsync`, checking again every `UPDATE_CHECK_MS` (1 hour). If a play starts during the download, the restart waits for the next night screen. It does nothing where `Updates.isEnabled` is false (development, web, no update address).
 - `src/storage/storage.ts` keeps small values on the device across restarts (`localStorage` on web, `expo-secure-store` on native). `src/pairing/carepartnerId.ts` stores the paired ID with it.
 - `src/theme/theme.ts` holds the palette, type sizes and spacing from the visual design. Its test enforces the contrast and text-size floors in the design rules.
 - `src/theme/fonts.ts` loads Atkinson Hyperlegible Next (regular, bold, extra bold) and exports `fonts`, the family names to use in styles. On Android a custom font's weight comes from its family name, so set `fontFamily: fonts.bold` and never `fontWeight`. `app/_layout.tsx` keeps the splash screen up until the fonts load, and carries on with the system font if they fail.
