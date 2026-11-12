@@ -2,6 +2,7 @@
   "expo": {
     "name": "carepartner",
     "slug": "carepartner",
+    "owner": "dawncare",
     "version": "1.0.0",
     "runtimeVersion": {
       "policy": "fingerprint"
@@ -55,6 +56,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "030f0232-690f-40ca-a5b9-8df236a922e2"
+      }
     }
   }
 }
