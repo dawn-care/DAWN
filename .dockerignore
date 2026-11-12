@@ -4,3 +4,6 @@
 .git
 # Demo media for the minio-init container; docker compose mounts it at run time, no image copies it.
 minio-init/storage
+# Local settings and caches from running the apps outside Docker.
+**/.env.local
+**/.expo

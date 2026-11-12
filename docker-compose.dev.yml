@@ -7,6 +7,7 @@ services:
       dockerfile: server/Dockerfile
       args:
         VITE_API_URL: http://localhost:8080/api
+        VITE_CAREPARTNER_URL: http://localhost:8080/carepartner/
         VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env (see .env.example)}
     environment:
       DB_HOST: db

@@ -82,6 +82,7 @@ import (
 	"server/internal/migrations"
 	"server/internal/realtime"
 	emailSvc "server/internal/services/email"
+	"server/internal/webapp"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -369,6 +370,12 @@ func main() {
 	// FRONTEND (STATIC FILE SERVING)
 	// Serve everything under /assets/* from /app/frontend/assets
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("/app/frontend/assets"))))
+
+	// The carepartner app's web build, which the caregiver app frames as its screen
+	// preview. Registered before the caregiver catch-all below, which would take it.
+	carepartnerWeb := webapp.Carepartner(os.DirFS("/app/carepartner"))
+	r.Handle(webapp.CarepartnerPath, carepartnerWeb)
+	r.Handle(webapp.CarepartnerPath+"/*", carepartnerWeb)
 
 	// Catch-all for SPA (any other path serves index.html)
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
