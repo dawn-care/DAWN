@@ -10,10 +10,22 @@ export function allowsPlainHttp(apiUrl: string | undefined): boolean {
   return !apiUrl || apiUrl.trim().toLowerCase().startsWith("http://");
 }
 
+/**
+ * Where the app asks for over-the-air updates: the EAS project's update
+ * address, once `eas init` has put the project's ID in app.json
+ * (`extra.eas.projectId`). Without an ID there is no address, and the app
+ * never asks.
+ */
+export function updatesUrl(projectId: unknown): string | undefined {
+  return typeof projectId === "string" && projectId ? `https://u.expo.dev/${projectId}` : undefined;
+}
+
 // Adds build settings that depend on the environment to the static app.json.
-export default ({ config }: ConfigContext): ExpoConfig =>
-  ({
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const url = updatesUrl(config.extra?.eas?.projectId);
+  return {
     ...config,
+    ...(url && { updates: { ...config.updates, url } }),
     plugins: [
       ...(config.plugins ?? []),
       [
@@ -21,4 +33,5 @@ export default ({ config }: ConfigContext): ExpoConfig =>
         { android: { usesCleartextTraffic: allowsPlainHttp(process.env.EXPO_PUBLIC_API_URL) } },
       ],
     ],
-  }) as ExpoConfig;
+  } as ExpoConfig;
+};

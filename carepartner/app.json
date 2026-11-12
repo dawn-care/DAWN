@@ -2,7 +2,11 @@
   "expo": {
     "name": "carepartner",
     "slug": "carepartner",
+    "owner": "dawncare",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "carepartner",
@@ -14,8 +18,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/icon.png"
+        "backgroundColor": "#1E2140",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -30,12 +34,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon.png",
+          "image": "./assets/images/adaptive-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#1E2140",
           "dark": {
-            "backgroundColor": "#000000"
+            "image": "./assets/images/adaptive-icon.png",
+            "backgroundColor": "#1E2140"
           }
         }
       ],
@@ -52,6 +57,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "030f0232-690f-40ca-a5b9-8df236a922e2"
+      }
     }
   }
 }

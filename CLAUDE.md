@@ -75,7 +75,7 @@ Tests sit in a `__tests__/` folder inside each feature folder of `shared/`, like
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The image build also copies `shared/` next to `caregiver/` (as `/frontend/shared`, so a `../shared` import from the caregiver resolves). The carepartner app is never bundled into this image; it ships separately as an Android app.
+`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The image build also copies `shared/` next to `caregiver/` (as `/frontend/shared`, so a `../shared` import from the caregiver resolves). The carepartner app is never bundled into this image; it ships separately as an Android app, built with EAS Build and updated over the air with EAS Update (see `carepartner/README.md`).
 
 ### CI (`.github/workflows/ci.yml`)
 

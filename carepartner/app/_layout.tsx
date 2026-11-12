@@ -12,6 +12,7 @@ import SchedulePlayer from "../src/schedule/SchedulePlayer";
 import { ScreenProvider } from "../src/screen/ScreenProvider";
 import { TouchTelemetryProvider } from "../src/telemetry/TouchTelemetry";
 import { useAppFonts } from "../src/theme/fonts";
+import NightlyUpdate from "../src/updates/NightlyUpdate";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -26,7 +27,8 @@ export default function RootLayout() {
 
   // A preview (in the caregiver's iframe) only shows the screen: it doesn't keep
   // the screen on, take staff commands, play the schedule, report plays or
-  // touches (the caregiver's clicks aren't the resident's), or show the toolbar.
+  // touches (the caregiver's clicks aren't the resident's), apply updates, or
+  // show the toolbar.
   const isTablet = !PREVIEW;
 
   return (
@@ -43,6 +45,7 @@ export default function RootLayout() {
               {isTablet && <StaffCommands />}
               {isTablet && <PlayReports />}
               {isTablet && <SchedulePlayer />}
+              {isTablet && <NightlyUpdate />}
               <Stack screenOptions={{ headerShown: false, animation: "none" }} />
               {__DEV__ && isTablet && <DevToolbar />}
             </RecordTouches>
