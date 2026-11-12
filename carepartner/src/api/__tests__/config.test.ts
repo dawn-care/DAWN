@@ -1,4 +1,4 @@
-import appConfig, { allowsPlainHttp } from "../../../app.config";
+import appConfig, { allowsPlainHttp, webBaseUrl } from "../../../app.config";
 import { localApiUrl } from "../config";
 
 describe("localApiUrl", () => {
@@ -24,6 +24,16 @@ describe("allowsPlainHttp", () => {
   });
 });
 
+describe("webBaseUrl", () => {
+  it.each([undefined, "", "  ", "/"])("serves the web build at the root when unset: %p", (value) => {
+    expect(webBaseUrl(value)).toBeUndefined();
+  });
+
+  it.each(["/carepartner", "/carepartner/", "carepartner"])("reads %p as /carepartner", (value) => {
+    expect(webBaseUrl(value)).toBe("/carepartner");
+  });
+});
+
 describe("app config", () => {
   const original = process.env.EXPO_PUBLIC_API_URL;
 
@@ -42,6 +52,22 @@ describe("app config", () => {
     const config = appConfig({ config: { name: "carepartner", slug: "carepartner", plugins: ["expo-router"] } } as never);
 
     expect(config.plugins?.[0]).toBe("expo-router");
+  });
+
+  it("sets the web base path only when CAREPARTNER_WEB_BASE_URL is set", () => {
+    const base = process.env.CAREPARTNER_WEB_BASE_URL;
+    const make = () =>
+      appConfig({ config: { name: "carepartner", slug: "carepartner", experiments: { typedRoutes: true } } } as never);
+    try {
+      delete process.env.CAREPARTNER_WEB_BASE_URL;
+      expect(make().experiments).toEqual({ typedRoutes: true, baseUrl: undefined });
+
+      process.env.CAREPARTNER_WEB_BASE_URL = "/carepartner";
+      expect(make().experiments).toEqual({ typedRoutes: true, baseUrl: "/carepartner" });
+    } finally {
+      if (base === undefined) delete process.env.CAREPARTNER_WEB_BASE_URL;
+      else process.env.CAREPARTNER_WEB_BASE_URL = base;
+    }
   });
 
   it("sets the Android plain-HTTP permission from the configured server", () => {
