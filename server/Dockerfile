@@ -33,8 +33,9 @@ FROM node:24.6-bookworm AS carepartner-builder
 # The app sits in /frontend/carepartner so its "../shared" resolves to /frontend/shared.
 WORKDIR /frontend/carepartner
 
-ARG CAREPARTNER_API_URL=https://startup-da.gccis.rit.edu/api
-ENV EXPO_PUBLIC_API_URL=$CAREPARTNER_API_URL
+# The same server address as the caregiver stage: Expo reads it as EXPO_PUBLIC_API_URL.
+ARG VITE_API_URL
+ENV EXPO_PUBLIC_API_URL=$VITE_API_URL
 # Must match webapp.CarepartnerPath in the server.
 ENV CAREPARTNER_WEB_BASE_URL=/carepartner
 
@@ -43,6 +44,8 @@ RUN npm ci
 
 COPY shared/ /frontend/shared/
 COPY carepartner/ ./
+# An empty address would build an app that can't reach the server.
+RUN test -n "$EXPO_PUBLIC_API_URL" || (echo "Set the VITE_API_URL build arg" >&2; exit 1)
 RUN npx expo export --platform web --output-dir dist
 
 
