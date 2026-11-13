@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -516,6 +517,47 @@ func TestFFProbeDuration(t *testing.T) {
 
 	_, err := FFProbeDuration(ctx, "../../utils/testFiles/test_photo.png")
 	assert.Error(t, err, "a still image has no duration")
+}
+
+// A WebM recorded in the browser (MediaRecorder) stores no duration, so it is read
+// from the packets. ffmpeg's live mode writes the same kind of file: here, the
+// first 3 seconds of the test audio as Opus, like Chrome records.
+func TestFFProbeDuration_WebMWithoutDuration(t *testing.T) {
+	for _, tool := range []string{"ffmpeg", "ffprobe"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skip(tool + " not installed")
+		}
+	}
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "recording.webm")
+	out, err := exec.CommandContext(ctx, "ffmpeg", "-v", "error", "-i", "../../utils/testFiles/test_audio.mp3",
+		"-t", "3", "-c:a", "libopus", "-live", "1", "-f", "webm", path).CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	// Without this the test would pass without reaching the fallback
+	stored, err := exec.CommandContext(ctx, "ffprobe", "-v", "error",
+		"-show_entries", "format=duration", "-of", "csv=p=0", path).Output()
+	require.NoError(t, err)
+	require.Equal(t, "N/A", strings.TrimSpace(string(stored)), "the file should store no duration")
+
+	seconds, err := FFProbeDuration(ctx, path)
+	require.NoError(t, err)
+	assert.InDelta(t, 3.0, seconds, 0.1)
+}
+
+func TestParseLastPacketEnd(t *testing.T) {
+	// Audio and video packets interleave, so the last line isn't always the latest; video lines can have an extra empty field
+	out := "0.000000,0.060000\n0.000000,0.033000,\n2.941000,0.060000\n2.936000,0.001000,\n\n"
+	end, err := parseLastPacketEnd(out)
+	require.NoError(t, err)
+	assert.InDelta(t, 3.001, end, 1e-9)
+
+	end, err = parseLastPacketEnd("1.500000,N/A\n")
+	require.NoError(t, err)
+	assert.InDelta(t, 1.5, end, 1e-9, "a missing packet duration counts as 0")
+
+	_, err = parseLastPacketEnd("N/A,N/A\n\n")
+	assert.Error(t, err, "no timed packets")
 }
 
 func TestSetTags_NoneTakesItOutOfTheStaffApp(t *testing.T) {

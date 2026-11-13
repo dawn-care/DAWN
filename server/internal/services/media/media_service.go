@@ -63,22 +63,86 @@ func (s *MinioStore) Remove(ctx context.Context, key string) error {
 // ProbeDuration returns the length in seconds of the media file at path
 type ProbeDuration func(ctx context.Context, path string) (float64, error)
 
-// FFProbeDuration reads a file's length with ffprobe, which must be on PATH
+/*
+FFProbeDuration reads a file's length with ffprobe, which must be on PATH.
+
+A WebM recorded in the browser (MediaRecorder, which the caregiver app uses to
+record) stores no duration, so for WebM and Matroska files without one the
+length is where the last packet ends. Other files without a duration (a still
+image) are still an error.
+*/
 func FFProbeDuration(ctx context.Context, path string) (float64, error) {
 	out, err := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
+		"-show_entries", "format=format_name,duration",
+		"-of", "default=noprint_wrappers=1",
 		path,
 	).Output()
 	if err != nil {
 		return 0, fmt.Errorf("ffprobe failed: %w", err)
 	}
-	seconds, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
-	if err != nil {
-		return 0, fmt.Errorf("ffprobe returned no duration: %w", err)
+
+	var formatName, duration string
+	for _, line := range strings.Split(string(out), "\n") {
+		key, value, _ := strings.Cut(strings.TrimSpace(line), "=")
+		switch key {
+		case "format_name":
+			formatName = value
+		case "duration":
+			duration = value
+		}
 	}
-	return seconds, nil
+
+	seconds, err := strconv.ParseFloat(duration, 64)
+	if err == nil {
+		return seconds, nil
+	}
+	if strings.Contains(formatName, "matroska") || strings.Contains(formatName, "webm") {
+		return lastPacketEnd(ctx, path)
+	}
+	return 0, fmt.Errorf("ffprobe returned no duration: %w", err)
+}
+
+// lastPacketEnd reads every packet's time (no decoding, so it stays quick) and returns where the last one ends
+func lastPacketEnd(ctx context.Context, path string) (float64, error) {
+	out, err := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
+		"-show_entries", "packet=pts_time,duration_time",
+		"-of", "csv=p=0",
+		path,
+	).Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe failed reading packets: %w", err)
+	}
+	return parseLastPacketEnd(string(out))
+}
+
+/*
+parseLastPacketEnd takes ffprobe's packet lines ("pts_time,duration_time",
+sometimes with more fields after) and returns the latest pts_time +
+duration_time. Packets are not always in time order across streams, so it
+takes the largest, not the last line. A missing duration counts as 0.
+*/
+func parseLastPacketEnd(out string) (float64, error) {
+	end, found := 0.0, false
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Split(strings.TrimSpace(line), ",")
+		pts, err := strconv.ParseFloat(fields[0], 64)
+		if err != nil {
+			continue
+		}
+		var length float64
+		if len(fields) > 1 {
+			length, _ = strconv.ParseFloat(fields[1], 64)
+		}
+		if !found || pts+length > end {
+			end, found = pts+length, true
+		}
+	}
+	if !found {
+		return 0, errors.New("ffprobe found no timed packets")
+	}
+	return end, nil
 }
 
 type MediaService struct {
