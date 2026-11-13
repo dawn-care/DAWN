@@ -81,6 +81,46 @@ export const SITUATIONS = [
 
 export type Situation = (typeof SITUATIONS)[number]["value"];
 
+/* ============================
+   Recording in the browser
+============================ */
+
+/** What a recording panel opens: the camera (with the microphone, if there is one) or only the microphone */
+export type RecordingSource = "camera" | "voice";
+
+/**
+ * Recording types to try, best first; the first the browser can record is used.
+ * The server accepts all of them. H.264 and AAC in MP4 come first because they
+ * play almost everywhere, the Android tablet included; a plain "video/mp4" can
+ * get VP9 inside the MP4 in Chrome.
+ */
+export const RECORDING_TYPES: Record<"video" | "audio", string[]> = {
+  video: ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"],
+  audio: ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"],
+};
+
+// Why the camera or microphone couldn't be opened, in the caregiver's words
+export const RECORDING_MESSAGES: Record<
+  RecordingSource,
+  { denied: string; notFound: string; inUse: string; failed: string }
+> = {
+  camera: {
+    denied: "DAWN isn't allowed to use your camera. Allow it in your browser (the camera icon by the address), then try again.",
+    notFound: "No camera was found. Connect one, then try again.",
+    inUse: "Your camera is being used by another app. Close that app, then try again.",
+    failed: "The camera couldn't be started. Please try again.",
+  },
+  voice: {
+    denied: "DAWN isn't allowed to use your microphone. Allow it in your browser (the microphone icon by the address), then try again.",
+    notFound: "No microphone was found. Connect one, then try again.",
+    inUse: "Your microphone is being used by another app. Close that app, then try again.",
+    failed: "The microphone couldn't be started. Please try again.",
+  },
+};
+
+export const RECORDING_UNSUPPORTED = "This browser can't record. Try the latest Chrome, Edge, Firefox or Safari.";
+export const SNAPSHOT_FAILED = "The photo couldn't be taken. Please try again.";
+
 // Shown when the server gives a code we have no wording for
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
 
