@@ -116,30 +116,20 @@ interface AddButtonProps {
   title: string;
   subtitle: string;
   open: boolean;
-  disabled?: boolean;
   onClick: () => void;
   ref?: Ref<HTMLButtonElement>;
 }
 
-function AddButton({
-  icon,
-  title,
-  subtitle,
-  open,
-  disabled = false,
-  onClick,
-  ref,
-}: AddButtonProps) {
+function AddButton({ icon, title, subtitle, open, onClick, ref }: AddButtonProps) {
   return (
     <button
       ref={ref}
       type="button"
       aria-pressed={open}
-      disabled={disabled}
       onClick={onClick}
-      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-ink ${
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-      } ${open ? "bg-accent/10 border-accent" : "bg-surface border-border"} ${FOCUS_RING}`}
+      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-ink cursor-pointer ${
+        open ? "bg-accent/10 border-accent" : "bg-surface border-border"
+      } ${FOCUS_RING}`}
     >
       <span className="shrink-0 text-link">{icon}</span>
       <span className="flex flex-col gap-0.5">

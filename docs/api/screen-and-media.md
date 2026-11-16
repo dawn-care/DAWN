@@ -273,7 +273,7 @@ Upload a file as `multipart/form-data`. Returns `201` with the new `Media`.
 | `situations` | optional, repeat the field for each |
 | `family_member_ids` | optional, repeat the field for each; must be this carepartner's |
 
-Video and audio over 10 minutes are rejected with `MEDIA_TOO_LONG`. Files over 1 GB get `FILE_TOO_LARGE`. Accepted types: photos JPEG, PNG, GIF, WebP, HEIC; videos MP4, MOV, WebM, Ogg; audio MP3, WAV, M4A, Ogg, WebM.
+Video and audio over 10 minutes are rejected with `MEDIA_TOO_LONG`. Files over 1 GB get `FILE_TOO_LARGE`. Accepted types: photos JPEG, PNG, GIF, WebP, HEIC; videos MP4, MOV, WebM, Ogg; audio MP3, WAV, M4A, Ogg, WebM. The server reads the length of video and audio itself (ffprobe), including WebM recorded in a browser, which stores none: its length is read from where its last packet ends. An MP4 sent as audio must be named `.m4a`.
 
 ```ts
 const form = new FormData();
