@@ -22,7 +22,7 @@ interface SegmentedControlProps<T extends string> {
   onChange: (value: T) => void;
   /** Names the group for screen readers */
   label: string;
-  /** Locks the choice, e.g. while it can't be changed */
+  /** Locks every segment and greys them out, e.g. the camera's Photo / Video while a video is recording */
   disabled?: boolean;
 }
 

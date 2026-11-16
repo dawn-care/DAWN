@@ -46,9 +46,12 @@ function messageFor(err: unknown, source: RecordingSource): string {
 
 /**
  * Opens the camera (front-facing where there is a choice, with sound) or the
- * microphone. A camera without a microphone still opens, without sound, so
- * photos and silent videos still work. Throws a RecordingError worded for the
- * caregiver. The caller must stopStream the result when done with it.
+ * microphone. If the camera can't open together with the microphone (none, not
+ * allowed, or busy in another app), the camera is tried on its own, so photos
+ * and silent videos still work; the stream then has no audio track, which the
+ * camera panel tells the caregiver. Throws a RecordingError worded for the
+ * caregiver, about the camera itself if it can't open even alone. The caller
+ * must stopStream the result when done with it.
  */
 export async function openStream(source: RecordingSource): Promise<MediaStream> {
   if (!mediaSupport()) throw new RecordingError(RECORDING_UNSUPPORTED);
@@ -58,12 +61,10 @@ export async function openStream(source: RecordingSource): Promise<MediaStream> 
     if (source === "voice") return await navigator.mediaDevices.getUserMedia({ audio: true });
     try {
       return await navigator.mediaDevices.getUserMedia({ video, audio: true });
-    } catch (err) {
-      // Most likely no microphone; try the camera on its own
-      if (err instanceof DOMException && NOT_FOUND.includes(err.name)) {
-        return await navigator.mediaDevices.getUserMedia({ video });
-      }
-      throw err;
+    } catch (withSound) {
+      // The microphone may be the problem; the camera on its own still takes photos and silent videos
+      console.warn("Could not open the camera with the microphone; trying the camera alone", withSound);
+      return await navigator.mediaDevices.getUserMedia({ video });
     }
   } catch (err) {
     console.error(`Could not open the ${source === "camera" ? "camera" : "microphone"}`, err);
@@ -96,8 +97,10 @@ function extensionFor(mimeType: string, kind: "video" | "audio"): string {
 }
 
 /**
- * A recording as a File, named "Video.mp4" or "Voice recording.m4a". The save
- * step suggests that name, without the extension, as the item's name.
+ * A recording as a File, named "Video" or "Voice recording" with the extension
+ * of what was recorded (".mp4" or ".m4a" in Chrome, ".webm" or ".ogg" in
+ * Firefox). The save step suggests that name, without the extension, as the
+ * item's name.
  */
 export function recordingFile(blob: Blob, kind: "video" | "audio", mimeType: string): File {
   const type = mimeType.split(";")[0].trim() || blob.type.split(";")[0];
@@ -107,15 +110,19 @@ export function recordingFile(blob: Blob, kind: "video" | "audio", mimeType: str
 
 /**
  * The frame the camera shows right now, as a JPEG File named "Photo.jpg".
- * It is the camera's own picture, not mirrored like a selfie preview.
+ * Neither the photo nor the live picture it comes from is mirrored. Refused
+ * if the camera has stopped, so a black or frozen frame is never taken.
  */
 export function snapshotFile(video: HTMLVideoElement): Promise<File> {
   return new Promise((resolve, reject) => {
     const { videoWidth: width, videoHeight: height } = video;
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
+    const source = video.srcObject;
+    const cameraLive =
+      source instanceof MediaStream && source.getVideoTracks().some((track) => track.readyState === "live");
     // No size means the camera hasn't shown a frame yet
-    if (width === 0 || height === 0 || !context) {
+    if (!cameraLive || width === 0 || height === 0 || !context) {
       reject(new RecordingError(SNAPSHOT_FAILED));
       return;
     }

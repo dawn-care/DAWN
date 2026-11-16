@@ -13,9 +13,11 @@
  *    was picked in the header
  *
  * Files picked in the upload panel are checked and queued, then named and
- * saved one at a time. A photo taken with the camera or a voice recording
- * goes into the same queue as a single file, and Retake in the save step goes
- * back to the panel it came from. Saved items go to the top of the grid with
+ * saved one at a time. A photo or video taken with the camera, or a voice
+ * recording, goes into the same queue as a single file: Retake in the save
+ * step goes back to the panel it came from, and Close leaves it. Clicking a
+ * card or another header button while recording asks first, since leaving
+ * would throw the recording away. Saved items go to the top of the grid with
  * a "New" badge, selected, with a toast.
  */
 
@@ -23,6 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, Ref, RefObject } from "react";
 import { Mic, Upload, Video } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import Dialog from "../components/ui/Dialog";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import {
@@ -48,6 +51,7 @@ import type { Pill } from "../media/FilterPills";
 import MediaCard from "../media/MediaCard";
 import type { PendingFile } from "../media/files";
 import SavePanel from "../media/SavePanel";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../media/styles";
 import UploadPanel from "../media/UploadPanel";
 import VoicePanel from "../media/VoicePanel";
 
@@ -161,6 +165,10 @@ export default function Media() {
   const [panel, setPanel] = useState<Panel>("detail");
   // Kept here, not in the camera panel, so Retake and reopening the camera come back to Photo or Video as it was
   const [cameraMode, setCameraMode] = useState<CameraMode>("photo");
+  // A camera or voice recording is running; leaving its panel would throw it away
+  const [recordingNow, setRecordingNow] = useState(false);
+  // Where the caregiver tried to go while recording, held until they say whether to throw the recording away
+  const [leaveTo, setLeaveTo] = useState<(() => void) | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Files that passed the upload checks and are waiting to be named and saved, plus a message for each that didn't pass
   const [queue, setQueue] = useState<PendingFile[]>([]);
@@ -327,7 +335,7 @@ export default function Media() {
     );
   };
 
-  // Back to the empty upload panel, ending the queue
+  // Ends the queue; the panel it came from shows again (the empty upload panel, or the camera or voice panel ready to record)
   const clearQueue = () => {
     announceSaved();
     setQueue([]);
@@ -339,8 +347,23 @@ export default function Media() {
 
   // Files waiting to be saved belong to the panel they came from, so opening a different one drops them
   const openPanel = (next: AddPanel) => {
-    if (queue.length > 0 && queueFrom !== next) clearQueue();
-    setPanel(next);
+    if (next === panel) return;
+    leaveRecordingThen(() => {
+      if (queue.length > 0 && queueFrom !== next) clearQueue();
+      setPanel(next);
+    });
+  };
+
+  // Runs `go` now, or first asks whether to throw away the recording it would end
+  const leaveRecordingThen = (go: () => void) => {
+    if (recordingNow) setLeaveTo(() => go);
+    else go();
+  };
+
+  const confirmLeave = () => {
+    const go = leaveTo;
+    setLeaveTo(null);
+    go?.();
   };
 
   const closePanel = (closing: AddPanel) => {
@@ -353,7 +376,7 @@ export default function Media() {
   const handleRecorded = (pending: PendingFile) => handleChosen([pending], []);
 
   // Moves on to the next picked file. After the last one: to the saved item if anything was
-  // saved, otherwise back to the upload panel.
+  // saved, otherwise back to the panel the files came from.
   const nextInQueue = () => {
     const rest = queue.slice(1);
     setQueue(rest);
@@ -376,12 +399,13 @@ export default function Media() {
     nextInQueue();
   };
 
-  const selectItem = (id: number) => {
-    setSelectedId(id);
-    setPanel("detail");
-    setNewIds([]);
-    setJustSavedId(null);
-  };
+  const selectItem = (id: number) =>
+    leaveRecordingThen(() => {
+      setSelectedId(id);
+      setPanel("detail");
+      setNewIds([]);
+      setJustSavedId(null);
+    });
 
   const retry = () => {
     setLoadError(null);
@@ -507,6 +531,7 @@ export default function Media() {
               <VoicePanel
                 onClose={() => closePanel("voice")}
                 onRecorded={handleRecorded}
+                onRecordingChange={setRecordingNow}
               />
             ) : panel === "camera" ? (
               <CameraPanel
@@ -514,6 +539,7 @@ export default function Media() {
                 onModeChange={setCameraMode}
                 onClose={() => closePanel("camera")}
                 onRecorded={handleRecorded}
+                onRecordingChange={setRecordingNow}
               />
             ) : (
               <UploadPanel
@@ -535,11 +561,34 @@ export default function Media() {
               onSkip={nextInQueue}
               // Back to the camera or voice panel, which opens the camera or microphone again
               onRetake={queue[0].recordedWith ? clearQueue : undefined}
-              onClose={clearQueue}
+              // Close leaves a recording's panel altogether, so the camera or microphone isn't opened again;
+              // for picked files it goes back to the empty upload panel, as before
+              onClose={queue[0].recordedWith ? () => closePanel(queueFrom) : clearQueue}
             />
           ) : null}
         </aside>
       </div>
+
+      {/* Asked when a card or another header button is clicked while recording */}
+      <Dialog
+        open={leaveTo !== null}
+        onOpenChange={(open) => {
+          if (!open) setLeaveTo(null);
+        }}
+        title="Throw away your recording?"
+        footer={
+          <>
+            <button type="button" onClick={() => setLeaveTo(null)} className={SECONDARY_BUTTON}>
+              Keep recording
+            </button>
+            <button type="button" onClick={confirmLeave} className={PRIMARY_BUTTON}>
+              Throw it away
+            </button>
+          </>
+        }
+      >
+        <p className="m-0 text-base">You're still recording. Leaving now stops it, and nothing is kept.</p>
+      </Dialog>
     </div>
   );
 }

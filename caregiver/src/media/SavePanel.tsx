@@ -3,20 +3,22 @@
  *
  * User: Caregiver
  *
- * Names and saves one picked file. The caregiver sees a preview (the photo
- * itself, or an icon for video and audio), a name field (starting as the
- * file name), how staff find it (see TagPicker: nothing is chosen to start
- * with, so staff don't see it until the caregiver picks) and Save; there is no scheduling or
+ * Names and saves one picked file or recording. The caregiver sees a preview
+ * (the photo itself; a player for a recorded video or voice clip; an icon for
+ * a picked video or audio file), a name field (starting as the file name),
+ * how staff find it (see TagPicker: nothing is chosen to start with, so staff
+ * don't see it until the caregiver picks) and Save; there is no scheduling or
  * placement here, that happens from the detail panel afterwards.
  *
  * When several files were picked, the panel is shown for each in turn with
- * "File 2 of 5". Skip is always there. Close stops going through the rest,
- * and cancels the upload if one is running. If saving fails the file is
- * kept, so Save becomes "Try again" and nothing has to be picked again.
+ * "File 2 of 5", and Skip moves on. Close stops going through the rest, and
+ * cancels the upload if one is running. If saving fails the file is kept, so
+ * Save becomes "Try again" and nothing has to be picked again.
  *
  * A photo taken or a recording made on the page comes here straight after
- * it's made. A recorded video or voice clip can be played back here, and
- * Retake (instead of Skip) throws it away to record again.
+ * it's made, with Retake instead of Skip to throw it away and record again.
+ * If the server can't read a recording, Save is turned off and the message
+ * points to Retake, since sending the same recording again can't help.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -24,9 +26,9 @@ import type { FormEvent } from "react";
 import { Image, Music, Video, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
 import TextField from "../components/ui/form/TextField";
-import { friendlyError, isAbort, uploadMedia } from "./api";
+import { ApiError, friendlyError, isAbort, uploadMedia } from "./api";
 import type { FamilyMember, Media } from "./api";
-import { ERROR_MESSAGES } from "./constants";
+import { ERROR_MESSAGES, RECORDING_UNPLAYABLE, RECORDING_UNREADABLE } from "./constants";
 import type { Situation } from "./constants";
 import type { PendingFile } from "./files";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
@@ -86,8 +88,12 @@ export default function SavePanel({
   const [error, setError] = useState<string | null>(null);
   // The last attempt reached the server and failed, as opposed to an empty name caught here
   const [saveFailed, setSaveFailed] = useState(false);
+  // The server couldn't read this recording, so saving it again can't work; only Retake can
+  const [unreadable, setUnreadable] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBroken, setPreviewBroken] = useState(false);
+  // The browser can't play the recording back; it may still save fine
+  const [playerBroken, setPlayerBroken] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
   // The upload in progress, so closing the panel can cancel it
   const upload = useRef<AbortController | null>(null);
@@ -136,7 +142,10 @@ export default function SavePanel({
     } catch (err) {
       // Closing the panel cancelled it; there is nothing left to update
       if (isAbort(err)) return;
-      setError(friendlyError(err));
+      // A picked file gets "try exporting it again"; a recording has no file to export, only Retake
+      const unreadableRecording = recordedWith !== undefined && err instanceof ApiError && err.code === "UNREADABLE_MEDIA";
+      setUnreadable(unreadableRecording);
+      setError(unreadableRecording ? RECORDING_UNREADABLE : friendlyError(err));
       setSaveFailed(true);
       setSaving(false);
       return;
@@ -184,11 +193,20 @@ export default function SavePanel({
             controls
             playsInline
             aria-label="Your recording"
+            onError={() => setPlayerBroken(true)}
             className="w-full max-h-[240px] rounded-[10px] bg-border"
           />
         ) : (
-          <audio src={previewUrl} controls aria-label="Your recording" className="w-full" />
+          <audio
+            src={previewUrl}
+            controls
+            aria-label="Your recording"
+            onError={() => setPlayerBroken(true)}
+            className="w-full"
+          />
         ))}
+
+      {playerBroken && <p className="m-0 text-[15px] text-ink-muted">{RECORDING_UNPLAYABLE}</p>}
 
       <div className="flex items-center gap-3">
         {!playable && (
@@ -242,8 +260,8 @@ export default function SavePanel({
         <button type="button" onClick={onRetake ?? onSkip} disabled={saving} className={SECONDARY_BUTTON}>
           {onRetake ? "Retake" : "Skip"}
         </button>
-        <button type="submit" disabled={saving} className={PRIMARY_BUTTON}>
-          {saving ? "Saving…" : saveFailed ? "Try again" : "Save"}
+        <button type="submit" disabled={saving || unreadable} className={PRIMARY_BUTTON}>
+          {saving ? "Saving…" : saveFailed && !unreadable ? "Try again" : "Save"}
         </button>
       </div>
     </form>

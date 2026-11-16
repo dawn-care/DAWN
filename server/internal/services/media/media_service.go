@@ -1,6 +1,7 @@
 package media
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -63,15 +65,21 @@ func (s *MinioStore) Remove(ctx context.Context, key string) error {
 // ProbeDuration returns the length in seconds of the media file at path
 type ProbeDuration func(ctx context.Context, path string) (float64, error)
 
+// probeTimeout bounds how long reading one file's length may take, including reading every packet of a WebM
+const probeTimeout = 60 * time.Second
+
 /*
 FFProbeDuration reads a file's length with ffprobe, which must be on PATH.
 
 A WebM recorded in the browser (MediaRecorder, which the caregiver app uses to
 record) stores no duration, so for WebM and Matroska files without one the
-length is where the last packet ends. Other files without a duration (a still
-image) are still an error.
+length is where the latest packet ends. Other files without a duration (a
+still image) are still an error. The whole check gives up after probeTimeout.
 */
 func FFProbeDuration(ctx context.Context, path string) (float64, error) {
+	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
+	defer cancel()
+
 	out, err := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-show_entries", "format=format_name,duration",
@@ -103,30 +111,46 @@ func FFProbeDuration(ctx context.Context, path string) (float64, error) {
 	return 0, fmt.Errorf("ffprobe returned no duration: %w", err)
 }
 
-// lastPacketEnd reads every packet's time (no decoding, so it stays quick) and returns where the last one ends
+/*
+lastPacketEnd reads every packet's time (no decoding, so it stays quick) and
+returns where the latest one ends. The output is read line by line as ffprobe
+writes it, keeping only the latest end, so a file with a great many packets
+doesn't fill memory.
+*/
 func lastPacketEnd(ctx context.Context, path string) (float64, error) {
-	out, err := exec.CommandContext(ctx, "ffprobe",
+	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-show_entries", "packet=pts_time,duration_time",
 		"-of", "csv=p=0",
 		path,
-	).Output()
+	)
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return 0, fmt.Errorf("ffprobe failed reading packets: %w", err)
 	}
-	return parseLastPacketEnd(string(out))
+	if err := cmd.Start(); err != nil {
+		return 0, fmt.Errorf("ffprobe failed reading packets: %w", err)
+	}
+	end, parseErr := parseLastPacketEnd(stdout)
+	// Read the rest, if parsing stopped early, so ffprobe isn't left blocked writing
+	_, _ = io.Copy(io.Discard, stdout)
+	if err := cmd.Wait(); err != nil {
+		return 0, fmt.Errorf("ffprobe failed reading packets: %w", err)
+	}
+	return end, parseErr
 }
 
 /*
-parseLastPacketEnd takes ffprobe's packet lines ("pts_time,duration_time",
+parseLastPacketEnd reads ffprobe's packet lines ("pts_time,duration_time",
 sometimes with more fields after) and returns the latest pts_time +
 duration_time. Packets are not always in time order across streams, so it
 takes the largest, not the last line. A missing duration counts as 0.
 */
-func parseLastPacketEnd(out string) (float64, error) {
+func parseLastPacketEnd(r io.Reader) (float64, error) {
 	end, found := 0.0, false
-	for _, line := range strings.Split(out, "\n") {
-		fields := strings.Split(strings.TrimSpace(line), ",")
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		fields := strings.Split(strings.TrimSpace(scanner.Text()), ",")
 		pts, err := strconv.ParseFloat(fields[0], 64)
 		if err != nil {
 			continue
@@ -138,6 +162,9 @@ func parseLastPacketEnd(out string) (float64, error) {
 		if !found || pts+length > end {
 			end, found = pts+length, true
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, fmt.Errorf("reading ffprobe's packets: %w", err)
 	}
 	if !found {
 		return 0, errors.New("ffprobe found no timed packets")
@@ -256,7 +283,13 @@ func (s *MediaService) Upload(ctx context.Context, in UploadInput) (*media.Media
 	var duration *int
 	if in.Kind != media.KindPhoto {
 		seconds, err := s.Probe(ctx, tmp.Name())
-		if err != nil || seconds < 0 || math.IsNaN(seconds) {
+		if err != nil {
+			log.Printf("media: could not read the length of an upload (kind %s, %s): %v", in.Kind, in.MimeType, err)
+			return nil, ErrUnreadableMedia
+		}
+		// No length at all (e.g. a recording with no timed data) is as unreadable as a failed probe
+		if seconds <= 0 || math.IsNaN(seconds) {
+			log.Printf("media: an upload has no length (kind %s, %s, %v seconds)", in.Kind, in.MimeType, seconds)
 			return nil, ErrUnreadableMedia
 		}
 		rounded := int(math.Round(seconds))

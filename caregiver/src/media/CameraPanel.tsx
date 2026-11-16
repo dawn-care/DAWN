@@ -11,8 +11,11 @@
  *
  * The photo or video is exactly what the live picture shows: neither is
  * mirrored. If the camera can't be used (not allowed, none found, in use),
- * the reason is shown with Try again. A video over 10 minutes is refused
- * here, so it is never uploaded.
+ * the reason is shown with Try again. If only the microphone can't be used,
+ * the camera still opens and Video mode says videos will have no sound. A
+ * video under a second or over 10 minutes is refused here, so it is never
+ * uploaded. The page is told while a video is recording, so it can ask
+ * before leaving it.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -20,7 +23,7 @@ import { Camera, Circle, Square, Video, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
 import SegmentedControl from "../components/ui/form/SegmentedControl";
 import type { Segment } from "../components/ui/form/SegmentedControl";
-import { SNAPSHOT_FAILED } from "./constants";
+import { NO_SOUND, SNAPSHOT_FAILED } from "./constants";
 import { pendingFromRecording } from "./files";
 import type { PendingFile } from "./files";
 import { formatDuration } from "./labels";
@@ -38,6 +41,8 @@ interface CameraPanelProps {
   onClose: () => void;
   /** A photo or video that is ready to be named and saved */
   onRecorded: (pending: PendingFile) => void;
+  /** Told when a video recording starts and ends, so the page can ask before leaving it */
+  onRecordingChange: (recording: boolean) => void;
 }
 
 const MODES: Segment<CameraMode>[] = [
@@ -47,7 +52,13 @@ const MODES: Segment<CameraMode>[] = [
 
 const ACTION_BUTTON = `${PRIMARY_BUTTON} flex items-center gap-2`;
 
-export default function CameraPanel({ mode, onModeChange, onClose, onRecorded }: CameraPanelProps) {
+export default function CameraPanel({
+  mode,
+  onModeChange,
+  onClose,
+  onRecorded,
+  onRecordingChange,
+}: CameraPanelProps) {
   // Why the last photo or video can't be used
   const [refused, setRefused] = useState<string | null>(null);
   const [taking, setTaking] = useState(false);
@@ -87,6 +98,18 @@ export default function CameraPanel({ mode, onModeChange, onClose, onRecorded }:
   useEffect(() => {
     if (preview.current) preview.current.srcObject = stream;
   }, [stream]);
+
+  // Let the page know while a recording would be lost by leaving, and that it no longer is once this panel goes
+  useEffect(() => {
+    const isRecording = status === "recording";
+    onRecordingChange(isRecording);
+    return () => {
+      if (isRecording) onRecordingChange(false);
+    };
+  }, [status, onRecordingChange]);
+
+  // The camera opened, but without the microphone
+  const noSound = stream !== null && stream.getAudioTracks().length === 0;
 
   const takePhoto = async () => {
     if (!preview.current) return;
@@ -186,6 +209,9 @@ export default function CameraPanel({ mode, onModeChange, onClose, onRecorded }:
           {mode === "video" && !recording && (
             <div className="text-center text-[15px] text-ink-muted">Videos can be up to 10 minutes long.</div>
           )}
+
+          {/* The camera opened without the microphone (blocked, busy or missing) */}
+          {mode === "video" && noSound && <p className="m-0 text-center text-base font-bold text-link">{NO_SOUND}</p>}
         </>
       ) : (
         <div className="h-[300px] flex flex-col items-center justify-center gap-3 p-4 text-center rounded-[14px] border-[3px] border-ink-muted">

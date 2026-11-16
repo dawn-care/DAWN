@@ -9,7 +9,8 @@
  * (server/internal/controllers/media/media_controller.go); these lists
  * follow what it accepts (the docs/api/screen-and-media.md list leaves out
  * a few formats, e.g. AAC) so the picker and the messages match, but the
- * server stays the authority.
+ * server stays the authority. Also the formats and wording for recording
+ * with the camera or microphone on the page.
  */
 
 export type MediaKind = "photo" | "video" | "audio";
@@ -92,34 +93,46 @@ export type RecordingSource = "camera" | "voice";
  * Recording types to try, best first; the first the browser can record is used.
  * The server accepts all of them. H.264 and AAC in MP4 come first because they
  * play almost everywhere, the Android tablet included; a plain "video/mp4" can
- * get VP9 inside the MP4 in Chrome.
+ * get VP9 inside the MP4 in Chrome (it did in testing).
  */
 export const RECORDING_TYPES: Record<"video" | "audio", string[]> = {
   video: ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"],
   audio: ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"],
 };
 
-// Why the camera or microphone couldn't be opened, in the caregiver's words
+// Why the camera or microphone couldn't be opened, or stopped working, in the caregiver's words
 export const RECORDING_MESSAGES: Record<
   RecordingSource,
-  { denied: string; notFound: string; inUse: string; failed: string }
+  { denied: string; notFound: string; inUse: string; failed: string; disconnected: string }
 > = {
   camera: {
     denied: "DAWN isn't allowed to use your camera. Allow it in your browser (the camera icon by the address), then try again.",
     notFound: "No camera was found. Connect one, then try again.",
     inUse: "Your camera is being used by another app. Close that app, then try again.",
     failed: "The camera couldn't be started. Please try again.",
+    disconnected: "Your camera or microphone stopped working, and anything you were recording wasn't kept. Check it's connected and allowed, then try again.",
   },
   voice: {
     denied: "DAWN isn't allowed to use your microphone. Allow it in your browser (the microphone icon by the address), then try again.",
     notFound: "No microphone was found. Connect one, then try again.",
     inUse: "Your microphone is being used by another app. Close that app, then try again.",
     failed: "The microphone couldn't be started. Please try again.",
+    disconnected: "Your microphone stopped working, and anything you were recording wasn't kept. Check it's connected and allowed, then try again.",
   },
 };
 
 export const RECORDING_UNSUPPORTED = "This browser can't record. Try the latest Chrome, Edge, Firefox or Safari.";
 export const SNAPSHOT_FAILED = "The photo couldn't be taken. Please try again.";
+// The camera opened without the microphone (blocked, busy or missing)
+export const NO_SOUND = "Your microphone can't be used right now, so videos will have no sound.";
+
+// Shortest recording kept; anything shorter is almost always Start and Stop pressed together
+export const MIN_RECORDING_SECONDS = 1;
+export const RECORDING_TOO_SHORT = "This recording is too short. Record for at least a second.";
+// The server couldn't read the recording; sending the same data again won't help, recording again will
+export const RECORDING_UNREADABLE = "This recording couldn't be read. Press Retake to record it again.";
+// The browser can't play back what it recorded (rare); it may still save fine
+export const RECORDING_UNPLAYABLE = "Your browser can't play this recording back here. You can still save it, or retake it.";
 
 // Shown when the server gives a code we have no wording for
 export const GENERIC_ERROR = "Something went wrong. Please try again.";

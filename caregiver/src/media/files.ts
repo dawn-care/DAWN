@@ -15,7 +15,13 @@
  */
 
 import { probeMedia } from "./api";
-import { ACCEPTED_TYPES, MAX_DURATION_SECONDS, MAX_FILE_BYTES } from "./constants";
+import {
+  ACCEPTED_TYPES,
+  MAX_DURATION_SECONDS,
+  MAX_FILE_BYTES,
+  MIN_RECORDING_SECONDS,
+  RECORDING_TOO_SHORT,
+} from "./constants";
 import type { MediaKind, RecordingSource } from "./constants";
 
 /** A file that passed the checks and is waiting to be named and saved */
@@ -23,7 +29,11 @@ export interface PendingFile {
   id: number;
   file: File;
   kind: MediaKind;
-  /** Length in seconds of video or audio, if the browser could read it */
+  /**
+   * Length in seconds of video or audio: for a picked file, what the browser
+   * read from it (null if it couldn't); for a recording, how long the recorder
+   * ran, since a browser recording may not store its length. Null for photos.
+   */
   seconds: number | null;
   /** Set when it was recorded on this page rather than picked: the panel it came from, which Retake goes back to */
   recordedWith?: RecordingSource;
@@ -108,7 +118,8 @@ async function checkFile(file: File): Promise<PendingFile | string> {
  * saved, or a message saying why it can't be. Its type needs no check (the
  * page chose it), but its size and length do: `seconds` is how long it was
  * recorded for (null for a photo), since a browser recording may not store
- * its length.
+ * its length. Under a second is refused too, as it is almost always Start
+ * and Stop pressed together.
  */
 export function pendingFromRecording(
   file: File,
@@ -117,6 +128,7 @@ export function pendingFromRecording(
   recordedWith: RecordingSource
 ): PendingFile | string {
   if (file.size > MAX_FILE_BYTES) return "This recording is too large. Try a shorter one.";
+  if (seconds !== null && seconds < MIN_RECORDING_SECONDS) return RECORDING_TOO_SHORT;
   // Rounded like the server does
   if (seconds !== null && Math.round(seconds) > MAX_DURATION_SECONDS) {
     return "This recording is too long. Videos and audio can be at most 10 minutes long.";

@@ -10,7 +10,9 @@
  * step (see SavePanel), where it can be played back, saved or retaken.
  *
  * If the microphone can't be used (not allowed, none found, in use), the
- * reason is shown with Try again. A recording over 10 minutes is refused
+ * reason is shown with Try again; if it stops working mid-recording, nothing
+ * is kept and that is said. The page is told while recording, so it can ask
+ * before leaving it. A recording under a second or over 10 minutes is refused
  * here, so it is never uploaded.
  */
 
@@ -28,11 +30,13 @@ interface VoicePanelProps {
   onClose: () => void;
   /** A recording that is ready to be named and saved */
   onRecorded: (pending: PendingFile) => void;
+  /** Told when a recording starts and ends, so the page can ask before leaving it */
+  onRecordingChange: (recording: boolean) => void;
 }
 
 const ACTION_BUTTON = `${PRIMARY_BUTTON} flex items-center gap-2`;
 
-export default function VoicePanel({ onClose, onRecorded }: VoicePanelProps) {
+export default function VoicePanel({ onClose, onRecorded, onRecordingChange }: VoicePanelProps) {
   // Why the last recording can't be used (too long or too large)
   const [refused, setRefused] = useState<string | null>(null);
 
@@ -43,6 +47,15 @@ export default function VoicePanel({ onClose, onRecorded }: VoicePanelProps) {
   };
 
   const { status, seconds, error, open, start, stop } = useRecorder("voice", handleRecorded);
+
+  // Let the page know while a recording would be lost by leaving, and that it no longer is once this panel goes
+  useEffect(() => {
+    const isRecording = status === "recording";
+    onRecordingChange(isRecording);
+    return () => {
+      if (isRecording) onRecordingChange(false);
+    };
+  }, [status, onRecordingChange]);
 
   // The main button for the current step, which gets the keyboard each time the step changes
   const action = useRef<HTMLButtonElement>(null);

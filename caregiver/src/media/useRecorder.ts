@@ -12,7 +12,8 @@
  * Status: idle → opening → ready ⇄ recording, or error (with a message for
  * the caregiver; `open` again to retry). The camera and microphone are always
  * turned off when the panel goes away, and a recording still running then is
- * thrown away.
+ * thrown away. If the camera or microphone stops by itself (unplugged,
+ * permission taken back), the status becomes error and nothing is kept.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -111,6 +112,17 @@ export function useRecorder(source: RecordingSource, onRecorded: (recording: Rec
         stopStream(opened);
         return;
       }
+      // A device that stops by itself (unplugged, permission taken back, another app took it) ends its
+      // track; a recording cut short that way is thrown away with a message, never saved as if Stop
+      // was pressed. Turning it off here (stopStream) doesn't fire this, and a later open or close
+      // changes the generation, so only this stream's own loss counts.
+      opened.getTracks().forEach((track) =>
+        track.addEventListener("ended", () => {
+          if (generation.current !== mine) return;
+          console.warn(`The ${track.kind} track ended by itself`);
+          fail(RECORDING_MESSAGES[source].disconnected);
+        })
+      );
       streamRef.current = opened;
       setStream(opened);
       setStatus("ready");
@@ -119,7 +131,7 @@ export function useRecorder(source: RecordingSource, onRecorded: (recording: Rec
       setStatus("error");
       setError(err instanceof RecordingError ? err.message : RECORDING_MESSAGES[source].failed);
     }
-  }, [source, release]);
+  }, [source, release, fail]);
 
   const start = useCallback(() => {
     const current = streamRef.current;
