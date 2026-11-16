@@ -7,6 +7,8 @@
  * photo, video or audio file the server accepts, is it small enough, and is
  * a video or audio file no longer than 10 minutes. Each file that passes
  * becomes a PendingFile; each that fails gets a friendly message naming it.
+ * A photo or recording made on the page becomes one through
+ * pendingFromRecording instead.
  *
  * These are early checks for a better message. The server checks again and
  * is the authority, so a file the browser can't measure is let through.
@@ -14,7 +16,7 @@
 
 import { probeMedia } from "./api";
 import { ACCEPTED_TYPES, MAX_DURATION_SECONDS, MAX_FILE_BYTES } from "./constants";
-import type { MediaKind } from "./constants";
+import type { MediaKind, RecordingSource } from "./constants";
 
 /** A file that passed the checks and is waiting to be named and saved */
 export interface PendingFile {
@@ -23,6 +25,8 @@ export interface PendingFile {
   kind: MediaKind;
   /** Length in seconds of video or audio, if the browser could read it */
   seconds: number | null;
+  /** Set when it was recorded on this page rather than picked: the panel it came from, which Retake goes back to */
+  recordedWith?: RecordingSource;
 }
 
 export interface CheckedFiles {
@@ -97,4 +101,26 @@ async function checkFile(file: File): Promise<PendingFile | string> {
 
   nextId += 1;
   return { id: nextId, file, kind, seconds };
+}
+
+/**
+ * A photo taken or a recording made on this page, ready to be named and
+ * saved, or a message saying why it can't be. Its type needs no check (the
+ * page chose it), but its size and length do: `seconds` is how long it was
+ * recorded for (null for a photo), since a browser recording may not store
+ * its length.
+ */
+export function pendingFromRecording(
+  file: File,
+  kind: MediaKind,
+  seconds: number | null,
+  recordedWith: RecordingSource
+): PendingFile | string {
+  if (file.size > MAX_FILE_BYTES) return "This recording is too large. Try a shorter one.";
+  // Rounded like the server does
+  if (seconds !== null && Math.round(seconds) > MAX_DURATION_SECONDS) {
+    return "This recording is too long. Videos and audio can be at most 10 minutes long.";
+  }
+  nextId += 1;
+  return { id: nextId, file, kind, seconds: kind === "photo" ? null : seconds, recordedWith };
 }

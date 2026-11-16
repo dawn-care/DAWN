@@ -13,6 +13,10 @@
  * "File 2 of 5". Skip is always there. Close stops going through the rest,
  * and cancels the upload if one is running. If saving fails the file is
  * kept, so Save becomes "Try again" and nothing has to be picked again.
+ *
+ * A photo taken or a recording made on the page comes here straight after
+ * it's made. A recorded video or voice clip can be played back here, and
+ * Retake (instead of Skip) throws it away to record again.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -41,6 +45,8 @@ interface SavePanelProps {
   notices: string[];
   onSaved: (media: Media) => void;
   onSkip: () => void;
+  /** For a photo or recording made on the page: throw it away and make another. Shown instead of Skip. */
+  onRetake?: () => void;
   /** Stop going through the rest */
   onClose: () => void;
 }
@@ -66,9 +72,12 @@ export default function SavePanel({
   notices,
   onSaved,
   onSkip,
+  onRetake,
   onClose,
 }: SavePanelProps) {
-  const { file, kind } = pending;
+  const { file, kind, recordedWith } = pending;
+  // A recorded video or voice clip is played back here; a picked one isn't
+  const playable = recordedWith !== undefined && kind !== "photo";
   const [name, setName] = useState(() => nameFromFile(file.name));
   // Nothing to start with: the caregiver opts each item into the staff app
   const [situations, setSituations] = useState<Situation[]>([]);
@@ -92,13 +101,13 @@ export default function SavePanel({
   // Leaving the panel any other way (e.g. picking a card) also cancels a running upload
   useEffect(() => () => upload.current?.abort(), []);
 
-  // A photo is shown as itself; the object URL is released when the file changes or the panel goes
+  // A photo (or a recording) is shown as itself; the object URL is released when the file changes or the panel goes
   useEffect(() => {
-    if (kind !== "photo") return;
+    if (kind !== "photo" && !playable) return;
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [file, kind]);
+  }, [file, kind, playable]);
 
   const Icon = KIND_ICONS[kind];
 
@@ -167,19 +176,35 @@ export default function SavePanel({
         </ul>
       )}
 
+      {playable &&
+        previewUrl &&
+        (kind === "video" ? (
+          <video
+            src={previewUrl}
+            controls
+            playsInline
+            aria-label="Your recording"
+            className="w-full max-h-[240px] rounded-[10px] bg-border"
+          />
+        ) : (
+          <audio src={previewUrl} controls aria-label="Your recording" className="w-full" />
+        ))}
+
       <div className="flex items-center gap-3">
-        <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-border text-ink-muted">
-          {previewUrl && !previewBroken ? (
-            <img
-              src={previewUrl}
-              alt=""
-              onError={() => setPreviewBroken(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Icon size={32} aria-hidden="true" />
-          )}
-        </div>
+        {!playable && (
+          <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-border text-ink-muted">
+            {previewUrl && !previewBroken ? (
+              <img
+                src={previewUrl}
+                alt=""
+                onError={() => setPreviewBroken(true)}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Icon size={32} aria-hidden="true" />
+            )}
+          </div>
+        )}
         <div className="grow min-w-0">
           <TextField
             ref={nameField}
@@ -193,7 +218,8 @@ export default function SavePanel({
         </div>
       </div>
 
-      <p className="m-0 text-[15px] text-ink-muted break-words">{file.name}</p>
+      {/* A recording's file name only repeats the suggested name */}
+      {!recordedWith && <p className="m-0 text-[15px] text-ink-muted break-words">{file.name}</p>}
 
       <TagPicker
         carepartnerId={carepartnerId}
@@ -213,8 +239,8 @@ export default function SavePanel({
       )}
 
       <div className="flex justify-between gap-2">
-        <button type="button" onClick={onSkip} disabled={saving} className={SECONDARY_BUTTON}>
-          Skip
+        <button type="button" onClick={onRetake ?? onSkip} disabled={saving} className={SECONDARY_BUTTON}>
+          {onRetake ? "Retake" : "Skip"}
         </button>
         <button type="submit" disabled={saving} className={PRIMARY_BUTTON}>
           {saving ? "Saving…" : saveFailed ? "Try again" : "Save"}
