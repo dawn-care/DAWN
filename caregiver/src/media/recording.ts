@@ -9,7 +9,6 @@
  * or a camera frame into a File that the save step uploads like a picked file.
  */
 
-import { timeLabel } from "@shared";
 import { RECORDING_MESSAGES, RECORDING_TYPES, RECORDING_UNSUPPORTED, SNAPSHOT_FAILED } from "./constants";
 import type { RecordingSource } from "./constants";
 
@@ -96,28 +95,21 @@ function extensionFor(mimeType: string, kind: "video" | "audio"): string {
   return ".webm";
 }
 
-// "Nov 13, 3:05 pm", in the app's wording for times
-function whenLabel(date: Date): string {
-  const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${day}, ${timeLabel(`${date.getHours()}:${date.getMinutes()}`)}`;
-}
-
 /**
- * A recording as a File. A video is named for when it was made ("Video Nov 13,
- * 3:05 pm.mp4"); a voice recording is just "Voice recording.m4a". The save
+ * A recording as a File, named "Video.mp4" or "Voice recording.m4a". The save
  * step suggests that name, without the extension, as the item's name.
  */
-export function recordingFile(blob: Blob, kind: "video" | "audio", mimeType: string, now = new Date()): File {
+export function recordingFile(blob: Blob, kind: "video" | "audio", mimeType: string): File {
   const type = mimeType.split(";")[0].trim() || blob.type.split(";")[0];
-  const name = kind === "video" ? `Video ${whenLabel(now)}` : "Voice recording";
+  const name = kind === "video" ? "Video" : "Voice recording";
   return new File([blob], `${name}${extensionFor(type, kind)}`, { type });
 }
 
 /**
- * The frame the camera shows right now, as a JPEG File ("Photo Nov 13, 3:05 pm.jpg").
+ * The frame the camera shows right now, as a JPEG File named "Photo.jpg".
  * It is the camera's own picture, not mirrored like a selfie preview.
  */
-export function snapshotFile(video: HTMLVideoElement, now = new Date()): Promise<File> {
+export function snapshotFile(video: HTMLVideoElement): Promise<File> {
   return new Promise((resolve, reject) => {
     const { videoWidth: width, videoHeight: height } = video;
     const canvas = document.createElement("canvas");
@@ -133,7 +125,7 @@ export function snapshotFile(video: HTMLVideoElement, now = new Date()): Promise
     canvas.toBlob(
       (blob) => {
         if (!blob) reject(new RecordingError(SNAPSHOT_FAILED));
-        else resolve(new File([blob], `Photo ${whenLabel(now)}.jpg`, { type: "image/jpeg" }));
+        else resolve(new File([blob], "Photo.jpg", { type: "image/jpeg" }));
       },
       "image/jpeg",
       0.9

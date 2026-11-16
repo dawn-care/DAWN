@@ -12,11 +12,11 @@
  *  - A right-hand panel that shows the selected item, or the add flow that
  *    was picked in the header
  *
- * The camera is switched off for now. Files picked in the upload panel are
- * checked and queued, then named and saved one at a time. A voice recording
+ * Files picked in the upload panel are checked and queued, then named and
+ * saved one at a time. A photo taken with the camera or a voice recording
  * goes into the same queue as a single file, and Retake in the save step goes
- * back to the voice panel. Saved items go to the top of the grid with a "New"
- * badge, selected, with a toast.
+ * back to the panel it came from. Saved items go to the top of the grid with
+ * a "New" badge, selected, with a toast.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -39,6 +39,7 @@ import type {
   Media as MediaItem,
   ScheduledItem,
 } from "../media/api";
+import CameraPanel from "../media/CameraPanel";
 import type { MediaKind } from "../media/constants";
 import DetailPanel from "../media/DetailPanel";
 import FilterPills from "../media/FilterPills";
@@ -61,7 +62,7 @@ window.addEventListener("pagehide", () =>
 );
 
 type Filter = "all" | MediaKind;
-type Panel = "detail" | "file" | "voice";
+type Panel = "detail" | "file" | "voice" | "camera";
 // The panels opened from the header buttons
 type AddPanel = Exclude<Panel, "detail">;
 
@@ -69,6 +70,7 @@ const PANEL_LABELS: Record<Panel, string> = {
   detail: "Selected item",
   file: "Upload a file",
   voice: "Record your voice",
+  camera: "Use your camera",
 };
 
 const FILTERS: { value: Filter; label: string; empty: string }[] = [
@@ -181,9 +183,11 @@ export default function Media() {
   // Focus goes back to the header button of a panel when that panel is closed
   const uploadButton = useRef<HTMLButtonElement>(null);
   const voiceButton = useRef<HTMLButtonElement>(null);
+  const cameraButton = useRef<HTMLButtonElement>(null);
   const panelButtons: Record<AddPanel, RefObject<HTMLButtonElement | null>> = {
     file: uploadButton,
     voice: voiceButton,
+    camera: cameraButton,
   };
   // The carepartner whose list is on screen; null until it has loaded
   const loadedFor = useRef<number | null>(null);
@@ -338,8 +342,7 @@ export default function Media() {
   };
 
   // The header panel the waiting files came from: a recording's own panel, otherwise the upload panel
-  const queueFrom: AddPanel =
-    queue[0]?.recordedWith === "voice" ? "voice" : "file";
+  const queueFrom: AddPanel = queue[0]?.recordedWith ?? "file";
 
   // Files waiting to be saved belong to the panel they came from, so opening a different one drops them
   const openPanel = (next: AddPanel) => {
@@ -407,10 +410,10 @@ export default function Media() {
         <AddButton
           icon={<Video size={34} aria-hidden="true" />}
           title="Use your camera"
-          subtitle="Coming soon"
-          open={false}
-          disabled
-          onClick={() => {}}
+          subtitle="Take a photo"
+          open={panel === "camera"}
+          onClick={() => openPanel("camera")}
+          ref={cameraButton}
         />
         <AddButton
           icon={<Mic size={34} aria-hidden="true" />}
@@ -512,6 +515,11 @@ export default function Media() {
                 onClose={() => closePanel("voice")}
                 onRecorded={handleRecorded}
               />
+            ) : panel === "camera" ? (
+              <CameraPanel
+                onClose={() => closePanel("camera")}
+                onRecorded={handleRecorded}
+              />
             ) : (
               <UploadPanel
                 onClose={() => closePanel("file")}
@@ -530,7 +538,7 @@ export default function Media() {
               notices={notices}
               onSaved={handleSaved}
               onSkip={nextInQueue}
-              // Back to the recording panel, which opens the microphone again
+              // Back to the camera or voice panel, which opens the camera or microphone again
               onRetake={queue[0].recordedWith ? clearQueue : undefined}
               onClose={clearQueue}
             />
