@@ -6,14 +6,14 @@
  * The "Awake hours" card in the calendar's left column: when the carepartner
  * wakes up and goes to bed, from the screen settings. Videos and audio only
  * play between them. "Change" opens the editor in place: Wakes up and Bedtime
- * selects, a warning naming every scheduled item still to play that would be
+ * time lists, a warning naming every scheduled item still to play that would be
  * outside the chosen hours (including any already outside the saved ones),
  * and Done to save (Cancel throws the changes away).
  */
 
 import { formatClock, parseClock, timeLabel } from "@shared";
 import { useEffect, useRef, useState } from "react";
-import SelectField from "../components/ui/form/SelectField";
+import ListSelectField from "../components/ui/form/ListSelectField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { friendlyError, listScheduledItems, saveScreenSettings } from "./api";
 import type { ScheduledItem, ScreenSettings } from "./api";
@@ -60,7 +60,7 @@ export default function AwakeHoursCard({ carepartnerId, settings, editing, onEdi
       className={`flex flex-col gap-1.5 p-3 bg-surface border-[1.5px] rounded-xl ${isEditing ? "border-accent" : "border-border"}`}
     >
       <div className="flex items-center justify-between">
-        <h2 className="m-0 text-[15px] font-extrabold">Awake hours</h2>
+        <h2 className="m-0 text-lg font-extrabold">Awake hours</h2>
         {!isEditing && settings && (
           <button ref={changeButton} type="button" onClick={onEdit} className={`${TEXT_BUTTON} text-link`}>
             Change
@@ -97,7 +97,7 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
   const [checkFailed, setCheckFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const wakeSelect = useRef<HTMLSelectElement>(null);
+  const wakeSelect = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     wakeSelect.current?.focus();
@@ -138,17 +138,17 @@ function AwakeHoursEditor({ carepartnerId, settings, onCancel, onSaved }: AwakeH
 
   return (
     <div className="flex flex-col gap-2">
-      <SelectField
+      <ListSelectField
         ref={wakeSelect}
         label="Wakes up"
         value={wake}
-        onChange={(event) => setWake(event.target.value)}
+        onValueChange={setWake}
         options={optionsFor(WAKE_RANGE, settings.wake_time)}
       />
-      <SelectField
+      <ListSelectField
         label="Bedtime"
         value={bed}
-        onChange={(event) => setBed(event.target.value)}
+        onValueChange={setBed}
         options={optionsFor(BED_RANGE, settings.bed_time)}
       />
       {names.length > 0 && (
