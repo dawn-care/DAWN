@@ -40,6 +40,7 @@ import type {
   ScheduledItem,
 } from "../media/api";
 import CameraPanel from "../media/CameraPanel";
+import type { CameraMode } from "../media/CameraPanel";
 import type { MediaKind } from "../media/constants";
 import DetailPanel from "../media/DetailPanel";
 import FilterPills from "../media/FilterPills";
@@ -168,6 +169,8 @@ export default function Media() {
 
   const [filter, setFilter] = useState<Filter>("all");
   const [panel, setPanel] = useState<Panel>("detail");
+  // Kept here, not in the camera panel, so Retake and reopening the camera come back to Photo or Video as it was
+  const [cameraMode, setCameraMode] = useState<CameraMode>("photo");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Files that passed the upload checks and are waiting to be named and saved, plus a message for each that didn't pass
   const [queue, setQueue] = useState<PendingFile[]>([]);
@@ -410,7 +413,7 @@ export default function Media() {
         <AddButton
           icon={<Video size={34} aria-hidden="true" />}
           title="Use your camera"
-          subtitle="Take a photo"
+          subtitle="Take a photo or record a video"
           open={panel === "camera"}
           onClick={() => openPanel("camera")}
           ref={cameraButton}
@@ -517,6 +520,8 @@ export default function Media() {
               />
             ) : panel === "camera" ? (
               <CameraPanel
+                mode={cameraMode}
+                onModeChange={setCameraMode}
                 onClose={() => closePanel("camera")}
                 onRecorded={handleRecorded}
               />
