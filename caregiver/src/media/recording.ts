@@ -103,13 +103,14 @@ function whenLabel(date: Date): string {
 }
 
 /**
- * A recording as a File, named for when it was made ("Video Nov 13, 3:05 pm.webm").
- * The save step suggests that name, without the extension, as the item's name.
+ * A recording as a File. A video is named for when it was made ("Video Nov 13,
+ * 3:05 pm.mp4"); a voice recording is just "Voice recording.m4a". The save
+ * step suggests that name, without the extension, as the item's name.
  */
 export function recordingFile(blob: Blob, kind: "video" | "audio", mimeType: string, now = new Date()): File {
   const type = mimeType.split(";")[0].trim() || blob.type.split(";")[0];
-  const label = kind === "video" ? "Video" : "Voice recording";
-  return new File([blob], `${label} ${whenLabel(now)}${extensionFor(type, kind)}`, { type });
+  const name = kind === "video" ? `Video ${whenLabel(now)}` : "Voice recording";
+  return new File([blob], `${name}${extensionFor(type, kind)}`, { type });
 }
 
 /**
