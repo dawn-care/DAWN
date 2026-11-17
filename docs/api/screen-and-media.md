@@ -16,10 +16,11 @@ How the caregiver web app and the carepartner tablet talk to the new backend: th
 8. [Calendar](#calendar)
 9. [The tablet screen](#the-tablet-screen)
 10. [Playback](#playback)
-11. [Carepartner changes](#carepartner-changes)
-12. [Error codes](#error-codes)
-13. [Migration checklist](#migration-checklist)
-14. [Where this lives in the server](#where-this-lives-in-the-server)
+11. [Touch telemetry](#touch-telemetry)
+12. [Carepartner changes](#carepartner-changes)
+13. [Error codes](#error-codes)
+14. [Migration checklist](#migration-checklist)
+15. [Where this lives in the server](#where-this-lives-in-the-server)
 
 ## Basics
 
@@ -690,6 +691,54 @@ export interface Playback {
 }
 ```
 
+## Touch telemetry
+
+Nothing on the tablet needs a tap, so the tablet records where the resident touches it anyway, as feedback on what residents expect to be interactive (#381; the tablet side is `carepartner/src/telemetry/touchLog.ts`). Touches are recorded on the always-on, default, night and playing screens, never on the pair screen, which staff use. There are no positions and no text, only the fields below.
+
+### `POST /tablet-events/touches`
+
+Store a batch of touch events. The tablet sends one about once a minute while there are touches, with at most 50 events. Returns `204` with no body.
+
+```jsonc
+{
+  "carepartner_id": 7,
+  "events": [
+    {
+      "screen": "always_on",        // always_on | default | night | playing
+      "target_type": "widget",      // widget | empty | media | null (nothing to name, e.g. night)
+      "widget_type": "weather",     // a widget type, when target_type is widget; else null
+      "widget_id": "12",            // the ScreenWidget id as a string, when target_type is widget; else null
+      "media_kind": null,           // video | audio | photo, when target_type is media; else null
+      "gesture": "tap",             // tap | long_press | swipe
+      "count": 3,                   // touches grouped into this event, at least 1
+      "first_at": "2026-10-18T14:00:00.000Z", // RFC 3339
+      "last_at": "2026-10-18T14:00:02.800Z"   // not before first_at
+    }
+  ]
+}
+```
+
+- One event is one or more quick touches with the same gesture on the same thing. `first_at` is the first of them, `last_at` the last.
+- `widget_type` and `widget_id` are set only for a widget, and `media_kind` only for media. For `empty` or a `null` target, all three are `null`. `widget_type` is one of the screen layout's widget types, and `widget_id` a positive whole number written as a string.
+- The widget's type and id are stored as sent and kept after the widget is deleted, so old touches still say what was touched.
+- Unknown fields are rejected, at the top level and in each event.
+
+### Responses
+
+The tablet's report queue (`carepartner/src/reports/queue.ts`) acts on the status alone:
+
+| Status | Meaning | The tablet |
+|---|---|---|
+| `204` | The whole batch is stored. | Moves on. |
+| `400` | The batch can never be stored: a malformed body, an unknown field, a rule above broken by any one event, 0 or more than 50 events, or an unknown `carepartner_id`. Nothing from the batch is stored. | Drops the batch and logs a warning. |
+| `500` | The server couldn't store it right now, for example the database is down. | Retries the batch later. |
+
+Errors are `{"error": "..."}` without a `code`. A `400` names the first problem, such as `"event 2: invalid touch batch: unknown gesture"`; a `500` is always `"could not store touches"`, with the cause in the server log.
+
+Sending a batch again is safe: an event already stored for the same carepartner, screen, gesture and `first_at` is skipped. So a batch the server stored but whose `204` never reached the tablet isn't stored twice when the tablet retries.
+
+There is no endpoint to read touches yet; they are in the `TabletTouch` table.
+
 ## Carepartner changes
 
 - `auto_start` is gone. The server no longer returns it and ignores it if sent. `wake_time` in screen settings replaces it.
@@ -764,4 +813,5 @@ If this guide and the server ever disagree, the server is right; please update t
 | Scheduled items and calendar | `server/internal/routes/scheduled_items/` | `server/internal/models/scheduled_items/scheduled_item_model.go` (`ScheduledItem`, `Occurrence`), `server/internal/services/scheduled_items/` (`recurrence.go`, validation) |
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
 | Playback | `server/internal/routes/playback/playback.go` | `server/internal/models/playback/playback_model.go`, `server/internal/services/playback/playback_service.go` (source and status rules) |
-| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables; migration 6 moves widgets onto the grid and drops layout presets) |
+| Touch telemetry | `server/internal/routes/tablet_events/` | `server/internal/models/tablet_events/touch.go` (`TouchEvent`), `server/internal/services/tablet_events/touch_service.go` (field rules, which errors are `400`) |
+| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables; migration 6 moves widgets onto the grid and drops layout presets; migration 10 adds `TabletTouch`) |

@@ -40,6 +40,39 @@ definitions:
       timed:
         type: boolean
     type: object
+  family.CreateFamilyMemberRequest:
+    properties:
+      carepartner_id:
+        type: integer
+      guidance_note:
+        type: string
+      name:
+        type: string
+      relationship:
+        type: string
+    type: object
+  family.FamilyError:
+    properties:
+      code:
+        type: string
+      error:
+        type: string
+    type: object
+  family.FamilyMember:
+    properties:
+      carepartner_id:
+        type: integer
+      created_at:
+        type: string
+      guidance_note:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      relationship:
+        type: string
+    type: object
   media.AudioMedia:
     properties:
       displayed_name:
@@ -63,12 +96,20 @@ definitions:
         type: string
       duration_seconds:
         type: integer
+      family_member_ids:
+        items:
+          type: integer
+        type: array
       id:
         type: integer
       kind:
         type: string
       mime_type:
         type: string
+      situations:
+        items:
+          type: string
+        type: array
       size_bytes:
         type: integer
       url:
@@ -102,6 +143,17 @@ definitions:
     properties:
       display_name:
         type: string
+    type: object
+  media.SetMediaTagsRequest:
+    properties:
+      family_member_ids:
+        items:
+          type: integer
+        type: array
+      situations:
+        items:
+          type: string
+        type: array
     type: object
   media.VideoMedia:
     properties:
@@ -217,6 +269,13 @@ definitions:
       started_at:
         type: string
       status:
+        type: string
+    type: object
+  playback.RatePlaybackRequest:
+    properties:
+      carepartner_id:
+        type: integer
+      rating:
         type: string
     type: object
   playback.StopRequest:
@@ -544,6 +603,36 @@ definitions:
       top_left:
         $ref: '#/definitions/screen_widgets.Cell'
       type:
+        type: string
+    type: object
+  tablet_events.RecordTouchesRequest:
+    properties:
+      carepartner_id:
+        type: integer
+      events:
+        items:
+          $ref: '#/definitions/tablet_events.TouchEvent'
+        type: array
+    type: object
+  tablet_events.TouchEvent:
+    properties:
+      count:
+        type: integer
+      first_at:
+        type: string
+      gesture:
+        type: string
+      last_at:
+        type: string
+      media_kind:
+        type: string
+      screen:
+        type: string
+      target_type:
+        type: string
+      widget_id:
+        type: string
+      widget_type:
         type: string
     type: object
   widgets.NewsWidget:
@@ -2018,6 +2107,65 @@ paths:
       summary: Delete all events in a list
       tags:
       - event
+  /family-members:
+    get:
+      description: In the order they were added. Family members are folders for grouping
+        media, not accounts.
+      parameters:
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/family.FamilyMember'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+      summary: List a carepartner's family members
+      tags:
+      - family
+    post:
+      consumes:
+      - application/json
+      description: Name is required; relationship and guidance_note are optional.
+      parameters:
+      - description: Family member
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/family.CreateFamilyMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/family.FamilyMember'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+      summary: Add a family member
+      tags:
+      - family
   /me:
     get:
       description: Returns the caregiver the session cookie belongs to, with their
@@ -2062,6 +2210,19 @@ paths:
       - description: photo, video or audio; omit for all
         in: query
         name: kind
+        type: string
+      - description: Only media under this situation
+        in: query
+        name: situation
+        type: string
+      - description: Only media about this family member
+        in: query
+        name: family_member_id
+        type: integer
+      - description: 'rank: what staff rated best first (the scores aren''t sent).
+          Left out: newest first'
+        in: query
+        name: sort
         type: string
       produces:
       - application/json
@@ -2108,6 +2269,20 @@ paths:
         in: formData
         name: display_name
         type: string
+      - collectionFormat: multi
+        description: Situations staff find it under; repeat the field for each
+        in: formData
+        items:
+          type: string
+        name: situations
+        type: array
+      - collectionFormat: multi
+        description: Family members it is about; repeat the field for each
+        in: formData
+        items:
+          type: integer
+        name: family_member_ids
+        type: array
       produces:
       - application/json
       responses:
@@ -2248,6 +2423,46 @@ paths:
           schema:
             $ref: '#/definitions/media.MediaError'
       summary: Download a media item's file
+      tags:
+      - media
+  /media/{id}/tags:
+    put:
+      consumes:
+      - application/json
+      description: Replaces its situations and family members; family members must
+        be the carepartner's. With both empty, staff don't see it.
+      parameters:
+      - description: Media ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Situations and family members
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.SetMediaTagsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/media.Media'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/media.MediaError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/media.MediaError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/media.MediaError'
+      summary: Set how staff find a media item
       tags:
       - media
   /messages:
@@ -2971,6 +3186,43 @@ paths:
       tags:
       - photo
   /playbacks:
+    get:
+      description: Playbacks that reached the screen, from any source, most recently
+        started first. Requests that never started are left out.
+      parameters:
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      - description: How many to return, 1 to 100 (default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/playback.Playback'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List what played on a carepartner's tablet
+      tags:
+      - playback
     post:
       consumes:
       - application/json
@@ -3001,6 +3253,104 @@ paths:
               type: string
             type: object
       summary: Record a playback request
+      tags:
+      - playback
+  /playbacks/{id}:
+    get:
+      description: 'Its status, and rating_closes_at: until when staff can rate it,
+        or null if it never reached the screen. The staff app polls this while a clip
+        plays.'
+      parameters:
+      - description: Playback ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/playback.Playback'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get one playback
+      tags:
+      - playback
+  /playbacks/{id}/rating:
+    post:
+      consumes:
+      - application/json
+      description: Staff rate a play from the staff app. Only a play that reached
+        the screen can be rated, until 5 minutes after it ended; rating again inside
+        that time replaces the rating. Ratings order the staff app's media list (GET
+        /media?sort=rank).
+      parameters:
+      - description: Playback ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Rating
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/playback.RatePlaybackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/playback.Playback'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rate how a play went
       tags:
       - playback
   /playbacks/{id}/status:
@@ -3860,6 +4210,40 @@ paths:
       summary: Get a team's game summary
       tags:
       - sports-news-widget
+  /tablet-events/touches:
+    post:
+      consumes:
+      - application/json
+      description: The tablet sends the touches it recorded about once a minute, at
+        most 50 events per request; quick repeats on the same thing are one event
+        with a count. The whole batch is stored, or none of it. Unknown fields are
+        rejected. 400 means the batch can never be stored and the tablet drops it;
+        5xx means it should retry, and a resent batch is not stored twice.
+      parameters:
+      - description: Touch events; first_at and last_at are RFC 3339
+        in: body
+        name: batch
+        required: true
+        schema:
+          $ref: '#/definitions/tablet_events.RecordTouchesRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Store a batch of the resident's touches
+      tags:
+      - tablet-events
   /video/list:
     get:
       consumes:
