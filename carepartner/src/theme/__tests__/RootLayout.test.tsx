@@ -30,6 +30,7 @@ jest.mock("../../telemetry/TouchTelemetry", () => ({
 jest.mock("../../schedule/SchedulePlayer", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../playback/StaffCommands", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../playback/PlayReports", () => ({ __esModule: true, default: () => null }));
+jest.mock("../../updates/NightlyUpdate", () => ({ __esModule: true, default: () => null }));
 jest.mock("../../dev/DevToolbar", () => ({ __esModule: true, default: () => null }));
 
 describe("RootLayout", () => {
