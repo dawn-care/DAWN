@@ -248,7 +248,10 @@ const Login = () => {
             </p>
           </div>
 
-          <div className="flex justify-center min-h-11">
+          {/* Google's button is a light-themed iframe slightly bigger than the button. In dark mode a
+              color-scheme mismatch makes the browser paint the whole iframe opaque, a light box around
+              the button; keeping this wrapper light leaves the iframe transparent. */}
+          <div className="flex justify-center min-h-11 [color-scheme:light]">
             <GoogleLogin onSuccess={handleSuccess} onError={handleError} />
           </div>
 
