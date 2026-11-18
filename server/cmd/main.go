@@ -224,9 +224,6 @@ func main() {
 	go playbackService.RunExpirySweep(context.Background(), 5*time.Second)
 
 	// Media
-	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
-	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
-	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
 	mediaService := mediaSvc.NewMediaService(db, minioClient, "media")
 	familyService := familySvc.NewFamilyService(db)
 
@@ -274,9 +271,6 @@ func main() {
 	screenCtrl := screenCtrlr.NewScreenController(screenService)
 
 	// Media
-	audioCtrl := mediaCtrlr.NewAudioController(audioService)
-	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
-	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
 	familyCtrl := familyCtrlr.NewFamilyController(familyService)
 
@@ -342,9 +336,6 @@ func main() {
 	screenRts.RegisterScreenRoutes(r, screenCtrl)
 
 	// Media
-	mediaRts.RegisterAudioRoutes(r, audioCtrl)
-	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
-	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 	mediaRts.RegisterMediaRoutes(r, mediaCtrl)
 	familyRts.RegisterFamilyRoutes(r, familyCtrl)
 
