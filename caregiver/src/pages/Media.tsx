@@ -16,8 +16,9 @@
  * saved one at a time. A photo or video taken with the camera, or a voice
  * recording, goes into the same queue as a single file: Retake in the save
  * step goes back to the panel it came from, and Close leaves it. Clicking a
- * card or another header button while recording asks first, since leaving
- * would throw the recording away. Saved items go to the top of the grid with
+ * card or another header button while recording, or before a photo or
+ * recording is saved, asks first, since leaving would throw it away; so does
+ * closing or reloading the tab. Saved items go to the top of the grid with
  * a "New" badge, selected, with a toast.
  */
 
@@ -344,6 +345,18 @@ export default function Media() {
 
   // The header panel the waiting files came from: a recording's own panel, otherwise the upload panel
   const queueFrom: AddPanel = queue[0]?.recordedWith ?? "file";
+  // A photo or recording that was stopped but not saved yet; leaving it would lose it like leaving mid-recording
+  const unsavedRecording = queue[0]?.recordedWith !== undefined;
+  const wouldLoseRecording = recordingNow || unsavedRecording;
+
+  // Closing or reloading the tab asks too (the browser's own question). Links in the nav bar don't:
+  // BrowserRouter can't block a route change.
+  useEffect(() => {
+    if (!wouldLoseRecording) return;
+    const ask = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [wouldLoseRecording]);
 
   // Files waiting to be saved belong to the panel they came from, so opening a different one drops them
   const openPanel = (next: AddPanel) => {
@@ -354,10 +367,15 @@ export default function Media() {
     });
   };
 
-  // Runs `go` now, or first asks whether to throw away the recording it would end
+  // Runs `go` now, or first asks whether to throw away the recording it would end or leave unsaved.
+  // Throwing away an unsaved one empties the queue, so it doesn't come back when its panel opens again.
   const leaveRecordingThen = (go: () => void) => {
-    if (recordingNow) setLeaveTo(() => go);
-    else go();
+    if (!wouldLoseRecording) go();
+    else
+      setLeaveTo(() => () => {
+        if (unsavedRecording) clearQueue();
+        go();
+      });
   };
 
   const confirmLeave = () => {
@@ -569,17 +587,21 @@ export default function Media() {
         </aside>
       </div>
 
-      {/* Asked when a card or another header button is clicked while recording */}
+      {/* Asked when a card or another header button is clicked while recording, or before a recording is saved */}
       <Dialog
         open={leaveTo !== null}
         onOpenChange={(open) => {
           if (!open) setLeaveTo(null);
         }}
-        title="Throw away your recording?"
+        title={
+          recordingNow || queue[0]?.kind === "audio"
+            ? "Throw away your recording?"
+            : `Throw away your ${queue[0]?.kind ?? "recording"}?`
+        }
         footer={
           <>
             <button type="button" onClick={() => setLeaveTo(null)} className={SECONDARY_BUTTON}>
-              Keep recording
+              {recordingNow ? "Keep recording" : "Keep it"}
             </button>
             <button type="button" onClick={confirmLeave} className={PRIMARY_BUTTON}>
               Throw it away
@@ -587,7 +609,11 @@ export default function Media() {
           </>
         }
       >
-        <p className="m-0 text-base">You're still recording. Leaving now stops it, and nothing is kept.</p>
+        <p className="m-0 text-base">
+          {recordingNow
+            ? "You're still recording. Leaving now stops it, and nothing is kept."
+            : "It isn't saved yet. Leaving now deletes it."}
+        </p>
       </Dialog>
     </div>
   );
