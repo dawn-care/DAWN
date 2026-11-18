@@ -2,7 +2,7 @@
 
 How the caregiver web app and the carepartner tablet talk to the new backend: the media library, screen layouts and widgets, the schedule, and the single endpoint the tablet reads. Written for ticket i332; updated 2026-10-16 (widgets placed on a 4×3 grid; layout presets removed).
 
-> **The old endpoints are going away.** `/api/photo`, `/api/video`, `/api/audio`, `/api/weather`, `/api/news`, `/api/sports`, the prompt endpoints, modules, configurations and exceptions all read tables that no longer exist, so they return database errors on a fresh database. Move to the endpoints in this guide; the old Go code is removed in a follow-up ticket.
+> **The old media endpoints have been removed.** Use `/api/media` for photos, videos, and audio; `/api/photo`, `/api/video`, and `/api/audio` are no longer registered. The remaining legacy weather, news, sports, prompt, module, configuration, and exception endpoints still read tables removed by migration 3 and are scheduled for separate cleanup. Move to the replacement endpoints in this guide.
 
 ## Contents
 

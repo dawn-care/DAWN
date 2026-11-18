@@ -115,9 +115,39 @@ func parseIDs(values []string) ([]int, bool) {
 	return ids, true
 }
 
+// Accepted upload types for the unified media endpoint. These used to live in
+// the per-type controllers; keep the same formats when removing those APIs.
+var VALID_IMAGE_TYPES = map[string]bool{
+	"image/jpg":  true,
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/heic": true,
+	"image/gif":  true,
+	"image/webp": true,
+}
+
+var VALID_VIDEO_TYPES = map[string]bool{
+	"video/mp4":  true,
+	"video/mov":  true,
+	"video/avi":  true,
+	"video/webm": true,
+	"video/ogg":  true,
+}
+
+var VALID_AUDIO_TYPES = map[string]bool{
+	"audio/mpeg":  true,
+	"audio/mp3":   true,
+	"audio/wav":   true,
+	"audio/x-wav": true,
+	"audio/aac":   true,
+	"audio/ogg":   true,
+	"audio/webm":  true,
+	"audio/mp4":   true,
+}
+
 /*
 detectMimeType checks the sniffed type of a file against its kind, using the
-existing VALID_*_TYPES lists. Go's sniffer names a few formats differently from
+VALID_*_TYPES lists. Go's sniffer names a few formats differently from
 those lists, or can't identify them from the bytes alone, so those are mapped here.
 Returns "" if the file isn't an accepted type for that kind.
 */
