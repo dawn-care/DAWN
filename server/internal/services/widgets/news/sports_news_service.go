@@ -1,23 +1,18 @@
 package news
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"time"
-
-	models "server/internal/models/widgets/news"
 )
 
 // ESPNBaseURL is where the ESPN site API lives; tests point a service elsewhere
 const ESPNBaseURL = "http://site.api.espn.com"
 
-// Service sturct (ESPN API does not require key)
-type SportsNewsWidgetService struct {
-	db      *sql.DB
+// SportsService fetches team schedules for screen widgets (ESPN requires no key).
+type SportsService struct {
 	client  *http.Client
 	baseURL string
 }
@@ -68,170 +63,11 @@ type GameSummaryResponse struct {
 
 var SPORTS_LEAGUES_MAP = map[string]string{"nfl": "football", "nba": "basketball", "mlb": "baseball", "nhl": "hockey"}
 
-func NewSportsNewsWidgetService(db *sql.DB) *SportsNewsWidgetService {
-	return &SportsNewsWidgetService{
-		db:      db,
+func NewSportsService() *SportsService {
+	return &SportsService{
 		client:  &http.Client{Timeout: 10 * time.Second},
 		baseURL: ESPNBaseURL,
 	}
-}
-
-// CREATE OPERATIONS
-
-/*
-Create a new sports news widget module
-sports_news_widget - information inputted formatted as a NewsWidget struct
-
-	** The COUNTRY field representing the league and the LANGUAGE field
-	   representing the team (formatted as "Team Name (TEAM ABBREVIATION)")
-*/
-func (s *SportsNewsWidgetService) CreateSportsNewsWidget(sports_news_widget *models.NewsWidget) error {
-	if sports_news_widget == nil {
-		return errors.New("NewsWidget cannot be nil")
-	}
-	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
-		return errors.New("COUNTRY and LANGUAGE cannot be empty")
-	}
-	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
-		return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
-	}
-	_, err := models.CreateNews(s.db, sports_news_widget)
-	if err != nil {
-		return fmt.Errorf("failed to create sports news widget: %v", err)
-	}
-	return nil
-}
-
-/*
-Create multiple sports widgets in bulk
-sports_news_widgets - List of NewsWidget structs
-
-	** The COUNTRY field representing the league and the LANGUAGE field
-	   representing the team (formatted as "Team Name (TEAM ABBREVIATION)")
-*/
-func (s *SportsNewsWidgetService) CreateSportsNewsWidgetsBulk(sports_news_widgets []models.NewsWidget) error {
-	if len(sports_news_widgets) == 0 {
-		return errors.New("no news widgets to create")
-	}
-	for _, sports_news_widget := range sports_news_widgets {
-		if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" || sports_news_widget.CATEGORY == "" {
-			return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
-		}
-		if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
-			return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
-		}
-	}
-	return models.CreateNewsBulk(s.db, sports_news_widgets)
-}
-
-// RETRIEVE OPERATIONS
-
-/*
-Retrieve a sports widget by its ID
-id - The ID of the sports widget to retrieve
-*/
-func (s *SportsNewsWidgetService) GetSportsNewsWidgetByID(id int) (*models.NewsWidget, error) {
-	if id <= 0 {
-		return nil, errors.New("invalid NewsWidget ID")
-	}
-	sports_news_widget, err := models.GetNewsByID(s.db, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get newswidget by id: %v", err)
-	}
-	if sports_news_widget == nil {
-		return nil, fmt.Errorf("NewsWidget with ID %d not found", id)
-	}
-	return sports_news_widget, nil
-}
-
-/*
-Retrieve all sports widgets for given carepartner and caregiver
-carepartner_id - The carepartner ID associated with the sports widgets to retrieve
-caregiver_id - The caregiver ID associated with the sports widgets to retrieve
-*/
-func (s *SportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]models.NewsWidget, error) {
-	if carepartner_id <= 0 || caregiver_id <= 0 {
-		return nil, errors.New("invalid Carepartner ID or Caregiver ID")
-	}
-	return models.GetNewsByCarepartnerAndCaregiver(s.db, carepartner_id, caregiver_id)
-}
-
-/*
-Retrieve all sports widgets for a carepartner on a given day
-carepartner_id - The carepartner ID associated with the sports widgets to retrieve
-day, month, year - The date to retrieve sports widgets for
-*/
-func (s *SportsNewsWidgetService) GetSportsNewsWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]models.NewsWidget, error) {
-	if carepartner_id <= 0 {
-		return nil, errors.New("invalid Carepartner ID")
-	}
-	if day < 0 || month < 0 || year < 0 || day > 31 || month > 11 {
-		return nil, errors.New("invalid date parameters")
-	}
-	return models.GetNewsByDayAndCarepartner(s.db, carepartner_id, day, month, year)
-}
-
-// UPDATE OPERATION
-
-/*
-Update an existing sports widget
-sports_news_widget - information inputted formatted as a NewsWidget struct
-*/
-func (s *SportsNewsWidgetService) UpdateSportsNewsWidget(sports_news_widget *models.NewsWidget) error {
-	if sports_news_widget == nil {
-		return errors.New("NewsWidget cannot be nil")
-	}
-	if sports_news_widget.ID <= 0 {
-		return errors.New("invalid NewsWidget ID")
-	}
-	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
-		return errors.New("COUNTRY, LANGUAGE, and CATEGORY cannot be empty")
-	}
-	if SPORTS_LEAGUES_MAP[sports_news_widget.COUNTRY] == "" {
-		return errors.New("COUNTRY must be one of the valid sports leagues: nfl, nba, mlb, nhl")
-	}
-	return models.UpdateNews(s.db, sports_news_widget)
-}
-
-// DELETE OPERATION
-
-/*
-Delete a sports widget by its ID
-id - The ID of the sports widget to delete
-*/
-func (s *SportsNewsWidgetService) DeleteSportsNewsWidget(id int) error {
-	if id <= 0 {
-		return errors.New("invalid NewsWidget ID")
-	}
-	return models.DeleteNews(s.db, id)
-}
-
-// ANALYTICS & STATS
-
-/*
-Get total number of sports widgets in the database for analytics purposes
-*/
-func (s *SportsNewsWidgetService) GetSportsNewsWidgetStats() (int, error) {
-	return models.GetNewsStats(s.db)
-}
-
-// EXTERNAL API CALLS
-
-/*
-Gets the last game for an old NewsWidget row (used by /api/sports/team-game), where
-COUNTRY holds the league and LANGUAGE holds the team as "Team Name (ABBR)"
-*/
-func (s *SportsNewsWidgetService) GetTeamGame(sports_news_widget *models.NewsWidget) (*GameSummaryResponse, error) {
-	if sports_news_widget.COUNTRY == "" || sports_news_widget.LANGUAGE == "" {
-		return nil, errors.New("league and team cannot be empty")
-	}
-	re := regexp.MustCompile(`\(([^)]+)\)$`)
-	match := re.FindStringSubmatch(sports_news_widget.LANGUAGE)
-	teamAbbr := ""
-	if len(match) > 1 {
-		teamAbbr = match[1]
-	}
-	return s.GetTeamGameFor(sports_news_widget.COUNTRY, teamAbbr)
 }
 
 /*
@@ -240,7 +76,7 @@ summary. Used with a sports screen widget's config.league and config.team.
 league - nfl, nba, mlb or nhl
 team - the team abbreviation, as listed by GET /api/widgets/sports/teams
 */
-func (s *SportsNewsWidgetService) GetTeamGameFor(league, team string) (*GameSummaryResponse, error) {
+func (s *SportsService) GetTeamGameFor(league, team string) (*GameSummaryResponse, error) {
 	sport, ok := SPORTS_LEAGUES_MAP[league]
 	if !ok {
 		return nil, fmt.Errorf("unknown league %q", league)

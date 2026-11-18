@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	models "server/internal/models/widgets/weather"
 )
 
 // fakeOpenWeather imitates the three OpenWeather endpoints GetWeatherForZip calls
@@ -41,7 +39,7 @@ func fakeOpenWeather(t *testing.T, overviewStatus int) (*httptest.Server, *[]str
 }
 
 func newTestWeatherService(baseURL string) *WeatherService {
-	s := NewWeatherService(nil, "test-key")
+	s := NewWeatherService("test-key")
 	s.baseURL = baseURL
 	return s
 }
@@ -87,14 +85,4 @@ func TestGetWeatherForZip_Errors(t *testing.T) {
 	defer down.Close()
 	_, err = newTestWeatherService(down.URL).GetWeatherForZip("14617")
 	assert.Error(t, err)
-}
-
-func TestGetWeatherOverview_UsesWidgetZip(t *testing.T) {
-	srv, calls := fakeOpenWeather(t, http.StatusOK)
-
-	w, err := newTestWeatherService(srv.URL).GetWeatherOverview(&models.WeatherWidget{ZIPCODE: "14617"})
-
-	require.NoError(t, err)
-	assert.Equal(t, "Irondequoit", w.Location)
-	assert.Contains(t, (*calls)[0], "zip=14617,US")
 }
