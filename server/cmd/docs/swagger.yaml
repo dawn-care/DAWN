@@ -40,17 +40,37 @@ definitions:
       timed:
         type: boolean
     type: object
-  media.AudioMedia:
+  family.CreateFamilyMemberRequest:
     properties:
-      displayed_name:
+      carepartner_id:
+        type: integer
+      guidance_note:
         type: string
-      extension:
+      name:
         type: string
-      filename:
+      relationship:
+        type: string
+    type: object
+  family.FamilyError:
+    properties:
+      code:
+        type: string
+      error:
+        type: string
+    type: object
+  family.FamilyMember:
+    properties:
+      carepartner_id:
+        type: integer
+      created_at:
+        type: string
+      guidance_note:
         type: string
       id:
         type: integer
-      uri:
+      name:
+        type: string
+      relationship:
         type: string
     type: object
   media.Media:
@@ -63,12 +83,20 @@ definitions:
         type: string
       duration_seconds:
         type: integer
+      family_member_ids:
+        items:
+          type: integer
+        type: array
       id:
         type: integer
       kind:
         type: string
       mime_type:
         type: string
+      situations:
+        items:
+          type: string
+        type: array
       size_bytes:
         type: integer
       url:
@@ -85,36 +113,21 @@ definitions:
       error:
         type: string
     type: object
-  media.PhotoMedia:
-    properties:
-      displayed_name:
-        type: string
-      extension:
-        type: string
-      filename:
-        type: string
-      id:
-        type: integer
-      uri:
-        type: string
-    type: object
   media.RenameMediaRequest:
     properties:
       display_name:
         type: string
     type: object
-  media.VideoMedia:
+  media.SetMediaTagsRequest:
     properties:
-      displayed_name:
-        type: string
-      extension:
-        type: string
-      filename:
-        type: string
-      id:
-        type: integer
-      uri:
-        type: string
+      family_member_ids:
+        items:
+          type: integer
+        type: array
+      situations:
+        items:
+          type: string
+        type: array
     type: object
   modules.Module:
     properties:
@@ -217,6 +230,13 @@ definitions:
       started_at:
         type: string
       status:
+        type: string
+    type: object
+  playback.RatePlaybackRequest:
+    properties:
+      carepartner_id:
+        type: integer
+      rating:
         type: string
     type: object
   playback.StopRequest:
@@ -567,271 +587,6 @@ definitions:
 info:
   contact: {}
 paths:
-  /audio:
-    delete:
-      description: Deletes audio metadata from the database
-      parameters:
-      - description: Audio ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "400":
-          description: invalid audio ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Delete an audio metadata record
-      tags:
-      - audio
-    get:
-      description: Retrieves audio metadata from the database
-      parameters:
-      - description: Audio ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/media.AudioMedia'
-        "400":
-          description: invalid audio ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Get audio metadata by ID
-      tags:
-      - audio
-    post:
-      consumes:
-      - application/json
-      description: Creates a new audio entry in the database
-      parameters:
-      - description: Audio data
-        in: body
-        name: audio
-        required: true
-        schema:
-          $ref: '#/definitions/media.AudioMedia'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/media.AudioMedia'
-        "400":
-          description: invalid request body
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Create a new audio record
-      tags:
-      - audio
-    put:
-      consumes:
-      - application/json
-      description: Updates audio metadata in the database
-      parameters:
-      - description: Audio data
-        in: body
-        name: audio
-        required: true
-        schema:
-          $ref: '#/definitions/media.AudioMedia'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/media.AudioMedia'
-        "400":
-          description: invalid request body
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Update an audio metadata record
-      tags:
-      - audio
-  /audio/file:
-    delete:
-      description: Deletes audio file from blob storage
-      parameters:
-      - description: Audio ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "400":
-          description: invalid audio ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Delete an audio file
-      tags:
-      - audio
-    get:
-      description: Retrieves the audio file from blob storage
-      parameters:
-      - description: Audio ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/octet-stream
-      responses:
-        "200":
-          description: Audio file
-          schema:
-            type: file
-        "400":
-          description: invalid audio ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Download audio file by ID
-      tags:
-      - audio
-    post:
-      consumes:
-      - multipart/form-data
-      description: Uploads an audio file to blob storage
-      parameters:
-      - description: Audio file
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: User ID
-        in: formData
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: bad request
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Upload a new audio file
-      tags:
-      - audio
-    put:
-      consumes:
-      - multipart/form-data
-      description: Uploads and replaces an existing audio file
-      parameters:
-      - description: Audio file
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: User ID
-        in: formData
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: bad request
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Update an audio file
-      tags:
-      - audio
-  /audio/list:
-    get:
-      description: Retrieves a list of audios filtered by carepartner ID and caregiver
-        ID
-      parameters:
-      - description: Carepartner ID
-        in: query
-        name: carepartner_id
-        required: true
-        type: integer
-      - description: Caregiver ID
-        in: query
-        name: caregiver_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/media.AudioMedia'
-            type: array
-        "400":
-          description: invalid or missing parameters
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Get audios by carepartner and caregiver
-      tags:
-      - audio
   /auth/email/code:
     post:
       consumes:
@@ -2018,6 +1773,65 @@ paths:
       summary: Delete all events in a list
       tags:
       - event
+  /family-members:
+    get:
+      description: In the order they were added. Family members are folders for grouping
+        media, not accounts.
+      parameters:
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/family.FamilyMember'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+      summary: List a carepartner's family members
+      tags:
+      - family
+    post:
+      consumes:
+      - application/json
+      description: Name is required; relationship and guidance_note are optional.
+      parameters:
+      - description: Family member
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/family.CreateFamilyMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/family.FamilyMember'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/family.FamilyError'
+      summary: Add a family member
+      tags:
+      - family
   /me:
     get:
       description: Returns the caregiver the session cookie belongs to, with their
@@ -2062,6 +1876,19 @@ paths:
       - description: photo, video or audio; omit for all
         in: query
         name: kind
+        type: string
+      - description: Only media under this situation
+        in: query
+        name: situation
+        type: string
+      - description: Only media about this family member
+        in: query
+        name: family_member_id
+        type: integer
+      - description: 'rank: what staff rated best first (the scores aren''t sent).
+          Left out: newest first'
+        in: query
+        name: sort
         type: string
       produces:
       - application/json
@@ -2108,6 +1935,20 @@ paths:
         in: formData
         name: display_name
         type: string
+      - collectionFormat: multi
+        description: Situations staff find it under; repeat the field for each
+        in: formData
+        items:
+          type: string
+        name: situations
+        type: array
+      - collectionFormat: multi
+        description: Family members it is about; repeat the field for each
+        in: formData
+        items:
+          type: integer
+        name: family_member_ids
+        type: array
       produces:
       - application/json
       responses:
@@ -2248,6 +2089,46 @@ paths:
           schema:
             $ref: '#/definitions/media.MediaError'
       summary: Download a media item's file
+      tags:
+      - media
+  /media/{id}/tags:
+    put:
+      consumes:
+      - application/json
+      description: Replaces its situations and family members; family members must
+        be the carepartner's. With both empty, staff don't see it.
+      parameters:
+      - description: Media ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Situations and family members
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/media.SetMediaTagsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/media.Media'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/media.MediaError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/media.MediaError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/media.MediaError'
+      summary: Set how staff find a media item
       tags:
       - media
   /messages:
@@ -2696,263 +2577,19 @@ paths:
       summary: Get total number of news widgets
       tags:
       - news-widget
-  /photo:
-    delete:
-      consumes:
-      - application/json
-      description: Deletes a photo metadata record by ID
-      parameters:
-      - description: Photo ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "400":
-          description: invalid photo ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Delete a photo record
-      tags:
-      - photo
+  /playbacks:
     get:
-      consumes:
-      - application/json
-      description: Retrieves metadata for a photo
-      parameters:
-      - description: Photo ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/media.PhotoMedia'
-        "400":
-          description: invalid photo ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Get a photo record by ID
-      tags:
-      - photo
-    post:
-      consumes:
-      - application/json
-      description: Creates a new photo entry in the database
-      parameters:
-      - description: Photo data
-        in: body
-        name: photo
-        required: true
-        schema:
-          $ref: '#/definitions/media.PhotoMedia'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/media.PhotoMedia'
-        "400":
-          description: invalid request body
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Create a new photo record
-      tags:
-      - photo
-    put:
-      consumes:
-      - application/json
-      description: Updates metadata for an existing photo
-      parameters:
-      - description: Photo data
-        in: body
-        name: photo
-        required: true
-        schema:
-          $ref: '#/definitions/media.PhotoMedia'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/media.PhotoMedia'
-        "400":
-          description: invalid request body
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Update a photo record
-      tags:
-      - photo
-  /photo/file:
-    delete:
-      consumes:
-      - application/json
-      description: Deletes the uploaded photo file for a given photo ID
-      parameters:
-      - description: Photo ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "400":
-          description: invalid photo ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Delete a photo file
-      tags:
-      - photo
-    get:
-      consumes:
-      - application/json
-      description: Returns the raw photo file for a given photo ID
-      parameters:
-      - description: Photo ID
-        in: query
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/octet-stream
-      responses:
-        "200":
-          description: Photo file
-          schema:
-            type: file
-        "400":
-          description: invalid photo ID
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Download a photo file by ID
-      tags:
-      - photo
-    post:
-      consumes:
-      - multipart/form-data
-      description: Uploads a new photo file for a user
-      parameters:
-      - description: Photo file
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: User ID
-        in: formData
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: invalid file or request
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Upload a photo file
-      tags:
-      - photo
-    put:
-      consumes:
-      - multipart/form-data
-      description: Updates the uploaded photo file for a user
-      parameters:
-      - description: Photo file
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: User ID
-        in: formData
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: invalid file or request
-          schema:
-            type: string
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Update a photo file
-      tags:
-      - photo
-  /photo/list:
-    get:
-      consumes:
-      - application/json
-      description: Returns all photo records associated with a carepartner and caregiver
+      description: Playbacks that reached the screen, from any source, most recently
+        started first. Requests that never started are left out.
       parameters:
       - description: Carepartner ID
         in: query
         name: carepartner_id
         required: true
         type: integer
-      - description: Caregiver ID
+      - description: How many to return, 1 to 100 (default 50)
         in: query
-        name: caregiver_id
-        required: true
+        name: limit
         type: integer
       produces:
       - application/json
@@ -2961,16 +2598,23 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/media.PhotoMedia'
+              $ref: '#/definitions/playback.Playback'
             type: array
-        "500":
-          description: internal server error
+        "400":
+          description: Bad Request
           schema:
-            type: string
-      summary: Get all photos for a carepartner and caregiver
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List what played on a carepartner's tablet
       tags:
-      - photo
-  /playbacks:
+      - playback
     post:
       consumes:
       - application/json
@@ -3001,6 +2645,104 @@ paths:
               type: string
             type: object
       summary: Record a playback request
+      tags:
+      - playback
+  /playbacks/{id}:
+    get:
+      description: 'Its status, and rating_closes_at: until when staff can rate it,
+        or null if it never reached the screen. The staff app polls this while a clip
+        plays.'
+      parameters:
+      - description: Playback ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Carepartner ID
+        in: query
+        name: carepartner_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/playback.Playback'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get one playback
+      tags:
+      - playback
+  /playbacks/{id}/rating:
+    post:
+      consumes:
+      - application/json
+      description: Staff rate a play from the staff app. Only a play that reached
+        the screen can be rated, until 5 minutes after it ended; rating again inside
+        that time replaces the rating. Ratings order the staff app's media list (GET
+        /media?sort=rank).
+      parameters:
+      - description: Playback ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Rating
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/playback.RatePlaybackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/playback.Playback'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rate how a play went
       tags:
       - playback
   /playbacks/{id}/status:
@@ -3860,38 +3602,6 @@ paths:
       summary: Get a team's game summary
       tags:
       - sports-news-widget
-  /video/list:
-    get:
-      consumes:
-      - application/json
-      description: Returns all video records associated with a carepartner and caregiver
-      parameters:
-      - description: Carepartner ID
-        in: query
-        name: carepartner_id
-        required: true
-        type: integer
-      - description: Caregiver ID
-        in: query
-        name: caregiver_id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/media.VideoMedia'
-            type: array
-        "500":
-          description: internal server error
-          schema:
-            type: string
-      summary: Get all videos for a carepartner and caregiver
-      tags:
-      - video
   /weather-widgets:
     post:
       consumes:
