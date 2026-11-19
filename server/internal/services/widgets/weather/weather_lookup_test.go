@@ -1,6 +1,9 @@
 package weather
 
 import (
+	"bytes"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,6 +11,57 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGetWeatherForZip_NetworkErrorsRedactAPIKey(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		path    string
+		message string
+	}{
+		{"geocode", "/geo/1.0/zip", "failed geocode request"},
+		{"current weather", "/data/2.5/weather", "failed current weather request"},
+		{"overview", "/data/3.0/onecall/overview", "failed overview request"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream, _ := fakeOpenWeather(t, http.StatusOK)
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == tc.path {
+					// Close the connection without a response to produce a real network error.
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if !assert.NoError(t, err) {
+						return
+					}
+					conn.Close()
+					return
+				}
+				upstream.Config.Handler.ServeHTTP(w, r)
+			}))
+			t.Cleanup(srv.Close)
+
+			var logs bytes.Buffer
+			previousOutput := log.Writer()
+			log.SetOutput(&logs)
+			t.Cleanup(func() { log.SetOutput(previousOutput) })
+
+			weather, err := newTestWeatherService(srv.URL).GetWeatherForZip("14617")
+			if tc.name == "overview" {
+				// An optional overview failure is logged without breaking current weather.
+				require.NoError(t, err)
+				require.NotNil(t, weather)
+				assert.Equal(t, 48, weather.Temp)
+				assert.Empty(t, weather.Message)
+				assert.Contains(t, logs.String(), tc.message)
+			} else {
+				require.ErrorContains(t, err, tc.message)
+				assert.ErrorIs(t, err, io.EOF)
+				assert.NotContains(t, err.Error(), "test-key")
+				assert.NotContains(t, err.Error(), "appid=")
+			}
+			assert.NotContains(t, logs.String(), "test-key")
+			assert.NotContains(t, logs.String(), "appid=")
+		})
+	}
+}
 
 // fakeOpenWeather imitates the three OpenWeather endpoints GetWeatherForZip calls
 func fakeOpenWeather(t *testing.T, overviewStatus int) (*httptest.Server, *[]string) {

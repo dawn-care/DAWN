@@ -102,7 +102,7 @@ func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse,
 
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed geocode request: %v", err)
+		return nil, fmt.Errorf("failed geocode request: %w", redactURLErr(err))
 	}
 	defer resp.Body.Close()
 
@@ -125,7 +125,7 @@ func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse,
 
 	currentResp, err := s.client.Get(currentURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed current weather request: %v", err)
+		return nil, fmt.Errorf("failed current weather request: %w", redactURLErr(err))
 	}
 	defer currentResp.Body.Close()
 
@@ -176,11 +176,20 @@ func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse,
 	}, nil
 }
 
+// redactURLErr removes request URLs, which contain the OpenWeather API key.
+func redactURLErr(err error) error {
+	var urlErr *neturl.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
+}
+
 // getOverview fetches the day's weather overview text
 func (s *WeatherService) getOverview(url string) (*OneCallOverviewResponse, error) {
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed overview request: %v", err)
+		return nil, fmt.Errorf("failed overview request: %w", redactURLErr(err))
 	}
 	defer resp.Body.Close()
 

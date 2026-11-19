@@ -9,7 +9,7 @@ import (
 )
 
 // ESPNBaseURL is where the ESPN site API lives; tests point a service elsewhere
-const ESPNBaseURL = "http://site.api.espn.com"
+const ESPNBaseURL = "https://site.api.espn.com"
 
 // SportsService fetches team schedules for screen widgets (ESPN requires no key).
 type SportsService struct {
