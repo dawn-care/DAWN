@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-18T13:41:49Z",
+  "generatedAt": "2026-11-19T14:09:11Z",
   "windowDays": 14,
   "allTime": {
     "AJBruno23": 5,
     "Helena-Lynd": 1,
     "ashton-michelstein": 7,
-    "dgh4572": 11,
+    "dgh4572": 12,
     "ea8251": 2,
     "ha4716": 4,
     "jmd9268": 6,
@@ -14,6 +14,7 @@
   "trailingWindow": {
     "AJBruno23": 1,
     "ashton-michelstein": 3,
+    "dgh4572": 1,
     "ha4716": 1,
     "jmd9268": 2,
     "saltyypanda": 1
