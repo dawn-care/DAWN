@@ -11,6 +11,16 @@ export function allowsPlainHttp(apiUrl: string | undefined): boolean {
 }
 
 /**
+ * The path the web build is served under, from CAREPARTNER_WEB_BASE_URL (the
+ * server image sets `/carepartner`, see server/Dockerfile). Unset everywhere
+ * else, so `npm run web` stays at `/` and the Android app is untouched.
+ */
+export function webBaseUrl(value: string | undefined): string | undefined {
+  const path = value?.trim().replace(/\/+$/, "");
+  return path ? (path.startsWith("/") ? path : `/${path}`) : undefined;
+}
+
+/**
  * Where the app asks for over-the-air updates: the EAS project's update
  * address, once `eas init` has put the project's ID in app.json
  * (`extra.eas.projectId`). Without an ID there is no address, and the app
@@ -25,6 +35,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const url = updatesUrl(config.extra?.eas?.projectId);
   return {
     ...config,
+    experiments: { ...config.experiments, baseUrl: webBaseUrl(process.env.CAREPARTNER_WEB_BASE_URL) },
     ...(url && { updates: { ...config.updates, url } }),
     plugins: [
       ...(config.plugins ?? []),
