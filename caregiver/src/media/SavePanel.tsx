@@ -28,7 +28,13 @@ import IconButton from "../components/ui/IconButton";
 import TextField from "../components/ui/form/TextField";
 import { ApiError, friendlyError, isAbort, uploadMedia } from "./api";
 import type { FamilyMember, Media } from "./api";
-import { ERROR_MESSAGES, RECORDING_UNPLAYABLE, RECORDING_UNREADABLE } from "./constants";
+import {
+  ERROR_MESSAGES,
+  MAX_DURATION_SECONDS,
+  RECORDING_LIMIT_REACHED,
+  RECORDING_UNPLAYABLE,
+  RECORDING_UNREADABLE,
+} from "./constants";
 import type { Situation } from "./constants";
 import type { PendingFile } from "./files";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
@@ -77,7 +83,9 @@ export default function SavePanel({
   onRetake,
   onClose,
 }: SavePanelProps) {
-  const { file, kind, recordedWith } = pending;
+  const { file, kind, recordedWith, seconds } = pending;
+  // The recorder stops by itself at the limit, so say why it ended
+  const reachedLimit = recordedWith !== undefined && seconds !== null && Math.round(seconds) >= MAX_DURATION_SECONDS;
   // A recorded video or voice clip is played back here; a picked one isn't
   const playable = recordedWith !== undefined && kind !== "photo";
   const [name, setName] = useState(() => nameFromFile(file.name));
@@ -206,6 +214,7 @@ export default function SavePanel({
           />
         ))}
 
+      {reachedLimit && <p className="m-0 text-[15px] text-ink-muted">{RECORDING_LIMIT_REACHED}</p>}
       {playerBroken && <p className="m-0 text-[15px] text-ink-muted">{RECORDING_UNPLAYABLE}</p>}
 
       <div className="flex items-center gap-3">

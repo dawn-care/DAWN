@@ -8,6 +8,8 @@
  * open stream is returned so the camera panel can show it live and take a
  * photo from it. When a recording stops, `onRecorded` gets it as a File with
  * its length, measured here because a browser recording may not store one.
+ * A recording stops by itself at the 10 minute limit (MAX_DURATION_SECONDS),
+ * as if Stop was pressed, so one left running by mistake can still be saved.
  *
  * Status: idle → opening → ready ⇄ recording, or error (with a message for
  * the caregiver; `open` again to retry). The camera and microphone are always
@@ -17,7 +19,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RECORDING_MESSAGES } from "./constants";
+import { MAX_DURATION_SECONDS, RECORDING_MESSAGES } from "./constants";
 import type { RecordingSource } from "./constants";
 import { RecordingError, openStream, pickRecordingType, recordingFile, stopStream } from "./recording";
 
@@ -61,6 +63,8 @@ export function useRecorder(source: RecordingSource, onRecorded: (recording: Rec
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const tickRef = useRef<number | null>(null);
+  // Stops the recording when it reaches the length limit
+  const limitRef = useRef<number | null>(null);
   // Bumped whenever the stream is let go, so an open or a recording that finishes afterwards is ignored
   const generation = useRef(0);
   // The latest callback, so a recording that ends after a re-render reports to the current one
@@ -72,6 +76,8 @@ export function useRecorder(source: RecordingSource, onRecorded: (recording: Rec
   const stopTicking = () => {
     if (tickRef.current !== null) window.clearInterval(tickRef.current);
     tickRef.current = null;
+    if (limitRef.current !== null) window.clearTimeout(limitRef.current);
+    limitRef.current = null;
   };
 
   // Stops any recording without keeping it and turns the camera or microphone off
@@ -190,6 +196,10 @@ export function useRecorder(source: RecordingSource, onRecorded: (recording: Rec
     setSeconds(0);
     setStatus("recording");
     tickRef.current = window.setInterval(() => setSeconds((performance.now() - startedAt) / 1000), TICK_MS);
+    // Stopped like Stop at the limit, so the recording is kept and can be saved
+    limitRef.current = window.setTimeout(() => {
+      if (recorder.state !== "inactive") recorder.stop();
+    }, MAX_DURATION_SECONDS * 1000);
   }, [source, fail]);
 
   const stop = useCallback(() => {

@@ -12,8 +12,8 @@
  * If the microphone can't be used (not allowed, none found, in use), the
  * reason is shown with Try again; if it stops working mid-recording, nothing
  * is kept and that is said. The page is told while recording, so it can ask
- * before leaving it. A recording under a second or over 10 minutes is refused
- * here, so it is never uploaded.
+ * before leaving it. Recording stops by itself at 10 minutes, and one under a
+ * second is refused here, so it is never uploaded.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -120,7 +120,7 @@ export default function VoicePanel({ onClose, onRecorded, onRecordingChange }: V
             ) : (
               <div className="text-[15px] text-ink-muted">Your browser may ask to use your microphone.</div>
             )}
-            <div className="text-[15px] text-ink-muted">Record any audio, up to 10 minutes.</div>
+            <div className="text-[15px] text-ink-muted">Record any audio, up to 10 minutes. Recording automatically stops after 10 minutes.</div>
           </>
         )}
       </div>

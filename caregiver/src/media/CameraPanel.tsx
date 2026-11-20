@@ -13,8 +13,8 @@
  * mirrored. If the camera can't be used (not allowed, none found, in use),
  * the reason is shown with Try again. If only the microphone can't be used,
  * the camera still opens and Video mode says videos will have no sound. A
- * video under a second or over 10 minutes is refused here, so it is never
- * uploaded. The page is told while a video is recording, so it can ask
+ * video stops recording by itself at 10 minutes, and one under a second is
+ * refused here, so it is never uploaded. The page is told while a video is recording, so it can ask
  * before leaving it.
  */
 
@@ -207,7 +207,7 @@ export default function CameraPanel({
           )}
 
           {mode === "video" && !recording && (
-            <div className="text-center text-[15px] text-ink-muted">Videos can be up to 10 minutes long.</div>
+            <div className="text-center text-[15px] text-ink-muted">Videos can be up to 10 minutes long. Recording automatically stops after 10 minutes.</div>
           )}
 
           {/* The camera opened without the microphone (blocked, busy or missing) */}

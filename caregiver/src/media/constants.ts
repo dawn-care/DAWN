@@ -129,6 +129,8 @@ export const NO_SOUND = "Your microphone can't be used right now, so videos will
 // Shortest recording kept; anything shorter is almost always Start and Stop pressed together
 export const MIN_RECORDING_SECONDS = 1;
 export const RECORDING_TOO_SHORT = "This recording is too short. Record for at least a second.";
+// Shown with a recording that ran to the limit, which stops it by itself
+export const RECORDING_LIMIT_REACHED = "Recording automatically stopped after 10 minutes.";
 // The server couldn't read the recording; sending the same data again won't help, recording again will
 export const RECORDING_UNREADABLE = "This recording couldn't be read. Press Retake to record it again.";
 // The browser can't play back what it recorded (rare); it may still save fine
