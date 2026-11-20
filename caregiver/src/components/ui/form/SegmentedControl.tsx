@@ -22,6 +22,8 @@ interface SegmentedControlProps<T extends string> {
   onChange: (value: T) => void;
   /** Names the group for screen readers */
   label: string;
+  /** Locks every segment and greys them out, e.g. the camera's Photo / Video while a video is recording */
+  disabled?: boolean;
 }
 
 export default function SegmentedControl<T extends string>({
@@ -29,19 +31,21 @@ export default function SegmentedControl<T extends string>({
   value,
   onChange,
   label,
+  disabled = false,
 }: SegmentedControlProps<T>) {
   return (
     <RadixRadioGroup.Root
       aria-label={label}
       value={value}
       onValueChange={(next) => onChange(next as T)}
+      disabled={disabled}
       className="flex gap-2"
     >
       {segments.map((segment) => (
         <RadixRadioGroup.Item
           key={segment.value}
           value={segment.value}
-          className={`flex-1 h-11 px-3 rounded-[10px] border-2 text-base font-bold cursor-pointer bg-surface text-ink border-ink-muted data-[state=checked]:bg-accent data-[state=checked]:text-on-accent data-[state=checked]:border-accent ${FOCUS_RING}`}
+          className={`flex-1 h-11 px-3 rounded-[10px] border-2 text-base font-bold cursor-pointer bg-surface text-ink border-ink-muted data-[state=checked]:bg-accent data-[state=checked]:text-on-accent data-[state=checked]:border-accent disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`}
         >
           {segment.label}
         </RadixRadioGroup.Item>

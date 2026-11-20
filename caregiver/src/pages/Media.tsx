@@ -12,16 +12,21 @@
  *  - A right-hand panel that shows the selected item, or the add flow that
  *    was picked in the header
  *
- * Camera and voice recording are switched off for now, so uploading a file is
- * the only way to add something. Files picked in the upload panel are checked
- * and queued, then named and saved one at a time. Saved items go to the top
- * of the grid with a "New" badge, selected, with a toast.
+ * Files picked in the upload panel are checked and queued, then named and
+ * saved one at a time. A photo or video taken with the camera, or a voice
+ * recording, goes into the same queue as a single file: Retake in the save
+ * step goes back to the panel it came from, and Close leaves it. Clicking a
+ * card or another header button while recording, or before a photo or
+ * recording is saved, asks first, since leaving would throw it away; so does
+ * closing or reloading the tab. Saved items go to the top of the grid with
+ * a "New" badge, selected, with a toast.
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode, Ref } from "react";
+import type { ReactNode, Ref, RefObject } from "react";
 import { Mic, Upload, Video } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import Dialog from "../components/ui/Dialog";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import {
@@ -33,7 +38,13 @@ import {
   listMedia,
   listScheduledItems,
 } from "../media/api";
-import type { FamilyMember, Media as MediaItem, ScheduledItem } from "../media/api";
+import type {
+  FamilyMember,
+  Media as MediaItem,
+  ScheduledItem,
+} from "../media/api";
+import CameraPanel from "../media/CameraPanel";
+import type { CameraMode } from "../media/CameraPanel";
 import type { MediaKind } from "../media/constants";
 import DetailPanel from "../media/DetailPanel";
 import FilterPills from "../media/FilterPills";
@@ -41,7 +52,9 @@ import type { Pill } from "../media/FilterPills";
 import MediaCard from "../media/MediaCard";
 import type { PendingFile } from "../media/files";
 import SavePanel from "../media/SavePanel";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../media/styles";
 import UploadPanel from "../media/UploadPanel";
+import VoicePanel from "../media/VoicePanel";
 
 // Items the caregiver removed whose Undo toast is still open. The server is
 // told to delete them only when the toast closes, so they stay hidden from
@@ -50,10 +63,21 @@ import UploadPanel from "../media/UploadPanel";
 // the deletes then, so a removed item doesn't come back.
 const pendingRemovalIds = new Set<number>();
 
-window.addEventListener("pagehide", () => pendingRemovalIds.forEach(deleteMediaOnExit));
+window.addEventListener("pagehide", () =>
+  pendingRemovalIds.forEach(deleteMediaOnExit),
+);
 
 type Filter = "all" | MediaKind;
-type Panel = "detail" | "file";
+type Panel = "detail" | "file" | "voice" | "camera";
+// The panels opened from the header buttons
+type AddPanel = Exclude<Panel, "detail">;
+
+const PANEL_LABELS: Record<Panel, string> = {
+  detail: "Selected item",
+  file: "Upload a file",
+  voice: "Record your voice",
+  camera: "Use your camera",
+};
 
 const FILTERS: { value: Filter; label: string; empty: string }[] = [
   { value: "all", label: "All", empty: "No media files added yet." },
@@ -70,14 +94,16 @@ const FILTERS: { value: Filter; label: string; empty: string }[] = [
 async function commitRemoval(
   removed: MediaItem,
   showToast: (text: string) => void,
-  reload: () => void
+  reload: () => void,
 ) {
   try {
     await deleteMedia(removed.id);
   } catch (err) {
     // Already gone (deleted somewhere else) is the outcome the caregiver wanted
     if (!(err instanceof ApiError && err.status === 404)) {
-      showToast(`Couldn't remove "${removed.display_name}". ${friendlyError(err)}`);
+      showToast(
+        `Couldn't remove "${removed.display_name}". ${friendlyError(err)}`,
+      );
     }
   } finally {
     pendingRemovalIds.delete(removed.id);
@@ -95,22 +121,20 @@ interface AddButtonProps {
   title: string;
   subtitle: string;
   open: boolean;
-  disabled?: boolean;
   onClick: () => void;
   ref?: Ref<HTMLButtonElement>;
 }
 
-function AddButton({ icon, title, subtitle, open, disabled = false, onClick, ref }: AddButtonProps) {
+function AddButton({ icon, title, subtitle, open, onClick, ref }: AddButtonProps) {
   return (
     <button
       ref={ref}
       type="button"
       aria-pressed={open}
-      disabled={disabled}
       onClick={onClick}
-      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-ink ${
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-      } ${open ? "bg-accent/10 border-accent" : "bg-surface border-border"} ${FOCUS_RING}`}
+      className={`min-h-[76px] flex items-center gap-3.5 px-[18px] py-2 rounded-[14px] border-2 text-left text-ink cursor-pointer ${
+        open ? "bg-accent/10 border-accent" : "bg-surface border-border"
+      } ${FOCUS_RING}`}
     >
       <span className="shrink-0 text-link">{icon}</span>
       <span className="flex flex-col gap-0.5">
@@ -140,6 +164,12 @@ export default function Media() {
 
   const [filter, setFilter] = useState<Filter>("all");
   const [panel, setPanel] = useState<Panel>("detail");
+  // Kept here, not in the camera panel, so Retake and reopening the camera come back to Photo or Video as it was
+  const [cameraMode, setCameraMode] = useState<CameraMode>("photo");
+  // A camera or voice recording is running; leaving its panel would throw it away
+  const [recordingNow, setRecordingNow] = useState(false);
+  // Where the caregiver tried to go while recording, held until they say whether to throw the recording away
+  const [leaveTo, setLeaveTo] = useState<(() => void) | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Files that passed the upload checks and are waiting to be named and saved, plus a message for each that didn't pass
   const [queue, setQueue] = useState<PendingFile[]>([]);
@@ -152,8 +182,15 @@ export default function Media() {
   const [justSavedId, setJustSavedId] = useState<number | null>(null);
   // What has been saved from the files picked together, for one toast when they are done
   const savedInBatch = useRef<MediaItem[]>([]);
-  // Focus goes back here when the upload panel is closed
+  // Focus goes back to the header button of a panel when that panel is closed
   const uploadButton = useRef<HTMLButtonElement>(null);
+  const voiceButton = useRef<HTMLButtonElement>(null);
+  const cameraButton = useRef<HTMLButtonElement>(null);
+  const panelButtons: Record<AddPanel, RefObject<HTMLButtonElement | null>> = {
+    file: uploadButton,
+    voice: voiceButton,
+    camera: cameraButton,
+  };
   // The carepartner whose list is on screen; null until it has loaded
   const loadedFor = useRef<number | null>(null);
 
@@ -175,11 +212,17 @@ export default function Media() {
     Promise.all([
       listMedia(activeCarePartnerId),
       listScheduledItems(activeCarePartnerId).catch((err) => {
-        console.warn("Could not load the schedule; showing plainer schedule text", err);
+        console.warn(
+          "Could not load the schedule; showing plainer schedule text",
+          err,
+        );
         return null;
       }),
       listFamilyMembers(activeCarePartnerId).catch((err) => {
-        console.warn("Could not load the family; media can't be linked to anyone for now", err);
+        console.warn(
+          "Could not load the family; media can't be linked to anyone for now",
+          err,
+        );
         return null;
       }),
     ])
@@ -214,23 +257,34 @@ export default function Media() {
   ============================ */
 
   const all = items ?? [];
-  const visible = filter === "all" ? all : all.filter((item) => item.kind === filter);
+  const visible =
+    filter === "all" ? all : all.filter((item) => item.kind === filter);
   // Nothing picked yet, or the picked item is filtered out or gone: show the first one
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  const selected =
+    visible.find((item) => item.id === selectedId) ?? visible[0] ?? null;
 
   const pills: Pill<Filter>[] = FILTERS.map(({ value, label }) => ({
     value,
     label,
-    count: value === "all" ? all.length : all.filter((item) => item.kind === value).length,
+    count:
+      value === "all"
+        ? all.length
+        : all.filter((item) => item.kind === value).length,
   }));
 
   const handleRenamed = (updated: MediaItem) => {
-    setItems((list) => list && list.map((item) => (item.id === updated.id ? updated : item)));
+    setItems(
+      (list) =>
+        list && list.map((item) => (item.id === updated.id ? updated : item)),
+    );
     toast.show(`Renamed to "${updated.display_name}".`);
   };
 
   const handleTagsChanged = (updated: MediaItem) => {
-    setItems((list) => list && list.map((item) => (item.id === updated.id ? updated : item)));
+    setItems(
+      (list) =>
+        list && list.map((item) => (item.id === updated.id ? updated : item)),
+    );
     toast.show(`Saved how staff find "${updated.display_name}".`);
   };
 
@@ -275,24 +329,72 @@ export default function Media() {
     const saved = savedInBatch.current;
     savedInBatch.current = [];
     if (saved.length === 0) return;
-    toast.show(saved.length === 1 ? `Added "${saved[0].display_name}".` : `Added ${saved.length} files.`);
+    toast.show(
+      saved.length === 1
+        ? `Added "${saved[0].display_name}".`
+        : `Added ${saved.length} files.`,
+    );
   };
 
-  // Back to the empty upload panel, ending the queue
+  // Ends the queue; the panel it came from shows again (the empty upload panel, or the camera or voice panel ready to record)
   const clearQueue = () => {
     announceSaved();
     setQueue([]);
     setNotices([]);
   };
 
-  const closeUpload = () => {
-    clearQueue();
-    setPanel("detail");
-    uploadButton.current?.focus();
+  // The header panel the waiting files came from: a recording's own panel, otherwise the upload panel
+  const queueFrom: AddPanel = queue[0]?.recordedWith ?? "file";
+  // A photo or recording that was stopped but not saved yet; leaving it would lose it like leaving mid-recording
+  const unsavedRecording = queue[0]?.recordedWith !== undefined;
+  const wouldLoseRecording = recordingNow || unsavedRecording;
+
+  // Closing or reloading the tab asks too (the browser's own question). Links in the nav bar don't:
+  // BrowserRouter can't block a route change.
+  useEffect(() => {
+    if (!wouldLoseRecording) return;
+    const ask = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [wouldLoseRecording]);
+
+  // Files waiting to be saved belong to the panel they came from, so opening a different one drops them
+  const openPanel = (next: AddPanel) => {
+    if (next === panel) return;
+    leaveRecordingThen(() => {
+      if (queue.length > 0 && queueFrom !== next) clearQueue();
+      setPanel(next);
+    });
   };
 
+  // Runs `go` now, or first asks whether to throw away the recording it would end or leave unsaved.
+  // Throwing away an unsaved one empties the queue, so it doesn't come back when its panel opens again.
+  const leaveRecordingThen = (go: () => void) => {
+    if (!wouldLoseRecording) go();
+    else
+      setLeaveTo(() => () => {
+        if (unsavedRecording) clearQueue();
+        go();
+      });
+  };
+
+  const confirmLeave = () => {
+    const go = leaveTo;
+    setLeaveTo(null);
+    go?.();
+  };
+
+  const closePanel = (closing: AddPanel) => {
+    clearQueue();
+    setPanel("detail");
+    panelButtons[closing].current?.focus();
+  };
+
+  // A recording is saved like a single picked file
+  const handleRecorded = (pending: PendingFile) => handleChosen([pending], []);
+
   // Moves on to the next picked file. After the last one: to the saved item if anything was
-  // saved, otherwise back to the upload panel.
+  // saved, otherwise back to the panel the files came from.
   const nextInQueue = () => {
     const rest = queue.slice(1);
     setQueue(rest);
@@ -315,12 +417,13 @@ export default function Media() {
     nextInQueue();
   };
 
-  const selectItem = (id: number) => {
-    setSelectedId(id);
-    setPanel("detail");
-    setNewIds([]);
-    setJustSavedId(null);
-  };
+  const selectItem = (id: number) =>
+    leaveRecordingThen(() => {
+      setSelectedId(id);
+      setPanel("detail");
+      setNewIds([]);
+      setJustSavedId(null);
+    });
 
   const retry = () => {
     setLoadError(null);
@@ -334,43 +437,56 @@ export default function Media() {
   return (
     // Wide screens: the page fits the window and the grid and panel scroll on their own. Narrower: the panel sits below the grid and the page scrolls.
     <div className="lg:h-screen flex flex-col gap-3 px-7 py-5">
-      <h1 className="m-0 min-h-11 flex items-center text-3xl font-extrabold">Photos, videos &amp; audio</h1>
+      <h1 className="m-0 min-h-11 flex items-center text-3xl font-extrabold">
+        Photos, videos &amp; audio
+      </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <AddButton
           icon={<Video size={34} aria-hidden="true" />}
           title="Use your camera"
-          subtitle="Coming soon"
-          open={false}
-          disabled
-          onClick={() => {}}
+          subtitle="Take a photo or record a video"
+          open={panel === "camera"}
+          onClick={() => openPanel("camera")}
+          ref={cameraButton}
         />
         <AddButton
           icon={<Mic size={34} aria-hidden="true" />}
           title="Record your voice"
-          subtitle="Coming soon"
-          open={false}
-          disabled
-          onClick={() => {}}
+          subtitle="Any audio you want to add"
+          open={panel === "voice"}
+          onClick={() => openPanel("voice")}
+          ref={voiceButton}
         />
         <AddButton
           icon={<Upload size={34} aria-hidden="true" />}
           title="Upload a file"
           subtitle="Photos, videos, audio or music"
           open={panel === "file"}
-          onClick={() => setPanel("file")}
+          onClick={() => openPanel("file")}
           ref={uploadButton}
         />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 grow min-h-0">
-        <section aria-label="Your media" className="grow min-w-0 flex flex-col gap-3">
-          <FilterPills pills={pills} value={filter} onChange={setFilter} label="Show" />
+        <section
+          aria-label="Your media"
+          className="grow min-w-0 flex flex-col gap-3"
+        >
+          <FilterPills
+            pills={pills}
+            value={filter}
+            onChange={setFilter}
+            label="Show"
+          />
 
           {/* p-[3px] leaves room for the selected card's border, which the scroll area would clip */}
           <div className="grow min-h-0 lg:overflow-y-auto p-[3px]">
             {loadError ? (
-              <div role="alert" className="flex flex-col items-start gap-2 text-base">
+              <div
+                role="alert"
+                className="flex flex-col items-start gap-2 text-base"
+              >
                 <p className="m-0">{loadError}</p>
                 <button
                   type="button"
@@ -385,7 +501,9 @@ export default function Media() {
                 Loading…
               </p>
             ) : visible.length === 0 ? (
-              <p className="m-0 text-base text-ink-muted">{FILTERS.find((f) => f.value === filter)?.empty}</p>
+              <p className="m-0 text-base text-ink-muted">
+                {FILTERS.find((f) => f.value === filter)?.empty}
+              </p>
             ) : (
               <div className="grid grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3 content-start">
                 {visible.map((item) => (
@@ -403,7 +521,7 @@ export default function Media() {
         </section>
 
         <aside
-          aria-label={panel === "detail" ? "Selected item" : "Upload a file"}
+          aria-label={PANEL_LABELS[panel]}
           className="w-full lg:w-[420px] shrink-0 lg:overflow-y-auto flex flex-col gap-3 p-[18px] bg-surface border-[1.5px] border-border rounded-2xl"
         >
           {panel === "detail" ? (
@@ -421,11 +539,32 @@ export default function Media() {
               />
             ) : items === null ? null : (
               <p className="m-auto text-center text-2xl font-bold text-ink-muted">
-                {all.length === 0 ? "Add a media file to see it here." : "Pick something to see it here."}
+                {all.length === 0
+                  ? "Add a media file to see it here."
+                  : "Pick something to see it here."}
               </p>
             )
           ) : queue.length === 0 ? (
-            <UploadPanel onClose={closeUpload} onChosen={handleChosen} />
+            panel === "voice" ? (
+              <VoicePanel
+                onClose={() => closePanel("voice")}
+                onRecorded={handleRecorded}
+                onRecordingChange={setRecordingNow}
+              />
+            ) : panel === "camera" ? (
+              <CameraPanel
+                mode={cameraMode}
+                onModeChange={setCameraMode}
+                onClose={() => closePanel("camera")}
+                onRecorded={handleRecorded}
+                onRecordingChange={setRecordingNow}
+              />
+            ) : (
+              <UploadPanel
+                onClose={() => closePanel("file")}
+                onChosen={handleChosen}
+              />
+            )
           ) : activeCarePartnerId !== null ? (
             <SavePanel
               key={queue[0].id}
@@ -438,11 +577,44 @@ export default function Media() {
               notices={notices}
               onSaved={handleSaved}
               onSkip={nextInQueue}
-              onClose={clearQueue}
+              // Back to the camera or voice panel, which opens the camera or microphone again
+              onRetake={queue[0].recordedWith ? clearQueue : undefined}
+              // Close leaves a recording's panel altogether, so the camera or microphone isn't opened again;
+              // for picked files it goes back to the empty upload panel, as before
+              onClose={queue[0].recordedWith ? () => closePanel(queueFrom) : clearQueue}
             />
           ) : null}
         </aside>
       </div>
+
+      {/* Asked when a card or another header button is clicked while recording, or before a recording is saved */}
+      <Dialog
+        open={leaveTo !== null}
+        onOpenChange={(open) => {
+          if (!open) setLeaveTo(null);
+        }}
+        title={
+          recordingNow || queue[0]?.kind === "audio"
+            ? "Throw away your recording?"
+            : `Throw away your ${queue[0]?.kind ?? "recording"}?`
+        }
+        footer={
+          <>
+            <button type="button" onClick={() => setLeaveTo(null)} className={SECONDARY_BUTTON}>
+              {recordingNow ? "Keep recording" : "Keep it"}
+            </button>
+            <button type="button" onClick={confirmLeave} className={PRIMARY_BUTTON}>
+              Throw it away
+            </button>
+          </>
+        }
+      >
+        <p className="m-0 text-base">
+          {recordingNow
+            ? "You're still recording. Leaving now stops it, and nothing is kept."
+            : "It isn't saved yet. Leaving now deletes it."}
+        </p>
+      </Dialog>
     </div>
   );
 }
