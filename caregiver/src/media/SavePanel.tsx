@@ -3,16 +3,22 @@
  *
  * User: Caregiver
  *
- * Names and saves one picked file. The caregiver sees a preview (the photo
- * itself, or an icon for video and audio), a name field (starting as the
- * file name), how staff find it (see TagPicker: nothing is chosen to start
- * with, so staff don't see it until the caregiver picks) and Save; there is no scheduling or
+ * Names and saves one picked file or recording. The caregiver sees a preview
+ * (the photo itself; a player for a recorded video or voice clip; an icon for
+ * a picked video or audio file), a name field (starting as the file name),
+ * how staff find it (see TagPicker: nothing is chosen to start with, so staff
+ * don't see it until the caregiver picks) and Save; there is no scheduling or
  * placement here, that happens from the detail panel afterwards.
  *
  * When several files were picked, the panel is shown for each in turn with
- * "File 2 of 5". Skip is always there. Close stops going through the rest,
- * and cancels the upload if one is running. If saving fails the file is
- * kept, so Save becomes "Try again" and nothing has to be picked again.
+ * "File 2 of 5", and Skip moves on. Close stops going through the rest, and
+ * cancels the upload if one is running. If saving fails the file is kept, so
+ * Save becomes "Try again" and nothing has to be picked again.
+ *
+ * A photo taken or a recording made on the page comes here straight after
+ * it's made, with Retake instead of Skip to throw it away and record again.
+ * If the server can't read a recording, Save is turned off and the message
+ * points to Retake, since sending the same recording again can't help.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -20,9 +26,15 @@ import type { FormEvent } from "react";
 import { Image, Music, Video, X } from "lucide-react";
 import IconButton from "../components/ui/IconButton";
 import TextField from "../components/ui/form/TextField";
-import { friendlyError, isAbort, uploadMedia } from "./api";
+import { ApiError, friendlyError, isAbort, uploadMedia } from "./api";
 import type { FamilyMember, Media } from "./api";
-import { ERROR_MESSAGES } from "./constants";
+import {
+  ERROR_MESSAGES,
+  MAX_DURATION_SECONDS,
+  RECORDING_LIMIT_REACHED,
+  RECORDING_UNPLAYABLE,
+  RECORDING_UNREADABLE,
+} from "./constants";
 import type { Situation } from "./constants";
 import type { PendingFile } from "./files";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "./styles";
@@ -41,6 +53,8 @@ interface SavePanelProps {
   notices: string[];
   onSaved: (media: Media) => void;
   onSkip: () => void;
+  /** For a photo or recording made on the page: throw it away and make another. Shown instead of Skip. */
+  onRetake?: () => void;
   /** Stop going through the rest */
   onClose: () => void;
 }
@@ -66,9 +80,14 @@ export default function SavePanel({
   notices,
   onSaved,
   onSkip,
+  onRetake,
   onClose,
 }: SavePanelProps) {
-  const { file, kind } = pending;
+  const { file, kind, recordedWith, seconds } = pending;
+  // The recorder stops by itself at the limit, so say why it ended
+  const reachedLimit = recordedWith !== undefined && seconds !== null && Math.round(seconds) >= MAX_DURATION_SECONDS;
+  // A recorded video or voice clip is played back here; a picked one isn't
+  const playable = recordedWith !== undefined && kind !== "photo";
   const [name, setName] = useState(() => nameFromFile(file.name));
   // Nothing to start with: the caregiver opts each item into the staff app
   const [situations, setSituations] = useState<Situation[]>([]);
@@ -77,8 +96,12 @@ export default function SavePanel({
   const [error, setError] = useState<string | null>(null);
   // The last attempt reached the server and failed, as opposed to an empty name caught here
   const [saveFailed, setSaveFailed] = useState(false);
+  // The server couldn't read this recording, so saving it again can't work; only Retake can
+  const [unreadable, setUnreadable] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBroken, setPreviewBroken] = useState(false);
+  // The browser can't play the recording back; it may still save fine
+  const [playerBroken, setPlayerBroken] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
   // The upload in progress, so closing the panel can cancel it
   const upload = useRef<AbortController | null>(null);
@@ -92,13 +115,13 @@ export default function SavePanel({
   // Leaving the panel any other way (e.g. picking a card) also cancels a running upload
   useEffect(() => () => upload.current?.abort(), []);
 
-  // A photo is shown as itself; the object URL is released when the file changes or the panel goes
+  // A photo (or a recording) is shown as itself; the object URL is released when the file changes or the panel goes
   useEffect(() => {
-    if (kind !== "photo") return;
+    if (kind !== "photo" && !playable) return;
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [file, kind]);
+  }, [file, kind, playable]);
 
   const Icon = KIND_ICONS[kind];
 
@@ -127,7 +150,10 @@ export default function SavePanel({
     } catch (err) {
       // Closing the panel cancelled it; there is nothing left to update
       if (isAbort(err)) return;
-      setError(friendlyError(err));
+      // A picked file gets "try exporting it again"; a recording has no file to export, only Retake
+      const unreadableRecording = recordedWith !== undefined && err instanceof ApiError && err.code === "UNREADABLE_MEDIA";
+      setUnreadable(unreadableRecording);
+      setError(unreadableRecording ? RECORDING_UNREADABLE : friendlyError(err));
       setSaveFailed(true);
       setSaving(false);
       return;
@@ -167,19 +193,45 @@ export default function SavePanel({
         </ul>
       )}
 
+      {playable &&
+        previewUrl &&
+        (kind === "video" ? (
+          <video
+            src={previewUrl}
+            controls
+            playsInline
+            aria-label="Your recording"
+            onError={() => setPlayerBroken(true)}
+            className="w-full max-h-[240px] rounded-[10px] bg-border"
+          />
+        ) : (
+          <audio
+            src={previewUrl}
+            controls
+            aria-label="Your recording"
+            onError={() => setPlayerBroken(true)}
+            className="w-full"
+          />
+        ))}
+
+      {reachedLimit && <p className="m-0 text-[15px] text-ink-muted">{RECORDING_LIMIT_REACHED}</p>}
+      {playerBroken && <p className="m-0 text-[15px] text-ink-muted">{RECORDING_UNPLAYABLE}</p>}
+
       <div className="flex items-center gap-3">
-        <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-border text-ink-muted">
-          {previewUrl && !previewBroken ? (
-            <img
-              src={previewUrl}
-              alt=""
-              onError={() => setPreviewBroken(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Icon size={32} aria-hidden="true" />
-          )}
-        </div>
+        {!playable && (
+          <div className="w-[140px] h-20 shrink-0 flex items-center justify-center overflow-hidden rounded-[10px] bg-border text-ink-muted">
+            {previewUrl && !previewBroken ? (
+              <img
+                src={previewUrl}
+                alt=""
+                onError={() => setPreviewBroken(true)}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Icon size={32} aria-hidden="true" />
+            )}
+          </div>
+        )}
         <div className="grow min-w-0">
           <TextField
             ref={nameField}
@@ -193,7 +245,8 @@ export default function SavePanel({
         </div>
       </div>
 
-      <p className="m-0 text-[15px] text-ink-muted break-words">{file.name}</p>
+      {/* A recording's file name only repeats the suggested name */}
+      {!recordedWith && <p className="m-0 text-[15px] text-ink-muted break-words">{file.name}</p>}
 
       <TagPicker
         carepartnerId={carepartnerId}
@@ -213,11 +266,11 @@ export default function SavePanel({
       )}
 
       <div className="flex justify-between gap-2">
-        <button type="button" onClick={onSkip} disabled={saving} className={SECONDARY_BUTTON}>
-          Skip
+        <button type="button" onClick={onRetake ?? onSkip} disabled={saving} className={SECONDARY_BUTTON}>
+          {onRetake ? "Retake" : "Skip"}
         </button>
-        <button type="submit" disabled={saving} className={PRIMARY_BUTTON}>
-          {saving ? "Saving…" : saveFailed ? "Try again" : "Save"}
+        <button type="submit" disabled={saving || unreadable} className={PRIMARY_BUTTON}>
+          {saving ? "Saving…" : saveFailed && !unreadable ? "Try again" : "Save"}
         </button>
       </div>
     </form>
