@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
-	"errors"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,8 +27,6 @@ import (
 	screenWidgetsCtrlr "server/internal/controllers/screen_widgets"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
-	newsCtrlr "server/internal/controllers/widgets/news"
-	weatherCtrlr "server/internal/controllers/widgets/weather"
 
 	configurationRts "server/internal/routes/configurations"
 	exceptionRts "server/internal/routes/exceptions"
@@ -45,7 +43,6 @@ import (
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
-	weatherRts "server/internal/routes/widgets/weather"
 
 	authSvc "server/internal/services/auth"
 	configurationSvc "server/internal/services/configurations"
@@ -231,9 +228,9 @@ func main() {
 	// Widgets
 	openWeatherKey := getEnvOrDefault("OPENWEATHER_API_KEY", "")
 	newsAPIKey := getEnvOrDefault("NEWS_API_KEY", "")
-	newsService := newsSvc.NewNewsWidgetService(db, newsAPIKey)
-	sportsService := newsSvc.NewSportsNewsWidgetService(db)
-	weatherService := weatherSvc.NewWeatherService(db, openWeatherKey)
+	newsService := newsSvc.NewNewsService(newsAPIKey)
+	sportsService := newsSvc.NewSportsService()
+	weatherService := weatherSvc.NewWeatherService(openWeatherKey)
 
 	// Screen (the tablet's view; uses the widget and schedule services above)
 	screenService := screenSvc.NewScreenService(db, weatherService, sportsService, newsService, scheduledItemsService)
@@ -274,11 +271,6 @@ func main() {
 	// Media
 	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
 	familyCtrl := familyCtrlr.NewFamilyController(familyService)
-
-	// Widgets
-	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
-	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
-	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
 
 	// Prompts
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
@@ -341,10 +333,7 @@ func main() {
 	familyRts.RegisterFamilyRoutes(r, familyCtrl)
 
 	// Widgets
-	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
-	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
 	newsRts.RegisterSportsTeamsRoutes(r)
-	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
 	// Prompts
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)

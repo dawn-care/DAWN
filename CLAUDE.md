@@ -83,7 +83,7 @@ Runs on every PR into `canary` or `main`, from the Actions tab ("Run workflow"),
 
 ## Backend architecture (`server/internal/`)
 
-Every domain (modules, configurations, exceptions, media/{photo,video,audio}, prompts/{message,event,caregiver_location,carepartner_location}, user/{caregiver,carepartner,device_pairing}, widgets/{news,weather}, auth) follows the same four-layer pattern, each in its own subpackage:
+Domains such as modules, configurations, exceptions, media, prompts/{message,event,caregiver_location,carepartner_location}, user/{caregiver,carepartner,device_pairing}, and auth follow the same four-layer pattern, each in its own subpackage:
 
 ```
 routes/<domain>/      → chi.Router registration, maps HTTP verb+path to a controller method
@@ -91,6 +91,8 @@ controllers/<domain>/ → decodes requests, calls a service through an interface
 services/<domain>/    → business logic; talks to *sql.DB (and minio.Client for media) directly with raw SQL
 models/<domain>/      → plain structs representing DB rows
 ```
+
+`services/widgets/{news,weather}` are lookup-only clients for external APIs (no tables), used by `/api/screen`. `/api/widgets/sports/teams` is the only widget route; it retains a route and controller for the team picker.
 
 Controllers depend on a **service interface** defined in the same file as the controller (e.g. `ModuleServiceInterface` in `module_controller.go`), not a concrete type — this is what makes controllers unit-testable against mocks. When adding a new endpoint, follow this same route → controller → service → model chain and add tests at the service (sqlmock) and controller (via the interface) layers, matching the existing `*_test.go` siblings.
 

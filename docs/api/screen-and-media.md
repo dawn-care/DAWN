@@ -2,7 +2,7 @@
 
 How the caregiver web app and the carepartner tablet talk to the new backend: the media library, screen layouts and widgets, the schedule, and the single endpoint the tablet reads. Written for ticket i332; updated 2026-10-16 (widgets placed on a 4×3 grid; layout presets removed).
 
-> **The old media endpoints have been removed.** Use `/api/media` for photos, videos, and audio; `/api/photo`, `/api/video`, and `/api/audio` are no longer registered. The remaining legacy weather, news, sports, prompt, module, configuration, and exception endpoints still read tables removed by migration 3 and are scheduled for separate cleanup. Move to the replacement endpoints in this guide.
+> **The old media and widget endpoints have been removed.** Use `/api/media` for photos, videos, and audio, `/api/screen-layout` to configure widgets, and `/api/screen` to read their live data. `/api/widgets/sports/teams` still supplies the team picker. The remaining legacy prompt, module, configuration, and exception endpoints read tables removed by migration 3 and are scheduled for separate cleanup.
 
 ## Contents
 
@@ -760,7 +760,7 @@ If this guide and the server ever disagree, the server is right; please update t
 | Media | `server/internal/routes/media/media.go` | `server/internal/models/media/media_model.go`, `server/internal/services/media/media_service.go`, `server/internal/controllers/media/media_controller.go` |
 | Screen settings | `server/internal/routes/screen_settings/` | `server/internal/services/screen_settings/screen_settings_service.go` (awake hour limits) |
 | Screen layout | `server/internal/routes/screen_widgets/` | `server/internal/models/screen_widgets/` (`layout.go` request and response types, `grid_area.go` corners to size), `server/internal/services/screen_widgets/` (`grid.go` grid size and corner and overlap checks, `screen_widget_service.go` saving, `config.go` settings per type) |
-| Sports teams | `server/internal/routes/widgets/news/sports_news.go` | `server/internal/services/widgets/news/sports_teams.go` |
+| Sports teams | `server/internal/routes/widgets/news/sports_teams.go` | `server/internal/services/widgets/news/sports_teams.go` |
 | Scheduled items and calendar | `server/internal/routes/scheduled_items/` | `server/internal/models/scheduled_items/scheduled_item_model.go` (`ScheduledItem`, `Occurrence`), `server/internal/services/scheduled_items/` (`recurrence.go`, validation) |
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
 | Playback | `server/internal/routes/playback/playback.go` | `server/internal/models/playback/playback_model.go`, `server/internal/services/playback/playback_service.go` (source and status rules) |
