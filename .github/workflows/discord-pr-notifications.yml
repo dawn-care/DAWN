@@ -1,6 +1,6 @@
 name: Discord PR Notifications
 
-# Just what's happening on PRs. Shame is the shame bot's (dawn-care/InternalTools,
+# Just what's happening on PRs. Shame is the shame bot's (dawn-care/Internal-Tools,
 # fed by shame-bot-forwarder.yml).
 
 on:

@@ -1,6 +1,6 @@
 name: Shame Bot Forwarder
 
-# The shame bot lives in dawn-care/InternalTools (shame-bot/). This only tells
+# The shame bot lives in dawn-care/Internal-Tools (shame-bot/). This only tells
 # it what happens on PRs here, as a "pr-event" repository_dispatch trimmed to
 # the fields it uses. It judges, logs and posts on its own, and checks open PRs
 # here hourly for overdue reviews.
@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Forward to the shame bot
         env:
-          # Fine-grained token with Contents: write on dawn-care/InternalTools only
+          # Fine-grained token with Contents: write on dawn-care/Internal-Tools only
           GH_TOKEN: ${{ secrets.SHAME_DISPATCH_TOKEN }}
         run: |
           set -euo pipefail
@@ -59,4 +59,4 @@ jobs:
                   } else null end)
                 } | keep)
               }
-            }' "$GITHUB_EVENT_PATH" | gh api repos/dawn-care/InternalTools/dispatches --input -
+            }' "$GITHUB_EVENT_PATH" | gh api repos/dawn-care/Internal-Tools/dispatches --input -
