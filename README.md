@@ -151,8 +151,9 @@ Then fill in:
 | `OPENWEATHER_API_KEY` | Weather widget key from https://openweathermap.org/api |
 | `NEWS_API_KEY` | News widget key from https://newsapi.org |
 | `GOOGLE_CLIENT_ID` | Google sign-in client ID. Already filled in by `.env.example`; leave it as is. |
+| `DB_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | The database and MinIO passwords. `.env.example` has development values; leave them as is locally. |
 
-Compose refuses to start if `GOOGLE_CLIENT_ID` is missing.
+Compose refuses to start if `GOOGLE_CLIENT_ID`, `DB_PASSWORD`, `MINIO_ROOT_USER` or `MINIO_ROOT_PASSWORD` is missing. If your `.env` is older than these, copy the three lines from `.env.example`.
 
 ---
 
@@ -174,7 +175,7 @@ This starts Postgres, MinIO, and the Go server, which also serves the built care
 |---|---|
 | Caregiver web app + API | http://localhost:8080 |
 | API docs (Swagger) | http://localhost:8080/swagger/ |
-| MinIO console (`localuser` / `localpass123`) | http://localhost:9001 |
+| MinIO console (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`) | http://localhost:9001 |
 
 Code changes need a rebuild (`up --build` again). On startup, the API applies pending Goose migrations and seeds a fresh database. Existing databases created by `init/database.sql` need the one-time baseline step below before the API can start.
 
@@ -182,10 +183,10 @@ Code changes need a rebuild (`up --build` again). On startup, the API applies pe
 
 The backend needs Postgres and MinIO to be reachable on `localhost`.
 
-**MinIO** — start just that service from Compose:
+**MinIO** — start just that service from Compose (the dev file is what publishes MinIO on `localhost:9000`):
 
 ```bash
-docker compose up -d minio minio-init
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d minio minio-init
 ```
 
 **Postgres** — the Compose database is not exposed to your machine, so use a local Postgres on port 5432. One-time setup, run as a Postgres superuser:
@@ -275,6 +276,32 @@ npm start        # or: npm run web
 The web version opens at http://localhost:8081 and talks to the backend at `http://localhost:8080/api` (set in `carepartner/app/config.ts`).
 
 ---
+
+### Changing the database or MinIO password
+
+`DB_PASSWORD`, `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` come from `.env`. In production, use
+long random values (`openssl rand -hex 24` makes one) and keep them only in the server's `.env`.
+Compose won't start without them, so add them to the server's `.env` before deploying a version
+that needs them. Setting them to the old development values (from `.env.example`) keeps
+everything working as it was; then change them as below.
+
+On a server that already has data:
+
+1. **Database.** Postgres only reads `DB_PASSWORD` when the database is first created, so change
+   the existing user's password to match (no password is needed from inside the container; avoid
+   `'` in the new password):
+
+   ```bash
+   docker compose exec db psql -U myuser -d mydb -c "ALTER USER myuser WITH PASSWORD 'the-new-password';"
+   ```
+
+2. **`.env`.** Set `DB_PASSWORD` to that same password, and set new `MINIO_ROOT_USER` and
+   `MINIO_ROOT_PASSWORD` values. MinIO reads its credentials on every start, and uploaded media
+   stays where it is.
+3. **Restart** with the new values: `docker compose up -d --build`.
+4. **Check** that you can sign in to the caregiver site and that photos and videos still load.
+
+To undo, put the old values back in `.env` (and run step 1 again with the old database password).
 
 ### Google sign-in
 

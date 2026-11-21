@@ -13,12 +13,12 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: myuser
-      DB_PASSWORD: mypassword
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env (see .env.example)}
       DB_NAME: mydb
       MINIO_HOST: minio
       MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: localuser
-      MINIO_SECRET_KEY: localpass123
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env (see .env.example)}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env (see .env.example)}
       API_URL: https://startup-da.gccis.rit.edu
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
       NEWS_API_KEY: ${NEWS_API_KEY}
@@ -48,7 +48,9 @@ services:
     image: postgres:15
     environment:
       POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
+      # Only used when the database is first created. To change the password of an
+      # existing database, see "Changing the database password" in README.md.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env (see .env.example)}
       POSTGRES_DB: mydb
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -64,12 +66,11 @@ services:
     image: pgsty/minio
     container_name: minio
     environment:
-      MINIO_ROOT_USER: localuser
-      MINIO_ROOT_PASSWORD: localpass123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env (see .env.example)}
     command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    # No published ports: the server reaches MinIO inside app-network, and the API and console
+    # stay off the internet. docker-compose.dev.yml publishes them on localhost for development.
     volumes:
       - minio-data:/data
     networks:
@@ -86,9 +87,13 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env (see .env.example)}
+    # $$ leaves the variables for the container's shell, so the password isn't in the command line.
     entrypoint: >
       /bin/sh -c "
-      mc alias set minio http://minio:9000 localuser localpass123;
+      mc alias set minio http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\";
       mc mb --ignore-existing minio/media;
       mc cp --recursive /media-files/ minio/media/users/1/;
       echo 'MinIO bucket initialized with media files';
