@@ -17,8 +17,9 @@ import { Ionicons } from '@expo/vector-icons';
 
 import LoadError from '../../../components/LoadError';
 import { SITUATIONS, getSleepingHours } from '../../../data/mock';
-import { getClips, getFamilyFolders, getResident, playOnTablet } from '../../../data/server';
+import { getClips, getFamilyFolders, getResident } from '../../../data/server';
 import type { Clip, Resident, SleepingHours } from '../../../data/types';
+import { useActivePlays } from '../../../lib/activePlays';
 import { formatTime, isAsleep } from '../../../lib/sleepingHours';
 import { logEvent } from '../../../lib/log';
 import { useThemeColors } from '../../../lib/theme';
@@ -39,6 +40,7 @@ export default function ClipsScreen() {
   }>();
   const residentId = Number(id);
   const colors = useThemeColors();
+  const { start } = useActivePlays();
 
   const [resident, setResident] = useState<Resident | null>(null);
   const [hours, setHours] = useState<SleepingHours | null>(null);
@@ -99,12 +101,9 @@ export default function ClipsScreen() {
     }
     setPlayError(false);
     setPlayingId(clip.id);
-    logEvent({ type: 'play_requested', residentId, clipId: clip.id });
     try {
-      const { playback, delivered } = await playOnTablet(residentId, clip.id);
-      router.push(
-        `/resident/${residentId}/playing?playbackId=${playback.id}&clipId=${clip.id}&delivered=${delivered ? 1 : 0}`
-      );
+      const playbackId = await start(resident, clip);
+      router.push(`/resident/${residentId}/playing?playbackId=${playbackId}&clipId=${clip.id}`);
     } catch {
       setPlayError(true);
     } finally {
