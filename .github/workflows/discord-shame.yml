@@ -1,0 +1,71 @@
+name: Discord Shame Bot
+
+# Posts shame to Discord and logs it in metrics/shame.json on the metrics
+# branch, under a category the team website charts. The rules are in
+# .github/scripts/shame/rules.mjs, and the file formats in its README.md:
+#   - behemoth: a PR over 1000 lines (not counting Swagger docs), once per PR
+#   - late_night: doing anything on a PR 1am-5am Eastern, once per person per night
+#   - slow_review: a requested reviewer not reviewing within 24 hours, or a
+#     reviewer not re-reviewing within 24 hours of a push
+#   - idle_author: the author not doing anything 48 hours after a review
+#   - manual: a /shame in Discord that 2 other teammates endorsed. The team
+#     website (dawn-care/Internal-Website) runs /shame and the Endorse button,
+#     and sends the result here as a "manual-shame" repository_dispatch.
+# slow_review and idle_author can't be seen in any one event,
+# so they're checked hourly and shamed again every further 24 hours.
+#
+# Pushes are recorded too (in metrics/shame-state.json): GitHub doesn't keep
+# when a commit was pushed, which is when a re-review is owed from.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, review_requested, closed]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
+  repository_dispatch:
+    types: [manual-shame]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  shame:
+    # Fork PRs never get the token or secrets; scheduled runs check same-repo PRs only.
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
+      (github.event_name != 'issue_comment' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the counts to the metrics branch
+      pull-requests: read # PR files, reviews, comments and review requests
+    steps:
+      # Always the default branch's script, so a PR can't change the rules
+      # that judge it. A manual run uses the branch it's run from, for testing.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.repository.default_branch }}
+          path: bot
+          sparse-checkout: .github/scripts/shame
+
+      - uses: actions/checkout@v4
+        with:
+          ref: metrics
+          path: metrics-branch
+
+      - name: Shame
+        working-directory: metrics-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          METRICS_DIR: ${{ github.workspace }}/metrics-branch
+          DISCORD_SHAME_WEBHOOK_URL: ${{ secrets.DISCORD_SHAME_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          node "$GITHUB_WORKSPACE/bot/.github/scripts/shame/shame.mjs"
