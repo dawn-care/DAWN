@@ -1,9 +1,10 @@
-name: Shame Bot Forwarder
+name: Internal Tools Forwarder
 
-# The shame bot lives in dawn-care/Internal-Tools (shame-bot/). This only tells
-# it what happens on PRs here, as a "pr-event" repository_dispatch trimmed to
-# the fields it uses. It judges, logs and posts on its own, and checks open PRs
-# here hourly for overdue reviews.
+# The team's Discord bots live in dawn-care/Internal-Tools: the PR
+# notifications (pr-notifications.yml) and the shame bot (shame-bot/). This
+# only tells them what happens on PRs here, as a "pr-event"
+# repository_dispatch trimmed to the fields they use. They read anything else
+# they need from this repo (it's public) and post on their own.
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, review_requested, closed]
@@ -23,14 +24,14 @@ jobs:
       (github.event_name != 'issue_comment' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
-      - name: Forward to the shame bot
+      - name: Forward to Internal-Tools
         env:
           # Fine-grained token with Contents: write on dawn-care/Internal-Tools only
-          GH_TOKEN: ${{ secrets.SHAME_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.TOOLS_DISPATCH_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::SHAME_DISPATCH_TOKEN isn't set, so nothing was forwarded."
+            echo "::notice::TOOLS_DISPATCH_TOKEN isn't set, so nothing was forwarded."
             exit 0
           fi
           jq -c --arg event "$GITHUB_EVENT_NAME" --arg repo "$GITHUB_REPOSITORY" '
@@ -43,13 +44,16 @@ jobs:
                 payload: ({
                   action,
                   sender: (.sender | {login, type}),
+                  requested_reviewer: (.requested_reviewer | if . then {login} else null end),
                   pull_request: (.pull_request | if . then {
-                    number, title, html_url, created_at, updated_at, closed_at, merged_at, merged,
+                    number, title, html_url, created_at, updated_at, closed_at, merged_at, merged, draft,
                     user: {login: .user.login},
+                    merged_by: (.merged_by | if . then {login} else null end),
+                    requested_reviewers: [.requested_reviewers[]? | {login}],
                     head: {repo: {full_name: .head.repo.full_name}}
                   } else null end),
                   review: (.review | if . then {
-                    state, submitted_at, author_association, user: (.user | {login, type})
+                    id, state, submitted_at, author_association, user: (.user | {login, type})
                   } else null end),
                   comment: (.comment | if . then {
                     created_at, author_association, user: (.user | {login, type})
