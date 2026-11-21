@@ -75,7 +75,7 @@ Tests sit in a `__tests__/` folder inside each feature folder of `shared/`, like
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The image build also copies `shared/` next to `caregiver/` (as `/frontend/shared`, so a `../shared` import from the caregiver resolves). The carepartner app is never bundled into this image; it ships separately as an Android app, built with EAS Build and updated over the air with EAS Update (see `carepartner/README.md`).
+`docker-compose.yml` is the production-shaped compose (Postgres, MinIO, MinIO init, TLS via autocert, RIT-hosted domain); `docker-compose.dev.yml` overrides it for local dev (`RUN_MODE=dev`, plain HTTP on :8080, no TLS/cert volume). The `server/Dockerfile` multi-stage build compiles the **caregiver** web app and copies its `dist/` into the final Go image — the Go binary serves that built frontend as static files and serves the API from the same origin in production (see "Static frontend serving" below). The image build also copies `shared/` next to `caregiver/` (as `/frontend/shared`, so a `../shared` import from the caregiver resolves). The tablet app is never bundled into this image; it ships separately as an Android app, built with EAS Build and updated over the air with EAS Update (see `carepartner/README.md`). The image does, however, build the **carepartner web build** (`npx expo export --platform web` in its own stage, with `shared/` next to it the same way, `EXPO_PUBLIC_API_URL` from the same `VITE_API_URL` build arg as the caregiver and `CAREPARTNER_WEB_BASE_URL=/carepartner`) into `/app/carepartner`, only for the caregiver app's screen preview. The compose files pass `VITE_CAREPARTNER_URL` (`https://startup-da.gccis.rit.edu/carepartner/` in production, `http://localhost:8080/carepartner/` in the dev override) so the caregiver build frames it; `npm run dev` in `caregiver/` keeps framing Expo web on `http://localhost:8081` (`.env.development`).
 
 ### CI (`.github/workflows/ci.yml`)
 
@@ -83,7 +83,7 @@ Runs on every PR into `canary` or `main`, from the Actions tab ("Run workflow"),
 
 ## Backend architecture (`server/internal/`)
 
-Every domain (modules, configurations, exceptions, media/{photo,video,audio}, prompts/{message,event,caregiver_location,carepartner_location}, user/{caregiver,carepartner,device_pairing}, widgets/{news,weather}, auth) follows the same four-layer pattern, each in its own subpackage:
+Domains such as modules, configurations, exceptions, media, prompts/{message,event,caregiver_location,carepartner_location}, user/{caregiver,carepartner,device_pairing}, and auth follow the same four-layer pattern, each in its own subpackage:
 
 ```
 routes/<domain>/      → chi.Router registration, maps HTTP verb+path to a controller method
@@ -91,6 +91,8 @@ controllers/<domain>/ → decodes requests, calls a service through an interface
 services/<domain>/    → business logic; talks to *sql.DB (and minio.Client for media) directly with raw SQL
 models/<domain>/      → plain structs representing DB rows
 ```
+
+`services/widgets/{news,weather}` are lookup-only clients for external APIs (no tables), used by `/api/screen`. `/api/widgets/sports/teams` is the only widget route; it retains a route and controller for the team picker.
 
 Controllers depend on a **service interface** defined in the same file as the controller (e.g. `ModuleServiceInterface` in `module_controller.go`), not a concrete type — this is what makes controllers unit-testable against mocks. When adding a new endpoint, follow this same route → controller → service → model chain and add tests at the service (sqlmock) and controller (via the interface) layers, matching the existing `*_test.go` siblings.
 
@@ -115,7 +117,7 @@ Media files themselves (photo/video/audio blobs) are stored in MinIO under bucke
 
 ### Static frontend serving
 
-In production the Go binary itself serves the built caregiver SPA (`/app/frontend`, copied in by the Dockerfile from the Vite build) with a catch-all route (`r.Get("/*", ...)` → `index.html`) after all `/api/*` and `/assets/*` routes are registered — so route order in `main.go` matters; API/asset routes must be registered before the SPA catch-all.
+In production the Go binary itself serves the built caregiver SPA (`/app/frontend`, copied in by the Dockerfile from the Vite build) with a catch-all route (`r.Get("/*", ...)` → `index.html`) after all `/api/*` and `/assets/*` routes are registered — so route order in `main.go` matters; API/asset routes must be registered before the SPA catch-all. The carepartner web build is served before that catch-all at `/carepartner/` by `webapp.Carepartner` (`server/internal/webapp/`): a file in the build as is, a route as its page (`/carepartner/pair` → `pair.html`, `/carepartner/` → `index.html`), anything else `+not-found.html` with a 404, and bare `/carepartner` redirects to `/carepartner/` with its query. Its responses send `Content-Security-Policy: frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, so only the caregiver app on the same origin can frame it. `webapp.CarepartnerPath` must match `CAREPARTNER_WEB_BASE_URL` in `server/Dockerfile`.
 
 ### Server startup mode
 

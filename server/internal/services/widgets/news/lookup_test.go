@@ -9,8 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	models "server/internal/models/widgets/news"
 )
 
 // A Yankees schedule: a 5-3 home win on Oct 1, a 2-4 away loss on Oct 3, a game on Oct 20
@@ -37,8 +35,8 @@ func fakeESPN(t *testing.T, body string) (*httptest.Server, *string) {
 	return srv, &path
 }
 
-func newTestSportsService(baseURL string) *SportsNewsWidgetService {
-	s := NewSportsNewsWidgetService(nil)
+func newTestSportsService(baseURL string) *SportsService {
+	s := NewSportsService()
 	s.baseURL = baseURL
 	return s
 }
@@ -69,15 +67,6 @@ func TestGetTeamGameFor_Errors(t *testing.T) {
 	defer down.Close()
 	_, err = newTestSportsService(down.URL).GetTeamGameFor("mlb", "NYY")
 	assert.ErrorContains(t, err, "ESPN API returned status 502")
-}
-
-func TestGetTeamGame_OldWidgetFormat(t *testing.T) {
-	srv, path := fakeESPN(t, `{"events":[]}`)
-
-	_, err := newTestSportsService(srv.URL).GetTeamGame(&models.NewsWidget{COUNTRY: "nfl", LANGUAGE: "Buffalo Bills (BUF)"})
-
-	require.NoError(t, err)
-	assert.Equal(t, "/apis/site/v2/sports/football/nfl/teams/BUF/schedule", *path)
 }
 
 func parseSchedule(t *testing.T, body string) *SportAPIResponse {
@@ -130,7 +119,7 @@ func TestGetGoodNews_FakeServer(t *testing.T) {
 		w.Write([]byte(`{"articles":[{"title":"Puppy rescued","description":"A happy ending"}]}`))
 	}))
 	defer srv.Close()
-	s := NewNewsWidgetService(nil, "news-key")
+	s := NewNewsService("news-key")
 	s.baseURL = srv.URL
 
 	news, err := s.GetGoodNews()
