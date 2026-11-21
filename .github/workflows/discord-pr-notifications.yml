@@ -1,6 +1,7 @@
 name: Discord PR Notifications
 
-# Just what's happening on PRs. Shame lives in discord-shame.yml.
+# Just what's happening on PRs. Shame is the shame bot's (dawn-care/InternalTools,
+# fed by shame-bot-forwarder.yml).
 
 on:
   pull_request:
