@@ -255,7 +255,7 @@ function messageFor(shame, pr) {
   let text;
   switch (shame.type) {
     case "behemoth":
-      text = `${who} opened a grotesque behemoth monstrosity 🧌: ${link(pr)} is ${shame.lines.toLocaleString("en-US")} lines`;
+      text = `${who}...you know what you did 🙂‍↔️ (${shame.lines.toLocaleString("en-US")} lines)`;
       break;
     case "late_night":
       text = `${who} needs to go to sleep. Go to sleep ${who} 🫵😐`;

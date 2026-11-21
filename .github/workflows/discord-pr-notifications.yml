@@ -57,6 +57,8 @@ jobs:
           SIZE_TAG=""
           if [ "$PR_LINES_CHANGED" -lt 40 ]; then
             SIZE_TAG=" (a rinky dinky lil guy 🐣, ${PR_LINES_CHANGED} lines)"
+          elif [ "$PR_LINES_CHANGED" -gt 1000 ]; then
+            SIZE_TAG=" (a grotesque behemoth monstrosity 🧌, ${PR_LINES_CHANGED} lines)"
           fi
 
           MESSAGE="🟢 ${PR_AUTHOR} ${VERB} [${TITLE}](${PR_URL})${SIZE_TAG}."
