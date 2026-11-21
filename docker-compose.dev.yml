@@ -13,12 +13,12 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: myuser
-      DB_PASSWORD: mypassword
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env (see .env.example)}
       DB_NAME: mydb
       MINIO_HOST: minio
       MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: localuser
-      MINIO_SECRET_KEY: localpass123
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env (see .env.example)}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env (see .env.example)}
       API_URL: http://localhost:8080
       RUN_MODE: dev
       PORT: 8080
@@ -37,3 +37,10 @@ services:
     ports:
       - "8080:8080"
     volumes: []
+
+  # Development only: MinIO's API and console on this computer (for Option B in README.md,
+  # and http://localhost:9001). Production publishes neither.
+  minio:
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
