@@ -13,13 +13,9 @@ import (
 	"time"
 
 	authCtrlr "server/internal/controllers/auth"
-	configurationCtrlr "server/internal/controllers/configurations"
-	exceptionCtrlr "server/internal/controllers/exceptions"
 	familyCtrlr "server/internal/controllers/family"
 	mediaCtrlr "server/internal/controllers/media"
-	modulesCtrlr "server/internal/controllers/modules"
 	playbackCtrlr "server/internal/controllers/playback"
-	promptsCtrlr "server/internal/controllers/prompts"
 	realtimeCtrlr "server/internal/controllers/realtime"
 	scheduledItemsCtrlr "server/internal/controllers/scheduled_items"
 	screenCtrlr "server/internal/controllers/screen"
@@ -28,13 +24,9 @@ import (
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
 
-	configurationRts "server/internal/routes/configurations"
-	exceptionRts "server/internal/routes/exceptions"
 	familyRts "server/internal/routes/family"
 	mediaRts "server/internal/routes/media"
-	modulesRts "server/internal/routes/modules"
 	playbackRts "server/internal/routes/playback"
-	promptsRts "server/internal/routes/prompts"
 	realtimeRts "server/internal/routes/realtime"
 	scheduledItemsRts "server/internal/routes/scheduled_items"
 	screenRts "server/internal/routes/screen"
@@ -45,13 +37,9 @@ import (
 	newsRts "server/internal/routes/widgets/news"
 
 	authSvc "server/internal/services/auth"
-	configurationSvc "server/internal/services/configurations"
-	exceptionSvc "server/internal/services/exceptions"
 	familySvc "server/internal/services/family"
 	mediaSvc "server/internal/services/media"
-	modulesSvc "server/internal/services/modules"
 	playbackSvc "server/internal/services/playback"
-	promptsSvc "server/internal/services/prompts"
 	scheduledItemsSvc "server/internal/services/scheduled_items"
 	screenSvc "server/internal/services/screen"
 	screenSettingsSvc "server/internal/services/screen_settings"
@@ -207,10 +195,7 @@ func main() {
 	}
 	authService.WithLoginCodes(loginCodes)
 
-	// Agenda
-	modulesService := modulesSvc.NewModuleService(db)
-	configurationService := configurationSvc.NewConfigurationService(db)
-	exceptionService := exceptionSvc.NewExceptionService(db)
+	// Playback
 	playbackService := playbackSvc.NewPlaybackService(db)
 
 	// Screen
@@ -235,12 +220,6 @@ func main() {
 	// Screen (the tablet's view; uses the widget and schedule services above)
 	screenService := screenSvc.NewScreenService(db, weatherService, sportsService, newsService, scheduledItemsService)
 
-	// Prompts
-	messageService := promptsSvc.NewMessageService(db)
-	eventsService := promptsSvc.NewEventService(db)
-	caregiverLocationService := promptsSvc.NewCaregiverLocationService(db)
-	carepartnerLocationService := promptsSvc.NewCarepartnerLocationService(db)
-
 	// ------------ CONTROLLERS ------------
 	// User
 	caregiverCtrl := caregiverCtrlr.NewCaregiverController(caregiverService)
@@ -250,10 +229,7 @@ func main() {
 	// Auth
 	authController := authCtrlr.AuthController{AuthService: authService}
 
-	// Agenda
-	modulesCtrl := modulesCtrlr.NewModuleController(modulesService)
-	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
-	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
+	// Playback
 	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService, tabletHub)
 	realtimeCtrl := realtimeCtrlr.NewRealtimeController(playbackService, carepartnerService, tabletHub, []string{
 		// Browser origins allowed to open a tablet WebSocket (the tablet's web build
@@ -271,12 +247,6 @@ func main() {
 	// Media
 	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
 	familyCtrl := familyCtrlr.NewFamilyController(familyService)
-
-	// Prompts
-	messageCtrl := promptsCtrlr.NewMessageController(messageService)
-	eventsCtrl := promptsCtrlr.NewEventController(eventsService)
-	caregiverLocationCtrl := promptsCtrlr.NewCaregiverLocationController(caregiverLocationService)
-	carepartnerLocationCtrl := promptsCtrlr.NewCarepartnerLocationController(carepartnerLocationService)
 
 	// ------------ ROUTES ------------
 	// User
@@ -315,10 +285,7 @@ func main() {
 		r.Put("/api/me", authController.UpdateMeHandler)
 	})
 
-	// Agenda
-	modulesRts.RegisterModulesRoutes(r, modulesCtrl)
-	configurationRts.RegisterConfigurationsRoutes(r, configurationCtrl)
-	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
+	// Playback
 	playbackRts.RegisterPlaybackRoutes(r, playbackCtrl)
 	realtimeRts.RegisterRealtimeRoutes(r, realtimeCtrl)
 
@@ -334,12 +301,6 @@ func main() {
 
 	// Widgets
 	newsRts.RegisterSportsTeamsRoutes(r)
-
-	// Prompts
-	promptsRts.RegisterMessageRoutes(r, messageCtrl)
-	promptsRts.RegisterEventRoutes(r, eventsCtrl)
-	promptsRts.RegisterCaregiverLocationRoutes(r, caregiverLocationCtrl)
-	promptsRts.RegisterCarepartnerLocationRoutes(r, carepartnerLocationCtrl)
 
 	r.Mount("/swagger", httpSwagger.WrapHandler)
 	// ===============================
