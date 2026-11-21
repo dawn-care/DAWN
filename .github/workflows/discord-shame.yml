@@ -66,6 +66,13 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_USER_MAP: ${{ secrets.DISCORD_USER_MAP }}
         run: |
+          # The PR that adds the shame bot runs this workflow before the
+          # default branch has the script; skip rather than fail.
+          SCRIPT="$GITHUB_WORKSPACE/bot/.github/scripts/shame/shame.mjs"
+          if [ ! -f "$SCRIPT" ]; then
+            echo "::notice::The shame bot isn't on ${{ github.event.repository.default_branch }} yet, so there's nothing to run."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          node "$GITHUB_WORKSPACE/bot/.github/scripts/shame/shame.mjs"
+          node "$SCRIPT"
