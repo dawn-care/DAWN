@@ -357,3 +357,11 @@ your branch ──PR──▶ canary ──PR──▶ main
 ### Hotfixes
 
 There is no shortcut into `main`. A fix goes into `canary` like any other change, then out in a release.
+
+---
+
+## License
+
+DAWN is licensed under the [Apache License, Version 2.0](LICENSE). Copyright 2026 The DAWN Authors; see [NOTICE](NOTICE).
+
+Unless you state otherwise, any contribution you submit to this repository is licensed under the same terms (section 5 of the license).
