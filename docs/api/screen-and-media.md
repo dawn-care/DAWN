@@ -2,7 +2,7 @@
 
 How the caregiver web app and the carepartner tablet talk to the new backend: the media library, screen layouts and widgets, the schedule, and the single endpoint the tablet reads. Written for ticket i332; updated 2026-10-16 (widgets placed on a 4×3 grid; layout presets removed).
 
-> **The old media and widget endpoints have been removed.** Use `/api/media` for photos, videos, and audio, `/api/screen-layout` to configure widgets, and `/api/screen` to read their live data. `/api/widgets/sports/teams` still supplies the team picker. The remaining legacy prompt, module, configuration, and exception endpoints read tables removed by migration 3 and are scheduled for separate cleanup.
+> **The legacy media, widget, prompt, module, configuration, and exception endpoints have been removed.** Use `/api/media` for photos, videos, and audio, `/api/screen-layout` for widgets (including messages and reminders), `/api/scheduled-items` for scheduling and skipped occurrences, and `/api/screen` for the tablet's content. `/api/widgets/sports/teams` still supplies the team picker. Migration 3 removed the old tables, configuration procedures, and `auto_start`; historical migrations remain for database upgrades.
 
 ## Contents
 

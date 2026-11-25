@@ -69,8 +69,8 @@ npm run update:tablet        # EAS Update: publish JS and assets over the air to
 
 ### Playback
 
-- `Module` is the playable unit. There are two media kinds, **video** and **audio**, plus a category label (family message, song, news, weather, and later ones). News and weather reports are videos, not generated cards. The tablet needs only those two players; the category doesn't affect how something plays.
-- Caregiver scheduling stays on `Configuration`, **timed items only**. The untimed routine and `auto_start` go away.
+- `Media` is the playable unit: **photo**, **video**, or **audio**. Category tags do not affect how an item plays. Live news and weather cards are separate screen widgets.
+- Caregiver scheduling uses `ScheduledItem` and `ScheduledItemSkip`, **timed items only**, delivered through `/api/screen`. The legacy `Configuration` API, untimed routine, and `auto_start` have been removed.
 - A scheduled item plays when it is due and hasn't played today, within a grace window (about 10 minutes), not on an exact-minute match.
 - Every play is a `Playback` row on the server with a source (`scheduled`, `staff`, `tap`) and a status (`requested` → `acknowledged` → `started` → `finished` / `stopped` / `failed` / `expired`). The tablet reports each step, including plays it starts itself. Played state lives there, not in memory.
 - Staff-triggered play and stop arrive over a WebSocket, and the tablet acknowledges them. Commands expire after about 30 seconds so a clip never starts late. On reconnect the tablet asks for any live command. The socket also carries a "refresh now" nudge.
