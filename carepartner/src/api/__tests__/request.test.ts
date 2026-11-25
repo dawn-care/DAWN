@@ -31,6 +31,17 @@ describe("getJson", () => {
     });
   });
 
+  it("returns null for 204 No Content without reading a body", async () => {
+    // A real 204 has no body, so reading it as JSON throws
+    const json = jest.fn(async () => {
+      throw new SyntaxError("Unexpected end of JSON input");
+    });
+    globalThis.fetch = jest.fn(async () => ({ ok: true, status: 204, json })) as unknown as typeof fetch;
+
+    await expect(postJson("/tablet-events/touches", { carepartner_id: 7, events: [] })).resolves.toBeNull();
+    expect(json).not.toHaveBeenCalled();
+  });
+
   it("throws an HttpError with the status on an error status", async () => {
     respond({ code: "NOT_FOUND" }, 404);
 

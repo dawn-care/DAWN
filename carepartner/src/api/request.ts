@@ -22,6 +22,7 @@ export class HttpError extends Error {
 /**
  * GETs `path` (relative to `API_URL`, such as "/media/9") and returns the
  * parsed JSON, unchecked; callers check its shape where it enters the app.
+ * A `204 No Content` answer returns `null`.
  * Throws an `HttpError` for an error status, and another error for a network
  * failure or a request that takes longer than `timeoutMs`.
  */
@@ -49,6 +50,9 @@ async function requestJson(path: string, init: RequestInit, { timeoutMs = REQUES
   try {
     const res = await fetch(`${API_URL}${path}`, { ...init, signal: controller.signal });
     if (!res.ok) throw new HttpError(path, res.status);
+    // A 204 has no body to parse. Reading one would throw, which a report queue
+    // takes for a network failure and retries forever, holding up later reports.
+    if (res.status === 204) return null;
     return await res.json();
   } finally {
     clearTimeout(timer);
