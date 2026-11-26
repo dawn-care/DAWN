@@ -22,7 +22,7 @@ import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useToast } from "../components/ui/toastContext";
 import { useAuth } from "../context/AuthContext";
-import { useLogout } from "../context/session";
+import { notifyUnauthorized, useLogout } from "../context/session";
 
 // The same two buttons as the rest of the app: one filled (the main action), one outlined (everything else)
 const PRIMARY_BUTTON = `h-11 px-[18px] flex items-center justify-center gap-2 rounded-[10px] border-2 border-accent bg-accent hover:brightness-95 text-on-accent text-base font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default ${FOCUS_RING}`;
@@ -131,6 +131,11 @@ export default function SettingsPage() {
         // The server sets the role from this too, so send the one it gave us
         body: JSON.stringify({ id: user.id, name: trimmed, role: user.role ?? "" }),
       });
+
+      if (res.status === 401) {
+        notifyUnauthorized();
+        return;
+      }
 
       if (!res.ok) {
         setSaveError(await saveNameError(res));

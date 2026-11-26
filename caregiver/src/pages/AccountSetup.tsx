@@ -30,7 +30,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import TextField from "../components/ui/form/TextField";
 import { FOCUS_RING } from "../components/ui/styles";
 import { useAuth } from "../context/AuthContext";
-import { fetchCurrentUser, useLogout } from "../context/session";
+import { fetchCurrentUser, notifyUnauthorized, useLogout } from "../context/session";
 import { pairingErrorWording } from "./pairingErrors";
 
 /* ============================
@@ -154,6 +154,11 @@ export default function AccountSetupPage() {
           carepartner_name: carePartnerName.trim(),
         }),
       });
+
+      if (res.status === 401) {
+        notifyUnauthorized();
+        return;
+      }
 
       if (!res.ok) {
         setSubmitError(await pairingError(res));

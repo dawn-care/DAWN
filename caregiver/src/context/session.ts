@@ -16,6 +16,22 @@ import type { User } from "./AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+type UnauthorizedListener = () => void;
+const unauthorizedListeners = new Set<UnauthorizedListener>();
+
+/** Subscribes to 401 responses from API helpers; returns an unsubscribe function */
+export function onUnauthorized(listener: UnauthorizedListener): () => void {
+  unauthorizedListeners.add(listener);
+  return () => {
+    unauthorizedListeners.delete(listener);
+  };
+}
+
+/** Tells RequireLogin that the server rejected the session (401), so it sends the caregiver to /login */
+export function notifyUnauthorized(): void {
+  unauthorizedListeners.forEach((listener) => listener());
+}
+
 /** The signed-in caregiver, or null when nobody is (401). Throws on any other answer */
 export async function fetchCurrentUser(): Promise<User | null> {
   const res = await fetch(`${API_URL}/me`, { credentials: "include" });

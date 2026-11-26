@@ -100,7 +100,7 @@ async function commitRemoval(
     await deleteMedia(removed.id);
   } catch (err) {
     // Already gone (deleted somewhere else) is the outcome the caregiver wanted
-    if (!(err instanceof ApiError && err.status === 404)) {
+    if (!(err instanceof ApiError && (err.status === 404 || err.status === 401))) {
       showToast(
         `Couldn't remove "${removed.display_name}". ${friendlyError(err)}`,
       );
@@ -235,7 +235,7 @@ export default function Media() {
         setLoadError(null);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || (err instanceof ApiError && err.status === 401)) return;
         // A refresh that fails leaves what is already on screen; only a first load has nothing to show
         if (loadedFor.current === activeCarePartnerId) {
           toast.show(`Couldn't refresh the list. ${friendlyError(err)}`, {

@@ -13,6 +13,7 @@
  * listMedia in ../media/api.
  */
 
+import { notifyUnauthorized } from "../context/session";
 import { ApiError } from "../media/api";
 import type { Repeat } from "../media/api";
 import type { MediaKind } from "../media/constants";
@@ -109,7 +110,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+    res = await fetch(`${API_URL}${path}`, { ...init, credentials: "include", headers });
   } catch (err) {
     // A request the caller cancelled is not a failure to report
     if (err instanceof DOMException && err.name === "AbortError") throw err;
@@ -117,6 +118,10 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(0, "NETWORK_ERROR", "could not reach the server");
   }
   if (res.status === 204) return undefined as T;
+  if (res.status === 401) {
+    notifyUnauthorized();
+    throw new ApiError(res.status, "UNAUTHORIZED", "unauthorized");
+  }
 
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -193,7 +198,7 @@ export function deleteScheduledItem(id: number, target: DeleteScope): Promise<vo
  * result to wait for.
  */
 export function deleteScheduledItemOnExit(id: number, target: DeleteScope): void {
-  void fetch(`${API_URL}${deletePath(id, target)}`, { method: "DELETE", keepalive: true }).catch(() => {
+  void fetch(`${API_URL}${deletePath(id, target)}`, { method: "DELETE", credentials: "include", keepalive: true }).catch(() => {
     // Nothing can be shown once the page is closing; the item is simply still there next visit
   });
 }

@@ -12,6 +12,7 @@
  * `activeCarePartnerId`), as the server expects it in the query or body.
  */
 
+import { notifyUnauthorized } from "../context/session";
 import { ERROR_MESSAGES, GENERIC_ERROR } from "./constants";
 import type { MediaKind, Situation } from "./constants";
 
@@ -104,7 +105,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+    res = await fetch(`${API_URL}${path}`, { ...init, credentials: "include", headers });
   } catch (err) {
     // A request the caller cancelled is not a failure to report
     if (err instanceof DOMException && err.name === "AbortError") throw err;
@@ -112,6 +113,10 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(0, "NETWORK_ERROR", "could not reach the server");
   }
   if (res.status === 204) return undefined as T;
+  if (res.status === 401) {
+    notifyUnauthorized();
+    throw new ApiError(res.status, "UNAUTHORIZED", "unauthorized");
+  }
 
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -206,7 +211,7 @@ export function deleteMedia(id: number): Promise<void> {
  * so there is no result to wait for.
  */
 export function deleteMediaOnExit(id: number): void {
-  void fetch(`${API_URL}/media/${id}`, { method: "DELETE", keepalive: true }).catch(() => {
+  void fetch(`${API_URL}/media/${id}`, { method: "DELETE", credentials: "include", keepalive: true }).catch(() => {
     // Nothing can be shown once the page is closing; the item is simply still there next visit
   });
 }

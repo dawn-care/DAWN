@@ -19,10 +19,10 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { FOCUS_RING } from "./ui/styles";
 import { useAuth } from "../context/AuthContext";
-import { fetchCurrentUser, useSignIn } from "../context/session";
+import { fetchCurrentUser, onUnauthorized, useSignIn } from "../context/session";
 
 export default function RequireLogin() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, setIsAuthenticated, setUser } = useAuth();
   const signIn = useSignIn();
   const location = useLocation();
   // What the server said: still waiting, nobody signed in, or no usable answer
@@ -31,7 +31,15 @@ export default function RequireLogin() {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (isAuthenticated) return;
+    return onUnauthorized(() => {
+      setAnswer("loggedOut");
+      setIsAuthenticated(false);
+      setUser(null);
+    });
+  }, [setIsAuthenticated, setUser]);
+
+  useEffect(() => {
+    if (isAuthenticated || answer !== "checking") return;
 
     let current = true;
     fetchCurrentUser()
@@ -49,7 +57,7 @@ export default function RequireLogin() {
     return () => {
       current = false;
     };
-  }, [isAuthenticated, signIn, attempt]);
+  }, [isAuthenticated, answer, signIn, attempt]);
 
   if (isAuthenticated) return <Outlet />;
   if (answer === "loggedOut") {

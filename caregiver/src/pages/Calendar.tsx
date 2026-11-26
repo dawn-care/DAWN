@@ -83,7 +83,7 @@ async function commitRemoval(
     await deleteScheduledItem(removal.id, removal.target);
   } catch (err) {
     // Already gone (deleted somewhere else) is the outcome the caregiver wanted
-    const alreadyGone = err instanceof ApiError && (err.status === 404 || err.code === "NOT_AN_OCCURRENCE");
+    const alreadyGone = err instanceof ApiError && (err.status === 404 || err.status === 401 || err.code === "NOT_AN_OCCURRENCE");
     if (!alreadyGone) showToast(`Couldn't remove "${name}". ${friendlyError(err)}`);
   } finally {
     pendingRemovals.delete(key);
@@ -171,7 +171,7 @@ export default function Calendar() {
         if (!cancelled) setLibrary(list);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || (err instanceof ApiError && err.status === 401)) return;
         toast.show(`Couldn't load the photos, videos and audio to choose from. ${friendlyError(err)}`, {
           actionLabel: "Try again",
           onAction: () => setLibraryKey((key) => key + 1),
@@ -281,7 +281,7 @@ export default function Calendar() {
       setEditingAwake(false);
       setForm({ key: formCount.current, initial, editing: { item, occurrenceDate: date } });
     } catch (err) {
-      if (request === openRequest.current) toast.show(friendlyError(err));
+      if (request === openRequest.current && !(err instanceof ApiError && err.status === 401)) toast.show(friendlyError(err));
     }
   };
 

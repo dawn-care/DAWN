@@ -15,6 +15,7 @@
  */
 
 import type { GridCell } from "@shared";
+import { notifyUnauthorized } from "../context/session";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -111,10 +112,14 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { ...init, headers });
+    res = await fetch(`${API_URL}${path}`, { ...init, credentials: "include", headers });
   } catch (err) {
     console.error(`${init.method ?? "GET"} ${path} could not reach the server`, err);
     throw new ApiError(0, "NETWORK_ERROR", "could not reach the server");
+  }
+  if (res.status === 401) {
+    notifyUnauthorized();
+    throw new ApiError(res.status, "UNAUTHORIZED", "unauthorized");
   }
 
   const body = await res.json().catch(() => null);
