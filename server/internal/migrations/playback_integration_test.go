@@ -33,7 +33,7 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 			require.NoError(t, err)
 			defer db.Close()
 			var before map[string]string
-			var carepartnersBefore string
+			var carepartnersBefore, caregiversBefore string
 			if legacy {
 				initial, err := files.ReadFile("sql/00001_initial_schema.sql")
 				require.NoError(t, err)
@@ -43,6 +43,7 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 				require.NoError(t, err)
 				before = snapshot(t, db, schema)
 				carepartnersBefore = carepartnerCore(t, db)
+				caregiversBefore = caregiverCore(t, db)
 				require.NoError(t, Baseline(ctx, db))
 			}
 			require.NoError(t, Up(ctx, db))
@@ -51,11 +52,12 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 				// Migration 3 drops the old content tables and reshapes Carepartner, so compare
 				// the tables it keeps as they are, and carepartners by identity, name and caregiver.
 				after := snapshot(t, db, schema)
-				for _, kept := range []string{"Caregiver", "Caregiver_id_seq", "Carepartner_id_seq",
+				for _, kept := range []string{"Caregiver_id_seq", "Carepartner_id_seq",
 					"Session", "Session_id_seq", "DevicePairing", "DevicePairing_id_seq"} {
 					require.Equal(t, before[kept], after[kept], "existing %s must be preserved", kept)
 				}
 				require.Equal(t, carepartnersBefore, carepartnerCore(t, db), "existing carepartners must be preserved")
+				require.Equal(t, caregiversBefore, caregiverCore(t, db), "existing caregivers must be preserved")
 			}
 			var applied int
 			require.NoError(t, db.QueryRow(`SELECT count(*) FROM goose_db_version WHERE version_id = 2 AND is_applied`).Scan(&applied))
@@ -118,6 +120,16 @@ func TestPlaybackMigrationIntegration(t *testing.T) {
 			require.Equal(t, 2, unlinked)
 		})
 	}
+}
+
+// caregiverCore lists caregivers by the fields every migration keeps. Migration 10 adds email and moves
+// the demo caregiver's seeded email out of google_id, so that one value is not compared.
+func caregiverCore(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	var core string
+	require.NoError(t, db.QueryRow(`SELECT COALESCE(jsonb_agg(jsonb_build_array(id, name, role, NULLIF(google_id, 'test.caregiver@example.com')) ORDER BY id), '[]')::text
+		FROM "Caregiver"`).Scan(&core))
+	return core
 }
 
 // carepartnerCore lists carepartners by the fields every migration keeps

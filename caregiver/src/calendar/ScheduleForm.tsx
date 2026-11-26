@@ -24,6 +24,7 @@ import IconButton from "../components/ui/IconButton";
 import { FOCUS_RING } from "../components/ui/styles";
 import PhotoPicker from "../components/ui/PhotoPicker";
 import RadioGroup from "../components/ui/form/RadioGroup";
+import ListSelectField from "../components/ui/form/ListSelectField";
 import RadioOption from "../components/ui/form/RadioOption";
 import SegmentedControl from "../components/ui/form/SegmentedControl";
 import SelectField from "../components/ui/form/SelectField";
@@ -286,11 +287,11 @@ export default function ScheduleForm({
         onChange={(event) => patch({ date: event.target.value })}
       />
 
-      <SelectField
+      <ListSelectField
         label="Time"
         value={formatClock(values.minute) ?? ""}
-        onChange={(event) => {
-          const [hour, minute] = event.target.value.split(":").map(Number);
+        onValueChange={(clock) => {
+          const [hour, minute] = clock.split(":").map(Number);
           patch({ minute: hour * 60 + minute });
         }}
         options={options.map((minute) => ({

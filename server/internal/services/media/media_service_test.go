@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -191,6 +192,18 @@ func TestUpload_Unreadable(t *testing.T) {
 
 	_, err := svc.Upload(context.Background(), UploadInput{
 		CarepartnerID: 1, Kind: "video", DisplayName: "Clip", MimeType: "video/mp4", File: strings.NewReader("abc"),
+	})
+
+	assert.ErrorIs(t, err, ErrUnreadableMedia)
+	assert.Empty(t, store.putKey)
+}
+
+// A file that probes as 0 seconds (e.g. a recording with no timed data) has no length to store
+func TestUpload_NoLengthIsUnreadable(t *testing.T) {
+	svc, _, store, _ := newTestService(t, 0, nil)
+
+	_, err := svc.Upload(context.Background(), UploadInput{
+		CarepartnerID: 1, Kind: "audio", DisplayName: "Voice recording", MimeType: "audio/webm", File: strings.NewReader("abc"),
 	})
 
 	assert.ErrorIs(t, err, ErrUnreadableMedia)
@@ -516,6 +529,89 @@ func TestFFProbeDuration(t *testing.T) {
 
 	_, err := FFProbeDuration(ctx, "../../utils/testFiles/test_photo.png")
 	assert.Error(t, err, "a still image has no duration")
+}
+
+// ffmpegEncodes reports whether the installed ffmpeg has all of these encoders (builds without libopus or libvpx exist)
+func ffmpegEncodes(t *testing.T, encoders ...string) bool {
+	out, err := exec.Command("ffmpeg", "-hide_banner", "-encoders").Output()
+	if err != nil {
+		return false
+	}
+	for _, encoder := range encoders {
+		if !regexp.MustCompile(`\s` + regexp.QuoteMeta(encoder) + `\s`).Match(out) {
+			t.Logf("ffmpeg has no %s encoder", encoder)
+			return false
+		}
+	}
+	return true
+}
+
+/*
+A WebM recorded in the browser (MediaRecorder) stores no duration, so it is read
+from the packets. ffmpeg's live mode writes the same kind of file: 3 seconds of
+Opus audio (a voice recording), and VP9 video with Opus audio (a camera
+recording), as Chrome and Firefox record them.
+*/
+func TestFFProbeDuration_WebMWithoutDuration(t *testing.T) {
+	for _, tool := range []string{"ffmpeg", "ffprobe"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skip(tool + " not installed")
+		}
+	}
+	ctx := context.Background()
+
+	cases := []struct {
+		name     string
+		encoders []string
+		args     []string
+	}{
+		{"voice", []string{"libopus"}, []string{"-i", "../../utils/testFiles/test_audio.mp3", "-t", "3", "-c:a", "libopus"}},
+		{"camera", []string{"libvpx-vp9", "libopus"}, []string{
+			"-f", "lavfi", "-i", "testsrc=size=320x240:rate=30", "-f", "lavfi", "-i", "sine",
+			"-t", "3", "-c:v", "libvpx-vp9", "-deadline", "realtime", "-c:a", "libopus",
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !ffmpegEncodes(t, tc.encoders...) {
+				t.Skip("this ffmpeg can't write the file")
+			}
+			path := filepath.Join(t.TempDir(), "recording.webm")
+			args := append(append([]string{"-v", "error"}, tc.args...), "-live", "1", "-f", "webm", path)
+			out, err := exec.CommandContext(ctx, "ffmpeg", args...).CombinedOutput()
+			require.NoError(t, err, string(out))
+
+			// Without this the test would pass without reaching the fallback
+			stored, err := exec.CommandContext(ctx, "ffprobe", "-v", "error",
+				"-show_entries", "format=duration", "-of", "csv=p=0", path).Output()
+			require.NoError(t, err)
+			require.Equal(t, "N/A", strings.TrimSpace(string(stored)), "the file should store no duration")
+
+			seconds, err := FFProbeDuration(ctx, path)
+			require.NoError(t, err)
+			assert.InDelta(t, 3.0, seconds, 0.1)
+		})
+	}
+}
+
+func TestParseLastPacketEnd(t *testing.T) {
+	// Audio and video packets interleave, so the last line isn't always the latest; video lines can have an extra empty field
+	out := "0.000000,0.060000\n0.000000,0.033000,\n2.941000,0.060000\n2.936000,0.001000,\n\n"
+	end, err := parseLastPacketEnd(strings.NewReader(out))
+	require.NoError(t, err)
+	assert.InDelta(t, 3.001, end, 1e-9)
+
+	end, err = parseLastPacketEnd(strings.NewReader("1.500000,N/A\n"))
+	require.NoError(t, err)
+	assert.InDelta(t, 1.5, end, 1e-9, "a missing packet duration counts as 0")
+
+	_, err = parseLastPacketEnd(strings.NewReader("N/A,N/A\n\n"))
+	assert.Error(t, err, "no timed packets")
+
+	// Windows line endings, as ffprobe writes them there
+	end, err = parseLastPacketEnd(strings.NewReader("0.5,0.5\r\n2.0,0.25\r\n"))
+	require.NoError(t, err)
+	assert.InDelta(t, 2.25, end, 1e-9)
 }
 
 func TestSetTags_NoneTakesItOutOfTheStaffApp(t *testing.T) {

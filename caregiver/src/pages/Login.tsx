@@ -3,7 +3,8 @@
  * 
  * User: Caregiver
  * 
- * This component handles user authentication via Google OAuth. The page is a
+ * This component handles user authentication via Google OAuth, or an emailed
+ * 6-digit code (EmailSignIn, for caregivers without a Google account). The page is a
  * brand panel (the nav bar's dark surface, with a sunrise) beside the sign-in card.
  * 
  * Responsibilities:
@@ -26,6 +27,7 @@ import { Calendar, Image, Monitor, Users } from "lucide-react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { fetchCurrentUser, pathAfterLogin, useSignIn } from "../context/session";
+import EmailSignIn from "../login/EmailSignIn";
 
 const FEATURES = [
   { icon: Monitor, text: "Choose what your carepartner sees every day" },
@@ -165,6 +167,17 @@ const Login = () => {
   };
 
   /**
+   * After the server has started a session by an emailed code: load who signed in and
+   * store them in global context, which redirects (see the render). False if nobody is signed in.
+   */
+  const finishSignIn = async () => {
+    const signedIn = await fetchCurrentUser();
+    if (!signedIn) return false;
+    signIn(signedIn);
+    return true;
+  };
+
+  /**
    * Handles Google login error
    */
   const handleError = () => {
@@ -231,11 +244,14 @@ const Login = () => {
           <div className="flex flex-col gap-2">
             <h1 className="m-0 text-3xl font-extrabold">Welcome</h1>
             <p className="m-0 text-lg text-ink-muted">
-              Log in or sign up with Google.
+              Log in or sign up with Google or your email.
             </p>
           </div>
 
-          <div className="flex justify-center min-h-11">
+          {/* Google's button is a light-themed iframe slightly bigger than the button. In dark mode a
+              color-scheme mismatch makes the browser paint the whole iframe opaque, a light box around
+              the button; keeping this wrapper light leaves the iframe transparent. */}
+          <div className="flex justify-center min-h-11 [color-scheme:light]">
             <GoogleLogin onSuccess={handleSuccess} onError={handleError} />
           </div>
 
@@ -254,8 +270,16 @@ const Login = () => {
             </p>
           )}
 
+          <div className="flex items-center gap-3 text-sm text-ink-muted">
+            <span aria-hidden="true" className="flex-1 border-t border-border" />
+            or use your email
+            <span aria-hidden="true" className="flex-1 border-t border-border" />
+          </div>
+
+          <EmailSignIn onSignedIn={finishSignIn} />
+
           <p className="m-0 pt-4 border-t border-border text-sm text-ink-muted">
-            New here? Signing in with Google creates your account.
+            New here? Signing in with Google or your email creates your account.
           </p>
         </div>
       </main>

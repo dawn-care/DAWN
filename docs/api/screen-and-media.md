@@ -2,7 +2,7 @@
 
 How the caregiver web app and the carepartner tablet talk to the new backend: the media library, screen layouts and widgets, the schedule, and the single endpoint the tablet reads. Written for ticket i332; updated 2026-10-16 (widgets placed on a 4×3 grid; layout presets removed).
 
-> **The old endpoints are going away.** `/api/photo`, `/api/video`, `/api/audio`, `/api/weather`, `/api/news`, `/api/sports`, the prompt endpoints, modules, configurations and exceptions all read tables that no longer exist, so they return database errors on a fresh database. Move to the endpoints in this guide; the old Go code is removed in a follow-up ticket.
+> **The old media and widget endpoints have been removed.** Use `/api/media` for photos, videos, and audio, `/api/screen-layout` to configure widgets, and `/api/screen` to read their live data. `/api/widgets/sports/teams` still supplies the team picker. The remaining legacy prompt, module, configuration, and exception endpoints read tables removed by migration 3 and are scheduled for separate cleanup.
 
 ## Contents
 
@@ -274,7 +274,7 @@ Upload a file as `multipart/form-data`. Returns `201` with the new `Media`.
 | `situations` | optional, repeat the field for each |
 | `family_member_ids` | optional, repeat the field for each; must be this carepartner's |
 
-Video and audio over 10 minutes are rejected with `MEDIA_TOO_LONG`. Files over 1 GB get `FILE_TOO_LARGE`. Accepted types: photos JPEG, PNG, GIF, WebP, HEIC; videos MP4, MOV, WebM, Ogg; audio MP3, WAV, M4A, Ogg, WebM.
+Video and audio over 10 minutes are rejected with `MEDIA_TOO_LONG`. Files over 1 GB get `FILE_TOO_LARGE`. Accepted types: photos JPEG, PNG, GIF, WebP, HEIC; videos MP4, MOV, WebM, Ogg; audio MP3, WAV, M4A, Ogg, WebM. The server reads the length of video and audio itself (ffprobe), including WebM recorded in a browser, which stores none: its length is read from where its latest packet ends. A file whose length can't be read, or is 0 seconds, gets `UNREADABLE_MEDIA`. An MP4 sent as audio must be named `.m4a`.
 
 ```ts
 const form = new FormData();
@@ -809,7 +809,7 @@ If this guide and the server ever disagree, the server is right; please update t
 | Media | `server/internal/routes/media/media.go` | `server/internal/models/media/media_model.go`, `server/internal/services/media/media_service.go`, `server/internal/controllers/media/media_controller.go` |
 | Screen settings | `server/internal/routes/screen_settings/` | `server/internal/services/screen_settings/screen_settings_service.go` (awake hour limits) |
 | Screen layout | `server/internal/routes/screen_widgets/` | `server/internal/models/screen_widgets/` (`layout.go` request and response types, `grid_area.go` corners to size), `server/internal/services/screen_widgets/` (`grid.go` grid size and corner and overlap checks, `screen_widget_service.go` saving, `config.go` settings per type) |
-| Sports teams | `server/internal/routes/widgets/news/sports_news.go` | `server/internal/services/widgets/news/sports_teams.go` |
+| Sports teams | `server/internal/routes/widgets/news/sports_teams.go` | `server/internal/services/widgets/news/sports_teams.go` |
 | Scheduled items and calendar | `server/internal/routes/scheduled_items/` | `server/internal/models/scheduled_items/scheduled_item_model.go` (`ScheduledItem`, `Occurrence`), `server/internal/services/scheduled_items/` (`recurrence.go`, validation) |
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
 | Playback | `server/internal/routes/playback/playback.go` | `server/internal/models/playback/playback_model.go`, `server/internal/services/playback/playback_service.go` (source and status rules) |

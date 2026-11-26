@@ -1,0 +1,66 @@
+name: Internal Tools Forwarder
+
+# The team's Discord bots live in dawn-care/Internal-Tools: the PR
+# notifications (pr-notifications.yml) and the shame bot (shame-bot/). This
+# only tells them what happens on PRs here, as a "pr-event"
+# repository_dispatch trimmed to the fields they use. They read anything else
+# they need from this repo (it's public) and post on their own.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, review_requested, closed]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  forward:
+    # Fork PRs never get the token. Comments only from the team, on PRs.
+    if: >-
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name != 'issue_comment' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Forward to Internal-Tools
+        env:
+          # Fine-grained token with Contents: write on dawn-care/Internal-Tools only
+          GH_TOKEN: ${{ secrets.TOOLS_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::TOOLS_DISPATCH_TOKEN isn't set, so nothing was forwarded."
+            exit 0
+          fi
+          jq -c --arg event "$GITHUB_EVENT_NAME" --arg repo "$GITHUB_REPOSITORY" '
+            def keep: with_entries(select(.value != null));
+            {
+              event_type: "pr-event",
+              client_payload: {
+                repo: $repo,
+                event: $event,
+                payload: ({
+                  action,
+                  sender: (.sender | {login, type}),
+                  requested_reviewer: (.requested_reviewer | if . then {login} else null end),
+                  pull_request: (.pull_request | if . then {
+                    number, title, html_url, created_at, updated_at, closed_at, merged_at, merged, draft,
+                    user: {login: .user.login},
+                    merged_by: (.merged_by | if . then {login} else null end),
+                    requested_reviewers: [.requested_reviewers[]? | {login}],
+                    head: {repo: {full_name: .head.repo.full_name}}
+                  } else null end),
+                  review: (.review | if . then {
+                    id, state, submitted_at, author_association, user: (.user | {login, type})
+                  } else null end),
+                  comment: (.comment | if . then {
+                    created_at, author_association, user: (.user | {login, type})
+                  } else null end),
+                  issue: (.issue | if . then {
+                    number, title, html_url, pull_request: (.pull_request != null)
+                  } else null end)
+                } | keep)
+              }
+            }' "$GITHUB_EVENT_PATH" | gh api repos/dawn-care/Internal-Tools/dispatches --input -

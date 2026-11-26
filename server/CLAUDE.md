@@ -25,6 +25,6 @@ baselining is required. Do not bypass failed schema checks or delete volumes.
 
 Safety tests: `go test -race ./internal/db ./internal/migrations`.
 
-Integration tests also run when `MIGRATION_TEST_DSN` is set to a disposable
+Integration tests (including the sign-in code and Google/email account linking tests) also run when `MIGRATION_TEST_DSN` is set to a disposable
 PostgreSQL database (lib/pq keyword connection string). They create and remove
 isolated test schemas. Never point this setting at an application database.

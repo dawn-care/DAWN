@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,8 +28,6 @@ import (
 	tabletEventsCtrlr "server/internal/controllers/tablet_events"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
-	newsCtrlr "server/internal/controllers/widgets/news"
-	weatherCtrlr "server/internal/controllers/widgets/weather"
 
 	configurationRts "server/internal/routes/configurations"
 	exceptionRts "server/internal/routes/exceptions"
@@ -44,7 +45,6 @@ import (
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
-	weatherRts "server/internal/routes/widgets/weather"
 
 	authSvc "server/internal/services/auth"
 	configurationSvc "server/internal/services/configurations"
@@ -81,6 +81,8 @@ import (
 	mw "server/internal/middleware"
 	"server/internal/migrations"
 	"server/internal/realtime"
+	emailSvc "server/internal/services/email"
+	"server/internal/webapp"
 )
 
 func getEnvOrDefault(key, fallback string) string {
@@ -91,18 +93,59 @@ func getEnvOrDefault(key, fallback string) string {
 	return val
 }
 
+// newLoginCodes sets up sign-in with an emailed code. It is always on: outside development it
+// needs a mail server (SMTP_*) and LOGIN_CODE_SECRET, and the server does not start without
+// them. In development with no SMTP_HOST the email is printed to the log, and with no
+// LOGIN_CODE_SECRET a random one is made for this run (codes then stop working on a restart).
+func newLoginCodes(getenv func(string) string, db *sql.DB) (authSvc.LoginCodeService, error) {
+	devMode := getenv("RUN_MODE") == "dev"
+	mailer, err := emailSvc.NewMailerFromEnv(getenv, devMode)
+	if err != nil {
+		return nil, err
+	}
+	if mailer == nil {
+		return nil, errors.New("SMTP_HOST is not set (see .env.example)")
+	}
+
+	secret := []byte(getenv("LOGIN_CODE_SECRET"))
+	if len(secret) == 0 && devMode {
+		secret = make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return nil, fmt.Errorf("making a development LOGIN_CODE_SECRET: %w", err)
+		}
+		log.Print("LOGIN_CODE_SECRET is not set; using a random one until the server restarts (development only)")
+	}
+	codes, err := authSvc.NewLoginCodeService(db, mailer, secret)
+	if err != nil {
+		// Returning codes here would wrap a nil pointer in a non-nil LoginCodeService
+		return nil, err
+	}
+	return codes, nil
+}
+
+// allowedOriginsFor lists the browser pages allowed to call the API with cookies. Production
+// trusts only its own https site (the caregiver app is served from it); the localhost
+// development servers are trusted only in development.
+func allowedOriginsFor(devMode bool) []string {
+	if devMode {
+		return []string{
+			"http://localhost:5173",
+			"http://localhost:8081",
+			"http://localhost:8082", // staff app web build in development
+		}
+	}
+	return []string{"https://startup-da.gccis.rit.edu"}
+}
+
 func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// Browser pages allowed to call the API. The sign-in routes trust the same origins.
+	allowedOrigins := allowedOriginsFor(os.Getenv("RUN_MODE") == "dev")
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"http://localhost:5173",
-			"http://localhost:8081",
-			"http://localhost:8082", // staff app web build in development
-			"http://startup-da.gccis.rit.edu",
-		},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -161,6 +204,11 @@ func main() {
 	googleService := authSvc.NewGoogleAuthService()
 	sessionService := authSvc.NewSessionService(db)
 	authService := authSvc.NewAuthService(googleService, caregiverService, carepartnerService, sessionService)
+	loginCodes, err := newLoginCodes(os.Getenv, db)
+	if err != nil {
+		log.Fatal("sign-in with an emailed code: ", err)
+	}
+	authService.WithLoginCodes(loginCodes)
 
 	// Agenda
 	modulesService := modulesSvc.NewModuleService(db)
@@ -178,18 +226,15 @@ func main() {
 	go playbackService.RunExpirySweep(context.Background(), 5*time.Second)
 
 	// Media
-	audioService := mediaSvc.NewAudioService(db, minioClient, "media")
-	photoService := mediaSvc.NewPhotoService(db, minioClient, "media")
-	videoService := mediaSvc.NewVideoService(db, minioClient, "media")
 	mediaService := mediaSvc.NewMediaService(db, minioClient, "media")
 	familyService := familySvc.NewFamilyService(db)
 
 	// Widgets
 	openWeatherKey := getEnvOrDefault("OPENWEATHER_API_KEY", "")
 	newsAPIKey := getEnvOrDefault("NEWS_API_KEY", "")
-	newsService := newsSvc.NewNewsWidgetService(db, newsAPIKey)
-	sportsService := newsSvc.NewSportsNewsWidgetService(db)
-	weatherService := weatherSvc.NewWeatherService(db, openWeatherKey)
+	newsService := newsSvc.NewNewsService(newsAPIKey)
+	sportsService := newsSvc.NewSportsService()
+	weatherService := weatherSvc.NewWeatherService(openWeatherKey)
 
 	// Screen (the tablet's view; uses the widget and schedule services above)
 	screenService := screenSvc.NewScreenService(db, weatherService, sportsService, newsService, scheduledItemsService)
@@ -229,16 +274,8 @@ func main() {
 	screenCtrl := screenCtrlr.NewScreenController(screenService)
 
 	// Media
-	audioCtrl := mediaCtrlr.NewAudioController(audioService)
-	photoCtrl := mediaCtrlr.NewPhotoController(photoService)
-	videoCtrl := mediaCtrlr.NewVideoController(videoService)
 	mediaCtrl := mediaCtrlr.NewMediaController(mediaService)
 	familyCtrl := familyCtrlr.NewFamilyController(familyService)
-
-	// Widgets
-	newsCtrl := newsCtrlr.NewNewsWidgetController(newsService)
-	sportsCtrl := newsCtrlr.NewSportsNewsWidgetController(sportsService)
-	weatherCtrl := weatherCtrlr.NewWeatherWidgetController(weatherService)
 
 	// Prompts
 	messageCtrl := promptsCtrlr.NewMessageController(messageService)
@@ -265,8 +302,16 @@ func main() {
 	})
 
 	// Auth
-	r.Post("/api/auth/google", authController.GoogleLogin)
-	r.Post("/api/auth/logout", authController.Logout)
+	// A sign-in request has no session cookie yet, so SameSite cannot stop another site's page
+	// from making it; these routes also refuse cross-site requests.
+	crossOrigin, err := mw.CrossOriginProtection(allowedOrigins)
+	if err != nil {
+		log.Fatal("cross-origin protection: ", err)
+	}
+	r.With(crossOrigin).Post("/api/auth/google", authController.GoogleLogin)
+	r.With(crossOrigin).Post("/api/auth/email/code", authController.RequestEmailCode)
+	r.With(crossOrigin).Post("/api/auth/email/verify", authController.VerifyEmailCode)
+	r.With(crossOrigin).Post("/api/auth/logout", authController.Logout)
 
 	// Protected route (test route - update later w protected routes)
 	r.Group(func(r chi.Router) {
@@ -290,17 +335,11 @@ func main() {
 	screenRts.RegisterScreenRoutes(r, screenCtrl)
 
 	// Media
-	mediaRts.RegisterAudioRoutes(r, audioCtrl)
-	mediaRts.RegisterPhotoRoutes(r, photoCtrl)
-	mediaRts.RegisterVideoRoutes(r, videoCtrl)
 	mediaRts.RegisterMediaRoutes(r, mediaCtrl)
 	familyRts.RegisterFamilyRoutes(r, familyCtrl)
 
 	// Widgets
-	newsRts.RegisterNewsWidgetRoutes(r, newsCtrl)
-	newsRts.RegisterSportsNewsWidgetRoutes(r, sportsCtrl)
 	newsRts.RegisterSportsTeamsRoutes(r)
-	weatherRts.RegisterWeatherWidgetRoutes(r, weatherCtrl)
 
 	// Prompts
 	promptsRts.RegisterMessageRoutes(r, messageCtrl)
@@ -317,6 +356,12 @@ func main() {
 	// FRONTEND (STATIC FILE SERVING)
 	// Serve everything under /assets/* from /app/frontend/assets
 	r.Handle("/assets/*", http.StripPrefix("/assets/", http.FileServer(http.Dir("/app/frontend/assets"))))
+
+	// The carepartner app's web build, which the caregiver app frames as its screen
+	// preview. Registered before the caregiver catch-all below, which would take it.
+	carepartnerWeb := webapp.Carepartner(os.DirFS("/app/carepartner"))
+	r.Handle(webapp.CarepartnerPath, carepartnerWeb)
+	r.Handle(webapp.CarepartnerPath+"/*", carepartnerWeb)
 
 	// Catch-all for SPA (any other path serves index.html)
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {

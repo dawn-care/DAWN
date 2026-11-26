@@ -14,6 +14,9 @@ type AuthService struct {
 	Caregivers   *caregiver.CaregiverService
 	Carepartners *carepartner.CarepartnerService
 	Sessions     SessionService
+	// LoginCodes sends and checks emailed sign-in codes. main always sets it (WithLoginCodes);
+	// the server does not start without a working email setup.
+	LoginCodes LoginCodeService
 }
 
 func NewAuthService(
@@ -22,7 +25,42 @@ func NewAuthService(
 	carepartners *carepartner.CarepartnerService,
 	sessions SessionService,
 ) *AuthService {
-	return &AuthService{google, caregivers, carepartners, sessions}
+	return &AuthService{Google: google, Caregivers: caregivers, Carepartners: carepartners, Sessions: sessions}
+}
+
+// WithLoginCodes sets the service that sends and checks emailed sign-in codes
+func (a *AuthService) WithLoginCodes(codes LoginCodeService) *AuthService {
+	a.LoginCodes = codes
+	return a
+}
+
+// RequestEmailCode emails a sign-in code. It does the same whether or not the address has an
+// account, so it cannot be used to find out who has one.
+func (a *AuthService) RequestEmailCode(ctx context.Context, address, ip string) error {
+	return a.LoginCodes.RequestCode(ctx, address, ip)
+}
+
+// LoginWithEmailCode signs in the caregiver who owns the address, creating them if this is
+// their first sign-in, once the code is right. It returns the token for their cookie.
+// The code is used up only once the session exists, so if finding the caregiver or starting
+// the session fails, the same code can be entered again.
+func (a *AuthService) LoginWithEmailCode(ctx context.Context, address, code, ip string) (string, error) {
+	var token string
+	err := a.LoginCodes.VerifyCode(ctx, address, code, ip, func() error {
+		user, err := a.Caregivers.FindOrCreateFromEmail(address)
+		if err != nil {
+			return fmt.Errorf("finding or creating the caregiver for email sign-in: %w", err)
+		}
+		token, err = a.StartSession(ctx, user.ID)
+		if err != nil {
+			return fmt.Errorf("starting a session for caregiver %d: %w", user.ID, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return token, nil
 }
 
 // ErrGoogleTokenRejected means Google did not accept the ID token, so the login is refused (401).

@@ -235,6 +235,14 @@ func TestDetectMimeType(t *testing.T) {
 	assert.Equal(t, "video/quicktime", detectMimeType("video", []byte("\x00\x00\x00\x14ftypqt  "), ".mov"))
 	assert.Equal(t, "", detectMimeType("photo", mp3, ".png"), "the extension can't make an mp3 a photo")
 	assert.Equal(t, "", detectMimeType("gif", png, ".png"))
+
+	// Recordings: a WebM or Ogg file is sniffed as video/webm or application/ogg, and is audio when sent as audio
+	webm := append([]byte("\x1A\x45\xDF\xA3"), make([]byte, 20)...)
+	ogg := append([]byte("OggS\x00"), make([]byte, 20)...)
+	assert.Equal(t, "video/webm", detectMimeType("video", webm, ".webm"))
+	assert.Equal(t, "audio/webm", detectMimeType("audio", webm, ".webm"), "a voice recording in WebM")
+	assert.Equal(t, "video/ogg", detectMimeType("video", ogg, ".ogv"))
+	assert.Equal(t, "audio/ogg", detectMimeType("audio", ogg, ".ogg"), "a voice recording in Ogg (Firefox)")
 }
 
 // ─────────────────────────────────────────────

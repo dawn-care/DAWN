@@ -1,7 +1,6 @@
 package weather
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,18 +8,14 @@ import (
 	"math"
 	"net/http"
 	neturl "net/url"
-	"regexp"
 	"time"
-
-	widgets "server/internal/models/widgets/weather"
 )
 
 // OpenWeatherBaseURL is where the OpenWeather API lives; tests point a service elsewhere
 const OpenWeatherBaseURL = "https://api.openweathermap.org"
 
-// Service struct
+// WeatherService fetches live weather for screen widgets.
 type WeatherService struct {
-	db      *sql.DB
 	apiKey  string
 	client  *http.Client
 	baseURL string
@@ -77,150 +72,12 @@ type WeatherOverviewResponse struct {
 	Message     string `json:"message"`
 }
 
-func NewWeatherService(db *sql.DB, apiKey string) *WeatherService {
+func NewWeatherService(apiKey string) *WeatherService {
 	return &WeatherService{
-		db:      db,
 		apiKey:  apiKey,
 		client:  &http.Client{Timeout: 10 * time.Second},
 		baseURL: OpenWeatherBaseURL,
 	}
-}
-
-// CREATE OPERATIONS
-
-/*
-Create a new weather widget module
-weather_widget - information inputted formatted as a WeatherWidget struct
-*/
-func (s *WeatherService) CreateWeatherWidget(weather_widget *widgets.WeatherWidget) error {
-	if weather_widget == nil {
-		return errors.New("WeatherWidget cannot be nil")
-	}
-	regex := `^\d{5}(?:[-\s]\d{4})?$`
-	match, _ := regexp.MatchString(regex, weather_widget.ZIPCODE)
-	if !match {
-		return errors.New("ZIPCODE must be in valid zip code format")
-	}
-	_, err := widgets.CreateWeather(s.db, weather_widget)
-	if err != nil {
-		return fmt.Errorf("failed to create weather widget: %v", err)
-	}
-	return nil
-}
-
-/*
-Create multiple weather widgets in bulk
-weather_widget - information inputted formatted as a WeatherWidget struct
-*/
-func (s *WeatherService) CreateWeatherWidgetsBulk(weather_widgets []widgets.WeatherWidget) error {
-	if len(weather_widgets) == 0 {
-		return errors.New("no weather widgets to create")
-	}
-
-	zipRegex := regexp.MustCompile(`^\d{5}(?:[-\s]\d{4})?$`)
-
-	for _, weather_widget := range weather_widgets {
-		if !zipRegex.MatchString(weather_widget.ZIPCODE) {
-			return errors.New("ZIPCODE must be in valid zip code format")
-		}
-	}
-
-	return widgets.CreateWeathersBulk(s.db, weather_widgets)
-}
-
-// RETRIEVE OPERATIONS
-
-/*
-Retrieve a weather widget by its ID
-id - The ID of the weather widget to retrieve
-*/
-func (s *WeatherService) GetWeatherWidgetByID(id int) (*widgets.WeatherWidget, error) {
-	if id <= 0 {
-		return nil, errors.New("invalid WeatherWidget ID")
-	}
-	weather_widget, err := widgets.GetWeatherByID(s.db, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get weatherwidget by id: %v", err)
-	}
-	if weather_widget == nil {
-		return nil, fmt.Errorf("WeatherWidget with ID %d not found", id)
-	}
-	return weather_widget, nil
-}
-
-/*
-Retrieve all weather widgets for given carepartner and caregiver
-carepartner_id - The carepartner ID associated with the weather widgets to retrieve
-caregiver_id - The caregiver ID associated with the weather widgets to retrieve
-*/
-func (s *WeatherService) GetWeatherWidgetsByCarepartnerAndCaregiver(carepartner_id int, caregiver_id int) ([]widgets.WeatherWidget, error) {
-	if carepartner_id <= 0 || caregiver_id <= 0 {
-		return nil, errors.New("invalid Carepartner ID or Caregiver ID")
-	}
-	return widgets.GetWeatherByCarepartnerAndCaregiver(s.db, carepartner_id, caregiver_id)
-}
-
-/*
-Retrieve all weather widgets for a carepartner on a given day
-carepartner_id - The carepartner ID associated with the weather widgets to retrieve
-day, month, year - The date to retrieve weather widgets for
-*/
-func (s *WeatherService) GetWeatherWidgetsByCarepartnerIDAndDay(carepartner_id int, day, month, year int) ([]widgets.WeatherWidget, error) {
-	if carepartner_id <= 0 {
-		return nil, errors.New("invalid Carepartner ID")
-	}
-	if day < 0 || month < 0 || year < 0 || day > 31 || month > 11 {
-		return nil, errors.New("invalid date parameters")
-	}
-	return widgets.GetWeatherByDayAndCarepartner(s.db, carepartner_id, day, month, year)
-}
-
-// UPDATE OPERATION
-
-/*
-Update an existing weather widget
-weather_widget - information inputted formatted as a WeatherWidget struct
-*/
-func (s *WeatherService) UpdateWeatherWidget(weather_widget *widgets.WeatherWidget) error {
-	if weather_widget == nil {
-		return errors.New("WeatherWidget cannot be nil")
-	}
-	if weather_widget.ID <= 0 {
-		return errors.New("invalid WeatherWidget ID")
-	}
-	return widgets.UpdateWeather(s.db, weather_widget)
-}
-
-// DELETE OPERATION
-
-/*
-Delete a weather widget by its ID
-id - The ID of the weather widget to delete
-*/
-func (s *WeatherService) DeleteWeatherWidget(id int) error {
-	if id <= 0 {
-		return errors.New("invalid WeatherWidget ID")
-	}
-	return widgets.DeleteWeather(s.db, id)
-}
-
-// ANALYTICS & STATS
-
-/*
-Get total number of weather widgets in the database for analytics purposes
-*/
-func (s *WeatherService) GetWeatherWidgetStats() (int, error) {
-	return widgets.GetWeatherStats(s.db)
-}
-
-// EXTERNAL API CALLS
-
-/*
-Gets the weather overview for an old WeatherWidget row (used by /api/weather/overview)
-weather_widget - weather widget containing the zipcode information
-*/
-func (s *WeatherService) GetWeatherOverview(weather_widget *widgets.WeatherWidget) (*WeatherOverviewResponse, error) {
-	return s.GetWeatherForZip(weather_widget.ZIPCODE)
 }
 
 /*
@@ -245,7 +102,7 @@ func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse,
 
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed geocode request: %v", err)
+		return nil, fmt.Errorf("failed geocode request: %w", redactURLErr(err))
 	}
 	defer resp.Body.Close()
 
@@ -268,7 +125,7 @@ func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse,
 
 	currentResp, err := s.client.Get(currentURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed current weather request: %v", err)
+		return nil, fmt.Errorf("failed current weather request: %w", redactURLErr(err))
 	}
 	defer currentResp.Body.Close()
 
@@ -319,11 +176,20 @@ func (s *WeatherService) GetWeatherForZip(zip string) (*WeatherOverviewResponse,
 	}, nil
 }
 
+// redactURLErr removes request URLs, which contain the OpenWeather API key.
+func redactURLErr(err error) error {
+	var urlErr *neturl.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
+}
+
 // getOverview fetches the day's weather overview text
 func (s *WeatherService) getOverview(url string) (*OneCallOverviewResponse, error) {
 	resp, err := s.client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed overview request: %v", err)
+		return nil, fmt.Errorf("failed overview request: %w", redactURLErr(err))
 	}
 	defer resp.Body.Close()
 

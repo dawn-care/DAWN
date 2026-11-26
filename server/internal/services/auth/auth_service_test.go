@@ -77,7 +77,7 @@ func TestLoginWithGoogle_ExistingCaregiverGetsASession(t *testing.T) {
 	svc, mock := newAuthService(t, fakeGoogle{user: &user.GoogleUser{ID: "g-1", Name: "Pat"}}, sessions)
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Caregiver"`)).
 		WithArgs("g-1").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "role", "google_id"}).AddRow(7, "Pat", "caregiver", "g-1"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "role", "google_id", "email"}).AddRow(7, "Pat", "caregiver", "g-1", nil))
 
 	token, err := svc.LoginWithGoogle(context.Background(), "id-token")
 
@@ -92,7 +92,7 @@ func TestLoginWithGoogle_NewCaregiverIsCreatedThenGetsASession(t *testing.T) {
 	svc, mock := newAuthService(t, fakeGoogle{user: &user.GoogleUser{ID: "g-2", Name: "Sam"}}, sessions)
 	mock.ExpectQuery(regexp.QuoteMeta(`FROM "Caregiver"`)).
 		WithArgs("g-2").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "role", "google_id"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "role", "google_id", "email"}))
 	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO "Caregiver"`)).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(12))
 
