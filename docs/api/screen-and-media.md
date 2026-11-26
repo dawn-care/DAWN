@@ -814,4 +814,4 @@ If this guide and the server ever disagree, the server is right; please update t
 | Tablet screen | `server/internal/routes/screen/` | `server/internal/services/screen/types.go` (the `/screen` response) |
 | Playback | `server/internal/routes/playback/playback.go` | `server/internal/models/playback/playback_model.go`, `server/internal/services/playback/playback_service.go` (source and status rules) |
 | Touch telemetry | `server/internal/routes/tablet_events/` | `server/internal/models/tablet_events/touch.go` (`TouchEvent`), `server/internal/services/tablet_events/touch_service.go` (field rules, which errors are `400`) |
-| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables; migration 6 moves widgets onto the grid and drops layout presets; migration 10 adds `TabletTouch`) |
+| Database | | `server/internal/migrations/sql/` (migration 3 creates these tables; migration 6 moves widgets onto the grid and drops layout presets; migration 11 adds `TabletTouch`) |
