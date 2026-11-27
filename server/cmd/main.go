@@ -25,6 +25,7 @@ import (
 	screenCtrlr "server/internal/controllers/screen"
 	screenSettingsCtrlr "server/internal/controllers/screen_settings"
 	screenWidgetsCtrlr "server/internal/controllers/screen_widgets"
+	tabletEventsCtrlr "server/internal/controllers/tablet_events"
 	caregiverCtrlr "server/internal/controllers/user/caregiver"
 	pairingCtrlr "server/internal/controllers/user/device_pairing"
 
@@ -40,6 +41,7 @@ import (
 	screenRts "server/internal/routes/screen"
 	screenSettingsRts "server/internal/routes/screen_settings"
 	screenWidgetsRts "server/internal/routes/screen_widgets"
+	tabletEventsRts "server/internal/routes/tablet_events"
 	caregiverRts "server/internal/routes/user"
 	pairingRts "server/internal/routes/user"
 	newsRts "server/internal/routes/widgets/news"
@@ -56,6 +58,7 @@ import (
 	screenSvc "server/internal/services/screen"
 	screenSettingsSvc "server/internal/services/screen_settings"
 	screenWidgetsSvc "server/internal/services/screen_widgets"
+	tabletEventsSvc "server/internal/services/tablet_events"
 	caregiverSvc "server/internal/services/user/caregiver"
 	pairingSvc "server/internal/services/user/device_pairing"
 	newsSvc "server/internal/services/widgets/news"
@@ -212,6 +215,7 @@ func main() {
 	configurationService := configurationSvc.NewConfigurationService(db)
 	exceptionService := exceptionSvc.NewExceptionService(db)
 	playbackService := playbackSvc.NewPlaybackService(db)
+	touchService := tabletEventsSvc.NewTouchService(db)
 
 	// Screen
 	screenSettingsService := screenSettingsSvc.NewScreenSettingsService(db)
@@ -255,6 +259,7 @@ func main() {
 	configurationCtrl := configurationCtrlr.NewConfigurationController(configurationService)
 	exceptionCtrl := exceptionCtrlr.NewExceptionController(exceptionService)
 	playbackCtrl := playbackCtrlr.NewPlaybackController(playbackService, tabletHub)
+	touchCtrl := tabletEventsCtrlr.NewTouchController(touchService)
 	realtimeCtrl := realtimeCtrlr.NewRealtimeController(playbackService, carepartnerService, tabletHub, []string{
 		// Browser origins allowed to open a tablet WebSocket (the tablet's web build
 		// in development). The native Android app sends no Origin header.
@@ -321,6 +326,7 @@ func main() {
 	exceptionRts.RegisterExceptionRoutes(r, exceptionCtrl)
 	playbackRts.RegisterPlaybackRoutes(r, playbackCtrl)
 	realtimeRts.RegisterRealtimeRoutes(r, realtimeCtrl)
+	tabletEventsRts.RegisterTabletEventRoutes(r, touchCtrl)
 
 	// Screen
 	screenSettingsRts.RegisterScreenSettingsRoutes(r, screenSettingsCtrl)

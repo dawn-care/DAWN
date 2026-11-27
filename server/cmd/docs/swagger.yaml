@@ -552,6 +552,36 @@ definitions:
       type:
         type: string
     type: object
+  tablet_events.RecordTouchesRequest:
+    properties:
+      carepartner_id:
+        type: integer
+      events:
+        items:
+          $ref: '#/definitions/tablet_events.TouchEvent'
+        type: array
+    type: object
+  tablet_events.TouchEvent:
+    properties:
+      count:
+        type: integer
+      first_at:
+        type: string
+      gesture:
+        type: string
+      last_at:
+        type: string
+      media_kind:
+        type: string
+      screen:
+        type: string
+      target_type:
+        type: string
+      widget_id:
+        type: string
+      widget_type:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
@@ -3006,6 +3036,40 @@ paths:
       summary: Replace a carepartner's screen settings
       tags:
       - screen-settings
+  /tablet-events/touches:
+    post:
+      consumes:
+      - application/json
+      description: The tablet sends the touches it recorded about once a minute, at
+        most 50 events per request; quick repeats on the same thing are one event
+        with a count. The whole batch is stored, or none of it. Unknown fields are
+        rejected. 400 means the batch can never be stored and the tablet drops it;
+        5xx means it should retry, and a resent batch is not stored twice.
+      parameters:
+      - description: Touch events; first_at and last_at are RFC 3339
+        in: body
+        name: batch
+        required: true
+        schema:
+          $ref: '#/definitions/tablet_events.RecordTouchesRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Store a batch of the resident's touches
+      tags:
+      - tablet-events
   /widgets/sports/teams:
     get:
       description: 'A sports widget''s config is {"league": <league id>, "team": <team
