@@ -18,7 +18,9 @@ CREATE TABLE "TabletTouch" (
   "screen" text NOT NULL CHECK ("screen" IN ('always_on', 'default', 'night', 'playing')),
   -- NULL when the screen has nothing to name under the finger, such as the night screen
   "target_type" text CHECK ("target_type" IN ('widget', 'empty', 'media')),
-  "widget_type" text CHECK ("widget_type" IN ('photo', 'message', 'reminder', 'weather', 'sports', 'news')),
+  -- No list of types here: ValidateTouch checks it against the screen layout's types
+  -- in Go, so old touches never stop a retired widget type from being removed
+  "widget_type" text,
   -- The ScreenWidget id as the tablet sent it
   "widget_id" text CHECK ("widget_id" ~ '^[1-9][0-9]{0,9}$'),
   "media_kind" text CHECK ("media_kind" IN ('video', 'audio', 'photo')),

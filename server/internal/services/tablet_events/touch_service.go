@@ -40,7 +40,8 @@ func invalid(format string, args ...any) error {
 
 /*
 ValidateTouch checks one event against the same rules as the CHECK constraints on
-"TabletTouch", so a bad batch is refused before any query runs. Widget fields only
+"TabletTouch", so a bad batch is refused before any query runs, plus one the table
+leaves out: widget_type must be one of the screen layout's types. Widget fields only
 for a widget, media_kind only for media, and none of them for an empty cell or when
 there is no target.
 */
